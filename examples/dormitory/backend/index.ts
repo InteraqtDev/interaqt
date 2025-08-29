@@ -160,8 +160,7 @@ export const PointDeduction = Entity.create({
     }),
     Property.create({
       name: 'isDeleted',
-      type: 'boolean',
-      defaultValue: () => false
+      type: 'boolean'
     })
   ]
 })
@@ -416,6 +415,19 @@ export const DeleteUserInteraction = Interaction.create({
     items: [
       PayloadItem.create({
         name: 'userId',
+        required: true
+      })
+    ]
+  })
+})
+
+export const DeletePointDeductionInteraction = Interaction.create({
+  name: 'deletePointDeduction',
+  action: Action.create({ name: 'delete' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'deductionId',
         required: true
       })
     ]
@@ -835,6 +847,7 @@ export const interactions = [
   CreateUserInteraction,
   UpdateUserInteraction,
   DeleteUserInteraction,
+  DeletePointDeductionInteraction,
   CreateDormitoryInteraction,
   UpdateDormitoryInteraction,
   DeleteDormitoryInteraction,
@@ -1516,4 +1529,30 @@ Bed.properties.find(p => p.name === 'isDeleted').computation = StateMachine.crea
     })
   ],
   defaultState: bedIsDeletedActiveState
+})
+
+// PointDeduction.isDeleted StateMachine computation
+const pointDeductionIsDeletedActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => false
+});
+
+const pointDeductionIsDeletedDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+});
+
+PointDeduction.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [pointDeductionIsDeletedActiveState, pointDeductionIsDeletedDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeletePointDeductionInteraction,
+      current: pointDeductionIsDeletedActiveState,
+      next: pointDeductionIsDeletedDeletedState,
+      computeTarget: (event) => ({
+        id: event.payload.deductionId
+      })
+    })
+  ],
+  defaultState: pointDeductionIsDeletedActiveState
 })

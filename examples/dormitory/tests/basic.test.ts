@@ -3983,4 +3983,82 @@ describe('Basic Functionality', () => {
     expect(deduction.deductedAt).toBeGreaterThan(1600000000) // After year 2020
     expect(deduction.deductedAt).toBeLessThan(2000000000)    // Before year 2033
   })
+
+  test('PointDeduction.isDeleted StateMachine computation', async () => {
+    /**
+     * Test Plan for: PointDeduction.isDeleted
+     * Dependencies: PointDeduction entity, DeletePointDeductionInteraction
+     * Steps: 1) Create point deduction 2) Verify isDeleted is false 3) Delete deduction 4) Verify isDeleted is true
+     * Business Logic: PointDeduction.isDeleted is set to true by DeletePointDeduction interaction (admin only for error correction)
+     */
+    
+    // Step 1: Create a user first (needed for point deduction)
+    const user = await system.storage.create('User', {
+      name: 'Test User',
+      email: 'test@example.com',
+      studentId: 'STU001',
+      phone: '123456789',
+      points: 100,
+      role: 'user',
+      createdAt: Math.floor(Date.now() / 1000),
+      updatedAt: Math.floor(Date.now() / 1000),
+      isDeleted: false
+    })
+
+    // Step 2: Create a deduction rule
+    const rule = await system.storage.create('DeductionRule', {
+      name: 'Late Return',
+      description: 'Late return from dormitory',
+      points: 10,
+      isActive: true,
+      createdAt: Math.floor(Date.now() / 1000),
+      updatedAt: Math.floor(Date.now() / 1000),
+      isDeleted: false
+    })
+
+    // Step 3: Apply point deduction to create a PointDeduction
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' }, // Admin user applying the deduction
+      payload: {
+        targetUserId: user.id,
+        ruleId: rule.id,
+        reason: 'Late return from dormitory'
+      }
+    })
+
+    // Should succeed
+    expect(deductionResult.error).toBeUndefined()
+
+    // Find the created point deduction
+    const deduction = await system.storage.findOne(
+      'PointDeduction',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Late return from dormitory'] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+
+    expect(deduction).toBeTruthy()
+    expect(deduction.isDeleted).toBe(false)
+
+    // Step 4: Delete the point deduction
+    const deleteResult = await controller.callInteraction('deletePointDeduction', {
+      user: { id: 'admin' }, // Admin user deleting the deduction for error correction
+      payload: {
+        deductionId: deduction.id
+      }
+    })
+
+    // Should succeed
+    expect(deleteResult.error).toBeUndefined()
+
+    // Step 5: Verify point deduction is marked as deleted
+    const deletedDeduction = await system.storage.findOne(
+      'PointDeduction',
+      MatchExp.atom({ key: 'id', value: ['=', deduction.id] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+
+    expect(deletedDeduction.isDeleted).toBe(true)
+  })
 }) 
