@@ -459,7 +459,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.capacity",

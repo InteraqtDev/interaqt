@@ -1313,3 +1313,32 @@ Dormitory.properties.find(p => p.name === 'name').computation = StateMachine.cre
   ],
   defaultState: dormitoryNameDefaultState
 })
+
+// Dormitory.location StateMachine computation
+const dormitoryLocationDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createDormitory') {
+      return event.payload.location;
+    }
+    if (event && event.interactionName === 'updateDormitory' && event.payload.location !== undefined) {
+      return event.payload.location;
+    }
+    return lastValue;
+  }
+});
+
+Dormitory.properties.find(p => p.name === 'location').computation = StateMachine.create({
+  states: [dormitoryLocationDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitoryInteraction,
+      current: dormitoryLocationDefaultState,
+      next: dormitoryLocationDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.dormitoryId
+      })
+    })
+  ],
+  defaultState: dormitoryLocationDefaultState
+})
