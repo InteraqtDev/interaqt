@@ -1,0 +1,907 @@
+{
+  "entities": [
+    {
+      "name": "User",
+      "entityAnalysis": {
+        "purpose": "System users with different roles (admin, dormitoryLeader, user) managing dormitory operations",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["CreateUser"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "soft-delete",
+            "deletionInteractions": ["DeleteUser"]
+          }
+        },
+        "computationDecision": "Transform",
+        "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
+        "calculationMethod": "Independently created by CreateUser interaction with admin privileges"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": null,
+          "calculationMethod": "auto-generated"
+        },
+        {
+          "propertyName": "name",
+          "type": "string",
+          "purpose": "User's display name",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "UpdateUser"],
+          "calculationMethod": "Direct assignment from interactions"
+        },
+        {
+          "propertyName": "email",
+          "type": "string",
+          "purpose": "Unique email identifier and contact",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions with uniqueness validation",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "UpdateUser"],
+          "calculationMethod": "Direct assignment from interactions with uniqueness validation"
+        },
+        {
+          "propertyName": "studentId",
+          "type": "string",
+          "purpose": "Unique student identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["CreateUser"],
+          "calculationMethod": "Set once at creation, immutable thereafter"
+        },
+        {
+          "propertyName": "phone",
+          "type": "string",
+          "purpose": "Contact phone number",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "UpdateUser"],
+          "calculationMethod": "Direct assignment from interactions"
+        },
+        {
+          "propertyName": "points",
+          "type": "number",
+          "purpose": "Current point total, decreases with violations",
+          "controlType": "independent",
+          "dataSource": "Starts at 100, automatically calculated as 100 minus sum of all active point deductions for this user",
+          "computationDecision": "Custom",
+          "reasoning": "controlType is independent, has dataDependencies with relations and complex calculation involving initial value and aggregation",
+          "dependencies": ["UserPointDeductionRelation", "PointDeduction.points"],
+          "interactionDependencies": ["CreateUser"],
+          "calculationMethod": "Starts at 100, automatically calculated as 100 minus sum of all active point deductions for this user"
+        },
+        {
+          "propertyName": "role",
+          "type": "string",
+          "purpose": "User role (admin, dormitoryLeader, user)",
+          "controlType": "independent",
+          "dataSource": "Set to 'dormitoryLeader' by AssignDormitoryLeader, otherwise directly assigned",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateUser", "AssignDormitoryLeader"],
+          "calculationMethod": "Set to 'dormitoryLeader' by AssignDormitoryLeader, otherwise directly assigned"
+        },
+        {
+          "propertyName": "createdAt",
+          "type": "number",
+          "purpose": "Timestamp of user creation",
+          "controlType": "creation-only",
+          "dataSource": "Set to current timestamp when CreateUser interaction occurs",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["CreateUser"],
+          "calculationMethod": "Set to current timestamp when CreateUser interaction occurs"
+        },
+        {
+          "propertyName": "updatedAt",
+          "type": "number",
+          "purpose": "Timestamp of last update",
+          "controlType": "independent",
+          "dataSource": "Automatically updated to current timestamp on any modification",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["UpdateUser", "AssignDormitoryLeader"],
+          "calculationMethod": "Automatically updated to current timestamp on any modification"
+        },
+        {
+          "propertyName": "isDeleted",
+          "type": "boolean",
+          "purpose": "Soft deletion flag for audit purposes",
+          "controlType": "independent",
+          "dataSource": "Set to true by DeleteUser interaction",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["DeleteUser"],
+          "calculationMethod": "Set to true by DeleteUser interaction"
+        }
+      ]
+    },
+    {
+      "name": "Dormitory",
+      "entityAnalysis": {
+        "purpose": "Dormitory buildings containing beds for student accommodation",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["CreateDormitory"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "soft-delete",
+            "deletionInteractions": ["DeleteDormitory"]
+          }
+        },
+        "computationDecision": "Transform",
+        "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
+        "calculationMethod": "Independently created by CreateDormitory interaction with admin privileges"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": null,
+          "calculationMethod": "auto-generated"
+        },
+        {
+          "propertyName": "name",
+          "type": "string",
+          "purpose": "Dormitory name identifier",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions with uniqueness validation",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
+          "calculationMethod": "Direct assignment from interactions with uniqueness validation"
+        },
+        {
+          "propertyName": "location",
+          "type": "string",
+          "purpose": "Physical location description",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
+          "calculationMethod": "Direct assignment from interactions"
+        },
+        {
+          "propertyName": "capacity",
+          "type": "number",
+          "purpose": "Maximum number of beds (4-6)",
+          "controlType": "independent",
+          "dataSource": "Direct assignment with range validation (4-6) and occupancy constraint",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDormitory", "UpdateDormitory"],
+          "calculationMethod": "Direct assignment with range validation (4-6) and occupancy constraint"
+        },
+        {
+          "propertyName": "currentOccupancy",
+          "type": "number",
+          "purpose": "Current number of occupied beds",
+          "controlType": "independent",
+          "dataSource": "Count of UserBedAssignmentRelation where bed belongs to this dormitory",
+          "computationDecision": "Count",
+          "reasoning": "controlType is independent, has dataDependencies with relations, and computationMethod contains 'count of'",
+          "dependencies": ["DormitoryBedRelation", "UserBedAssignmentRelation"],
+          "interactionDependencies": [],
+          "calculationMethod": "Count of UserBedAssignmentRelation where bed belongs to this dormitory"
+        },
+        {
+          "propertyName": "createdAt",
+          "type": "number",
+          "purpose": "Timestamp of dormitory creation",
+          "controlType": "creation-only",
+          "dataSource": "Set to current timestamp when CreateDormitory interaction occurs",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["CreateDormitory"],
+          "calculationMethod": "Set to current timestamp when CreateDormitory interaction occurs"
+        },
+        {
+          "propertyName": "updatedAt",
+          "type": "number",
+          "purpose": "Timestamp of last update",
+          "controlType": "independent",
+          "dataSource": "Automatically updated to current timestamp on any modification",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["UpdateDormitory"],
+          "calculationMethod": "Automatically updated to current timestamp on any modification"
+        },
+        {
+          "propertyName": "isDeleted",
+          "type": "boolean",
+          "purpose": "Soft deletion flag for audit purposes",
+          "controlType": "independent",
+          "dataSource": "Set to true by DeleteDormitory interaction, requires currentOccupancy = 0",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["DeleteDormitory"],
+          "calculationMethod": "Set to true by DeleteDormitory interaction, requires currentOccupancy = 0"
+        }
+      ]
+    },
+    {
+      "name": "Bed",
+      "entityAnalysis": {
+        "purpose": "Individual bed units within dormitories for user assignment",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["CreateBed"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "soft-delete",
+            "deletionInteractions": ["DeleteBed"]
+          }
+        },
+        "computationDecision": "Transform",
+        "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
+        "calculationMethod": "Created by CreateBed interaction within a specific dormitory"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": null,
+          "calculationMethod": "auto-generated"
+        },
+        {
+          "propertyName": "number",
+          "type": "string",
+          "purpose": "Bed identifier within dormitory (e.g., A1, B2)",
+          "controlType": "independent",
+          "dataSource": "Direct assignment with uniqueness validation within dormitory",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateBed", "UpdateBed"],
+          "calculationMethod": "Direct assignment with uniqueness validation within dormitory"
+        },
+        {
+          "propertyName": "status",
+          "type": "string",
+          "purpose": "Bed occupancy status (vacant, occupied)",
+          "controlType": "independent",
+          "dataSource": "Automatically determined: 'occupied' if UserBedAssignmentRelation exists for this bed, otherwise 'vacant'",
+          "computationDecision": "Custom",
+          "reasoning": "controlType is independent, has dataDependencies with relations, and involves conditional logic based on existence of relation",
+          "dependencies": ["UserBedAssignmentRelation"],
+          "interactionDependencies": [],
+          "calculationMethod": "Automatically determined: 'occupied' if UserBedAssignmentRelation exists for this bed, otherwise 'vacant'"
+        },
+        {
+          "propertyName": "createdAt",
+          "type": "number",
+          "purpose": "Timestamp of bed creation",
+          "controlType": "creation-only",
+          "dataSource": "Set to current timestamp when CreateBed interaction occurs",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["CreateBed"],
+          "calculationMethod": "Set to current timestamp when CreateBed interaction occurs"
+        },
+        {
+          "propertyName": "updatedAt",
+          "type": "number",
+          "purpose": "Timestamp of last update",
+          "controlType": "independent",
+          "dataSource": "Automatically updated to current timestamp on any modification",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["UpdateBed"],
+          "calculationMethod": "Automatically updated to current timestamp on any modification"
+        },
+        {
+          "propertyName": "isDeleted",
+          "type": "boolean",
+          "purpose": "Soft deletion flag for audit purposes",
+          "controlType": "independent",
+          "dataSource": "Set to true by DeleteBed interaction, requires status = 'vacant'",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["DeleteBed"],
+          "calculationMethod": "Set to true by DeleteBed interaction, requires status = 'vacant'"
+        }
+      ]
+    },
+    {
+      "name": "PointDeduction",
+      "entityAnalysis": {
+        "purpose": "Records of point deductions applied to users for policy violations",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["ApplyPointDeduction"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "soft-delete",
+            "deletionInteractions": ["DeletePointDeduction"]
+          }
+        },
+        "computationDecision": "Transform",
+        "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
+        "calculationMethod": "Created by ApplyPointDeduction interaction linking user, rule, and deduction details"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": null,
+          "calculationMethod": "auto-generated"
+        },
+        {
+          "propertyName": "reason",
+          "type": "string",
+          "purpose": "Specific reason for the point deduction",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation for audit trail integrity",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["ApplyPointDeduction"],
+          "calculationMethod": "Set once at creation for audit trail integrity"
+        },
+        {
+          "propertyName": "points",
+          "type": "number",
+          "purpose": "Number of points deducted (positive value)",
+          "controlType": "creation-only",
+          "dataSource": "Set from the referenced DeductionRule.points at time of creation",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": ["DeductionRule"],
+          "interactionDependencies": ["ApplyPointDeduction"],
+          "calculationMethod": "Set from the referenced DeductionRule.points at time of creation"
+        },
+        {
+          "propertyName": "deductedAt",
+          "type": "number",
+          "purpose": "Timestamp when deduction was applied",
+          "controlType": "creation-only",
+          "dataSource": "Set to current timestamp when ApplyPointDeduction interaction occurs",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["ApplyPointDeduction"],
+          "calculationMethod": "Set to current timestamp when ApplyPointDeduction interaction occurs"
+        },
+        {
+          "propertyName": "isDeleted",
+          "type": "boolean",
+          "purpose": "Soft deletion flag for administrative error correction",
+          "controlType": "independent",
+          "dataSource": "Set to true by DeletePointDeduction interaction (admin only for error correction)",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["DeletePointDeduction"],
+          "calculationMethod": "Set to true by DeletePointDeduction interaction (admin only for error correction)"
+        }
+      ]
+    },
+    {
+      "name": "RemovalRequest",
+      "entityAnalysis": {
+        "purpose": "Requests by dormitory leaders to remove problematic residents, requiring admin approval",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["SubmitRemovalRequest"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "soft-delete",
+            "deletionInteractions": ["DeleteRemovalRequest"]
+          }
+        },
+        "computationDecision": "Transform",
+        "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
+        "calculationMethod": "Created by SubmitRemovalRequest interaction from dormitory leaders"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": null,
+          "calculationMethod": "auto-generated"
+        },
+        {
+          "propertyName": "reason",
+          "type": "string",
+          "purpose": "Justification for removal request",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation for request integrity",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["SubmitRemovalRequest"],
+          "calculationMethod": "Set once at creation for request integrity"
+        },
+        {
+          "propertyName": "status",
+          "type": "string",
+          "purpose": "Current request status (pending, approved, rejected)",
+          "controlType": "independent",
+          "dataSource": "Set to 'pending' at creation, modified by ProcessRemovalRequest to 'approved' or 'rejected'",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property with defined state transitions",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["SubmitRemovalRequest", "ProcessRemovalRequest"],
+          "calculationMethod": "Set to 'pending' at creation, modified by ProcessRemovalRequest to 'approved' or 'rejected'"
+        },
+        {
+          "propertyName": "requestedAt",
+          "type": "number",
+          "purpose": "Timestamp when request was submitted",
+          "controlType": "creation-only",
+          "dataSource": "Set to current timestamp when SubmitRemovalRequest interaction occurs",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["SubmitRemovalRequest"],
+          "calculationMethod": "Set to current timestamp when SubmitRemovalRequest interaction occurs"
+        },
+        {
+          "propertyName": "processedAt",
+          "type": "number",
+          "purpose": "Timestamp when request was processed by admin",
+          "controlType": "independent",
+          "dataSource": "Set to current timestamp when ProcessRemovalRequest changes status from pending",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["ProcessRemovalRequest"],
+          "calculationMethod": "Set to current timestamp when ProcessRemovalRequest changes status from pending"
+        },
+        {
+          "propertyName": "adminComment",
+          "type": "string",
+          "purpose": "Admin's notes on the decision",
+          "controlType": "independent",
+          "dataSource": "Set by ProcessRemovalRequest when admin provides decision comments",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["ProcessRemovalRequest"],
+          "calculationMethod": "Set by ProcessRemovalRequest when admin provides decision comments"
+        },
+        {
+          "propertyName": "isDeleted",
+          "type": "boolean",
+          "purpose": "Soft deletion flag for administrative cleanup",
+          "controlType": "independent",
+          "dataSource": "Set to true by DeleteRemovalRequest interaction",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["DeleteRemovalRequest"],
+          "calculationMethod": "Set to true by DeleteRemovalRequest interaction"
+        }
+      ]
+    },
+    {
+      "name": "DeductionRule",
+      "entityAnalysis": {
+        "purpose": "Predefined rules for point deductions with associated point values and descriptions",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["CreateDeductionRule"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "soft-delete",
+            "deletionInteractions": ["DeleteDeductionRule"]
+          }
+        },
+        "computationDecision": "Transform",
+        "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
+        "calculationMethod": "Independently created by CreateDeductionRule interaction with admin privileges"
+      },
+      "propertyAnalysis": [
+        {
+          "propertyName": "id",
+          "type": "string",
+          "purpose": "System-generated unique identifier",
+          "controlType": "creation-only",
+          "dataSource": "Set once at creation, immutable thereafter",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": null,
+          "calculationMethod": "auto-generated"
+        },
+        {
+          "propertyName": "name",
+          "type": "string",
+          "purpose": "Rule name identifier",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions with uniqueness validation",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDeductionRule", "UpdateDeductionRule"],
+          "calculationMethod": "Direct assignment from interactions with uniqueness validation"
+        },
+        {
+          "propertyName": "description",
+          "type": "string",
+          "purpose": "Detailed description of the rule",
+          "controlType": "independent",
+          "dataSource": "Direct assignment from interactions",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDeductionRule", "UpdateDeductionRule"],
+          "calculationMethod": "Direct assignment from interactions"
+        },
+        {
+          "propertyName": "points",
+          "type": "number",
+          "purpose": "Point deduction amount (positive number)",
+          "controlType": "independent",
+          "dataSource": "Direct assignment with positive number validation, affects future deductions only",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDeductionRule", "UpdateDeductionRule"],
+          "calculationMethod": "Direct assignment with positive number validation, affects future deductions only"
+        },
+        {
+          "propertyName": "isActive",
+          "type": "boolean",
+          "purpose": "Whether rule can be applied for new deductions",
+          "controlType": "independent",
+          "dataSource": "Set by admin interactions to enable/disable rule application",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["CreateDeductionRule", "UpdateDeductionRule", "DeactivateDeductionRule"],
+          "calculationMethod": "Set by admin interactions to enable/disable rule application"
+        },
+        {
+          "propertyName": "createdAt",
+          "type": "number",
+          "purpose": "Timestamp of rule creation",
+          "controlType": "creation-only",
+          "dataSource": "Set to current timestamp when CreateDeductionRule interaction occurs",
+          "computationDecision": "_owner",
+          "reasoning": "controlType is creation-only, so property is controlled by entity creation",
+          "dependencies": null,
+          "interactionDependencies": ["CreateDeductionRule"],
+          "calculationMethod": "Set to current timestamp when CreateDeductionRule interaction occurs"
+        },
+        {
+          "propertyName": "updatedAt",
+          "type": "number",
+          "purpose": "Timestamp of last update",
+          "controlType": "independent",
+          "dataSource": "Automatically updated to current timestamp on any modification",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["UpdateDeductionRule", "DeactivateDeductionRule"],
+          "calculationMethod": "Automatically updated to current timestamp on any modification"
+        },
+        {
+          "propertyName": "isDeleted",
+          "type": "boolean",
+          "purpose": "Soft deletion flag for rule retirement",
+          "controlType": "independent",
+          "dataSource": "Set to true by DeleteDeductionRule interaction",
+          "computationDecision": "StateMachine",
+          "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
+          "dependencies": ["InteractionEventEntity"],
+          "interactionDependencies": ["DeleteDeductionRule"],
+          "calculationMethod": "Set to true by DeleteDeductionRule interaction"
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "name": "UserDormitoryLeaderRelation",
+      "relationAnalysis": {
+        "purpose": "Links dormitory leaders to their managed dormitory",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["AssignDormitoryLeader"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "hard-delete",
+            "deletionInteractions": ["RemoveDormitoryLeader", "DeleteUser"]
+          }
+        },
+        "computationDecision": "StateMachine",
+        "reasoning": "interaction-created relation with hard-delete capability requires StateMachine for both creation and deletion",
+        "calculationMethod": "Created by AssignDormitoryLeader interaction when admin assigns leadership"
+      }
+    },
+    {
+      "name": "UserBedAssignmentRelation",
+      "relationAnalysis": {
+        "purpose": "Assigns users to specific beds in dormitories",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["AssignUserToBed"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "hard-delete",
+            "deletionInteractions": ["RemoveUserFromBed", "DeleteUser"]
+          }
+        },
+        "computationDecision": "StateMachine",
+        "reasoning": "interaction-created relation with hard-delete capability requires StateMachine for both creation and deletion",
+        "calculationMethod": "Created by AssignUserToBed interaction ensuring single assignment per user"
+      }
+    },
+    {
+      "name": "DormitoryBedRelation",
+      "relationAnalysis": {
+        "purpose": "Links beds to their parent dormitory",
+        "lifecycle": {
+          "creation": {
+            "type": "created-with-entity",
+            "parent": "Bed",
+            "creationInteractions": ["CreateBed"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "auto-delete",
+            "deletionInteractions": ["DeleteBed", "DeleteDormitory"]
+          }
+        },
+        "computationDecision": "_parent:Bed",
+        "reasoning": "creation type is created-with-entity, so relation is created by parent Bed entity's computation",
+        "calculationMethod": "Created together with Bed entity by CreateBed interaction"
+      }
+    },
+    {
+      "name": "UserPointDeductionRelation",
+      "relationAnalysis": {
+        "purpose": "Links point deductions to the users who received them",
+        "lifecycle": {
+          "creation": {
+            "type": "created-with-entity",
+            "parent": "PointDeduction",
+            "creationInteractions": ["ApplyPointDeduction"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "auto-delete",
+            "deletionInteractions": ["DeletePointDeduction", "DeleteUser"]
+          }
+        },
+        "computationDecision": "_parent:PointDeduction",
+        "reasoning": "creation type is created-with-entity, so relation is created by parent PointDeduction entity's computation",
+        "calculationMethod": "Created together with PointDeduction entity by ApplyPointDeduction interaction"
+      }
+    },
+    {
+      "name": "UserRemovalRequestTargetRelation",
+      "relationAnalysis": {
+        "purpose": "Links removal requests to the target users requested for removal",
+        "lifecycle": {
+          "creation": {
+            "type": "created-with-entity",
+            "parent": "RemovalRequest",
+            "creationInteractions": ["SubmitRemovalRequest"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "auto-delete",
+            "deletionInteractions": ["DeleteRemovalRequest", "DeleteUser"]
+          }
+        },
+        "computationDecision": "_parent:RemovalRequest",
+        "reasoning": "creation type is created-with-entity, so relation is created by parent RemovalRequest entity's computation",
+        "calculationMethod": "Created together with RemovalRequest entity by SubmitRemovalRequest interaction"
+      }
+    },
+    {
+      "name": "UserRemovalRequestRequesterRelation",
+      "relationAnalysis": {
+        "purpose": "Links removal requests to the dormitory leaders who submitted them",
+        "lifecycle": {
+          "creation": {
+            "type": "created-with-entity",
+            "parent": "RemovalRequest",
+            "creationInteractions": ["SubmitRemovalRequest"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "auto-delete",
+            "deletionInteractions": ["DeleteRemovalRequest", "DeleteUser"]
+          }
+        },
+        "computationDecision": "_parent:RemovalRequest",
+        "reasoning": "creation type is created-with-entity, so relation is created by parent RemovalRequest entity's computation",
+        "calculationMethod": "Created together with RemovalRequest entity by SubmitRemovalRequest interaction"
+      }
+    },
+    {
+      "name": "UserRemovalRequestProcessorRelation",
+      "relationAnalysis": {
+        "purpose": "Links removal requests to the admins who processed them",
+        "lifecycle": {
+          "creation": {
+            "type": "interaction-created",
+            "parent": null,
+            "creationInteractions": ["ProcessRemovalRequest"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "auto-delete",
+            "deletionInteractions": ["DeleteRemovalRequest", "DeleteUser"]
+          }
+        },
+        "computationDecision": "StateMachine",
+        "reasoning": "interaction-created relation with auto-delete capability requires StateMachine for creation",
+        "calculationMethod": "Created by ProcessRemovalRequest interaction when admin processes a request"
+      }
+    },
+    {
+      "name": "DeductionRuleApplicationRelation",
+      "relationAnalysis": {
+        "purpose": "Links point deductions to the rules they were based on",
+        "lifecycle": {
+          "creation": {
+            "type": "created-with-entity",
+            "parent": "PointDeduction",
+            "creationInteractions": ["ApplyPointDeduction"]
+          },
+          "deletion": {
+            "canBeDeleted": true,
+            "deletionType": "auto-delete",
+            "deletionInteractions": ["DeletePointDeduction"]
+          }
+        },
+        "computationDecision": "_parent:PointDeduction",
+        "reasoning": "creation type is created-with-entity, so relation is created by parent PointDeduction entity's computation",
+        "calculationMethod": "Created together with PointDeduction entity by ApplyPointDeduction interaction"
+      }
+    }
+  ],
+  "dictionaries": [
+    {
+      "name": "systemUserCount",
+      "dictionaryAnalysis": {
+        "purpose": "Track total number of active users in the system",
+        "type": "number",
+        "collection": false,
+        "computationDecision": "StateMachine",
+        "reasoning": "has interactionDependencies that modify the count value directly",
+        "dependencies": [],
+        "interactionDependencies": ["CreateUser", "DeleteUser"],
+        "calculationMethod": "Incremented by 1 on CreateUser, decremented by 1 on DeleteUser (soft delete sets isDeleted=true)"
+      }
+    },
+    {
+      "name": "totalDormitoryCapacity",
+      "dictionaryAnalysis": {
+        "purpose": "Track total bed capacity across all active dormitories",
+        "type": "number",
+        "collection": false,
+        "computationDecision": "Summation",
+        "reasoning": "computationMethod contains 'summation of' for aggregating capacity values",
+        "dependencies": ["Dormitory.capacity"],
+        "interactionDependencies": [],
+        "calculationMethod": "Summation of Dormitory.capacity where Dormitory.isDeleted = false"
+      }
+    },
+    {
+      "name": "totalOccupiedBeds",
+      "dictionaryAnalysis": {
+        "purpose": "Track total number of currently occupied beds system-wide",
+        "type": "number",
+        "collection": false,
+        "computationDecision": "Count",
+        "reasoning": "computationMethod contains 'count of' for counting relation records",
+        "dependencies": ["UserBedAssignmentRelation"],
+        "interactionDependencies": [],
+        "calculationMethod": "Count of active UserBedAssignmentRelation records"
+      }
+    },
+    {
+      "name": "systemOccupancyRate",
+      "dictionaryAnalysis": {
+        "purpose": "Calculate system-wide occupancy percentage",
+        "type": "number",
+        "collection": false,
+        "computationDecision": "Custom",
+        "reasoning": "involves complex calculation with percentage logic and division of dictionary values",
+        "dependencies": ["totalOccupiedBeds", "totalDormitoryCapacity"],
+        "interactionDependencies": [],
+        "calculationMethod": "Custom: (totalOccupiedBeds / totalDormitoryCapacity) * 100, or 0 if totalDormitoryCapacity is 0"
+      }
+    },
+    {
+      "name": "pendingRemovalRequestCount",
+      "dictionaryAnalysis": {
+        "purpose": "Track number of pending removal requests requiring admin attention",
+        "type": "number",
+        "collection": false,
+        "computationDecision": "Count",
+        "reasoning": "computationMethod contains 'count of' with filter condition",
+        "dependencies": ["RemovalRequest.status"],
+        "interactionDependencies": [],
+        "calculationMethod": "Count of RemovalRequest where status = 'pending' and isDeleted = false"
+      }
+    }
+  ]
+}
