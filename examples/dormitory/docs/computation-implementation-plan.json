@@ -285,7 +285,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Direct assignment from interactions with uniqueness validation",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.studentId",

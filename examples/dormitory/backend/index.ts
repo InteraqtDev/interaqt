@@ -1141,3 +1141,32 @@ User.properties.find(p => p.name === 'name').computation = StateMachine.create({
   ],
   defaultState: nameDefaultState
 })
+
+// User.email StateMachine computation
+const emailDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createUser') {
+      return event.payload.email;
+    }
+    if (event && event.interactionName === 'updateUser' && event.payload.email !== undefined) {
+      return event.payload.email;
+    }
+    return lastValue;
+  }
+});
+
+User.properties.find(p => p.name === 'email').computation = StateMachine.create({
+  states: [emailDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateUserInteraction,
+      current: emailDefaultState,
+      next: emailDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.userId
+      })
+    })
+  ],
+  defaultState: emailDefaultState
+})

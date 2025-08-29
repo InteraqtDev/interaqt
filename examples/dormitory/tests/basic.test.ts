@@ -1719,4 +1719,92 @@ describe('Basic Functionality', () => {
     expect(finalUpdatedUser.email).toBe('nametest@example.com') // Should remain unchanged
     expect(finalUpdatedUser.studentId).toBe('STU123') // Should remain unchanged
   })
+
+  test('User.email StateMachine computation handles create and update interactions', async () => {
+    /**
+     * Test Plan for: User.email StateMachine computation
+     * Dependencies: User entity, InteractionEventEntity, CreateUser interaction, UpdateUser interaction
+     * Steps: 1) Create user with email via CreateUser interaction 2) Verify email is correctly set 3) Update user email via UpdateUser interaction 4) Verify email is updated correctly
+     * Business Logic: StateMachine manages User.email property with direct assignment from CreateUser and UpdateUser interactions with uniqueness validation
+     */
+    
+    // Step 1: Create user via CreateUser interaction
+    const createResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User',
+        email: 'initial@example.com',
+        studentId: 'STU456',
+        phone: '123-456-7890'
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created user and verify email
+    let createdUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'initial@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId']
+    )
+
+    expect(createdUser).toBeDefined()
+    expect(createdUser.name).toBe('Test User')
+    expect(createdUser.email).toBe('initial@example.com')
+    expect(createdUser.studentId).toBe('STU456')
+
+    // Step 2: Update user email via UpdateUser interaction
+    const updateResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: createdUser.id,
+        name: 'Test User',
+        email: 'updated@example.com' // Update email
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify email was updated
+    const updatedUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId']
+    )
+
+    expect(updatedUser).toBeDefined()
+    expect(updatedUser.name).toBe('Test User')
+    expect(updatedUser.email).toBe('updated@example.com')
+    expect(updatedUser.studentId).toBe('STU456') // Should remain unchanged
+    expect(updatedUser.id).toBe(createdUser.id) // Same user
+
+    // Step 3: Update user with only email field (testing email updates only)
+    const secondEmailUpdateResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: createdUser.id,
+        email: 'final@example.com' // Update only email
+      }
+    })
+
+    expect(secondEmailUpdateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify email was updated again
+    const finalUpdatedUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId']
+    )
+
+    expect(finalUpdatedUser).toBeDefined()
+    expect(finalUpdatedUser.name).toBe('Test User') // Should remain unchanged
+    expect(finalUpdatedUser.email).toBe('final@example.com') // Should be updated to final email
+    expect(finalUpdatedUser.studentId).toBe('STU456') // Should remain unchanged
+  })
 }) 
