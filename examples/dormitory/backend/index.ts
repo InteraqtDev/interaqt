@@ -26,7 +26,8 @@ import {
   GetAction,
   Query,
   QueryItem,
-  MatchExp
+  MatchExp,
+  InteractionEventEntity
 } from 'interaqt'
 
 // =============================================================================
@@ -864,3 +865,29 @@ export const interactions = [
 ]
 
 export const dicts = []
+
+// =============================================================================
+// COMPUTATIONS
+// =============================================================================
+
+// User entity computation - Transform computation for creation
+User.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: function(event) {
+    if (event.interactionName === 'createUser') {
+      return {
+        name: event.payload.name,
+        email: event.payload.email,
+        studentId: event.payload.studentId,
+        phone: event.payload.phone || '',
+        role: event.payload.role || 'user',
+        points: 100,
+        createdAt: Math.floor(Date.now() / 1000),
+        updatedAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})
