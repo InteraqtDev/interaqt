@@ -610,7 +610,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
           "calculationMethod": "Automatically updated to current timestamp on any modification",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.isDeleted",

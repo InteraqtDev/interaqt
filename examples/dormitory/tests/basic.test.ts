@@ -3175,4 +3175,135 @@ describe('Basic Functionality', () => {
     expect(createdBed.number).toBe('BC001')
     expect(createdBed.updatedAt).toBeDefined()
   })
+
+  test('Bed.updatedAt StateMachine computation automatically updates timestamp', async () => {
+    /**
+     * Test Plan for: Bed.updatedAt StateMachine computation
+     * Dependencies: Bed entity, Dormitory entity, CreateBed, UpdateBed interactions
+     * Steps: 1) Create dormitory 2) Create bed 3) Verify initial updatedAt 4) Update bed 5) Verify updatedAt is updated
+     * Business Logic: StateMachine automatically updates updatedAt to current timestamp on any modification
+     */
+    
+    // Create a dormitory first
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory for Bed UpdatedAt',
+        location: 'Building D',
+        capacity: 4
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the dormitory ID
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory for Bed UpdatedAt'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(allDormitories.length).toBe(1)
+      dormitoryId = allDormitories[0].id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Create a bed via CreateBed interaction
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'BD001'
+      }
+    })
+    
+    expect(bedResult.error).toBeUndefined()
+    expect(bedResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created bed ID from effects OR from database query
+    let bedCreateEffect = bedResult.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    let bedId
+    
+    if (bedCreateEffect) {
+      expect(bedCreateEffect.record.id).toBeDefined()
+      bedId = bedCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created bed
+      const beds = await system.storage.find(
+        'Bed',
+        MatchExp.atom({ key: 'number', value: ['=', 'BD001'] }),
+        undefined,
+        ['id', 'number']
+      )
+      expect(beds.length).toBe(1)
+      bedId = beds[0].id
+    }
+    
+    expect(bedId).toBeDefined()
+    
+    // Get initial bed state
+    const initialBed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'createdAt', 'updatedAt']
+    )
+    
+    expect(initialBed).toBeDefined()
+    expect(initialBed.updatedAt).toBeDefined()
+    expect(typeof initialBed.updatedAt).toBe('number')
+    
+    // Wait a second to ensure timestamp difference
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Record timestamp before update
+    const beforeUpdateTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Update bed via UpdateBed interaction
+    const updateResult = await controller.callInteraction('updateBed', {
+      user: { id: 'admin' },
+      payload: {
+        bedId: bedId,
+        number: 'BD002'
+      }
+    })
+    
+    // Record timestamp after update
+    const afterUpdateTimestamp = Math.floor(Date.now() / 1000)
+    
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get updated bed state
+    const updatedBed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'createdAt', 'updatedAt']
+    )
+    
+    expect(updatedBed).toBeDefined()
+    expect(updatedBed.number).toBe('BD002') // Number should be updated
+    expect(updatedBed.updatedAt).toBeDefined()
+    expect(typeof updatedBed.updatedAt).toBe('number')
+    
+    // Verify updatedAt was updated (should be later than initial)
+    expect(updatedBed.updatedAt).toBeGreaterThan(initialBed.updatedAt)
+    
+    // Verify updatedAt is within the expected range
+    expect(updatedBed.updatedAt).toBeGreaterThanOrEqual(beforeUpdateTimestamp)
+    expect(updatedBed.updatedAt).toBeLessThanOrEqual(afterUpdateTimestamp)
+    
+    // Verify createdAt didn't change
+    expect(updatedBed.createdAt).toBe(initialBed.createdAt)
+  })
 }) 

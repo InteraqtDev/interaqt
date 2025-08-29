@@ -133,8 +133,7 @@ export const Bed = Entity.create({
     }),
     Property.create({
       name: 'updatedAt',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     }),
     Property.create({
       name: 'isDeleted',
@@ -916,11 +915,12 @@ Bed.computation = Transform.create({
   attributeQuery: ['interactionName', 'payload', 'user'],
   callback: function(event) {
     if (event.interactionName === 'createBed') {
+      const timestamp = Math.floor(Date.now() / 1000)
       return {
         number: event.payload.number,
         status: 'vacant',
-        createdAt: Math.floor(Date.now() / 1000),
-        updatedAt: Math.floor(Date.now() / 1000),
+        createdAt: timestamp,
+        updatedAt: timestamp, // Initialize updatedAt with same timestamp as createdAt
         isDeleted: false,
         dormitory: { id: event.payload.dormitoryId } // Creates DormitoryBedRelation via 'dormitory' targetProperty
       }
@@ -1459,4 +1459,30 @@ Bed.properties.find(p => p.name === 'number').computation = StateMachine.create(
     })
   ],
   defaultState: bedNumberDefaultState
+})
+
+// Bed.updatedAt StateMachine computation
+const bedUpdatedAtDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'updateBed') {
+      return Math.floor(Date.now() / 1000);
+    }
+    return lastValue;
+  }
+});
+
+Bed.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [bedUpdatedAtDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateBedInteraction,
+      current: bedUpdatedAtDefaultState,
+      next: bedUpdatedAtDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.bedId
+      })
+    })
+  ],
+  defaultState: bedUpdatedAtDefaultState
 })
