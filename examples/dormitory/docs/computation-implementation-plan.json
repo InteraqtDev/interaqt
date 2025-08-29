@@ -58,7 +58,7 @@
           ],
           "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
           "calculationMethod": "Created by ApplyPointDeduction interaction linking user, rule, and deduction details",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest",
@@ -86,7 +86,7 @@
           ],
           "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
           "calculationMethod": "Independently created by CreateDeductionRule interaction with admin privileges",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 1: 6 entity computation(s)"

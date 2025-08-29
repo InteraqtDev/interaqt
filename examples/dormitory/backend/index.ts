@@ -929,3 +929,40 @@ Bed.computation = Transform.create({
     return null
   }
 })
+
+// PointDeduction entity computation - Transform computation for creation
+PointDeduction.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: function(event) {
+    if (event.interactionName === 'applyPointDeduction') {
+      return {
+        reason: event.payload.reason,
+        points: 0, // Will be set by property computation from deduction rule
+        deductedAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})
+
+// DeductionRule entity computation - Transform computation for creation
+DeductionRule.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: function(event) {
+    if (event.interactionName === 'createDeductionRule') {
+      return {
+        name: event.payload.name,
+        description: event.payload.description,
+        points: event.payload.points,
+        isActive: event.payload.isActive !== undefined ? event.payload.isActive : true,
+        createdAt: Math.floor(Date.now() / 1000),
+        updatedAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})
