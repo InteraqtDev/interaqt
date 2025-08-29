@@ -38,7 +38,7 @@ Based on the current task in `docs/STATUS.json`, use the appropriate sub-agent:
   - **Exception: Task 3.2.2 - Permission and Business Rule Implementation Loop** → Use sub-agent `permission-generation-handler` during the implementation loop
 
 **🔴 CRITICAL - AUTORUN LOOP EXECUTION:**
-- **Check `docs/SCHEDULE.json`**: If `"autorun": true`, you MUST continuously execute the implementation loop
+- **Check `docs/SCHEDULE.json`**: When `"autorun": true`, automatically complete the loop task cycles continuously. When `autorun` doesn't exist or is `false`, execute only one iteration of the loop task then stop and wait for user's manual instruction to proceed with the next iteration
 - **Loop Termination Condition**: Continue looping until the `completionCriteria` in `docs/STATUS.json` is fully satisfied
 - **Example**: For Task 3.1.4.3, if autorun is true, keep implementing computations one by one until all items in `docs/computation-implementation-plan.json` have `completed: true`
 - **Example**: For Task 3.2.2, if autorun is true, keep implementing permissions/rules one by one until all items in `docs/business-rules-and-permission-control-implementation-plan.json` have `completed: true`

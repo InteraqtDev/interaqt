@@ -3708,7 +3708,125 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('isAdmin')
     })
 
-    
+    test('P013: Dormitory leader can submit removal request (TC004)', async () => {
+      // Create admin user for setup
+      const admin = await system.storage.create('User', {
+        username: 'admin',
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory
+      const dormResult = await controller.callInteraction('CreateDormitory', {
+        user: admin,
+        payload: {
+          name: 'Test Dorm',
+          capacity: 4,
+          floor: 1,
+          building: 'Building A'
+        }
+      })
+      expect(dormResult.error).toBeUndefined()
+      
+      // Get the dormitory
+      const dormitories = await system.storage.find('Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dorm'] }),
+        undefined,
+        ['id']
+      )
+      const dormitoryId = dormitories[0].id
+      
+      // Get beds in the dormitory
+      const beds = await system.storage.find('Bed',
+        MatchExp.atom({ key: 'dormitory.id', value: ['=', dormitoryId] }),
+        undefined,
+        ['id']
+      )
+      
+      // Create dormitory leader
+      const leader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'resident', // Start as resident
+        points: 100
+      })
+      
+      // Create target user with low points (less than 30)
+      const targetUser = await system.storage.create('User', {
+        username: 'resident1',
+        password: 'password123',
+        email: 'resident1@test.com',
+        name: 'Resident User',
+        role: 'resident',
+        points: 0 // Low points to justify removal
+      })
+      
+      // Assign both users to beds in the dormitory
+      const assignLeaderResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          bedId: beds[0].id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+      
+      const assignTargetResult = await controller.callInteraction('AssignUserToBed', {
+        user: admin,
+        payload: {
+          userId: targetUser.id,
+          bedId: beds[1].id
+        }
+      })
+      expect(assignTargetResult.error).toBeUndefined()
+      
+      // Assign leader as dormitory leader
+      const assignLeaderRoleResult = await controller.callInteraction('AssignDormitoryLeader', {
+        user: admin,
+        payload: {
+          userId: leader.id,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignLeaderRoleResult.error).toBeUndefined()
+      
+      // Get updated leader user with dormitoryLeader role
+      const updatedLeader = await system.storage.findOne('User',
+        MatchExp.atom({ key: 'id', value: ['=', leader.id] }),
+        undefined,
+        ['id', 'role']
+      )
+      expect(updatedLeader.role).toBe('dormitoryLeader')
+      
+      // Dormitory leader should be able to submit removal request for resident with low points
+      const result = await controller.callInteraction('SubmitRemovalRequest', {
+        user: updatedLeader,
+        payload: {
+          userId: targetUser.id,
+          reason: 'Consistently low points'
+        }
+      })
+      
+      // Verify success - no error
+      expect(result.error).toBeUndefined()
+      
+      // Verify RemovalRequest was created
+      const removalRequests = await system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'targetUser.id', value: ['=', targetUser.id] }),
+        undefined,
+        ['id', 'reason', 'status', ['targetUser', { attributeQuery: ['id'] }], ['requestedBy', { attributeQuery: ['id'] }]]
+      )
+      expect(removalRequests.length).toBe(1)
+      expect(removalRequests[0].reason).toBe('Consistently low points')
+      expect(removalRequests[0].status).toBe('pending')
+      expect(removalRequests[0].targetUser?.id).toBe(targetUser.id)
+      expect(removalRequests[0].requestedBy?.id).toBe(updatedLeader.id)
+    })
 
     test('P013: Regular resident cannot submit removal request (TC009)', async () => {
       // Create regular resident user

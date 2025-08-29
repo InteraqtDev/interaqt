@@ -159,7 +159,7 @@
             "Dormitory leader can submit removal request (TC004)",
             "Regular resident cannot submit removal request (TC009)"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     },
