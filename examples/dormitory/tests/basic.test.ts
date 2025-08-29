@@ -421,6 +421,57 @@ describe('Basic Functionality', () => {
     // Similar to above, the interaction succeeds but computation handles validation
   })
 
+  test('Dormitory.createdAt property is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: Dormitory.createdAt _owner computation
+     * Dependencies: Dormitory entity, CreateDormitory interaction
+     * Steps: 1) Create dormitory 2) Verify createdAt is set automatically 3) Verify timestamp is reasonable
+     * Business Logic: _owner computation sets createdAt timestamp when Dormitory entity is created
+     */
+    
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Create dormitory via interaction
+    const createResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'CreatedAt Test Building',
+        location: 'Test Campus Building F',
+        capacity: 4
+      }
+    })
+
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    expect(createResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created dormitory
+    const dormitories = await system.storage.find(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'CreatedAt Test Building'] }),
+      undefined,
+      ['id', 'name', 'location', 'capacity', 'createdAt']
+    )
+    
+    expect(dormitories.length).toBe(1)
+    const dormitory = dormitories[0]
+    
+    // Verify createdAt is set by _owner computation
+    expect(dormitory.createdAt).toBeDefined()
+    expect(typeof dormitory.createdAt).toBe('number')
+    
+    // Verify createdAt timestamp is within reasonable range (set during entity creation)
+    expect(dormitory.createdAt).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(dormitory.createdAt).toBeLessThanOrEqual(afterTimestamp)
+    
+    // Verify other properties are set correctly
+    expect(dormitory.name).toBe('CreatedAt Test Building')
+    expect(dormitory.location).toBe('Test Campus Building F')
+    expect(dormitory.capacity).toBe(4)
+  })
+
   test('Bed entity Transform computation creates bed via CreateBed interaction', async () => {
     /**
      * Test Plan for: Bed entity Transform computation
