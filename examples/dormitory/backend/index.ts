@@ -891,3 +891,23 @@ User.computation = Transform.create({
     return null
   }
 })
+
+// Dormitory entity computation - Transform computation for creation
+Dormitory.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: function(event) {
+    if (event.interactionName === 'createDormitory') {
+      return {
+        name: event.payload.name,
+        location: event.payload.location,
+        capacity: event.payload.capacity,
+        currentOccupancy: 0,
+        createdAt: Math.floor(Date.now() / 1000),
+        updatedAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})

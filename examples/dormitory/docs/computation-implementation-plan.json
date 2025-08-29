@@ -30,7 +30,7 @@
           ],
           "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
           "calculationMethod": "Independently created by CreateDormitory interaction with admin privileges",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed",

@@ -137,4 +137,66 @@ describe('Basic Functionality', () => {
     expect(createdUser.phone).toBe('') // Default empty string
     expect(createdUser.role).toBe('user') // Default role
   })
+
+  test('Dormitory entity Transform computation creates dormitory via CreateDormitory interaction', async () => {
+    /**
+     * Test Plan for: Dormitory entity Transform computation
+     * Dependencies: Dormitory entity, CreateDormitory interaction
+     * Steps: 1) Trigger CreateDormitory interaction 2) Verify Dormitory entity is created 3) Verify properties are correct
+     * Business Logic: Transform computation creates Dormitory entity when CreateDormitory interaction occurs
+     */
+    
+    // Create dormitory via interaction
+    const result = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' }, // Admin user triggering the creation
+      payload: {
+        name: 'Building A Room 101',
+        location: 'North Campus Building A',
+        capacity: 4
+      }
+    })
+
+    // Check that interaction was successful
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects.length).toBeGreaterThan(0)
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check if any Dormitory records were created by querying the database
+    const allDormitories = await system.storage.find(
+      'Dormitory',
+      undefined,
+      undefined,
+      ['id', 'name', 'location', 'capacity', 'currentOccupancy', 'createdAt', 'updatedAt', 'isDeleted']
+    )
+
+    // Get the created dormitory ID from effects OR from database query
+    let dormitoryCreateEffect = result.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    let createdDormitory
+    
+    if (dormitoryCreateEffect) {
+      expect(dormitoryCreateEffect.record.id).toBeDefined()
+      createdDormitory = await system.storage.findOne(
+        'Dormitory',
+        MatchExp.atom({ key: 'id', value: ['=', dormitoryCreateEffect.record.id] }),
+        undefined,
+        ['id', 'name', 'location', 'capacity', 'currentOccupancy', 'createdAt', 'updatedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, try to find the created dormitory by name (should be unique)
+      createdDormitory = allDormitories.find(dorm => dorm.name === 'Building A Room 101')
+      expect(createdDormitory).toBeDefined()
+    }
+
+    expect(createdDormitory).toBeDefined()
+    expect(createdDormitory.name).toBe('Building A Room 101')
+    expect(createdDormitory.location).toBe('North Campus Building A')
+    expect(createdDormitory.capacity).toBe(4)
+    expect(createdDormitory.currentOccupancy).toBe(0) // Initial occupancy should be 0
+    expect(createdDormitory.isDeleted).toBe(false)
+    expect(createdDormitory.createdAt).toBeDefined()
+    expect(createdDormitory.updatedAt).toBeDefined()
+  })
 }) 
