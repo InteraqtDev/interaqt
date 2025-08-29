@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -874,5 +874,103 @@ describe('Basic Functionality', () => {
     
     // Verify the bed has the dormitory reference
     expect(actualBed.dormitory.id).toBe(dormitoryId)
+  })
+
+  test('UserPointDeductionRelation created by PointDeduction Transform (_parent:PointDeduction)', async () => {
+    /**
+     * Test Plan for: _parent:PointDeduction
+     * This tests the PointDeduction's Transform computation that creates UserPointDeductionRelation
+     * Dependencies: User entity, PointDeduction entity, DeductionRule entity, UserPointDeductionRelation, CreateUser, CreateDeductionRule, ApplyPointDeduction interactions
+     * Steps: 1) Create user 2) Create deduction rule 3) Apply point deduction with targetUserId 4) Verify UserPointDeductionRelation is created
+     * Business Logic: PointDeduction's Transform creates UserPointDeductionRelation using user targetProperty
+     */
+
+    // Create user first
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User',
+        email: 'testuser@example.com',
+        studentId: 'STU123',
+        phone: '123-456-7890'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    const userId = userResult.effects?.[0]?.record?.id
+    expect(userId).toBeTruthy()
+
+    // Create deduction rule
+    const ruleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule',
+        description: 'Test deduction rule',
+        points: 10,
+        isActive: true
+      }
+    })
+
+    expect(ruleResult.error).toBeUndefined()
+    const ruleId = ruleResult.effects?.[0]?.record?.id
+    expect(ruleId).toBeTruthy()
+
+    // Apply point deduction with targetUserId
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'Test violation'
+      }
+    })
+
+    expect(deductionResult.error).toBeUndefined()
+
+    // Find the point deduction that was created with its user relation
+    const allDeductions = await system.storage.find(
+      'PointDeduction',
+      undefined,
+      undefined,
+      [
+        'id', 
+        'reason', 
+        'points',
+        'deductedAt',
+        ['user', { attributeQuery: ['id'] }]
+      ]
+    )
+    
+    expect(allDeductions.length).toBe(1)
+    
+    // Use the actual deduction that was created
+    const actualDeduction = allDeductions[0]
+    const deductionId = actualDeduction.id
+
+    // Verify UserPointDeductionRelation was created between the user and point deduction
+    const relations = await system.storage.find(
+      UserPointDeductionRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+        .and({ key: 'target.id', value: ['=', deductionId] }),
+      undefined,
+      [
+        'id',
+        'createdAt',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'reason'] }]
+      ]
+    )
+
+    expect(relations.length).toBe(1)
+    
+    const relation = relations[0]
+    expect(relation.source.id).toBe(userId)
+    expect(relation.target.id).toBe(deductionId)
+    expect(relation.target.reason).toBe('Test violation')
+    expect(relation.createdAt).toBeTypeOf('number')
+    expect(relation.createdAt).toBeGreaterThan(0)
+    
+    // Verify the point deduction has the user reference
+    expect(actualDeduction.user.id).toBe(userId)
   })
 }) 
