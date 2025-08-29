@@ -932,11 +932,18 @@ Bed.computation = Transform.create({
 PointDeduction.computation = Transform.create({
   record: InteractionEventEntity,
   attributeQuery: ['interactionName', 'payload', 'user'],
-  callback: function(event) {
+  callback: async function(event) {
     if (event.interactionName === 'applyPointDeduction') {
+      // Fetch the deduction rule to get the points value (_owner computation)
+      const rule = await this.system.storage.findOne('DeductionRule',
+        this.globals.MatchExp.atom({ key: 'id', value: ['=', event.payload.ruleId] }),
+        undefined,
+        ['id', 'points']
+      )
+      
       return {
         reason: event.payload.reason,
-        points: 0, // Will be set by property computation from deduction rule
+        points: rule?.points || 0, // Set from referenced DeductionRule.points
         deductedAt: Math.floor(Date.now() / 1000),
         isDeleted: false,
         user: { id: event.payload.targetUserId }, // Creates UserPointDeductionRelation via 'user' targetProperty

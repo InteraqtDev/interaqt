@@ -777,7 +777,7 @@ describe('Basic Functionality', () => {
 
     expect(createdDeduction).toBeDefined()
     expect(createdDeduction.reason).toBe('Testing point deduction system')
-    expect(createdDeduction.points).toBe(0) // Initially 0, will be set by property computation
+    expect(createdDeduction.points).toBe(5) // Set from DeductionRule.points via _owner computation
     expect(createdDeduction.isDeleted).toBe(false)
     expect(createdDeduction.deductedAt).toBeDefined()
   })
@@ -3710,5 +3710,181 @@ describe('Basic Functionality', () => {
     expect(firstDeduction.deductedAt).toBeDefined()
     expect(secondDeduction.deductedAt).toBeDefined()
     expect(secondDeduction.deductedAt).toBeGreaterThanOrEqual(firstDeduction.deductedAt)
+  })
+
+  test('PointDeduction.points computation (_owner)', async () => {
+    /**
+     * Test Plan for: PointDeduction.points
+     * This is a _owner computation that sets points from referenced DeductionRule.points at creation time
+     * Dependencies: User entity, DeductionRule entity, PointDeduction entity, ApplyPointDeduction interaction
+     * Steps: 1) Create user 2) Create deduction rule with specific points 3) Apply point deduction 4) Verify points copied from rule
+     * Business Logic: PointDeduction.points is set from the referenced DeductionRule.points at time of creation
+     */
+    
+    // Create a user
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Alice Johnson',
+        email: 'alice.johnson@university.edu',
+        studentId: 'STU123456',
+        phone: '+1-555-0123',
+        role: 'student'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    const userId = userResult.effects[0].record.id
+    
+    // Create a deduction rule with specific points value
+    const ruleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Noise Violation Rule',
+        description: 'Point deduction for noise violations',
+        points: 15 // Specific points value to test
+      }
+    })
+    
+    expect(ruleResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 500)) // Longer wait for rule to be fully committed
+    
+    // Get the rule ID using the proper pattern
+    let ruleId
+    const ruleCreateEffect = ruleResult.effects.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    
+    if (ruleCreateEffect && ruleCreateEffect.record.id) {
+      ruleId = ruleCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created rule
+      const rules = await system.storage.find(
+        'DeductionRule',
+        MatchExp.atom({ key: 'name', value: ['=', 'Noise Violation Rule'] }),
+        undefined,
+        ['id', 'name', 'points']
+      )
+      expect(rules.length).toBeGreaterThan(0)
+      ruleId = rules[0].id
+    }
+    
+    expect(ruleId).toBeDefined()
+    
+    // Apply point deduction using the rule
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'Loud music after quiet hours'
+      }
+    })
+    
+    expect(deductionResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the created point deduction - search by reason since effects might not include PointDeduction
+    let createdDeduction = await system.storage.findOne(
+      'PointDeduction',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Loud music after quiet hours'] }),
+      undefined,
+      ['id', 'reason', 'points', 'deductedAt']
+    )
+    
+    if (!createdDeduction) {
+      // Fallback: get all deductions and find ours
+      const allDeductions = await system.storage.find(
+        'PointDeduction',
+        undefined,
+        undefined,
+        ['id', 'reason', 'points', 'deductedAt']
+      )
+      createdDeduction = allDeductions.find(d => d.reason === 'Loud music after quiet hours')
+    }
+    
+    expect(createdDeduction).toBeDefined()
+    
+    // Verify that points were correctly set from the DeductionRule (_owner computation)
+    expect(createdDeduction.points).toBe(15) // Should match the rule's points value
+    
+    // Test with different rule having different points
+    const secondRuleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Cleanliness Violation Rule',
+        description: 'Point deduction for cleanliness violations',
+        points: 8 // Different points value
+      }
+    })
+    
+    expect(secondRuleResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 500)) // Longer wait for rule to be fully committed
+    
+    // Get the second rule ID using the proper pattern
+    let secondRuleId
+    const secondRuleCreateEffect = secondRuleResult.effects.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    
+    if (secondRuleCreateEffect && secondRuleCreateEffect.record.id) {
+      secondRuleId = secondRuleCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created rule
+      const rules = await system.storage.find(
+        'DeductionRule',
+        MatchExp.atom({ key: 'name', value: ['=', 'Cleanliness Violation Rule'] }),
+        undefined,
+        ['id', 'name', 'points']
+      )
+      expect(rules.length).toBeGreaterThan(0)
+      secondRuleId = rules[0].id
+    }
+    
+    expect(secondRuleId).toBeDefined()
+    
+    // Apply second point deduction
+    const secondDeductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: secondRuleId,
+        reason: 'Left dirty dishes in common area'
+      }
+    })
+    
+    expect(secondDeductionResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the second point deduction - search by reason
+    let secondDeduction = await system.storage.findOne(
+      'PointDeduction',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Left dirty dishes in common area'] }),
+      undefined,
+      ['id', 'reason', 'points', 'deductedAt']
+    )
+    
+    if (!secondDeduction) {
+      // Fallback: get all deductions and find ours
+      const allDeductions = await system.storage.find(
+        'PointDeduction',
+        undefined,
+        undefined,
+        ['id', 'reason', 'points', 'deductedAt']
+      )
+      secondDeduction = allDeductions.find(d => d.reason === 'Left dirty dishes in common area')
+    }
+    
+    expect(secondDeduction).toBeDefined()
+    
+    // Verify that points were correctly set from the second DeductionRule
+    expect(secondDeduction.points).toBe(8) // Should match the second rule's points value
+    
+    // Verify the deductions have different points values as expected
+    expect(createdDeduction.points).not.toBe(secondDeduction.points)
+    
+    // Also verify other properties are set correctly
+    expect(createdDeduction.reason).toBe('Loud music after quiet hours')
+    expect(secondDeduction.reason).toBe('Left dirty dishes in common area')
+    expect(createdDeduction.deductedAt).toBeDefined()
+    expect(secondDeduction.deductedAt).toBeDefined()
   })
 }) 

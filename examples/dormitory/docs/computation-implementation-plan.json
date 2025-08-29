@@ -682,7 +682,7 @@
           ],
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "Set from the referenced DeductionRule.points at time of creation",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction.deductedAt",
