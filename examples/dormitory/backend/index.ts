@@ -156,8 +156,7 @@ export const PointDeduction = Entity.create({
     }),
     Property.create({
       name: 'deductedAt',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     }),
     Property.create({
       name: 'isDeleted',

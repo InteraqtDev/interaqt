@@ -3887,4 +3887,100 @@ describe('Basic Functionality', () => {
     expect(createdDeduction.deductedAt).toBeDefined()
     expect(secondDeduction.deductedAt).toBeDefined()
   })
+
+  test('PointDeduction.deductedAt is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: _owner
+     * This tests that deductedAt is properly set when PointDeduction is created
+     * Steps: 1) Create deduction rule 2) Create target user 3) Apply point deduction 4) Verify deductedAt is set with current timestamp
+     * Business Logic: PointDeduction's creation computation sets deductedAt timestamp
+     */
+    
+    // Step 1: Create deduction rule
+    const ruleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Timestamp Rule',
+        description: 'Rule for testing timestamp',
+        points: 5
+      }
+    })
+    
+    expect(ruleResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the rule ID
+    const rules = await system.storage.find('DeductionRule', 
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Timestamp Rule'] }),
+      undefined, 
+      ['id', 'name']
+    )
+    expect(rules.length).toBe(1)
+    const ruleId = rules[0].id
+    
+    // Step 2: Create target user
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User',
+        email: 'test@example.com',
+        studentId: 'STU999',
+        phone: '999-999-9999'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get user ID
+    const users = await system.storage.find('User', 
+      MatchExp.atom({ key: 'email', value: ['=', 'test@example.com'] }),
+      undefined, 
+      ['id', 'email']
+    )
+    expect(users.length).toBe(1)
+    const userId = users[0].id
+    
+    // Step 3: Record timestamp before applying deduction
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Apply point deduction
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'Testing timestamp functionality'
+      }
+    })
+    
+    expect(deductionResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Record timestamp after applying deduction
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Step 4: Verify deductedAt is set correctly
+    const deductions = await system.storage.find(
+      'PointDeduction',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Testing timestamp functionality'] }),
+      undefined,
+      ['id', 'reason', 'points', 'deductedAt']
+    )
+    
+    expect(deductions.length).toBe(1)
+    const deduction = deductions[0]
+    
+    // Verify deductedAt is defined and is a reasonable timestamp
+    expect(deduction.deductedAt).toBeDefined()
+    expect(typeof deduction.deductedAt).toBe('number')
+    
+    // Verify the timestamp is within the expected range (between before and after timestamps)
+    expect(deduction.deductedAt).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(deduction.deductedAt).toBeLessThanOrEqual(afterTimestamp)
+    
+    // Verify it's a Unix timestamp in seconds (reasonable range)
+    expect(deduction.deductedAt).toBeGreaterThan(1600000000) // After year 2020
+    expect(deduction.deductedAt).toBeLessThan(2000000000)    // Before year 2033
+  })
 }) 
