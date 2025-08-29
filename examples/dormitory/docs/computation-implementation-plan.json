@@ -109,7 +109,7 @@
           ],
           "reasoning": "interaction-created relation with hard-delete capability requires StateMachine for both creation and deletion",
           "calculationMethod": "Created by AssignDormitoryLeader interaction when admin assigns leadership",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserBedAssignmentRelation",

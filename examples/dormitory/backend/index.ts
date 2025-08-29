@@ -984,3 +984,32 @@ RemovalRequest.computation = Transform.create({
     return null
   }
 })
+
+// UserDormitoryLeaderRelation StateMachine computation
+const notAssignedState = StateNode.create({ 
+  name: 'notAssigned',
+  computeValue: () => null  // Return null means no relation
+});
+
+const assignedState = StateNode.create({ 
+  name: 'assigned',
+  computeValue: () => ({
+    assignedAt: Math.floor(Date.now() / 1000)
+  })
+});
+
+UserDormitoryLeaderRelation.computation = StateMachine.create({
+  states: [notAssignedState, assignedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignDormitoryLeaderInteraction,
+      current: notAssignedState,
+      next: assignedState,
+      computeTarget: (event) => ({
+        source: { id: event.payload.userId },
+        target: { id: event.payload.dormitoryId }
+      })
+    })
+  ],
+  defaultState: notAssignedState
+})

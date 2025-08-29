@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -521,5 +521,129 @@ describe('Basic Functionality', () => {
     expect(createdRequest.processedAt).toBeUndefined() // Should be undefined/null initially
     expect(createdRequest.adminComment).toBeUndefined() // Should be undefined/null initially
     expect(createdRequest.isDeleted).toBe(false)
+  })
+
+  test('UserDormitoryLeaderRelation StateMachine computation creates relation via AssignDormitoryLeader interaction', async () => {
+    /**
+     * Test Plan for: UserDormitoryLeaderRelation StateMachine computation
+     * Dependencies: UserDormitoryLeaderRelation, AssignDormitoryLeader interaction, User entity, Dormitory entity
+     * Steps: 1) Create a user 2) Create a dormitory 3) Trigger AssignDormitoryLeader interaction 4) Verify relation is created 5) Verify properties are correct
+     * Business Logic: StateMachine computation creates UserDormitoryLeaderRelation when AssignDormitoryLeader interaction occurs
+     */
+    
+    // First create a user (who will become dormitory leader)
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Future Leader',
+        email: 'leader@example.com',
+        studentId: 'STU005'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the user ID
+    let userId
+    const userCreateEffect = userResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (userCreateEffect && userCreateEffect.record.id) {
+      userId = userCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      const createdUser = users.find(user => user.email === 'leader@example.com')
+      expect(createdUser).toBeDefined()
+      userId = createdUser.id
+    }
+    
+    expect(userId).toBeDefined()
+    
+    // Create a dormitory
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Leadership Building',
+        location: 'Admin Campus',
+        capacity: 6
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the dormitory ID
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const dormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      const createdDormitory = dormitories.find(dorm => dorm.name === 'Leadership Building')
+      expect(createdDormitory).toBeDefined()
+      dormitoryId = createdDormitory.id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Now assign dormitory leader via interaction
+    const result = await controller.callInteraction('assignDormitoryLeader', {
+      user: { id: 'admin' }, // Admin user assigning the leader
+      payload: {
+        userId: userId,
+        dormitoryId: dormitoryId
+      }
+    })
+
+    // Check that interaction was successful
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects.length).toBeGreaterThan(0)
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check if any UserDormitoryLeaderRelation records were created by querying the database
+    const allRelations = await system.storage.findRelationByName(
+      UserDormitoryLeaderRelation.name,
+      undefined,
+      undefined,
+      [
+        'id',
+        'assignedAt',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+
+    // Find the created relation
+    const createdRelation = allRelations.find(relation => 
+      relation.source && relation.source.id === userId &&
+      relation.target && relation.target.id === dormitoryId
+    )
+
+    expect(createdRelation).toBeDefined()
+    expect(createdRelation.source).toBeDefined()
+    expect(createdRelation.source.id).toBe(userId)
+    expect(createdRelation.source.name).toBe('Future Leader')
+    expect(createdRelation.target).toBeDefined()
+    expect(createdRelation.target.id).toBe(dormitoryId)
+    expect(createdRelation.target.name).toBe('Leadership Building')
+    expect(createdRelation.assignedAt).toBeDefined()
   })
 }) 
