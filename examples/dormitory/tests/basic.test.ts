@@ -2795,4 +2795,175 @@ describe('Basic Functionality', () => {
     expect(createdDormitory2.id.length).toBeGreaterThan(0)
     expect(createdDormitory2.id).not.toBe(createdDormitory.id) // IDs should be unique
   })
+
+  test('Dormitory.isDeleted StateMachine computation for soft deletion', async () => {
+    /**
+     * Test Plan for: Dormitory.isDeleted StateMachine computation
+     * Dependencies: Dormitory entity, DeleteDormitory interaction
+     * Steps: 1) Create dormitory 2) Verify initial isDeleted is false 3) Trigger DeleteDormitory interaction 4) Verify isDeleted transitions to true
+     * Business Logic: StateMachine manages soft deletion, setting isDeleted to true on DeleteDormitory interaction
+     */
+    
+    // Create dormitory via interaction
+    const result = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory Delete',
+        location: 'Test Building C',
+        capacity: 4
+      }
+    })
+
+    // Check that interaction was successful
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created dormitory and get its ID
+    let dormitoryId
+    const dormitoryCreateEffect = result.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory Delete'] }),
+        undefined,
+        ['id', 'name', 'isDeleted']
+      )
+      expect(allDormitories.length).toBe(1)
+      dormitoryId = allDormitories[0].id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+
+    // Verify initial state - dormitory should be active (isDeleted = false)
+    const dormitoryBefore = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+
+    expect(dormitoryBefore).toBeDefined()
+    expect(dormitoryBefore.isDeleted).toBe(false) // Should start in active state
+
+    // Delete the dormitory via interaction
+    const deleteResult = await controller.callInteraction('deleteDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId
+      }
+    })
+
+    expect(deleteResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify dormitory isDeleted is now true (deleted state)
+    const dormitoryAfter = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+
+    expect(dormitoryAfter).toBeDefined()
+    expect(dormitoryAfter.isDeleted).toBe(true)
+  })
+
+  test('Bed.id property is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: Bed.id (_owner)
+     * This tests that id is properly set when Bed is created
+     * Dependencies: Bed entity, Dormitory entity, CreateBed interaction
+     * Steps: 1) Create dormitory 2) Create bed 3) Verify bed id is set
+     * Business Logic: Bed's creation computation sets id automatically
+     */
+    
+    // Create a dormitory first
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory for Bed',
+        location: 'Building A',
+        capacity: 4
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the dormitory ID
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory for Bed'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(allDormitories.length).toBe(1)
+      dormitoryId = allDormitories[0].id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Create a bed via interaction
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'B001'
+      }
+    })
+    
+    expect(bedResult.error).toBeUndefined()
+    expect(bedResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created bed ID from effects OR from database query
+    let bedCreateEffect = bedResult.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    let createdBed
+    
+    if (bedCreateEffect) {
+      expect(bedCreateEffect.record.id).toBeDefined()
+      createdBed = await system.storage.findOne(
+        'Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bedCreateEffect.record.id] }),
+        undefined,
+        ['id', 'number', 'status', 'createdAt', 'updatedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, query the database to find the created bed
+      const beds = await system.storage.find(
+        'Bed',
+        MatchExp.atom({ key: 'number', value: ['=', 'B001'] }),
+        undefined,
+        ['id', 'number', 'status', 'createdAt', 'updatedAt', 'isDeleted']
+      )
+      expect(beds.length).toBe(1)
+      createdBed = beds[0]
+    }
+    
+    expect(createdBed).toBeDefined()
+    
+    // Verify that id is properly set (_owner computation)
+    expect(createdBed.id).toBeDefined()
+    expect(typeof createdBed.id).toBe('string')
+    expect(createdBed.id.length).toBeGreaterThan(0)
+    
+    // Verify other properties are correct
+    expect(createdBed.number).toBe('B001')
+    expect(createdBed.status).toBe('vacant')
+    expect(createdBed.isDeleted).toBe(false)
+    expect(createdBed.createdAt).toBeDefined()
+    expect(createdBed.updatedAt).toBeDefined()
+  })
 }) 

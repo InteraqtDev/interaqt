@@ -109,8 +109,7 @@ export const Dormitory = Entity.create({
     }),
     Property.create({
       name: 'isDeleted',
-      type: 'boolean',
-      defaultValue: () => false
+      type: 'boolean'
     })
   ]
 })
@@ -1406,4 +1405,30 @@ Dormitory.properties.find(p => p.name === 'updatedAt').computation = StateMachin
     })
   ],
   defaultState: dormitoryUpdatedAtDefaultState
+})
+
+// Dormitory.isDeleted StateMachine computation
+const dormitoryIsDeletedActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => false
+});
+
+const dormitoryIsDeletedDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+});
+
+Dormitory.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [dormitoryIsDeletedActiveState, dormitoryIsDeletedDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteDormitoryInteraction,
+      current: dormitoryIsDeletedActiveState,
+      next: dormitoryIsDeletedDeletedState,
+      computeTarget: (event) => ({
+        id: event.payload.dormitoryId
+      })
+    })
+  ],
+  defaultState: dormitoryIsDeletedActiveState
 })

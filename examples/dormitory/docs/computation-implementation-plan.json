@@ -537,7 +537,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
           "calculationMethod": "Set to true by DeleteDormitory interaction, requires currentOccupancy = 0",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.id",
@@ -552,7 +552,7 @@
           "interactionDependencies": null,
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "auto-generated",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.number",
