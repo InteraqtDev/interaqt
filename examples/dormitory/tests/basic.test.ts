@@ -1871,4 +1871,122 @@ describe('Basic Functionality', () => {
     expect(updatedUser.studentId).toBe('STU999') // Should remain unchanged
     expect(updatedUser.name).toBe('Updated Name') // Name can be updated
   })
+
+  test('User.phone StateMachine computation handles create and update interactions', async () => {
+    /**
+     * Test Plan for: User.phone StateMachine computation
+     * Dependencies: User entity, InteractionEventEntity, CreateUser interaction, UpdateUser interaction
+     * Steps: 1) Create user with phone via CreateUser interaction 2) Verify phone is correctly set 3) Update user phone via UpdateUser interaction 4) Verify phone is updated correctly 5) Test empty phone handling
+     * Business Logic: StateMachine manages User.phone property with direct assignment from CreateUser and UpdateUser interactions. Should handle optional phone numbers (empty string if not provided).
+     */
+    
+    // Step 1: Create user via CreateUser interaction with phone
+    const createResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Phone Test User',
+        email: 'phonetest@example.com',
+        studentId: 'STU789',
+        phone: '555-123-4567'
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created user and verify phone
+    let createdUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'phonetest@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'phone']
+    )
+
+    expect(createdUser).toBeDefined()
+    expect(createdUser.name).toBe('Phone Test User')
+    expect(createdUser.email).toBe('phonetest@example.com')
+    expect(createdUser.studentId).toBe('STU789')
+    expect(createdUser.phone).toBe('555-123-4567')
+
+    // Step 2: Update user phone via UpdateUser interaction
+    const updateResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: createdUser.id,
+        phone: '555-987-6543' // Update phone only
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify phone was updated
+    const updatedUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'phone']
+    )
+
+    expect(updatedUser).toBeDefined()
+    expect(updatedUser.name).toBe('Phone Test User') // Should remain unchanged
+    expect(updatedUser.email).toBe('phonetest@example.com') // Should remain unchanged
+    expect(updatedUser.studentId).toBe('STU789') // Should remain unchanged
+    expect(updatedUser.phone).toBe('555-987-6543') // Should be updated
+    expect(updatedUser.id).toBe(createdUser.id) // Same user
+
+    // Step 3: Create user without phone (testing empty phone handling)
+    const createWithoutPhoneResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'No Phone User',
+        email: 'nophone@example.com',
+        studentId: 'STU790'
+        // phone omitted
+      }
+    })
+
+    expect(createWithoutPhoneResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the user created without phone
+    const userWithoutPhone = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'nophone@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'phone']
+    )
+
+    expect(userWithoutPhone).toBeDefined()
+    expect(userWithoutPhone.name).toBe('No Phone User')
+    expect(userWithoutPhone.email).toBe('nophone@example.com')
+    expect(userWithoutPhone.studentId).toBe('STU790')
+    expect(userWithoutPhone.phone).toBe('') // Should default to empty string
+
+    // Step 4: Update user with empty phone
+    const updateToEmptyPhoneResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: updatedUser.id,
+        phone: '' // Clear phone
+      }
+    })
+
+    expect(updateToEmptyPhoneResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify phone was cleared
+    const userWithClearedPhone = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', updatedUser.id] }),
+      undefined,
+      ['id', 'name', 'email', 'studentId', 'phone']
+    )
+
+    expect(userWithClearedPhone).toBeDefined()
+    expect(userWithClearedPhone.name).toBe('Phone Test User') // Should remain unchanged
+    expect(userWithClearedPhone.email).toBe('phonetest@example.com') // Should remain unchanged
+    expect(userWithClearedPhone.studentId).toBe('STU789') // Should remain unchanged
+    expect(userWithClearedPhone.phone).toBe('') // Should be cleared to empty string
+  })
 }) 
