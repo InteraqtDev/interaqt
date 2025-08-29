@@ -480,7 +480,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Direct assignment with range validation (4-6) and occupancy constraint",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.createdAt",

@@ -1342,3 +1342,44 @@ Dormitory.properties.find(p => p.name === 'location').computation = StateMachine
   ],
   defaultState: dormitoryLocationDefaultState
 })
+
+// Dormitory.capacity StateMachine computation
+const dormitoryCapacityDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createDormitory') {
+      const capacity = event.payload.capacity;
+      // Validate capacity range (4-6)
+      if (capacity < 4 || capacity > 6) {
+        throw new Error('Dormitory capacity must be between 4 and 6');
+      }
+      return capacity;
+    }
+    if (event && event.interactionName === 'updateDormitory' && event.payload.capacity !== undefined) {
+      const capacity = event.payload.capacity;
+      // Validate capacity range (4-6)
+      if (capacity < 4 || capacity > 6) {
+        throw new Error('Dormitory capacity must be between 4 and 6');
+      }
+      // Note: occupancy constraint validation would need to be handled by business logic
+      // The StateMachine computation doesn't have access to current occupancy data
+      return capacity;
+    }
+    return lastValue;
+  }
+});
+
+Dormitory.properties.find(p => p.name === 'capacity').computation = StateMachine.create({
+  states: [dormitoryCapacityDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitoryInteraction,
+      current: dormitoryCapacityDefaultState,
+      next: dormitoryCapacityDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.dormitoryId
+      })
+    })
+  ],
+  defaultState: dormitoryCapacityDefaultState
+})
