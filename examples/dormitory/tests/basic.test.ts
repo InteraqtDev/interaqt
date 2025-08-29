@@ -2184,4 +2184,117 @@ describe('Basic Functionality', () => {
     expect(updatedUser.createdAt).toBe(createdUser.createdAt) // Should remain unchanged
     expect(updatedUser.name).toBe('Updated Name') // Name should be updated
   })
+
+  test('User.updatedAt StateMachine computation automatically updates timestamp', async () => {
+    /**
+     * Test Plan for: User.updatedAt StateMachine computation
+     * Dependencies: User entity, UpdateUser interaction, AssignDormitoryLeader interaction
+     * Steps: 1) Create user 2) Update user and verify updatedAt changes 3) Assign dormitory leader and verify updatedAt changes
+     * Business Logic: User.updatedAt should be automatically updated when UpdateUser or AssignDormitoryLeader interactions occur
+     */
+    
+    // Create user first
+    const createResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'John Doe',
+        email: 'john@example.com',
+        studentId: 'STU001',
+        phone: '123-456-7890',
+        role: 'user'
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const createdUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'john@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'updatedAt']
+    )
+
+    expect(createdUser).toBeDefined()
+    const initialUpdatedAt = createdUser.updatedAt
+    expect(initialUpdatedAt).toBeDefined()
+
+    // Wait a moment to ensure timestamp difference
+    await new Promise(resolve => setTimeout(resolve, 1100))
+
+    // Test 1: Update user should update the updatedAt timestamp
+    const updateResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: createdUser.id,
+        name: 'Updated John Doe',
+        email: 'updated.john@example.com'
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const userAfterUpdate = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+      undefined,
+      ['id', 'name', 'email', 'updatedAt']
+    )
+
+    expect(userAfterUpdate).toBeDefined()
+    expect(userAfterUpdate.name).toBe('Updated John Doe')
+    expect(userAfterUpdate.email).toBe('updated.john@example.com')
+    expect(userAfterUpdate.updatedAt).toBeGreaterThan(initialUpdatedAt)
+
+    const updatedAtAfterUpdate = userAfterUpdate.updatedAt
+
+    // Wait a moment to ensure timestamp difference
+    await new Promise(resolve => setTimeout(resolve, 1100))
+
+    // Test 2: Create dormitory and assign user as leader should also update updatedAt
+    const dormCreateResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Building A',
+        capacity: 4
+      }
+    })
+
+    expect(dormCreateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const dormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory'] }),
+      undefined,
+      ['id', 'name']
+    )
+
+    expect(dormitory).toBeDefined()
+
+    // Assign user as dormitory leader
+    const assignResult = await controller.callInteraction('assignDormitoryLeader', {
+      user: { id: 'admin' },
+      payload: {
+        userId: createdUser.id,
+        dormitoryId: dormitory.id
+      }
+    })
+
+    expect(assignResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const userAfterAssignment = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+      undefined,
+      ['id', 'name', 'role', 'updatedAt']
+    )
+
+    expect(userAfterAssignment).toBeDefined()
+    expect(userAfterAssignment.role).toBe('dormitoryLeader')
+    expect(userAfterAssignment.updatedAt).toBeGreaterThan(updatedAtAfterUpdate)
+  })
 }) 

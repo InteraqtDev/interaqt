@@ -69,8 +69,7 @@ export const User = Entity.create({
     }),
     Property.create({
       name: 'updatedAt',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     }),
     Property.create({
       name: 'isDeleted',
@@ -1225,4 +1224,38 @@ User.properties.find(p => p.name === 'role').computation = StateMachine.create({
     })
   ],
   defaultState: roleDefaultState
+})
+
+// User.updatedAt StateMachine computation
+const updatedAtDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && (event.interactionName === 'updateUser' || event.interactionName === 'assignDormitoryLeader')) {
+      return Math.floor(Date.now() / 1000);
+    }
+    return lastValue;
+  }
+});
+
+User.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [updatedAtDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateUserInteraction,
+      current: updatedAtDefaultState,
+      next: updatedAtDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.userId
+      })
+    }),
+    StateTransfer.create({
+      trigger: AssignDormitoryLeaderInteraction,
+      current: updatedAtDefaultState,
+      next: updatedAtDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.userId
+      })
+    })
+  ],
+  defaultState: updatedAtDefaultState
 })
