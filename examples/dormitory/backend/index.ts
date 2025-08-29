@@ -105,8 +105,7 @@ export const Dormitory = Entity.create({
     }),
     Property.create({
       name: 'updatedAt',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     }),
     Property.create({
       name: 'isDeleted',
@@ -1381,4 +1380,30 @@ Dormitory.properties.find(p => p.name === 'capacity').computation = StateMachine
     })
   ],
   defaultState: dormitoryCapacityDefaultState
+})
+
+// Dormitory.updatedAt StateMachine computation
+const dormitoryUpdatedAtDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'updateDormitory') {
+      return Math.floor(Date.now() / 1000);
+    }
+    return lastValue;
+  }
+});
+
+Dormitory.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [dormitoryUpdatedAtDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDormitoryInteraction,
+      current: dormitoryUpdatedAtDefaultState,
+      next: dormitoryUpdatedAtDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.dormitoryId
+      })
+    })
+  ],
+  defaultState: dormitoryUpdatedAtDefaultState
 })

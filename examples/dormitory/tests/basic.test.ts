@@ -472,6 +472,89 @@ describe('Basic Functionality', () => {
     expect(dormitory.capacity).toBe(4)
   })
 
+  test('Dormitory.updatedAt StateMachine computation automatically updates timestamp', async () => {
+    /**
+     * Test Plan for: Dormitory.updatedAt StateMachine computation
+     * Dependencies: Dormitory entity, CreateDormitory interaction, UpdateDormitory interaction
+     * Steps: 1) Create dormitory 2) Record initial timestamp 3) Update dormitory 4) Verify updatedAt was updated
+     * Business Logic: StateMachine computation automatically sets updatedAt timestamp when UpdateDormitory interaction occurs
+     */
+    
+    // Step 1: Create dormitory
+    const createResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'UpdatedAt Test Building',
+        location: 'Test Campus Building G',
+        capacity: 5
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created dormitory
+    const dormitories = await system.storage.find(
+      'Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'UpdatedAt Test Building'] }),
+      undefined,
+      ['id', 'name', 'location', 'capacity', 'createdAt', 'updatedAt']
+    )
+    
+    expect(dormitories.length).toBe(1)
+    const dormitory = dormitories[0]
+    
+    // Get initial timestamps (from entity creation Transform computation)
+    const initialCreatedAt = dormitory.createdAt
+    const initialUpdatedAt = dormitory.updatedAt
+    
+    // Verify initial state (both timestamps should be set by entity Transform computation)
+    expect(initialCreatedAt).toBeDefined()
+    expect(initialUpdatedAt).toBeDefined()
+    
+    // Wait a bit to ensure timestamp difference
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    const beforeUpdateTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Step 2: Update the dormitory to trigger updatedAt StateMachine computation
+    const updateResult = await controller.callInteraction('updateDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitory.id,
+        name: 'Updated Test Building',
+        location: 'Updated Campus Location'
+      }
+    })
+
+    const afterUpdateTimestamp = Math.floor(Date.now() / 1000)
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 3: Verify updatedAt was updated by StateMachine computation
+    const updatedDormitory = await system.storage.findOne(
+      'Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitory.id] }),
+      undefined,
+      ['id', 'name', 'location', 'capacity', 'createdAt', 'updatedAt']
+    )
+    
+    expect(updatedDormitory).toBeDefined()
+    
+    // Verify updatedAt has changed and is within reasonable range
+    expect(updatedDormitory.updatedAt).toBeDefined()
+    expect(updatedDormitory.updatedAt).not.toBe(initialUpdatedAt) // Should be different from initial
+    expect(updatedDormitory.updatedAt).toBeGreaterThanOrEqual(beforeUpdateTimestamp)
+    expect(updatedDormitory.updatedAt).toBeLessThanOrEqual(afterUpdateTimestamp)
+    
+    // Verify createdAt remains unchanged
+    expect(updatedDormitory.createdAt).toBe(initialCreatedAt)
+    
+    // Verify other properties were updated
+    expect(updatedDormitory.name).toBe('Updated Test Building')
+    expect(updatedDormitory.location).toBe('Updated Campus Location')
+    expect(updatedDormitory.capacity).toBe(5) // Should remain unchanged since not specified in update
+  })
+
   test('Bed entity Transform computation creates bed via CreateBed interaction', async () => {
     /**
      * Test Plan for: Bed entity Transform computation
