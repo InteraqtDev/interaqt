@@ -966,3 +966,21 @@ DeductionRule.computation = Transform.create({
     return null
   }
 })
+
+// RemovalRequest entity computation - Transform computation for creation
+RemovalRequest.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: function(event) {
+    if (event.interactionName === 'submitRemovalRequest') {
+      return {
+        reason: event.payload.reason,
+        status: 'pending',
+        requestedAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+        // processedAt and adminComment are not set initially
+      }
+    }
+    return null
+  }
+})

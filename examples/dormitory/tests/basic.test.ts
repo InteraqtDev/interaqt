@@ -426,4 +426,100 @@ describe('Basic Functionality', () => {
     expect(createdDeduction.isDeleted).toBe(false)
     expect(createdDeduction.deductedAt).toBeDefined()
   })
+
+  test('RemovalRequest entity Transform computation creates removal request via SubmitRemovalRequest interaction', async () => {
+    /**
+     * Test Plan for: RemovalRequest entity Transform computation
+     * Dependencies: RemovalRequest entity, SubmitRemovalRequest interaction, User entity
+     * Steps: 1) Create target user 2) Create requester user 3) Trigger SubmitRemovalRequest interaction 4) Verify RemovalRequest entity is created 5) Verify properties are correct
+     * Business Logic: Transform computation creates RemovalRequest entity when SubmitRemovalRequest interaction occurs
+     */
+    
+    // First create a target user (user to be removed)
+    const targetUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Target User for Removal',
+        email: 'remove.target@example.com',
+        studentId: 'STU004'
+      }
+    })
+    
+    expect(targetUserResult.error).toBeUndefined()
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the target user ID
+    let targetUserId
+    const targetUserCreateEffect = targetUserResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (targetUserCreateEffect && targetUserCreateEffect.record.id) {
+      targetUserId = targetUserCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created user
+      const users = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      const createdUser = users.find(user => user.email === 'remove.target@example.com')
+      expect(createdUser).toBeDefined()
+      targetUserId = createdUser.id
+    }
+    
+    expect(targetUserId).toBeDefined()
+    
+    // Now submit removal request via interaction
+    const result = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: 'requester-user' }, // Requester user (dormitory leader)
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Violation of dormitory rules and policies'
+      }
+    })
+
+    // Check that interaction was successful
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects.length).toBeGreaterThan(0)
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check if any RemovalRequest records were created by querying the database
+    const allRequests = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      ['id', 'reason', 'status', 'requestedAt', 'processedAt', 'adminComment', 'isDeleted']
+    )
+
+    // Get the created removal request ID from effects OR from database query
+    let requestCreateEffect = result.effects.find(effect => effect.recordName === 'RemovalRequest' && effect.type === 'create')
+    let createdRequest
+    
+    if (requestCreateEffect) {
+      expect(requestCreateEffect.record.id).toBeDefined()
+      createdRequest = await system.storage.findOne(
+        'RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requestCreateEffect.record.id] }),
+        undefined,
+        ['id', 'reason', 'status', 'requestedAt', 'processedAt', 'adminComment', 'isDeleted']
+      )
+    } else {
+      // If no effect, try to find the created request by reason (should be unique in this test)
+      createdRequest = allRequests.find(request => request.reason === 'Violation of dormitory rules and policies')
+      expect(createdRequest).toBeDefined()
+    }
+
+    expect(createdRequest).toBeDefined()
+    expect(createdRequest.reason).toBe('Violation of dormitory rules and policies')
+    expect(createdRequest.status).toBe('pending') // Initial status should be pending
+    expect(createdRequest.requestedAt).toBeDefined()
+    expect(createdRequest.processedAt).toBeUndefined() // Should be undefined/null initially
+    expect(createdRequest.adminComment).toBeUndefined() // Should be undefined/null initially
+    expect(createdRequest.isDeleted).toBe(false)
+  })
 }) 
