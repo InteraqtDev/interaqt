@@ -1112,3 +1112,32 @@ UserRemovalRequestProcessorRelation.computation = StateMachine.create({
   ],
   defaultState: notProcessedState
 })
+
+// User.name StateMachine computation
+const nameDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createUser') {
+      return event.payload.name;
+    }
+    if (event && event.interactionName === 'updateUser' && event.payload.name !== undefined) {
+      return event.payload.name;
+    }
+    return lastValue;
+  }
+});
+
+User.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [nameDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateUserInteraction,
+      current: nameDefaultState,
+      next: nameDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.userId
+      })
+    })
+  ],
+  defaultState: nameDefaultState
+})
