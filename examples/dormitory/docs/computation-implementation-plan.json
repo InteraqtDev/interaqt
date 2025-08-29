@@ -402,7 +402,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
           "calculationMethod": "Set to true by DeleteUser interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.id",

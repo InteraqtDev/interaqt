@@ -73,8 +73,7 @@ export const User = Entity.create({
     }),
     Property.create({
       name: 'isDeleted',
-      type: 'boolean',
-      defaultValue: () => false
+      type: 'boolean'
     })
   ]
 })
@@ -1258,4 +1257,30 @@ User.properties.find(p => p.name === 'updatedAt').computation = StateMachine.cre
     })
   ],
   defaultState: updatedAtDefaultState
+})
+
+// User.isDeleted StateMachine computation
+const isDeletedActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => false
+});
+
+const isDeletedDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+});
+
+User.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [isDeletedActiveState, isDeletedDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteUserInteraction,
+      current: isDeletedActiveState,
+      next: isDeletedDeletedState,
+      computeTarget: (event) => ({
+        id: event.payload.userId
+      })
+    })
+  ],
+  defaultState: isDeletedActiveState
 })

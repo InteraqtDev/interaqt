@@ -2297,4 +2297,71 @@ describe('Basic Functionality', () => {
     expect(userAfterAssignment.role).toBe('dormitoryLeader')
     expect(userAfterAssignment.updatedAt).toBeGreaterThan(updatedAtAfterUpdate)
   })
+
+  test('User.isDeleted StateMachine computation', async () => {
+    /**
+     * Test Plan for: User.isDeleted
+     * Dependencies: User entity, DeleteUser interaction
+     * Steps: 1) Create user 2) Verify isDeleted is initially false 3) Delete user 4) Verify isDeleted is true
+     * Business Logic: User.isDeleted starts false and transitions to true when DeleteUser interaction occurs
+     */
+    
+    // Create user
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User',
+        email: 'test@example.com',
+        studentId: 'STU001',
+        phone: '123-456-7890'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    let userId
+    const userCreateEffect = userResult.effects?.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (userCreateEffect && userCreateEffect.record.id) {
+      userId = userCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const createdUser = users.find(user => user.email === 'test@example.com')
+      expect(createdUser).toBeDefined()
+      userId = createdUser.id
+    }
+
+    // Verify user isDeleted is initially false (active state)
+    const userBefore = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+
+    expect(userBefore).toBeDefined()
+    expect(userBefore.isDeleted).toBe(false)
+
+    // Delete the user via interaction
+    const deleteResult = await controller.callInteraction('deleteUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId
+      }
+    })
+
+    expect(deleteResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify user isDeleted is now true (deleted state)
+    const userAfter = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'name', 'isDeleted']
+    )
+
+    expect(userAfter).toBeDefined()
+    expect(userAfter.isDeleted).toBe(true)
+  })
 }) 
