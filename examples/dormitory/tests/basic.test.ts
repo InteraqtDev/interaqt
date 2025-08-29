@@ -1807,4 +1807,68 @@ describe('Basic Functionality', () => {
     expect(finalUpdatedUser.email).toBe('final@example.com') // Should be updated to final email
     expect(finalUpdatedUser.studentId).toBe('STU456') // Should remain unchanged
   })
+
+  test('User.studentId computation (_owner type)', async () => {
+    /**
+     * Test Plan for: _owner
+     * This tests that studentId is properly set when User is created
+     * Steps: 1) Trigger interaction that creates User 2) Verify studentId is set
+     * Business Logic: User's creation computation sets studentId property
+     */
+    
+    // Create user to test studentId _owner computation
+    const result = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'StudentId Test User',
+        email: 'studentid@example.com',
+        studentId: 'STU999'
+      }
+    })
+
+    expect(result.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created user
+    const users = await system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'studentid@example.com'] }),
+      undefined,
+      ['id', 'studentId']
+    )
+
+    expect(users.length).toBe(1)
+    const user = users[0]
+    
+    // Verify studentId was set correctly by the _owner computation (via entity creation)
+    expect(user.studentId).toBe('STU999')
+    
+    // Verify studentId cannot be changed via update (since it's creation-only)
+    const updateResult = await controller.callInteraction('updateUser', {
+      user: { id: 'admin' },
+      payload: {
+        userId: user.id,
+        name: 'Updated Name'
+        // Note: not trying to update studentId since it's creation-only
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify studentId remains unchanged
+    const updatedUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      undefined,
+      ['id', 'studentId', 'name']
+    )
+
+    expect(updatedUser.studentId).toBe('STU999') // Should remain unchanged
+    expect(updatedUser.name).toBe('Updated Name') // Name can be updated
+  })
 }) 

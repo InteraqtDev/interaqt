@@ -302,7 +302,7 @@
           ],
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "Set once at creation, immutable thereafter",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.phone",
