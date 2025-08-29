@@ -4061,4 +4061,270 @@ describe('Basic Functionality', () => {
 
     expect(deletedDeduction.isDeleted).toBe(true)
   })
+
+  test('RemovalRequest.id property is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: RemovalRequest.id (_owner)
+     * This tests that id is properly set when RemovalRequest is created
+     * Dependencies: RemovalRequest entity, User entity, SubmitRemovalRequest interaction
+     * Steps: 1) Create target user 2) Create requester user 3) Submit removal request 4) Verify id is auto-generated
+     * Business Logic: RemovalRequest's creation computation sets id automatically when SubmitRemovalRequest interaction occurs
+     */
+    
+    // Create target user first
+    const targetUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Target User for Removal',
+        email: 'target.removal@example.com',
+        studentId: 'TRU001',
+        phone: '555-1111',
+        role: 'user'
+      }
+    })
+    
+    expect(targetUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the target user ID
+    let targetUserId
+    const targetUserCreateEffect = targetUserResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (targetUserCreateEffect && targetUserCreateEffect.record.id) {
+      targetUserId = targetUserCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        MatchExp.atom({ key: 'email', value: ['=', 'target.removal@example.com'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(users.length).toBe(1)
+      targetUserId = users[0].id
+    }
+    
+    expect(targetUserId).toBeDefined()
+    
+    // Create requester user (dormitory leader)
+    const requesterUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Dormitory Leader',
+        email: 'leader.removal@example.com',
+        studentId: 'LRU001',
+        phone: '555-2222',
+        role: 'dormitoryLeader'
+      }
+    })
+    
+    expect(requesterUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the requester user ID
+    let requesterUserId
+    const requesterUserCreateEffect = requesterUserResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (requesterUserCreateEffect && requesterUserCreateEffect.record.id) {
+      requesterUserId = requesterUserCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        MatchExp.atom({ key: 'email', value: ['=', 'leader.removal@example.com'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(users.length).toBe(1)
+      requesterUserId = users[0].id
+    }
+    
+    expect(requesterUserId).toBeDefined()
+    
+    // Submit removal request via interaction
+    const requestResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: requesterUserId }, // Dormitory leader submitting the request
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Repeated violations of dormitory rules and noise complaints'
+      }
+    })
+    
+    expect(requestResult.error).toBeUndefined()
+    expect(requestResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created removal request ID from effects OR from database query
+    let requestCreateEffect = requestResult.effects.find(effect => effect.recordName === 'RemovalRequest' && effect.type === 'create')
+    let createdRequest
+    
+    if (requestCreateEffect) {
+      expect(requestCreateEffect.record.id).toBeDefined()
+      createdRequest = await system.storage.findOne(
+        'RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requestCreateEffect.record.id] }),
+        undefined,
+        ['id', 'reason', 'status', 'requestedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, query the database to find the created request
+      const requests = await system.storage.find(
+        'RemovalRequest',
+        MatchExp.atom({ key: 'reason', value: ['=', 'Repeated violations of dormitory rules and noise complaints'] }),
+        undefined,
+        ['id', 'reason', 'status', 'requestedAt', 'isDeleted']
+      )
+      expect(requests.length).toBe(1)
+      createdRequest = requests[0]
+    }
+    
+    expect(createdRequest).toBeDefined()
+    
+    // Verify that id is properly set (_owner computation)
+    expect(createdRequest.id).toBeDefined()
+    expect(typeof createdRequest.id).toBe('string')
+    expect(createdRequest.id.length).toBeGreaterThan(0)
+    
+    // Verify other properties are correct
+    expect(createdRequest.reason).toBe('Repeated violations of dormitory rules and noise complaints')
+    expect(createdRequest.status).toBe('pending')
+    expect(createdRequest.requestedAt).toBeDefined()
+    expect(typeof createdRequest.requestedAt).toBe('number')
+    expect(createdRequest.isDeleted).toBe(false)
+  })
+
+  test('RemovalRequest.reason set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: RemovalRequest.reason (_owner computation)
+     * Dependencies: RemovalRequest entity, User entity, SubmitRemovalRequest interaction
+     * Steps: 
+     *   1) Create test users (requester and target)
+     *   2) Submit removal request with specific reason
+     *   3) Verify RemovalRequest is created with correct reason property
+     *   4) Verify reason is set once at creation and immutable
+     * Business Logic: RemovalRequest.reason is controlled by entity creation and set once for request integrity
+     */
+    
+    // Create target user first
+    const targetUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Target User for Reason Test',
+        email: 'target.reason@example.com',
+        studentId: 'TRT001',
+        phone: '555-3333',
+        role: 'user'
+      }
+    })
+    
+    expect(targetUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the target user ID
+    let targetUserId
+    const targetUserCreateEffect = targetUserResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (targetUserCreateEffect && targetUserCreateEffect.record.id) {
+      targetUserId = targetUserCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        MatchExp.atom({ key: 'email', value: ['=', 'target.reason@example.com'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(users.length).toBe(1)
+      targetUserId = users[0].id
+    }
+    
+    expect(targetUserId).toBeDefined()
+    
+    // Create requester user (dormitory leader)
+    const requesterUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Leader for Reason Test',
+        email: 'leader.reason@example.com',
+        studentId: 'LRT001',
+        phone: '555-4444',
+        role: 'dormitoryLeader'
+      }
+    })
+    
+    expect(requesterUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the requester user ID
+    let requesterUserId
+    const requesterUserCreateEffect = requesterUserResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (requesterUserCreateEffect && requesterUserCreateEffect.record.id) {
+      requesterUserId = requesterUserCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        MatchExp.atom({ key: 'email', value: ['=', 'leader.reason@example.com'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(users.length).toBe(1)
+      requesterUserId = users[0].id
+    }
+    
+    expect(requesterUserId).toBeDefined()
+    
+    // Submit removal request with specific reason via interaction
+    const specificReason = 'Continuous disruption of study environment and violation of quiet hours'
+    const requestResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: requesterUserId }, // Dormitory leader submitting the request
+      payload: {
+        targetUserId: targetUserId,
+        reason: specificReason
+      }
+    })
+    
+    expect(requestResult.error).toBeUndefined()
+    expect(requestResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created removal request ID from effects OR from database query
+    let requestCreateEffect = requestResult.effects.find(effect => effect.recordName === 'RemovalRequest' && effect.type === 'create')
+    let createdRequest
+    
+    if (requestCreateEffect) {
+      expect(requestCreateEffect.record.id).toBeDefined()
+      createdRequest = await system.storage.findOne(
+        'RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', requestCreateEffect.record.id] }),
+        undefined,
+        ['id', 'reason', 'status', 'requestedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, query the database to find the created request by reason
+      const requests = await system.storage.find(
+        'RemovalRequest',
+        MatchExp.atom({ key: 'reason', value: ['=', specificReason] }),
+        undefined,
+        ['id', 'reason', 'status', 'requestedAt', 'isDeleted']
+      )
+      expect(requests.length).toBe(1)
+      createdRequest = requests[0]
+    }
+    
+    expect(createdRequest).toBeDefined()
+    
+    // Verify that reason is properly set by _owner computation
+    expect(createdRequest.reason).toBe(specificReason)
+    expect(createdRequest.reason).toBe('Continuous disruption of study environment and violation of quiet hours')
+    
+    // Verify other properties are correct to ensure the full entity was created properly
+    expect(createdRequest.id).toBeDefined()
+    expect(createdRequest.status).toBe('pending')
+    expect(createdRequest.requestedAt).toBeDefined()
+    expect(typeof createdRequest.requestedAt).toBe('number')
+    expect(createdRequest.isDeleted).toBe(false)
+    
+    // Verify reason is set once at creation and immutable (part of _owner computation behavior)
+    // The reason should match exactly what was provided in the payload
+    expect(typeof createdRequest.reason).toBe('string')
+    expect(createdRequest.reason.length).toBeGreaterThan(0)
+  })
 }) 

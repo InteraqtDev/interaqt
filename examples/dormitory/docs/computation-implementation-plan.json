@@ -734,7 +734,7 @@
           "interactionDependencies": null,
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "auto-generated",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.reason",
@@ -751,7 +751,7 @@
           ],
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "Set once at creation for request integrity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.status",
