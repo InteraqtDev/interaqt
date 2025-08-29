@@ -143,7 +143,7 @@
           ],
           "reasoning": "creation type is created-with-entity, so relation is created by parent Bed entity's computation",
           "calculationMethod": "Created together with Bed entity by CreateBed interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserPointDeductionRelation",

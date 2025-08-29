@@ -923,7 +923,8 @@ Bed.computation = Transform.create({
         status: 'vacant',
         createdAt: Math.floor(Date.now() / 1000),
         updatedAt: Math.floor(Date.now() / 1000),
-        isDeleted: false
+        isDeleted: false,
+        dormitory: { id: event.payload.dormitoryId } // Creates DormitoryBedRelation via 'dormitory' targetProperty
       }
     }
     return null

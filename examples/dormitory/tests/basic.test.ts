@@ -793,4 +793,86 @@ describe('Basic Functionality', () => {
 
     expect(remainingRelation).toBeUndefined() // Should be removed
   })
+
+  test('DormitoryBedRelation created by Bed Transform (_parent:Bed)', async () => {
+    /**
+     * Test Plan for: _parent:Bed
+     * This tests the Bed's Transform computation that creates DormitoryBedRelation
+     * Dependencies: Dormitory entity, Bed entity, DormitoryBedRelation, CreateDormitory, CreateBed interactions
+     * Steps: 1) Create dormitory 2) Create bed with dormitoryId 3) Verify DormitoryBedRelation is created
+     * Business Logic: Bed's Transform creates DormitoryBedRelation using dormitory targetProperty
+     */
+
+    // Create dormitory first
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Building A',
+        capacity: 4
+      }
+    })
+
+    expect(dormitoryResult.error).toBeUndefined()
+    const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+    expect(dormitoryId).toBeTruthy()
+
+    // Create bed with dormitoryId
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'B001'
+      }
+    })
+
+    expect(bedResult.error).toBeUndefined()
+
+    // Import DormitoryBedRelation to get relation name
+    const { DormitoryBedRelation } = await import('../backend')
+
+    // Find the bed that was created with its dormitory relation
+    const allBeds = await system.storage.find(
+      'Bed',
+      undefined,
+      undefined,
+      [
+        'id', 
+        'number', 
+        ['dormitory', { attributeQuery: ['id'] }]
+      ]
+    )
+    
+    expect(allBeds.length).toBe(1)
+    
+    // Use the actual bed that was created
+    const actualBed = allBeds[0]
+    const bedId = actualBed.id
+
+    // Verify DormitoryBedRelation was created between the dormitory and bed
+    const relations = await system.storage.find(
+      DormitoryBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', dormitoryId] })
+        .and({ key: 'target.id', value: ['=', bedId] }),
+      undefined,
+      [
+        'id',
+        'createdAt',
+        ['source', { attributeQuery: ['id'] }],
+        ['target', { attributeQuery: ['id', 'number'] }]
+      ]
+    )
+
+    expect(relations.length).toBe(1)
+    
+    const relation = relations[0]
+    expect(relation.source.id).toBe(dormitoryId)
+    expect(relation.target.id).toBe(bedId)
+    expect(relation.target.number).toBe('B001')
+    expect(relation.createdAt).toBeTypeOf('number')
+    expect(relation.createdAt).toBeGreaterThan(0)
+    
+    // Verify the bed has the dormitory reference
+    expect(actualBed.dormitory.id).toBe(dormitoryId)
+  })
 }) 
