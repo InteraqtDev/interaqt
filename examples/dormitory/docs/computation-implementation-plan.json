@@ -630,7 +630,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
           "calculationMethod": "Set to true by DeleteBed interaction, requires status = 'vacant'",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction.id",

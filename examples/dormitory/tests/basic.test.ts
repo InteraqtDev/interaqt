@@ -3306,4 +3306,115 @@ describe('Basic Functionality', () => {
     // Verify createdAt didn't change
     expect(updatedBed.createdAt).toBe(initialBed.createdAt)
   })
+
+  test('Bed.isDeleted StateMachine computation for soft deletion', async () => {
+    /**
+     * Test Plan for: Bed.isDeleted StateMachine computation
+     * Dependencies: Bed entity, Dormitory entity, CreateBed, DeleteBed interactions
+     * Steps: 1) Create dormitory 2) Create bed 3) Verify initial isDeleted=false 4) Delete bed 5) Verify isDeleted=true
+     * Business Logic: StateMachine manages soft deletion - set to true by DeleteBed interaction, requires status = 'vacant'
+     */
+    
+    // Create a dormitory first
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory for Bed Deletion',
+        location: 'Building E',
+        capacity: 6
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the dormitory ID
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory for Bed Deletion'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(allDormitories.length).toBe(1)
+      dormitoryId = allDormitories[0].id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Create a bed via CreateBed interaction
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'BE001'
+      }
+    })
+    
+    expect(bedResult.error).toBeUndefined()
+    expect(bedResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created bed ID from effects OR from database query
+    let bedCreateEffect = bedResult.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    let bedId
+    
+    if (bedCreateEffect) {
+      expect(bedCreateEffect.record.id).toBeDefined()
+      bedId = bedCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created bed
+      const beds = await system.storage.find(
+        'Bed',
+        MatchExp.atom({ key: 'number', value: ['=', 'BE001'] }),
+        undefined,
+        ['id', 'number']
+      )
+      expect(beds.length).toBe(1)
+      bedId = beds[0].id
+    }
+    
+    expect(bedId).toBeDefined()
+    
+    // Verify initial state - bed should be active (isDeleted = false)
+    const bedBefore = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'status', 'isDeleted']
+    )
+    
+    expect(bedBefore).toBeDefined()
+    expect(bedBefore.isDeleted).toBe(false) // Should start in active state
+    expect(bedBefore.status).toBe('vacant') // Should be vacant initially
+    
+    // Delete the bed via DeleteBed interaction
+    const deleteResult = await controller.callInteraction('deleteBed', {
+      user: { id: 'admin' },
+      payload: {
+        bedId: bedId
+      }
+    })
+    
+    expect(deleteResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Verify bed isDeleted is now true (deleted state)
+    const bedAfter = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'status', 'isDeleted']
+    )
+    
+    expect(bedAfter).toBeDefined()
+    expect(bedAfter.isDeleted).toBe(true)
+    expect(bedAfter.number).toBe('BE001') // Other properties should remain the same
+    expect(bedAfter.id).toBe(bedId) // ID should remain the same
+  })
 }) 

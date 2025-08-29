@@ -137,8 +137,7 @@ export const Bed = Entity.create({
     }),
     Property.create({
       name: 'isDeleted',
-      type: 'boolean',
-      defaultValue: () => false
+      type: 'boolean'
     })
   ]
 })
@@ -1485,4 +1484,30 @@ Bed.properties.find(p => p.name === 'updatedAt').computation = StateMachine.crea
     })
   ],
   defaultState: bedUpdatedAtDefaultState
+})
+
+// Bed.isDeleted StateMachine computation
+const bedIsDeletedActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => false
+});
+
+const bedIsDeletedDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+});
+
+Bed.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [bedIsDeletedActiveState, bedIsDeletedDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteBedInteraction,
+      current: bedIsDeletedActiveState,
+      next: bedIsDeletedDeletedState,
+      computeTarget: (event) => ({
+        id: event.payload.bedId
+      })
+    })
+  ],
+  defaultState: bedIsDeletedActiveState
 })
