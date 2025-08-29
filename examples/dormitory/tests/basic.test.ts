@@ -199,4 +199,99 @@ describe('Basic Functionality', () => {
     expect(createdDormitory.createdAt).toBeDefined()
     expect(createdDormitory.updatedAt).toBeDefined()
   })
+
+  test('Bed entity Transform computation creates bed via CreateBed interaction', async () => {
+    /**
+     * Test Plan for: Bed entity Transform computation
+     * Dependencies: Bed entity, CreateBed interaction, Dormitory entity
+     * Steps: 1) Create a dormitory first 2) Trigger CreateBed interaction 3) Verify Bed entity is created 4) Verify properties are correct
+     * Business Logic: Transform computation creates Bed entity when CreateBed interaction occurs
+     */
+    
+    // First create a dormitory (needed for dormitoryId reference)
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Building A',
+        location: 'Test Campus',
+        capacity: 4
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created dormitory ID - check effects OR find in database
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created dormitory
+      const dormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      const createdDormitory = dormitories.find(dorm => dorm.name === 'Test Building A')
+      expect(createdDormitory).toBeDefined()
+      dormitoryId = createdDormitory.id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Now create bed via interaction
+    const result = await controller.callInteraction('createBed', {
+      user: { id: 'admin' }, // Admin user triggering the creation
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'B001'
+      }
+    })
+
+    // Check that interaction was successful
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects.length).toBeGreaterThan(0)
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check if any Bed records were created by querying the database
+    const allBeds = await system.storage.find(
+      'Bed',
+      undefined,
+      undefined,
+      ['id', 'number', 'status', 'createdAt', 'updatedAt', 'isDeleted']
+    )
+
+    // Get the created bed ID from effects OR from database query
+    let bedCreateEffect = result.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    let createdBed
+    
+    if (bedCreateEffect) {
+      expect(bedCreateEffect.record.id).toBeDefined()
+      createdBed = await system.storage.findOne(
+        'Bed',
+        MatchExp.atom({ key: 'id', value: ['=', bedCreateEffect.record.id] }),
+        undefined,
+        ['id', 'number', 'status', 'createdAt', 'updatedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, try to find the created bed by number (should be unique in this test)
+      createdBed = allBeds.find(bed => bed.number === 'B001')
+      expect(createdBed).toBeDefined()
+    }
+
+    expect(createdBed).toBeDefined()
+    expect(createdBed.number).toBe('B001')
+    expect(createdBed.status).toBe('vacant') // Initial status should be vacant
+    expect(createdBed.isDeleted).toBe(false)
+    expect(createdBed.createdAt).toBeDefined()
+    expect(createdBed.updatedAt).toBeDefined()
+  })
 }) 

@@ -911,3 +911,21 @@ Dormitory.computation = Transform.create({
     return null
   }
 })
+
+// Bed entity computation - Transform computation for creation
+Bed.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: function(event) {
+    if (event.interactionName === 'createBed') {
+      return {
+        number: event.payload.number,
+        status: 'vacant',
+        createdAt: Math.floor(Date.now() / 1000),
+        updatedAt: Math.floor(Date.now() / 1000),
+        isDeleted: false
+      }
+    }
+    return null
+  }
+})

@@ -44,7 +44,7 @@
           ],
           "reasoning": "interaction-created entity with soft-delete capability uses Transform for creation + status property with StateMachine for deletion",
           "calculationMethod": "Created by CreateBed interaction within a specific dormitory",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction",
