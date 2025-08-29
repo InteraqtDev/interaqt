@@ -979,8 +979,10 @@ RemovalRequest.computation = Transform.create({
         reason: event.payload.reason,
         status: 'pending',
         requestedAt: Math.floor(Date.now() / 1000),
-        isDeleted: false
+        isDeleted: false,
         // processedAt and adminComment are not set initially
+        targetUser: { id: event.payload.targetUserId }, // Creates UserRemovalRequestTargetRelation via 'targetUser' targetProperty
+        requestedBy: event.user // Creates UserRemovalRequestRequesterRelation via 'requestedBy' targetProperty
       }
     }
     return null

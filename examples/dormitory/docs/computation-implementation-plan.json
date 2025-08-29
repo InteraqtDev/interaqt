@@ -177,7 +177,7 @@
           ],
           "reasoning": "creation type is created-with-entity, so relation is created by parent RemovalRequest entity's computation",
           "calculationMethod": "Created together with RemovalRequest entity by SubmitRemovalRequest interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserRemovalRequestRequesterRelation",

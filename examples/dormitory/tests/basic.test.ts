@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation, UserPointDeductionRelation, UserRemovalRequestTargetRelation } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -471,9 +471,43 @@ describe('Basic Functionality', () => {
     
     expect(targetUserId).toBeDefined()
     
+    // Create a requester user (dormitory leader)
+    const requesterUserResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Requester User Leader',
+        email: 'requester.leader@example.com',
+        studentId: 'STU005',
+        role: 'dormitoryLeader'
+      }
+    })
+    
+    expect(requesterUserResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the requester user ID
+    let requesterUserId
+    const requesterUserCreateEffect = requesterUserResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (requesterUserCreateEffect && requesterUserCreateEffect.record.id) {
+      requesterUserId = requesterUserCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      const requesterUser = users.find(user => user.email === 'requester.leader@example.com')
+      expect(requesterUser).toBeDefined()
+      requesterUserId = requesterUser.id
+    }
+    
+    expect(requesterUserId).toBeDefined()
+    
     // Now submit removal request via interaction
     const result = await controller.callInteraction('submitRemovalRequest', {
-      user: { id: 'requester-user' }, // Requester user (dormitory leader)
+      user: { id: requesterUserId }, // Requester user (dormitory leader)
       payload: {
         targetUserId: targetUserId,
         reason: 'Violation of dormitory rules and policies'
@@ -972,5 +1006,122 @@ describe('Basic Functionality', () => {
     
     // Verify the point deduction has the user reference
     expect(actualDeduction.user.id).toBe(userId)
+  })
+
+  test('UserRemovalRequestTargetRelation creation through RemovalRequest Transform (_parent:RemovalRequest)', async () => {
+    /**
+     * Test Plan for: UserRemovalRequestTargetRelation (_parent:RemovalRequest)
+     * Dependencies: User entity, RemovalRequest entity, UserRemovalRequestTargetRelation
+     * Steps: 1) Create requester user 2) Create target user 3) Submit removal request 4) Verify UserRemovalRequestTargetRelation is created
+     * Business Logic: RemovalRequest's Transform creates UserRemovalRequestTargetRelation when submitRemovalRequest interaction occurs
+     */
+    
+    // Create requester user (dormitory leader)
+    const requesterResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Dorm Leader',
+        email: 'leader@example.com',
+        studentId: 'STU007',
+        role: 'dormitoryLeader'
+      }
+    })
+    
+    expect(requesterResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let requesterId
+    const requesterCreateEffect = requesterResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (requesterCreateEffect && requesterCreateEffect.record.id) {
+      requesterId = requesterCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const requesterUser = users.find(user => user.email === 'leader@example.com')
+      expect(requesterUser).toBeDefined()
+      requesterId = requesterUser.id
+    }
+
+    // Create target user (the one being requested for removal)
+    const targetResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Target User',
+        email: 'target@example.com',
+        studentId: 'STU008'
+      }
+    })
+    
+    expect(targetResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let targetUserId
+    const targetCreateEffect = targetResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (targetCreateEffect && targetCreateEffect.record.id) {
+      targetUserId = targetCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const targetUser = users.find(user => user.email === 'target@example.com')
+      expect(targetUser).toBeDefined()
+      targetUserId = targetUser.id
+    }
+
+    // Submit removal request
+    const removalResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: requesterId }, // Requester user submitting the request
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Violation of dormitory rules'
+      }
+    })
+
+    expect(removalResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the removal request that was created
+    const allRequests = await system.storage.find(
+      'RemovalRequest',
+      undefined,
+      undefined,
+      [
+        'id',
+        'reason',
+        'status',
+        'requestedAt',
+        ['targetUser', { attributeQuery: ['id', 'name'] }],
+        ['requestedBy', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+    
+    expect(allRequests.length).toBe(1)
+    const actualRequest = allRequests[0]
+    const requestId = actualRequest.id
+
+    // Verify UserRemovalRequestTargetRelation was created between the target user and removal request
+    const targetRelations = await system.storage.find(
+      UserRemovalRequestTargetRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] })
+        .and({ key: 'target.id', value: ['=', requestId] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'status'] }]
+      ]
+    )
+
+    expect(targetRelations.length).toBe(1)
+    
+    const targetRelation = targetRelations[0]
+    expect(targetRelation.source.id).toBe(targetUserId)
+    expect(targetRelation.source.name).toBe('Target User')
+    expect(targetRelation.target.id).toBe(requestId)
+    expect(targetRelation.target.reason).toBe('Violation of dormitory rules')
+    expect(targetRelation.target.status).toBe('pending')
+    
+    // Verify the removal request has the target user reference
+    expect(actualRequest.targetUser.id).toBe(targetUserId)
+    expect(actualRequest.targetUser.name).toBe('Target User')
+    expect(actualRequest.requestedBy.id).toBe(requesterId)
+    expect(actualRequest.requestedBy.name).toBe('Dorm Leader')
   })
 }) 
