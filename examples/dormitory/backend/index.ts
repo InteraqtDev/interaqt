@@ -1013,3 +1013,50 @@ UserDormitoryLeaderRelation.computation = StateMachine.create({
   ],
   defaultState: notAssignedState
 })
+
+// UserBedAssignmentRelation StateMachine computation
+const notAssignedToBedState = StateNode.create({ 
+  name: 'notAssigned',
+  computeValue: () => null  // Return null means no relation
+});
+
+const assignedToBedState = StateNode.create({ 
+  name: 'assigned',
+  computeValue: () => ({
+    assignedAt: Math.floor(Date.now() / 1000)
+  })
+});
+
+UserBedAssignmentRelation.computation = StateMachine.create({
+  states: [notAssignedToBedState, assignedToBedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignUserToBedInteraction,
+      current: notAssignedToBedState,
+      next: assignedToBedState,
+      computeTarget: (event) => ({
+        source: { id: event.payload.userId },
+        target: { id: event.payload.bedId }
+      })
+    }),
+    StateTransfer.create({
+      trigger: RemoveUserFromBedInteraction,
+      current: assignedToBedState,
+      next: notAssignedToBedState,
+      computeTarget: async function(this: any, event) {
+        // Find existing relation to remove
+        const relation = await this.system.storage.findOneRelationByName(
+          UserBedAssignmentRelation.name,
+          this.globals.MatchExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        );
+        return relation;
+      }
+    })
+  ],
+  defaultState: notAssignedToBedState
+})

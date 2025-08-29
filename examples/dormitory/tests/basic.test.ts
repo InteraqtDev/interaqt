@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserDormitoryLeaderRelation, UserBedAssignmentRelation } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -645,5 +645,152 @@ describe('Basic Functionality', () => {
     expect(createdRelation.target.id).toBe(dormitoryId)
     expect(createdRelation.target.name).toBe('Leadership Building')
     expect(createdRelation.assignedAt).toBeDefined()
+  })
+
+  test('UserBedAssignmentRelation StateMachine computation creates and removes relation via AssignUserToBed and RemoveUserFromBed interactions', async () => {
+    /**
+     * Test Plan for: UserBedAssignmentRelation StateMachine computation
+     * Dependencies: UserBedAssignmentRelation, AssignUserToBed interaction, RemoveUserFromBed interaction, User entity, Bed entity, Dormitory entity
+     * Steps: 1) Create user and dormitory+bed 2) Assign user to bed 3) Verify relation creation 4) Remove user from bed 5) Verify relation deletion
+     * Business Logic: StateMachine computation manages UserBedAssignmentRelation lifecycle via both assign and remove interactions
+     */
+    
+    // First create a user
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Student User',
+        email: 'student@example.com',
+        studentId: 'STU006'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let userId
+    const userCreateEffect = userResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (userCreateEffect && userCreateEffect.record.id) {
+      userId = userCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const createdUser = users.find(user => user.email === 'student@example.com')
+      expect(createdUser).toBeDefined()
+      userId = createdUser.id
+    }
+    
+    // Create a dormitory
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Student Building',
+        location: 'Student Campus',
+        capacity: 4
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const dormitories = await system.storage.find('Dormitory', undefined, undefined, ['id', 'name'])
+      const createdDormitory = dormitories.find(dorm => dorm.name === 'Student Building')
+      expect(createdDormitory).toBeDefined()
+      dormitoryId = createdDormitory.id
+    }
+    
+    // Create a bed
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'B002'
+      }
+    })
+    
+    expect(bedResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let bedId
+    const bedCreateEffect = bedResult.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    if (bedCreateEffect && bedCreateEffect.record.id) {
+      bedId = bedCreateEffect.record.id
+    } else {
+      const beds = await system.storage.find('Bed', undefined, undefined, ['id', 'number'])
+      const createdBed = beds.find(bed => bed.number === 'B002')
+      expect(createdBed).toBeDefined()
+      bedId = createdBed.id
+    }
+    
+    // Now assign user to bed
+    const assignResult = await controller.callInteraction('assignUserToBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        bedId: bedId
+      }
+    })
+
+    expect(assignResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify relation was created
+    const allRelations = await system.storage.findRelationByName(
+      UserBedAssignmentRelation.name,
+      undefined,
+      undefined,
+      [
+        'id',
+        'assignedAt',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'number'] }]
+      ]
+    )
+
+    const createdRelation = allRelations.find(relation => 
+      relation.source && relation.source.id === userId &&
+      relation.target && relation.target.id === bedId
+    )
+
+    expect(createdRelation).toBeDefined()
+    expect(createdRelation.source.id).toBe(userId)
+    expect(createdRelation.source.name).toBe('Student User')
+    expect(createdRelation.target.id).toBe(bedId)
+    expect(createdRelation.target.number).toBe('B002')
+    expect(createdRelation.assignedAt).toBeDefined()
+
+    // Now remove user from bed
+    const removeResult = await controller.callInteraction('removeUserFromBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId
+      }
+    })
+
+    expect(removeResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify relation was removed
+    const relationsAfterRemoval = await system.storage.findRelationByName(
+      UserBedAssignmentRelation.name,
+      undefined,
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id'] }],
+        ['target', { attributeQuery: ['id'] }]
+      ]
+    )
+
+    const remainingRelation = relationsAfterRemoval.find(relation => 
+      relation.source && relation.source.id === userId &&
+      relation.target && relation.target.id === bedId
+    )
+
+    expect(remainingRelation).toBeUndefined() // Should be removed
   })
 }) 

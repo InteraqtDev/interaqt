@@ -126,7 +126,7 @@
           ],
           "reasoning": "interaction-created relation with hard-delete capability requires StateMachine for both creation and deletion",
           "calculationMethod": "Created by AssignUserToBed interaction ensuring single assignment per user",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DormitoryBedRelation",
