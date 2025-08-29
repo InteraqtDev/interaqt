@@ -8187,6 +8187,204 @@ describe('Permission and Business Rules', () => {
       expect(request.reason).toBe('Multiple violations')
     })
 
+    test('BR018: Can process pending request (TC005, TC015)', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',  
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request in pending status - this will automatically create the relations
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Violation of dormitory rules',
+        status: 'pending',
+        createdAt: Math.floor(Date.now() / 1000),
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Admin should be able to process pending request
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'approved',
+          adminComment: 'Request approved'
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      
+      // Verify removal request was processed
+      const processedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'processedAt', 'adminComment']
+      )
+      expect(processedRequest.status).toBe('approved')
+      expect(processedRequest.processedAt).toBeDefined()
+      expect(processedRequest.processedAt).toBeGreaterThan(0)
+      expect(processedRequest.adminComment).toBe('Request approved')
+    })
+
+    test('BR018: Cannot process already approved request', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',  
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request in approved status (already processed)
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Violation of dormitory rules',
+        status: 'approved',  // Already approved
+        createdAt: Math.floor(Date.now() / 1000),
+        processedAt: Math.floor(Date.now() / 1000),
+        adminComment: 'Previously approved',
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Admin should NOT be able to process already approved request
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'rejected',  // Trying to change to rejected
+          adminComment: 'Trying to change decision'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('requestMustBePending')
+      
+      // Verify removal request was not changed
+      const unchangedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'adminComment']
+      )
+      expect(unchangedRequest.status).toBe('approved')  // Still approved
+      expect(unchangedRequest.adminComment).toBe('Previously approved')  // Not changed
+    })
+
+    test('BR018: Cannot process already rejected request', async () => {
+      // Create admin user
+      const admin = await system.storage.create('User', {
+        username: 'admin',  
+        password: 'password123',
+        email: 'admin@test.com',
+        name: 'Admin User',
+        role: 'admin',
+        points: 100
+      })
+      
+      // Create dormitory leader user
+      const dormitoryLeader = await system.storage.create('User', {
+        username: 'leader1',
+        password: 'password123',
+        email: 'leader@test.com',
+        name: 'Dormitory Leader',
+        role: 'dormitoryLeader',
+        points: 100
+      })
+      
+      // Create target user
+      const targetUser = await system.storage.create('User', {
+        username: 'target1',
+        password: 'password123',
+        email: 'target@test.com',
+        name: 'Target User',
+        role: 'resident',
+        points: 20  // Low points (less than 30)
+      })
+      
+      // Create removal request in rejected status (already processed)
+      const removalRequest = await system.storage.create('RemovalRequest', {
+        reason: 'Minor violation',
+        status: 'rejected',  // Already rejected
+        createdAt: Math.floor(Date.now() / 1000),
+        processedAt: Math.floor(Date.now() / 1000),
+        adminComment: 'Previously rejected',
+        targetUser: { id: targetUser.id },
+        requestedBy: { id: dormitoryLeader.id }
+      })
+      
+      // Admin should NOT be able to process already rejected request
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: admin,
+        payload: {
+          requestId: removalRequest.id,
+          decision: 'approved',  // Trying to change to approved
+          adminComment: 'Trying to approve after rejection'
+        }
+      })
+      
+      // Verify error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('requestMustBePending')
+      
+      // Verify removal request was not changed
+      const unchangedRequest = await system.storage.findOne('RemovalRequest',
+        MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+        undefined,
+        ['id', 'status', 'adminComment']
+      )
+      expect(unchangedRequest.status).toBe('rejected')  // Still rejected
+      expect(unchangedRequest.adminComment).toBe('Previously rejected')  // Not changed
+    })
+
     test('BR019: User points cannot go below 0 - Points reduced normally when sufficient (TC003)', async () => {
       // Create admin user
       const admin = await system.storage.create('User', {

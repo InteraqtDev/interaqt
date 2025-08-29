@@ -459,7 +459,7 @@
             "Cannot process already approved request",
             "Cannot process already rejected request"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR019",
