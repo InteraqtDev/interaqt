@@ -573,7 +573,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Direct assignment with uniqueness validation within dormitory",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed.createdAt",

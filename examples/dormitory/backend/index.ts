@@ -1432,3 +1432,32 @@ Dormitory.properties.find(p => p.name === 'isDeleted').computation = StateMachin
   ],
   defaultState: dormitoryIsDeletedActiveState
 })
+
+// Bed.number StateMachine computation
+const bedNumberDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createBed') {
+      return event.payload.number;
+    }
+    if (event && event.interactionName === 'updateBed' && event.payload.number !== undefined) {
+      return event.payload.number;
+    }
+    return lastValue;
+  }
+});
+
+Bed.properties.find(p => p.name === 'number').computation = StateMachine.create({
+  states: [bedNumberDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateBedInteraction,
+      current: bedNumberDefaultState,
+      next: bedNumberDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.bedId
+      })
+    })
+  ],
+  defaultState: bedNumberDefaultState
+})

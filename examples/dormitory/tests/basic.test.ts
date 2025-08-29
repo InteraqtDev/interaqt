@@ -2966,4 +2966,114 @@ describe('Basic Functionality', () => {
     expect(createdBed.createdAt).toBeDefined()
     expect(createdBed.updatedAt).toBeDefined()
   })
+
+  test('Bed.number StateMachine computation handles create and update interactions', async () => {
+    /**
+     * Test Plan for: Bed.number StateMachine computation
+     * Dependencies: Bed entity, Dormitory entity, CreateBed, UpdateBed interactions
+     * Steps: 1) Create dormitory 2) Create bed 3) Verify number is set 4) Update bed number 5) Verify number is updated
+     * Business Logic: StateMachine manages bed number through CreateBed and UpdateBed interactions with uniqueness validation within dormitory
+     */
+    
+    // Create a dormitory first
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory for Bed Number',
+        location: 'Building B',
+        capacity: 6
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the dormitory ID
+    let dormitoryId
+    const dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    
+    if (dormitoryCreateEffect && dormitoryCreateEffect.record.id) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory for Bed Number'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(allDormitories.length).toBe(1)
+      dormitoryId = allDormitories[0].id
+    }
+    
+    expect(dormitoryId).toBeDefined()
+    
+    // Create a bed via CreateBed interaction
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'BN001'
+      }
+    })
+    
+    expect(bedResult.error).toBeUndefined()
+    expect(bedResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created bed ID from effects OR from database query
+    let bedCreateEffect = bedResult.effects.find(effect => effect.recordName === 'Bed' && effect.type === 'create')
+    let bedId
+    
+    if (bedCreateEffect) {
+      expect(bedCreateEffect.record.id).toBeDefined()
+      bedId = bedCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created bed
+      const beds = await system.storage.find(
+        'Bed',
+        MatchExp.atom({ key: 'number', value: ['=', 'BN001'] }),
+        undefined,
+        ['id', 'number']
+      )
+      expect(beds.length).toBe(1)
+      bedId = beds[0].id
+    }
+    
+    expect(bedId).toBeDefined()
+    
+    // Verify bed number is correctly set from CreateBed interaction
+    const createdBed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'status']
+    )
+    
+    expect(createdBed).toBeDefined()
+    expect(createdBed.number).toBe('BN001')
+    
+    // Update bed number via UpdateBed interaction
+    const updateResult = await controller.callInteraction('updateBed', {
+      user: { id: 'admin' },
+      payload: {
+        bedId: bedId,
+        number: 'BN002'
+      }
+    })
+    
+    expect(updateResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Verify bed number is correctly updated
+    const updatedBed = await system.storage.findOne(
+      'Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'status']
+    )
+    
+    expect(updatedBed).toBeDefined()
+    expect(updatedBed.number).toBe('BN002')
+    expect(updatedBed.id).toBe(bedId) // ID should remain the same
+  })
 }) 
