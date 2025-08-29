@@ -264,6 +264,15 @@ git commit -m "feat: Task 3.1.4.2 - Generate computation implementation plan"
 
 #### Task 3.1.4.3: Progressive Implementation Loop
 
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.1.4.3",
+  "completed": false,
+  "completionCriteria": "All items in `docs/computation-implementation-plan.json` have `completed: true`"
+}
+```
+
 **📌 NOTE: For Task 3.1.4.3, use the specialized sub-agent `computation-generation-handler`**
 
 This task has its own dedicated sub-agent that handles the progressive implementation of computations one by one.
@@ -460,6 +469,15 @@ git commit -m "feat: Task 3.2.1 - Create permission and business rules implement
 ```
 
 ### Task 3.2.2: Progressive Implementation Loop
+
+**🔄 Update `docs/STATUS.json`:**
+```json
+{
+  "currentTask": "Task 3.2.2",
+  "completed": false,
+  "completionCriteria": "All items in `docs/business-rules-and-permission-control-implementation-plan.json` have `completed: true`"
+}
+```
 
 **📌 NOTE: For Task 3.2.2, use the specialized sub-agent `permission-generation-handler`**
 

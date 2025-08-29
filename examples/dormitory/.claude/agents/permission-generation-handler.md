@@ -93,7 +93,7 @@ import {
          const currentYear = new Date().getFullYear()
          const existingLeaves = await this.system.storage.find(
            'LeaveRequest',
-           BoolExp.atom({ key: 'userId', value: ['=', event.user.id] })
+           MatchExp.atom({ key: 'userId', value: ['=', event.user.id] })
              .and({ key: 'month', value: ['=', currentMonth] })
              .and({ key: 'year', value: ['=', currentYear] })
          )
@@ -146,6 +146,10 @@ import {
   - [ ] Add test cases in `tests/permission.test.ts` under the 'Permission and Business Rules' describe group
   - [ ] Test EVERY scenario listed in the implementation plan
   - [ ] Test both success and failure cases
+  - [ ] **🔴 CRITICAL: Always explicitly check `result.error` after `controller.callInteraction`:**
+    - For expected success: `expect(result.error).toBeUndefined()`
+    - For expected permission failures: `expect(result.error).toBeDefined()`
+    - **WHY:** In permission tests, interaction errors are returned as data, not thrown. Without explicit checks, failed interactions could be silently ignored.
 
 5. **Type Check Test Code**
   - Run `npm run check` to ensure test code has no type errors
@@ -153,25 +157,37 @@ import {
   - Do NOT run actual tests until type checking passes
    
 6. **Run Test**
-  - [ ] **First run type check**: `npm run check` to ensure test code has no type errors
-  - [ ] **🔴 CRITICAL: Run BOTH test suites every time** to ensure no regression:
-    - Run permission tests: `npm run test tests/permission.test.ts`
-    - Ensures new rules don't break existing functionality
-    - If ANY test fails (new or existing), must fix before proceeding
-  - [ ] Fix any test failures (both new tests and any regressions)
-  - [ ] **🔴 CRITICAL: NEVER cheat to pass tests!**
-    - ❌ Do NOT mark tests as `.skip()` or `.todo()`
-    - ❌ Do NOT fake/mock data just to make tests pass
-    - ❌ Do NOT remove or ignore critical assertions
-    - ✅ Actually fix the implementation until tests genuinely pass
-  - [ ] If test still fails after 10 fix attempts, STOP and wait for user guidance
-  - [ ] **MUST record all encountered errors** in `docs/errors/` directory with descriptive filenames (e.g., `permission-admin-error.md`)
-  - [ ] Do NOT proceed to next rule until ALL tests pass (both new and existing)
+  - First run type check: `npm run check` to ensure test code has no type errors
+  - Run full test suite: `npm run test tests/permission.test.ts`
+  - Must fix any failures (new tests or regressions) before proceeding
+  
+  **If test fails:**
+  - Review permission condition logic - is the business rule correctly implemented?
+  - Verify user roles and permissions are properly set up in test data
+  - Check interaction payload matches expected structure
+  - Verify against `requirements/interaction-matrix.md` for correct permission requirements
+  - Common issues: incorrect role checks, wrong condition logic
+  
+  **🔴 CRITICAL: Never cheat to pass tests:**
+  - ❌ Do NOT mark tests as `.skip()` or `.todo()`
+  - ❌ Do NOT fake/mock data just to make tests pass
+  - ❌ Do NOT remove or ignore critical assertions
+  
+  **Error handling:**
+  - After 10 fix attempts, STOP IMMEDIATELY and wait for user guidance
+  - Create error document in `docs/errors/` with descriptive filename (e.g., `permission-admin-error.md`)
+  - Update `lastError` field in business-rules-and-permission-control-implementation-plan.json with error doc path
+  - Never skip tests or fake data to pass
 
 7. **Document Progress**
-  - [ ] **MUST** update the completed rule status in `docs/business-rules-and-permission-control-implementation-plan.json` (mark as `"completed": true`)
-  - [ ] Create new documents in `docs/errors/` to record any errors encountered
-  - [ ] Add comments in code explaining complex conditions
+  - **🔴 CRITICAL: Update `docs/business-rules-and-permission-control-implementation-plan.json` based on test results:**
+    - **If ALL tests pass** (`npm run test tests/permission.test.ts` shows ALL tests passing):
+      - Set `"completed": true`
+      - Remove `lastError` field if it exists
+    - **If ANY test fails** (including regression tests):
+      - Keep `"completed": false` - the item is NOT done
+      - Add/update `lastError` field with path to error document in `docs/errors/`
+      - The item remains incomplete and needs fixing
 
 8. **Commit Changes (only if tests pass)**
   - **📝 If rule was successfully implemented:**
@@ -183,4 +199,4 @@ import {
 
 9. **Complete and Exit**
   - **🛑 MANDATORY STOP: Exit immediately after completing ONE item**
-  - Wait for user confirmation before selecting the next computation
+  - Wait for user confirmation before selecting the next item
