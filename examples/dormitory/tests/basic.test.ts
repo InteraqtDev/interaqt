@@ -3417,4 +3417,132 @@ describe('Basic Functionality', () => {
     expect(bedAfter.number).toBe('BE001') // Other properties should remain the same
     expect(bedAfter.id).toBe(bedId) // ID should remain the same
   })
+
+  test('PointDeduction.id property is set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: PointDeduction.id (_owner)
+     * This tests that id is properly set when PointDeduction is created
+     * Dependencies: PointDeduction entity, User entity, DeductionRule entity
+     * Steps: 1) Create user 2) Create deduction rule 3) Apply point deduction 4) Verify id is auto-generated
+     * Business Logic: PointDeduction's creation computation sets id automatically when ApplyPointDeduction interaction occurs
+     */
+    
+    // Create a user first
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User for PointDeduction',
+        email: 'pointdeduction.test@example.com',
+        studentId: 'PDU001',
+        phone: '555-1234',
+        role: 'user'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the user ID
+    let userId
+    const userCreateEffect = userResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    
+    if (userCreateEffect && userCreateEffect.record.id) {
+      userId = userCreateEffect.record.id
+    } else {
+      const users = await system.storage.find(
+        'User',
+        MatchExp.atom({ key: 'email', value: ['=', 'pointdeduction.test@example.com'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(users.length).toBe(1)
+      userId = users[0].id
+    }
+    
+    expect(userId).toBeDefined()
+    
+    // Create a deduction rule first
+    const ruleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule for PointDeduction',
+        description: 'Test rule for ID verification',
+        points: 5,
+        isActive: true
+      }
+    })
+    
+    expect(ruleResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the rule ID
+    let ruleId
+    const ruleCreateEffect = ruleResult.effects.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    
+    if (ruleCreateEffect && ruleCreateEffect.record.id) {
+      ruleId = ruleCreateEffect.record.id
+    } else {
+      const rules = await system.storage.find(
+        'DeductionRule',
+        MatchExp.atom({ key: 'name', value: ['=', 'Test Rule for PointDeduction'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(rules.length).toBe(1)
+      ruleId = rules[0].id
+    }
+    
+    expect(ruleId).toBeDefined()
+    
+    // Apply point deduction via interaction
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'Test reason for ID verification'
+      }
+    })
+    
+    expect(deductionResult.error).toBeUndefined()
+    expect(deductionResult.effects).toBeDefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get the created point deduction ID from effects OR from database query
+    let deductionCreateEffect = deductionResult.effects.find(effect => effect.recordName === 'PointDeduction' && effect.type === 'create')
+    let createdDeduction
+    
+    if (deductionCreateEffect) {
+      expect(deductionCreateEffect.record.id).toBeDefined()
+      createdDeduction = await system.storage.findOne(
+        'PointDeduction',
+        MatchExp.atom({ key: 'id', value: ['=', deductionCreateEffect.record.id] }),
+        undefined,
+        ['id', 'reason', 'points', 'deductedAt', 'isDeleted']
+      )
+    } else {
+      // If no effect, query the database to find the created deduction
+      const deductions = await system.storage.find(
+        'PointDeduction',
+        MatchExp.atom({ key: 'reason', value: ['=', 'Test reason for ID verification'] }),
+        undefined,
+        ['id', 'reason', 'points', 'deductedAt', 'isDeleted']
+      )
+      expect(deductions.length).toBe(1)
+      createdDeduction = deductions[0]
+    }
+    
+    expect(createdDeduction).toBeDefined()
+    
+    // Verify that id is properly set (_owner computation)
+    expect(createdDeduction.id).toBeDefined()
+    expect(typeof createdDeduction.id).toBe('string')
+    expect(createdDeduction.id.length).toBeGreaterThan(0)
+    
+    // Verify other properties are correct
+    expect(createdDeduction.reason).toBe('Test reason for ID verification')
+    expect(createdDeduction.deductedAt).toBeDefined()
+    expect(typeof createdDeduction.deductedAt).toBe('number')
+    expect(createdDeduction.isDeleted).toBe(false)
+  })
 }) 

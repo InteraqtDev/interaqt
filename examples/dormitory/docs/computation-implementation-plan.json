@@ -645,7 +645,7 @@
           "interactionDependencies": null,
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "auto-generated",
-          "completed": false
+          "completed": true
         },
         {
           "id": "PointDeduction.reason",
