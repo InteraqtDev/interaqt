@@ -456,6 +456,44 @@ export const BedIsVacantCondition = Condition.create({
   }
 })
 
+// Business rule condition: Leader must be a resident of the dormitory
+export const LeaderMustBeResidentCondition = Condition.create({
+  name: 'leaderMustBeResident',
+  content: async function(this: any, event: any) {
+    const userId = event.payload.userId
+    const dormitoryId = event.payload.dormitoryId
+    if (!userId || !dormitoryId) return false
+    
+    // Find the user's bed assignment
+    const userBedAssignment = await this.system.storage.findOneRelationByName(
+      UserBedAssignmentRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      [
+        'id',
+        ['target', { attributeQuery: ['id'] }]
+      ]
+    )
+    
+    // If user has no bed assignment, they are not a resident
+    if (!userBedAssignment || !userBedAssignment.target) {
+      return false
+    }
+    
+    // Check if the user's assigned bed belongs to the target dormitory
+    const bedDormitoryRelation = await this.system.storage.findOneRelationByName(
+      DormitoryBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', dormitoryId] })
+        .and({ key: 'target.id', value: ['=', userBedAssignment.target.id] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if the user's bed is in the target dormitory
+    return !!bedDormitoryRelation
+  }
+})
+
 // =============================================================================
 // INTERACTIONS
 // =============================================================================
@@ -710,7 +748,9 @@ export const AssignDormitoryLeaderInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: IsAdminCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(LeaderMustBeResidentCondition))
+  })
 })
 
 // Point Deduction System Interactions

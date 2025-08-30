@@ -217,7 +217,7 @@
             "Can assign leader who is resident of the dormitory",
             "Cannot assign leader who is not resident of the dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR009",

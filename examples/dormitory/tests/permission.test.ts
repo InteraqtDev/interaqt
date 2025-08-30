@@ -938,5 +938,218 @@ describe('Permission and Business Rules', () => {
         expect((secondAssignResult.error as any).type).toBe('condition check failed')
       })
     })
+
+    describe('BR015: AssignDormitoryLeader - Leader must be a resident of the dormitory', () => {
+      test('Can assign leader who is resident of the dormitory', async () => {
+        /**
+         * Test Plan for: BR015
+         * Dependencies: User entity, Bed entity, Dormitory entity, UserBedAssignmentRelation, DormitoryBedRelation
+         * Steps: 1) Create admin user 2) Create dormitory 3) Create bed 4) Create user 5) Assign user to bed 6) Assign user as dormitory leader
+         * Business Logic: User who is assigned to a bed in the dormitory can be assigned as leader
+         */
+        
+        // Create admin user
+        const adminResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin5', role: 'admin' },
+          payload: {
+            name: 'Admin User 5',
+            email: 'admin5@university.edu',
+            studentId: 'ADMIN005',
+            role: 'admin'
+          }
+        })
+        expect(adminResult.error).toBeUndefined()
+
+        // Create dormitory
+        const dormitoryResult = await controller.callInteraction('createDormitory', {
+          user: { id: 'admin5', role: 'admin' },
+          payload: {
+            name: 'Test Dormitory 5',
+            location: 'Building E',
+            capacity: 4
+          }
+        })
+        expect(dormitoryResult.error).toBeUndefined()
+        
+        // Wait for async computations to complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Check if the Dormitory was created via Transform computation
+        const allDormitories = await system.storage.find(
+          'Dormitory',
+          undefined,
+          undefined,
+          ['id', 'name', 'location', 'capacity']
+        )
+        
+        expect(allDormitories.length).toBeGreaterThan(0)
+        const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 5')
+        expect(createdDormitory).toBeDefined()
+        const dormitoryId = createdDormitory.id
+
+        // Create bed
+        const bedResult = await controller.callInteraction('createBed', {
+          user: { id: 'admin5', role: 'admin' },
+          payload: {
+            number: 'E101',
+            dormitoryId: dormitoryId
+          }
+        })
+        expect(bedResult.error).toBeUndefined()
+        
+        // Wait for bed creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created bed
+        const allBeds = await system.storage.find(
+          'Bed',
+          undefined,
+          undefined,
+          ['id', 'number']
+        )
+        
+        const createdBed = allBeds.find(b => b.number === 'E101')
+        expect(createdBed).toBeDefined()
+        const bedId = createdBed.id
+
+        // Create regular user
+        const userResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin5', role: 'admin' },
+          payload: {
+            name: 'Test User 6',
+            email: 'user6@university.edu',
+            studentId: '2024006',
+            role: 'user'
+          }
+        })
+        expect(userResult.error).toBeUndefined()
+        
+        // Wait for user creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created user
+        const allUsers = await system.storage.find(
+          'User',
+          undefined,
+          undefined,
+          ['id', 'email']
+        )
+        
+        const createdUser = allUsers.find(u => u.email === 'user6@university.edu')
+        expect(createdUser).toBeDefined()
+        const userId = createdUser.id
+
+        // Assign user to bed in the dormitory
+        const assignBedResult = await controller.callInteraction('assignUserToBed', {
+          user: { id: 'admin5', role: 'admin' },
+          payload: {
+            userId: userId,
+            bedId: bedId
+          }
+        })
+        expect(assignBedResult.error).toBeUndefined()
+        expect(assignBedResult.effects).toBeDefined()
+        
+        // Wait for bed assignment to complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Assign user as dormitory leader - should succeed because user is a resident
+        const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+          user: { id: 'admin5', role: 'admin' },
+          payload: {
+            userId: userId,
+            dormitoryId: dormitoryId
+          }
+        })
+        expect(assignLeaderResult.error).toBeUndefined()
+        expect(assignLeaderResult.effects).toBeDefined()
+      })
+
+      test('Cannot assign leader who is not resident of the dormitory', async () => {
+        /**
+         * Test Plan for: BR015 violation
+         * Dependencies: User entity, Bed entity, Dormitory entity, UserBedAssignmentRelation, DormitoryBedRelation
+         * Steps: 1) Create admin user 2) Create dormitory 3) Create user (not assigned to any bed) 4) Try to assign user as dormitory leader
+         * Business Logic: User who is not assigned to a bed in the dormitory cannot be assigned as leader
+         */
+        
+        // Create admin user
+        const adminResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin6', role: 'admin' },
+          payload: {
+            name: 'Admin User 6',
+            email: 'admin6@university.edu',
+            studentId: 'ADMIN006',
+            role: 'admin'
+          }
+        })
+        expect(adminResult.error).toBeUndefined()
+
+        // Create dormitory
+        const dormitoryResult = await controller.callInteraction('createDormitory', {
+          user: { id: 'admin6', role: 'admin' },
+          payload: {
+            name: 'Test Dormitory 6',
+            location: 'Building F',
+            capacity: 4
+          }
+        })
+        expect(dormitoryResult.error).toBeUndefined()
+        
+        // Wait for async computations to complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Check if the Dormitory was created via Transform computation
+        const allDormitories = await system.storage.find(
+          'Dormitory',
+          undefined,
+          undefined,
+          ['id', 'name', 'location', 'capacity']
+        )
+        
+        expect(allDormitories.length).toBeGreaterThan(0)
+        const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 6')
+        expect(createdDormitory).toBeDefined()
+        const dormitoryId = createdDormitory.id
+
+        // Create regular user (but do NOT assign them to any bed in this dormitory)
+        const userResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin6', role: 'admin' },
+          payload: {
+            name: 'Test User 7',
+            email: 'user7@university.edu',
+            studentId: '2024007',
+            role: 'user'
+          }
+        })
+        expect(userResult.error).toBeUndefined()
+        
+        // Wait for user creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created user
+        const allUsers = await system.storage.find(
+          'User',
+          undefined,
+          undefined,
+          ['id', 'email']
+        )
+        
+        const createdUser = allUsers.find(u => u.email === 'user7@university.edu')
+        expect(createdUser).toBeDefined()
+        const userId = createdUser.id
+
+        // Try to assign user as dormitory leader without them being a resident - should fail
+        const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+          user: { id: 'admin6', role: 'admin' },
+          payload: {
+            userId: userId,
+            dormitoryId: dormitoryId
+          }
+        })
+        expect(assignLeaderResult.error).toBeDefined()
+        expect((assignLeaderResult.error as any).type).toBe('condition check failed')
+      })
+    })
   })
 })
