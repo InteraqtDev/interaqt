@@ -191,7 +191,7 @@
             "Can assign unassigned user to vacant bed",
             "Cannot assign user who already has a bed assignment"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR013",

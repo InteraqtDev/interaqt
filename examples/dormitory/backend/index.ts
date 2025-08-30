@@ -416,6 +416,26 @@ export const CanSubmitRemovalRequestCondition = Condition.create({
   }
 })
 
+// Business rule condition: User can only be assigned to one bed at a time
+export const UserNotAssignedToBedCondition = Condition.create({
+  name: 'userNotAssignedToBed',
+  content: async function(this: any, event: any) {
+    const userId = event.payload.userId
+    if (!userId) return false
+    
+    // Check if user is already assigned to a bed by querying UserBedAssignmentRelation
+    const existingAssignment = await this.system.storage.findOneRelationByName(
+      UserBedAssignmentRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if NO existing assignment (user is not assigned to any bed)
+    return !existingAssignment
+  }
+})
+
 // =============================================================================
 // INTERACTIONS
 // =============================================================================
@@ -635,7 +655,9 @@ export const AssignUserToBedInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: IsAdminCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(UserNotAssignedToBedCondition))
+  })
 })
 
 export const RemoveUserFromBedInteraction = Interaction.create({
