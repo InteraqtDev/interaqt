@@ -95,8 +95,7 @@ export const Dormitory = Entity.create({
     }),
     Property.create({
       name: 'currentOccupancy',
-      type: 'number',
-      defaultValue: () => 0
+      type: 'number'
     }),
     Property.create({
       name: 'createdAt',
@@ -903,7 +902,18 @@ const pointDeductionTrigger = Dictionary.create({
   })
 })
 
-export const dicts = [pointDeductionTrigger]
+// Global dictionary to trigger Dormitory.currentOccupancy computation when UserBedAssignmentRelation changes
+const bedAssignmentTrigger = Dictionary.create({
+  name: 'bedAssignmentTrigger',
+  type: 'number',
+  collection: false,
+  defaultValue: () => 0,
+  computation: Count.create({
+    record: UserBedAssignmentRelation
+  })
+})
+
+export const dicts = [pointDeductionTrigger, bedAssignmentTrigger]
 
 // =============================================================================
 // COMPUTATIONS
@@ -1923,5 +1933,19 @@ User.properties.find(p => p.name === 'points').computation = Custom.create({
   },
   getDefaultValue: function() {
     return 100
+  }
+})
+
+// Dormitory.currentOccupancy Count computation
+Dormitory.properties.find(p => p.name === 'currentOccupancy').computation = Count.create({
+  property: 'beds',
+  attributeQuery: [
+    'id',
+    ['occupant', { attributeQuery: ['id'] }]
+  ],
+  callback: function(bed) {
+    // Count beds that have an occupant (UserBedAssignmentRelation exists)
+    // The occupant field should contain the user object if the bed is occupied
+    return bed.occupant && bed.occupant.id
   }
 })

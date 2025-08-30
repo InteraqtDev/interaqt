@@ -5882,4 +5882,224 @@ describe('Basic Functionality', () => {
     )
     expect(deletedDeduction.isDeleted).toBe(true)
   })
+
+  test('Dormitory.currentOccupancy computation', async () => {
+    /**
+     * Test Plan for: Dormitory.currentOccupancy
+     * Dependencies: Dormitory entity, Bed entity, User entity, DormitoryBedRelation, UserBedAssignmentRelation
+     * Steps: 1) Create dormitory 2) Create beds in dormitory 3) Create users 4) Assign users to beds 5) Verify currentOccupancy count updates
+     * Business Logic: Count of UserBedAssignmentRelation where bed belongs to this dormitory
+     */
+
+    // Create dormitory
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Building A',
+        capacity: 4
+      }
+    })
+
+    // Check that interaction was successful
+    expect(dormitoryResult.error).toBeUndefined()
+    expect(dormitoryResult.effects).toBeDefined()
+
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Get the created dormitory ID from effects
+    let dormitoryCreateEffect = dormitoryResult.effects.find(effect => effect.recordName === 'Dormitory' && effect.type === 'create')
+    let dormitoryId: string
+    
+    if (dormitoryCreateEffect) {
+      dormitoryId = dormitoryCreateEffect.record.id
+    } else {
+      // If no effect, try to find the created dormitory by name (should be unique)
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name', 'location', 'capacity', 'currentOccupancy']
+      )
+      const createdDormitory = allDormitories.find(dorm => dorm.name === 'Test Dormitory')
+      expect(createdDormitory).toBeDefined()
+      dormitoryId = createdDormitory.id
+    }
+
+    expect(dormitoryId).toBeDefined()
+
+    // Initially, currentOccupancy should be 0
+    let dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'currentOccupancy']
+    )
+    
+    expect(dormitory).toBeDefined()
+    expect(dormitory.currentOccupancy).toBe(0)
+
+    // Create beds in the dormitory
+    const bed1Result = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'Bed-1'
+      }
+    })
+    const bed1Id = bed1Result.effects?.[0]?.record?.id
+    expect(bed1Id).toBeDefined()
+
+    const bed2Result = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'Bed-2'
+      }
+    })
+    const bed2Id = bed2Result.effects?.[0]?.record?.id
+    expect(bed2Id).toBeDefined()
+
+    // After creating beds, currentOccupancy should still be 0 (no assignments yet)
+    dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'currentOccupancy']
+    )
+    expect(dormitory.currentOccupancy).toBe(0)
+
+    // Create users
+    const user1Result = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Alice',
+        email: 'alice@example.com',
+        studentId: 'STU001',
+        phone: '123-456-7890'
+      }
+    })
+    const user1Id = user1Result.effects?.[0]?.record?.id
+    expect(user1Id).toBeDefined()
+
+    const user2Result = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Bob',
+        email: 'bob@example.com',
+        studentId: 'STU002',
+        phone: '123-456-7891'
+      }
+    })
+    const user2Id = user2Result.effects?.[0]?.record?.id
+    expect(user2Id).toBeDefined()
+
+    // Assign first user to first bed
+    await controller.callInteraction('assignUserToBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: user1Id,
+        bedId: bed1Id
+      }
+    })
+
+    // Wait for computation to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Debug: Check all UserBedAssignmentRelations
+    const allRelations = await system.storage.find(UserBedAssignmentRelation.name,
+      undefined,
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'number'] }]
+      ]
+    )
+    console.log('All UserBedAssignmentRelations:', allRelations)
+
+    // Debug: Check beds with occupants - try to access occupant properly
+    const bedsInDormitory = await system.storage.find('Bed',
+      MatchExp.atom({ key: 'dormitory.id', value: ['=', dormitoryId] }),
+      undefined,
+      [
+        'id',
+        'number',
+        ['occupant', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+    console.log('Beds in dormitory with occupants (full):', JSON.stringify(bedsInDormitory, null, 2))
+
+    // Debug: Query the specific bed that should have an occupant
+    const assignedBedId = allRelations[0]?.target?.id
+    if (assignedBedId) {
+      const specificBed = await system.storage.findOne('Bed',
+        MatchExp.atom({ key: 'id', value: ['=', assignedBedId] }),
+        undefined,
+        [
+          'id',
+          'number',
+          ['occupant', { attributeQuery: ['id', 'name'] }]
+        ]
+      )
+      console.log('Specific assigned bed:', JSON.stringify(specificBed, null, 2))
+    }
+
+    // After one assignment, currentOccupancy should be 1
+    dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'currentOccupancy']
+    )
+    console.log('Dormitory after assignment:', dormitory)
+    expect(dormitory.currentOccupancy).toBe(1)
+
+    // Assign second user to second bed
+    await controller.callInteraction('assignUserToBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: user2Id,
+        bedId: bed2Id
+      }
+    })
+
+    // After two assignments, currentOccupancy should be 2
+    dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'currentOccupancy']
+    )
+    expect(dormitory.currentOccupancy).toBe(2)
+
+    // Remove one user from bed
+    await controller.callInteraction('removeUserFromBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: user1Id
+      }
+    })
+
+    // After removal, currentOccupancy should decrease to 1
+    dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'currentOccupancy']
+    )
+    expect(dormitory.currentOccupancy).toBe(1)
+
+    // Remove second user from bed
+    await controller.callInteraction('removeUserFromBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: user2Id
+      }
+    })
+
+    // After removing all users, currentOccupancy should be 0
+    dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'currentOccupancy']
+    )
+    expect(dormitory.currentOccupancy).toBe(0)
+  })
 }) 

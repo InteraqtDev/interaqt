@@ -1056,7 +1056,8 @@
           "interactionDependencies": [],
           "reasoning": "controlType is independent, has dataDependencies with relations, and computationMethod contains 'count of'",
           "calculationMethod": "Count of UserBedAssignmentRelation where bed belongs to this dormitory",
-          "completed": false
+          "completed": false,
+          "lastError": "docs/errors/dormitory-currentoccupancy-relation-issue.md"
         },
         {
           "id": "Bed.status",
