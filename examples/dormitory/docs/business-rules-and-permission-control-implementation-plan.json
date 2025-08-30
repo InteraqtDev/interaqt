@@ -16,7 +16,7 @@
             "Non-admin (dormitory leader) cannot create user",
             "Non-admin (regular user) cannot create user"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P004",

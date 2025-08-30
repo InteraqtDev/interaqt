@@ -339,6 +339,18 @@ export const DeductionRuleApplicationRelation = Relation.create({
 })
 
 // =============================================================================
+// CONDITIONS
+// =============================================================================
+
+// Permission condition: Only admin can perform action
+export const IsAdminCondition = Condition.create({
+  name: 'isAdmin',
+  content: async function(this: any, event: any) {
+    return event.user && event.user.role === 'admin'
+  }
+})
+
+// =============================================================================
 // INTERACTIONS
 // =============================================================================
 
@@ -370,7 +382,8 @@ export const CreateUserInteraction = Interaction.create({
         required: false
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 export const UpdateUserInteraction = Interaction.create({
