@@ -5160,4 +5160,96 @@ describe('Basic Functionality', () => {
     expect(rule2.points).toBe(15)
     expect(rule2.isActive).toBe(true)
   })
+
+  test('DeductionRule.description StateMachine computation', async () => {
+    /**
+     * Test Plan for: DeductionRule.description
+     * Dependencies: DeductionRule entity, CreateDeductionRule interaction, UpdateDeductionRule interaction
+     * Steps: 1) Create deduction rule with description 2) Verify description is set 3) Update description 4) Verify description is updated
+     * Business Logic: StateMachine computation handles description assignment from create and update interactions
+     */
+
+    // Step 1: Create deduction rule with description
+    const createResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule',
+        description: 'Initial test description',
+        points: 5,
+        isActive: true
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Check if any DeductionRule records were created by querying the database
+    const allRules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+    
+    expect(allRules.length).toBeGreaterThan(0)
+    
+    // Find our rule by name
+    const createdRule = allRules.find(rule => rule.name === 'Test Rule')
+    expect(createdRule).toBeDefined()
+    const ruleId = createdRule?.id
+    expect(ruleId).toBeDefined()
+
+    // Step 2: Verify description is correctly set on creation
+    expect(createdRule.description).toBe('Initial test description')
+
+    // Step 3: Update the description
+    const updateResult = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId,
+        description: 'Updated test description'
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+
+    // Step 4: Verify description has been updated
+    const updatedRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(updatedRule).toBeDefined()
+    expect(updatedRule.description).toBe('Updated test description')
+    // Verify other properties remain unchanged
+    expect(updatedRule.name).toBe('Test Rule')
+    expect(updatedRule.points).toBe(5)
+    expect(updatedRule.isActive).toBe(true)
+
+    // Step 5: Update with undefined description - should not change existing value
+    const updateResult2 = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId,
+        name: 'Updated Rule Name' // Only updating name, not description
+      }
+    })
+
+    expect(updateResult2.error).toBeUndefined()
+
+    const finalRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(finalRule).toBeDefined()
+    expect(finalRule.description).toBe('Updated test description') // Should remain unchanged
+    expect(finalRule.name).toBe('Updated Rule Name') // Should be updated
+  })
 }) 

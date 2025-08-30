@@ -1711,3 +1711,32 @@ DeductionRule.properties.find(p => p.name === 'name').computation = StateMachine
   ],
   defaultState: deductionRuleNameDefaultState
 })
+
+// DeductionRule.description StateMachine computation
+const deductionRuleDescriptionDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createDeductionRule') {
+      return event.payload.description;
+    }
+    if (event && event.interactionName === 'updateDeductionRule' && event.payload.description !== undefined) {
+      return event.payload.description;
+    }
+    return lastValue;
+  }
+});
+
+DeductionRule.properties.find(p => p.name === 'description').computation = StateMachine.create({
+  states: [deductionRuleDescriptionDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDeductionRuleInteraction,
+      current: deductionRuleDescriptionDefaultState,
+      next: deductionRuleDescriptionDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    })
+  ],
+  defaultState: deductionRuleDescriptionDefaultState
+})
