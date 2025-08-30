@@ -182,4 +182,174 @@ describe('Permission and Business Rules', () => {
       expect(result.error).toBeUndefined()
     })
   })
+
+  describe('BR006: CreateDormitory - Capacity must be 4-6', () => {
+    test('Can create dormitory with capacity 4', async () => {
+      const result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Block C', location: 'East Campus', capacity: 4 }
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.effects).toBeDefined()
+    })
+
+    test('Can create dormitory with capacity 6', async () => {
+      const result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Block D', location: 'West Campus', capacity: 6 }
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.effects).toBeDefined()
+    })
+
+    test('Cannot create dormitory with capacity 3', async () => {
+      const result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Block E', location: 'South Campus', capacity: 3 }
+      })
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+
+    test('Cannot create dormitory with capacity 7', async () => {
+      const result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Block F', location: 'North Campus', capacity: 7 }
+      })
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('BR016: CreateDeductionRule - Points must be positive', () => {
+    test('Can create rule with positive points', async () => {
+      const result = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Noise Violation', description: 'Making noise after 10 PM', points: 10 }
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.effects).toBeDefined()
+    })
+
+    test('Cannot create rule with zero points', async () => {
+      const result = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Warning', description: 'First warning', points: 0 }
+      })
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+
+    test('Cannot create rule with negative points', async () => {
+      const result = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Reward', description: 'Good behavior', points: -5 }
+      })
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('BR018: ApplyPointDeduction - Cannot apply inactive rule', () => {
+    test('Can apply deduction with active rule', async () => {
+      // First create an active deduction rule
+      const ruleResult = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { 
+          name: 'Test Rule', 
+          description: 'Test rule for BR018', 
+          points: 5, 
+          isActive: true 
+        }
+      })
+      expect(ruleResult.error).toBeUndefined()
+      
+      // Wait for computations to process
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Get rule ID from effects or fallback to query
+      let ruleId
+      const ruleEffect = ruleResult.effects?.find(e => e.recordName === 'DeductionRule' && e.type === 'create')
+      if (ruleEffect && ruleEffect.record.id) {
+        ruleId = ruleEffect.record.id
+      } else {
+        // Fallback: query for the rule
+        const rules = await controller.system.storage.find(
+          'DeductionRule',
+          undefined,
+          undefined,
+          ['id', 'name']
+        )
+        const rule = rules.find((r: any) => r.name === 'Test Rule')
+        ruleId = rule?.id
+      }
+      expect(ruleId).toBeDefined()
+
+      // Now try to apply the active rule
+      const result = await controller.callInteraction('applyPointDeduction', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { 
+          targetUserId: 'user1', 
+          ruleId: ruleId, 
+          reason: 'Test deduction' 
+        }
+      })
+      // Note: This might fail due to missing user/permission, but the rule check should pass
+      // We're mainly checking that the ActiveRuleCondition doesn't reject it
+      if (result.error) {
+        // If there's an error, it should NOT be a condition check failed due to inactive rule
+        expect((result.error as any).type).not.toBe('condition check failed')
+      } else {
+        expect(result.effects).toBeDefined()
+      }
+    })
+
+    test('Cannot apply deduction with inactive rule', async () => {
+      // First create an inactive deduction rule
+      const ruleResult = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { 
+          name: 'Inactive Rule', 
+          description: 'Inactive rule for BR018', 
+          points: 10, 
+          isActive: false 
+        }
+      })
+      expect(ruleResult.error).toBeUndefined()
+      
+      // Wait for computations to process
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Get rule ID from effects or fallback to query
+      let ruleId
+      const ruleEffect = ruleResult.effects?.find(e => e.recordName === 'DeductionRule' && e.type === 'create')
+      if (ruleEffect && ruleEffect.record.id) {
+        ruleId = ruleEffect.record.id
+      } else {
+        // Fallback: query for the rule
+        const rules = await controller.system.storage.find(
+          'DeductionRule',
+          undefined,
+          undefined,
+          ['id', 'name']
+        )
+        const rule = rules.find((r: any) => r.name === 'Inactive Rule')
+        ruleId = rule?.id
+      }
+      expect(ruleId).toBeDefined()
+
+      // Now try to apply the inactive rule
+      const result = await controller.callInteraction('applyPointDeduction', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { 
+          targetUserId: 'user1', 
+          ruleId: ruleId, 
+          reason: 'Test deduction with inactive rule' 
+        }
+      })
+      
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+  })
 })

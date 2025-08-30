@@ -350,6 +350,42 @@ export const IsAdminCondition = Condition.create({
   }
 })
 
+// Business rule condition: Dormitory capacity must be 4-6
+export const ValidDormitoryCapacityCondition = Condition.create({
+  name: 'validDormitoryCapacity',
+  content: async function(this: any, event: any) {
+    const capacity = event.payload.capacity
+    return capacity >= 4 && capacity <= 6
+  }
+})
+
+// Business rule condition: Deduction rule points must be positive
+export const PositivePointsCondition = Condition.create({
+  name: 'positivePoints',
+  content: async function(this: any, event: any) {
+    const points = event.payload.points
+    return points > 0
+  }
+})
+
+// Business rule condition: Deduction rule must be active for application
+export const ActiveRuleCondition = Condition.create({
+  name: 'activeRule',
+  content: async function(this: any, event: any) {
+    const ruleId = event.payload.ruleId
+    if (!ruleId) return false
+    
+    // Query the DeductionRule to check if it's active
+    const rule = await this.system.storage.findOne('DeductionRule', 
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'isActive']
+    )
+    
+    return rule && rule.isActive === true
+  }
+})
+
 // =============================================================================
 // INTERACTIONS
 // =============================================================================
@@ -458,7 +494,9 @@ export const CreateDormitoryInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: IsAdminCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(ValidDormitoryCapacityCondition))
+  })
 })
 
 export const UpdateDormitoryInteraction = Interaction.create({
@@ -625,7 +663,9 @@ export const CreateDeductionRuleInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: IsAdminCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(PositivePointsCondition))
+  })
 })
 
 export const UpdateDeductionRuleInteraction = Interaction.create({
@@ -701,7 +741,8 @@ export const ApplyPointDeductionInteraction = Interaction.create({
         required: true
       })
     ]
-  })
+  }),
+  conditions: ActiveRuleCondition
 })
 
 // Removal Request Workflow Interactions

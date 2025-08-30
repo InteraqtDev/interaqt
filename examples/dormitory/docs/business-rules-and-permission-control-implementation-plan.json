@@ -110,7 +110,7 @@
             "Cannot create dormitory with capacity 3",
             "Cannot create dormitory with capacity 7"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR016",
@@ -123,7 +123,7 @@
             "Cannot create rule with zero points",
             "Cannot create rule with negative points"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR018",
@@ -136,7 +136,7 @@
             "Can apply deduction with active rule",
             "Cannot apply deduction with inactive rule"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     },
