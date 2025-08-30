@@ -1057,7 +1057,9 @@
           "reasoning": "controlType is independent, has dataDependencies with relations, and computationMethod contains 'count of'",
           "calculationMethod": "Count of UserBedAssignmentRelation where bed belongs to this dormitory",
           "completed": false,
-          "lastError": "docs/errors/dormitory-currentoccupancy-relation-issue.md"
+          "frameworkLimitation": true,
+          "lastError": "docs/errors/dormitory-currentoccupancy-relation-issue.md",
+          "notes": "Cannot be implemented due to framework limitation in relation target property resolution. Documented after 10+ fix attempts."
         },
         {
           "id": "Bed.status",
