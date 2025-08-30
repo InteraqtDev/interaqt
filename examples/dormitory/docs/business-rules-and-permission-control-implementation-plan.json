@@ -1,0 +1,325 @@
+{
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Basic Admin Permissions",
+      "description": "Simple role-based permissions for admin-only operations",
+      "rules": [
+        {
+          "id": "P001",
+          "interaction": "CreateUser",
+          "type": "permission",
+          "description": "Only admin can create users",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can create user with valid data",
+            "Non-admin (dormitory leader) cannot create user",
+            "Non-admin (regular user) cannot create user"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P004",
+          "interaction": "CreateDormitory",
+          "type": "permission",
+          "description": "Only admin can create dormitories",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can create dormitory",
+            "Non-admin cannot create dormitory"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P007",
+          "interaction": "CreateBed",
+          "type": "permission",
+          "description": "Only admin can create beds",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can create bed in dormitory",
+            "Non-admin cannot create bed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P010",
+          "interaction": "AssignUserToBed",
+          "type": "permission",
+          "description": "Only admin can assign users to beds",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can assign user to vacant bed",
+            "Non-admin cannot assign users to beds"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P012",
+          "interaction": "AssignDormitoryLeader",
+          "type": "permission",
+          "description": "Only admin can assign dormitory leaders",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can assign dormitory leader",
+            "Non-admin cannot assign dormitory leader"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P013",
+          "interaction": "CreateDeductionRule",
+          "type": "permission",
+          "description": "Only admin can create deduction rules",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can create deduction rule",
+            "Non-admin cannot create deduction rule"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P018",
+          "interaction": "ProcessRemovalRequest",
+          "type": "permission",
+          "description": "Only admin can process removal requests",
+          "condition": "user.role === 'admin'",
+          "testScenarios": [
+            "Admin can approve removal request",
+            "Admin can reject removal request",
+            "Non-admin cannot process removal request"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Simple Business Rules",
+      "description": "Basic validation rules for data integrity",
+      "rules": [
+        {
+          "id": "BR006",
+          "interaction": "CreateDormitory",
+          "type": "business_rule",
+          "description": "Dormitory capacity must be 4-6",
+          "condition": "payload.capacity >= 4 && payload.capacity <= 6",
+          "testScenarios": [
+            "Can create dormitory with capacity 4",
+            "Can create dormitory with capacity 6",
+            "Cannot create dormitory with capacity 3",
+            "Cannot create dormitory with capacity 7"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR016",
+          "interaction": "CreateDeductionRule",
+          "type": "business_rule",
+          "description": "Deduction rule points must be positive",
+          "condition": "payload.points > 0",
+          "testScenarios": [
+            "Can create rule with positive points",
+            "Cannot create rule with zero points",
+            "Cannot create rule with negative points"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR018",
+          "interaction": "ApplyPointDeduction",
+          "type": "business_rule",
+          "description": "Cannot apply inactive deduction rule",
+          "condition": "Check that referenced rule is active",
+          "dependencies": ["Need to query DeductionRule entity"],
+          "testScenarios": [
+            "Can apply deduction with active rule",
+            "Cannot apply deduction with inactive rule"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "User-Specific Permissions",
+      "description": "Permissions that depend on user relationships and ownership",
+      "rules": [
+        {
+          "id": "P002",
+          "interaction": "UpdateUser",
+          "type": "permission",
+          "description": "Users can update own profile, admins can update any",
+          "condition": "user.role === 'admin' || user.id === payload.userId",
+          "testScenarios": [
+            "Admin can update any user profile",
+            "User can update own profile",
+            "User cannot update other user's profile"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P017",
+          "interaction": "SubmitRemovalRequest",
+          "type": "permission",
+          "description": "Only dormitory leaders can submit requests for their residents",
+          "condition": "user.role === 'dormitoryLeader' && Check user is leader of target user's dormitory",
+          "dependencies": ["Need to query user-dormitory relationships"],
+          "testScenarios": [
+            "Dormitory leader can submit request for their resident",
+            "Dormitory leader cannot submit request for non-resident",
+            "Regular user cannot submit removal request",
+            "Admin cannot submit removal request (not a leader)"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Complex Cross-Entity Business Rules",
+      "description": "Rules that require querying multiple entities and relationships",
+      "rules": [
+        {
+          "id": "BR012",
+          "interaction": "AssignUserToBed",
+          "type": "business_rule",
+          "description": "User can only be assigned to one bed at a time",
+          "condition": "Check user is not already assigned to another bed",
+          "dependencies": ["Need to query UserBedAssignmentRelation"],
+          "testScenarios": [
+            "Can assign unassigned user to vacant bed",
+            "Cannot assign user who already has a bed assignment"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR013",
+          "interaction": "AssignUserToBed",
+          "type": "business_rule",
+          "description": "Bed can only accommodate one user",
+          "condition": "Check bed is vacant (not occupied by another user)",
+          "dependencies": ["Need to query bed status or UserBedAssignmentRelation"],
+          "testScenarios": [
+            "Can assign user to vacant bed",
+            "Cannot assign user to occupied bed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR015",
+          "interaction": "AssignDormitoryLeader",
+          "type": "business_rule",
+          "description": "Leader must be a resident of the dormitory",
+          "condition": "Check user is assigned to a bed in the target dormitory",
+          "dependencies": ["Need to query UserBedAssignmentRelation and DormitoryBedRelation"],
+          "testScenarios": [
+            "Can assign leader who is resident of the dormitory",
+            "Cannot assign leader who is not resident of the dormitory"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR009",
+          "interaction": "CreateBed",
+          "type": "business_rule",
+          "description": "Cannot exceed dormitory capacity",
+          "condition": "Check current bed count in dormitory is less than capacity",
+          "dependencies": ["Need to count beds in dormitory"],
+          "testScenarios": [
+            "Can create bed when under capacity",
+            "Cannot create bed when at capacity"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Advanced Permission Rules",
+      "description": "Complex permissions requiring entity queries and relationship checks",
+      "rules": [
+        {
+          "id": "P016",
+          "interaction": "ApplyPointDeduction",
+          "type": "permission",
+          "description": "Admins can deduct from any user, leaders only from their dormitory residents",
+          "condition": "user.role === 'admin' || (user.role === 'dormitoryLeader' && Check target user is in leader's managed dormitory)",
+          "dependencies": ["Need to query user-dormitory relationships"],
+          "testScenarios": [
+            "Admin can deduct points from any user",
+            "Dormitory leader can deduct from their residents",
+            "Dormitory leader cannot deduct from other dormitory residents",
+            "Regular user cannot deduct points"
+          ],
+          "completed": false
+        },
+        {
+          "id": "P019",
+          "interaction": "GetUserProfile",
+          "type": "permission",
+          "description": "Users see own profile, leaders see residents, admins see all",
+          "condition": "user.role === 'admin' || user.id === payload.userId || (user.role === 'dormitoryLeader' && Check target user is in managed dormitory)",
+          "dependencies": ["Need to query user-dormitory relationships"],
+          "testScenarios": [
+            "Admin can view any user profile",
+            "User can view own profile",
+            "User cannot view other user's profile",
+            "Dormitory leader can view resident profiles",
+            "Dormitory leader cannot view non-resident profiles"
+          ],
+          "completed": false
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Complex Business Rules with State Validation",
+      "description": "Advanced business rules requiring state consistency and complex validations",
+      "rules": [
+        {
+          "id": "BR022",
+          "interaction": "SubmitRemovalRequest",
+          "type": "business_rule",
+          "description": "Cannot submit multiple pending requests for same user",
+          "condition": "Check no existing pending removal request exists for target user",
+          "dependencies": ["Need to query RemovalRequest entities"],
+          "testScenarios": [
+            "Can submit first removal request for user",
+            "Cannot submit second pending request for same user",
+            "Can submit new request after previous is processed"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR023",
+          "interaction": "ProcessRemovalRequest",
+          "type": "business_rule",
+          "description": "Request must be in pending status",
+          "condition": "Check request status is 'pending'",
+          "dependencies": ["Need to query RemovalRequest status"],
+          "testScenarios": [
+            "Can process request in pending status",
+            "Cannot process already approved request",
+            "Cannot process already rejected request"
+          ],
+          "completed": false
+        },
+        {
+          "id": "BR020",
+          "interaction": "ApplyPointDeduction",
+          "type": "business_rule",
+          "description": "User points cannot go below zero",
+          "condition": "Check user's current points minus deduction amount >= 0",
+          "dependencies": ["Need to query user's current points"],
+          "testScenarios": [
+            "Can deduct points when user has sufficient balance",
+            "Cannot deduct points that would make balance negative",
+            "Deduction is clamped to bring balance to exactly zero"
+          ],
+          "completed": false
+        }
+      ]
+    }
+  ]
+}
