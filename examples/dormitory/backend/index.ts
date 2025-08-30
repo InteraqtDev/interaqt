@@ -436,6 +436,26 @@ export const UserNotAssignedToBedCondition = Condition.create({
   }
 })
 
+// Business rule condition: Bed can only accommodate one user
+export const BedIsVacantCondition = Condition.create({
+  name: 'bedIsVacant',
+  content: async function(this: any, event: any) {
+    const bedId = event.payload.bedId
+    if (!bedId) return false
+    
+    // Check if bed already has a user assigned by querying UserBedAssignmentRelation
+    const existingOccupant = await this.system.storage.findOneRelationByName(
+      UserBedAssignmentRelation.name,
+      MatchExp.atom({ key: 'target.id', value: ['=', bedId] }),
+      undefined,
+      ['id']
+    )
+    
+    // Return true if NO existing occupant (bed is vacant)
+    return !existingOccupant
+  }
+})
+
 // =============================================================================
 // INTERACTIONS
 // =============================================================================
@@ -656,7 +676,9 @@ export const AssignUserToBedInteraction = Interaction.create({
     ]
   }),
   conditions: Conditions.create({
-    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(UserNotAssignedToBedCondition))
+    content: BoolExp.atom(IsAdminCondition)
+      .and(BoolExp.atom(UserNotAssignedToBedCondition))
+      .and(BoolExp.atom(BedIsVacantCondition))
   })
 })
 

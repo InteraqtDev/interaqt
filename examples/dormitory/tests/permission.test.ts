@@ -676,5 +676,267 @@ describe('Permission and Business Rules', () => {
         expect((secondAssignResult.error as any).type).toBe('condition check failed')
       })
     })
+
+    describe('BR013: AssignUserToBed - Bed can only accommodate one user', () => {
+      test('Can assign user to vacant bed', async () => {
+        /**
+         * Test Plan for: BR013
+         * Dependencies: User entity, Bed entity, Dormitory entity, UserBedAssignmentRelation
+         * Steps: 1) Create admin user 2) Create dormitory 3) Create bed 4) Create user 5) Assign user to vacant bed
+         * Business Logic: User can be assigned to a bed that has no existing occupant
+         */
+        
+        // Create admin user
+        const adminResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin3', role: 'admin' },
+          payload: {
+            name: 'Admin User 3',
+            email: 'admin3@university.edu',
+            studentId: 'ADMIN003',
+            role: 'admin'
+          }
+        })
+        expect(adminResult.error).toBeUndefined()
+
+        // Create dormitory
+        const dormitoryResult = await controller.callInteraction('createDormitory', {
+          user: { id: 'admin3', role: 'admin' },
+          payload: {
+            name: 'Test Dormitory 3',
+            location: 'Building C',
+            capacity: 4
+          }
+        })
+        expect(dormitoryResult.error).toBeUndefined()
+        
+        // Wait for async computations to complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Check if the Dormitory was created via Transform computation
+        const allDormitories = await system.storage.find(
+          'Dormitory',
+          undefined,
+          undefined,
+          ['id', 'name', 'location', 'capacity']
+        )
+        
+        expect(allDormitories.length).toBeGreaterThan(0)
+        const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 3')
+        expect(createdDormitory).toBeDefined()
+        const dormitoryId = createdDormitory.id
+
+        // Create bed
+        const bedResult = await controller.callInteraction('createBed', {
+          user: { id: 'admin3', role: 'admin' },
+          payload: {
+            number: 'C101',
+            dormitoryId: dormitoryId
+          }
+        })
+        expect(bedResult.error).toBeUndefined()
+        
+        // Wait for bed creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created bed
+        const allBeds = await system.storage.find(
+          'Bed',
+          undefined,
+          undefined,
+          ['id', 'number']
+        )
+        
+        const createdBed = allBeds.find(b => b.number === 'C101')
+        expect(createdBed).toBeDefined()
+        const bedId = createdBed.id
+
+        // Create regular user
+        const userResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin3', role: 'admin' },
+          payload: {
+            name: 'Test User 3',
+            email: 'user3@university.edu',
+            studentId: '2024003',
+            role: 'user'
+          }
+        })
+        expect(userResult.error).toBeUndefined()
+        
+        // Wait for user creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created user
+        const allUsers = await system.storage.find(
+          'User',
+          undefined,
+          undefined,
+          ['id', 'email']
+        )
+        
+        const createdUser = allUsers.find(u => u.email === 'user3@university.edu')
+        expect(createdUser).toBeDefined()
+        const userId = createdUser.id
+
+        // Assign user to vacant bed - should succeed
+        const assignResult = await controller.callInteraction('assignUserToBed', {
+          user: { id: 'admin3', role: 'admin' },
+          payload: {
+            userId: userId,
+            bedId: bedId
+          }
+        })
+        expect(assignResult.error).toBeUndefined()
+        expect(assignResult.effects).toBeDefined()
+      })
+
+      test('Cannot assign user to occupied bed', async () => {
+        /**
+         * Test Plan for: BR013 violation
+         * Dependencies: User entity, Bed entity, Dormitory entity, UserBedAssignmentRelation
+         * Steps: 1) Create admin user 2) Create dormitory 3) Create bed 4) Create two users 5) Assign first user to bed 6) Try to assign second user to same bed
+         * Business Logic: Bed already occupied by one user cannot accommodate another user
+         */
+        
+        // Create admin user
+        const adminResult = await controller.callInteraction('createUser', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            name: 'Admin User 4',
+            email: 'admin4@university.edu',
+            studentId: 'ADMIN004',
+            role: 'admin'
+          }
+        })
+        expect(adminResult.error).toBeUndefined()
+
+        // Create dormitory
+        const dormitoryResult = await controller.callInteraction('createDormitory', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            name: 'Test Dormitory 4',
+            location: 'Building D',
+            capacity: 4
+          }
+        })
+        expect(dormitoryResult.error).toBeUndefined()
+        
+        // Wait for async computations to complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Check if the Dormitory was created via Transform computation
+        const allDormitories = await system.storage.find(
+          'Dormitory',
+          undefined,
+          undefined,
+          ['id', 'name', 'location', 'capacity']
+        )
+        
+        expect(allDormitories.length).toBeGreaterThan(0)
+        const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 4')
+        expect(createdDormitory).toBeDefined()
+        const dormitoryId = createdDormitory.id
+
+        // Create bed
+        const bedResult = await controller.callInteraction('createBed', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            number: 'D101',
+            dormitoryId: dormitoryId
+          }
+        })
+        expect(bedResult.error).toBeUndefined()
+        
+        // Wait for bed creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created bed
+        const allBeds = await system.storage.find(
+          'Bed',
+          undefined,
+          undefined,
+          ['id', 'number']
+        )
+        
+        const createdBed = allBeds.find(b => b.number === 'D101')
+        expect(createdBed).toBeDefined()
+        const bedId = createdBed.id
+
+        // Create first user
+        const user1Result = await controller.callInteraction('createUser', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            name: 'Test User 4',
+            email: 'user4@university.edu',
+            studentId: '2024004',
+            role: 'user'
+          }
+        })
+        expect(user1Result.error).toBeUndefined()
+        
+        // Wait for user creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created user
+        const allUsers1 = await system.storage.find(
+          'User',
+          undefined,
+          undefined,
+          ['id', 'email']
+        )
+        
+        const createdUser1 = allUsers1.find(u => u.email === 'user4@university.edu')
+        expect(createdUser1).toBeDefined()
+        const user1Id = createdUser1.id
+
+        // Create second user
+        const user2Result = await controller.callInteraction('createUser', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            name: 'Test User 5',
+            email: 'user5@university.edu',
+            studentId: '2024005',
+            role: 'user'
+          }
+        })
+        expect(user2Result.error).toBeUndefined()
+        
+        // Wait for user creation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Find the created user
+        const allUsers2 = await system.storage.find(
+          'User',
+          undefined,
+          undefined,
+          ['id', 'email']
+        )
+        
+        const createdUser2 = allUsers2.find(u => u.email === 'user5@university.edu')
+        expect(createdUser2).toBeDefined()
+        const user2Id = createdUser2.id
+
+        // Assign first user to bed - should succeed
+        const firstAssignResult = await controller.callInteraction('assignUserToBed', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            userId: user1Id,
+            bedId: bedId
+          }
+        })
+        expect(firstAssignResult.error).toBeUndefined()
+        expect(firstAssignResult.effects).toBeDefined()
+
+        // Try to assign second user to same bed - should fail with condition check failed
+        const secondAssignResult = await controller.callInteraction('assignUserToBed', {
+          user: { id: 'admin4', role: 'admin' },
+          payload: {
+            userId: user2Id,
+            bedId: bedId
+          }
+        })
+        expect(secondAssignResult.error).toBeDefined()
+        expect((secondAssignResult.error as any).type).toBe('condition check failed')
+      })
+    })
   })
 })

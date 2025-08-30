@@ -204,7 +204,7 @@
             "Can assign user to vacant bed",
             "Cannot assign user to occupied bed"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "BR015",
