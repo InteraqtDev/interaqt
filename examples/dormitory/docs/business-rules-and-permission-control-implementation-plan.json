@@ -28,7 +28,7 @@
             "Admin can create dormitory",
             "Non-admin cannot create dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P007",
@@ -40,7 +40,7 @@
             "Admin can create bed in dormitory",
             "Non-admin cannot create bed"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P010",
@@ -52,7 +52,7 @@
             "Admin can assign user to vacant bed",
             "Non-admin cannot assign users to beds"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P012",
@@ -64,7 +64,7 @@
             "Admin can assign dormitory leader",
             "Non-admin cannot assign dormitory leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P013",
@@ -76,7 +76,7 @@
             "Admin can create deduction rule",
             "Non-admin cannot create deduction rule"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P018",
@@ -89,7 +89,7 @@
             "Admin can reject removal request",
             "Non-admin cannot process removal request"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     },

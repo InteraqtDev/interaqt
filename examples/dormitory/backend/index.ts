@@ -457,7 +457,8 @@ export const CreateDormitoryInteraction = Interaction.create({
         required: true
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 export const UpdateDormitoryInteraction = Interaction.create({
@@ -514,7 +515,8 @@ export const CreateBedInteraction = Interaction.create({
         required: true
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 export const UpdateBedInteraction = Interaction.create({
@@ -563,7 +565,8 @@ export const AssignUserToBedInteraction = Interaction.create({
         required: true
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 export const RemoveUserFromBedInteraction = Interaction.create({
@@ -593,7 +596,8 @@ export const AssignDormitoryLeaderInteraction = Interaction.create({
         required: true
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 // Point Deduction System Interactions
@@ -620,7 +624,8 @@ export const CreateDeductionRuleInteraction = Interaction.create({
         required: false
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 export const UpdateDeductionRuleInteraction = Interaction.create({
@@ -736,7 +741,8 @@ export const ProcessRemovalRequestInteraction = Interaction.create({
         required: false
       })
     ]
-  })
+  }),
+  conditions: IsAdminCondition
 })
 
 export const DeleteRemovalRequestInteraction = Interaction.create({

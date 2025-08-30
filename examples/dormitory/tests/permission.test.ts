@@ -66,7 +66,7 @@ describe('Permission and Business Rules', () => {
       })
       
       expect(result.error).toBeDefined()
-      expect(result.error.type).toBe('condition check failed')
+      expect((result.error as any).type).toBe('condition check failed')
     })
 
     test('Non-admin (regular user) cannot create user', async () => {
@@ -86,7 +86,100 @@ describe('Permission and Business Rules', () => {
       })
       
       expect(result.error).toBeDefined()
-      expect(result.error.type).toBe('condition check failed')
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('P004: CreateDormitory - Only admin can create dormitories', () => {
+    test('Admin can create dormitory', async () => {
+      const result = await controller.callInteraction('createDormitory', {
+        user: {
+          id: 'admin1',
+          name: 'Admin User',
+          email: 'admin@university.edu',
+          studentId: 'ADMIN001',
+          role: 'admin'
+        },
+        payload: {
+          name: 'Block A',
+          location: 'North Campus',
+          capacity: 6
+        }
+      })
+      
+      expect(result.error).toBeUndefined()
+      expect(result.effects).toBeDefined()
+    })
+
+    test('Non-admin cannot create dormitory', async () => {
+      const result = await controller.callInteraction('createDormitory', {
+        user: {
+          id: 'user1',
+          name: 'Regular User',
+          email: 'user@university.edu',
+          studentId: 'USER001',
+          role: 'user'
+        },
+        payload: {
+          name: 'Block B',
+          location: 'South Campus',
+          capacity: 4
+        }
+      })
+      
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('P007, P010, P012, P013, P018: Additional admin-only permissions', () => {
+    test('Admin can create bed (P007)', async () => {
+      const result = await controller.callInteraction('createBed', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { dormitoryId: 'dorm1', number: 'A1' }
+      })
+      expect(result.error).toBeUndefined()
+    })
+
+    test('Non-admin cannot create bed (P007)', async () => {
+      const result = await controller.callInteraction('createBed', {
+        user: { id: 'user1', role: 'user' },
+        payload: { dormitoryId: 'dorm1', number: 'A1' }
+      })
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+    })
+
+    test('Admin can assign user to bed (P010)', async () => {
+      const result = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { userId: 'user1', bedId: 'bed1' }
+      })
+      expect(result.error).toBeUndefined()
+    })
+
+    test('Admin can assign dormitory leader (P012)', async () => {
+      const result = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { userId: 'user1', dormitoryId: 'dorm1' }
+      })
+      expect(result.error).toBeUndefined()
+    })
+
+    test('Admin can create deduction rule (P013)', async () => {
+      const result = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { name: 'Noise Violation', description: 'Making noise after 10 PM', points: 10 }
+      })
+      expect(result.error).toBeUndefined()
+    })
+
+    test('Admin can process removal request (P018)', async () => {
+      const result = await controller.callInteraction('processRemovalRequest', {
+        user: { id: 'admin1', role: 'admin' },
+        payload: { requestId: 'req1', decision: 'approved' }
+      })
+      expect(result.error).toBeUndefined()
     })
   })
 })
