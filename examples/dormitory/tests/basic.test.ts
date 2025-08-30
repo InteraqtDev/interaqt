@@ -5585,4 +5585,105 @@ describe('Basic Functionality', () => {
     // Verify second rule's createdAt is greater than or equal to first rule's (since it was created later)
     expect(rule2.createdAt).toBeGreaterThanOrEqual(rule.createdAt)
   })
+
+  test('DeductionRule.updatedAt computation', async () => {
+    /**
+     * Test Plan for: DeductionRule.updatedAt
+     * Dependencies: DeductionRule entity, UpdateDeductionRuleInteraction, DeactivateDeductionRuleInteraction
+     * Steps: 1) Create deduction rule 2) Verify initial updatedAt 3) Update rule 4) Verify updated timestamp 5) Deactivate rule 6) Verify updated timestamp
+     * Business Logic: Automatically updated to current timestamp on any modification
+     */
+    
+    // Create a deduction rule
+    const createResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule',
+        description: 'Test description',
+        points: 10,
+        isActive: true
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Get the created rule - find by name since effects might not contain DeductionRule
+    const allRules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'updatedAt']
+    )
+    
+    const initialRule = allRules.find(rule => rule.name === 'Test Rule')
+    expect(initialRule).toBeDefined()
+    const ruleId = initialRule.id
+
+    expect(initialRule.updatedAt).toBeDefined()
+    expect(typeof initialRule.updatedAt).toBe('number')
+    const initialUpdatedAt = initialRule.updatedAt
+
+    // Wait a moment to ensure different timestamp
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Update the rule
+    const updateResult = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId,
+        name: 'Updated Rule Name'
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+
+    // Get updated rule
+    const updatedRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'updatedAt']
+    )
+
+    expect(updatedRule).toBeDefined()
+    expect(updatedRule.updatedAt).toBeDefined()
+    expect(typeof updatedRule.updatedAt).toBe('number')
+    expect(updatedRule.name).toBe('Updated Rule Name')
+    
+    // Verify updatedAt was changed and is greater than initial timestamp
+    expect(updatedRule.updatedAt).toBeGreaterThan(initialUpdatedAt)
+    const afterUpdateTimestamp = updatedRule.updatedAt
+
+    // Wait another moment
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Deactivate the rule
+    const deactivateResult = await controller.callInteraction('deactivateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId
+      }
+    })
+
+    expect(deactivateResult.error).toBeUndefined()
+
+    // Get deactivated rule
+    const deactivatedRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'isActive', 'updatedAt']
+    )
+
+    expect(deactivatedRule).toBeDefined()
+    expect(deactivatedRule.updatedAt).toBeDefined()
+    expect(typeof deactivatedRule.updatedAt).toBe('number')
+    expect(deactivatedRule.isActive).toBe(false)
+    
+    // Verify updatedAt was changed again and is greater than after update timestamp
+    expect(deactivatedRule.updatedAt).toBeGreaterThan(afterUpdateTimestamp)
+  })
 }) 

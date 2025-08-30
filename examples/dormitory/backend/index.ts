@@ -222,8 +222,7 @@ export const DeductionRule = Entity.create({
     }),
     Property.create({
       name: 'updatedAt',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     }),
     Property.create({
       name: 'isDeleted',
@@ -1806,4 +1805,38 @@ DeductionRule.properties.find(p => p.name === 'isActive').computation = StateMac
     })
   ],
   defaultState: deductionRuleIsActiveDefaultState
+})
+
+// DeductionRule.updatedAt StateMachine computation
+const deductionRuleUpdatedAtDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && (event.interactionName === 'updateDeductionRule' || event.interactionName === 'deactivateDeductionRule')) {
+      return Math.floor(Date.now() / 1000);
+    }
+    return lastValue;
+  }
+});
+
+DeductionRule.properties.find(p => p.name === 'updatedAt').computation = StateMachine.create({
+  states: [deductionRuleUpdatedAtDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDeductionRuleInteraction,
+      current: deductionRuleUpdatedAtDefaultState,
+      next: deductionRuleUpdatedAtDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    }),
+    StateTransfer.create({
+      trigger: DeactivateDeductionRuleInteraction,
+      current: deductionRuleUpdatedAtDefaultState,
+      next: deductionRuleUpdatedAtDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    })
+  ],
+  defaultState: deductionRuleUpdatedAtDefaultState
 })
