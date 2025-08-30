@@ -5339,4 +5339,163 @@ describe('Basic Functionality', () => {
     expect(finalRule2.points).toBe(15) // Should remain unchanged
     expect(finalRule2.name).toBe('Updated Points Rule Name') // Should be updated
   })
+
+  test('DeductionRule.isActive transitions correctly through interactions', async () => {
+    /**
+     * Test Plan for: DeductionRule.isActive
+     * Dependencies: DeductionRule entity, CreateDeductionRule/UpdateDeductionRule/DeactivateDeductionRule interactions
+     * Steps: 1) Create rule (default active) 2) Create rule with explicit false 3) Update active status 4) Deactivate rule
+     * Business Logic: Set by admin interactions to enable/disable rule application
+     */
+    
+    // Test 1: Create rule with default active (true)
+    const result1 = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Default Active Rule',
+        description: 'Should be active by default',
+        points: 5
+      }
+    })
+
+    expect(result1.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get rule ID from effects or by querying
+    let ruleId1
+    const ruleCreateEffect = result1.effects?.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    
+    if (ruleCreateEffect && ruleCreateEffect.record.id) {
+      ruleId1 = ruleCreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created rule
+      const rules = await system.storage.find(
+        'DeductionRule',
+        MatchExp.atom({ key: 'name', value: ['=', 'Default Active Rule'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(rules.length).toBe(1)
+      ruleId1 = rules[0].id
+    }
+    
+    expect(ruleId1).toBeDefined()
+
+    // Verify default active status
+    let rule1 = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId1] }),
+      undefined,
+      ['id', 'isActive']
+    )
+    expect(rule1).toBeDefined()
+    expect(rule1.isActive).toBe(true)
+
+    // Test 2: Create rule with explicit false
+    const result2 = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Inactive Rule',
+        description: 'Should be inactive from creation',
+        points: 8,
+        isActive: false
+      }
+    })
+
+    expect(result2.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Get rule ID from effects or by querying
+    let ruleId2
+    const rule2CreateEffect = result2.effects?.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    
+    if (rule2CreateEffect && rule2CreateEffect.record.id) {
+      ruleId2 = rule2CreateEffect.record.id
+    } else {
+      // If no effect, query the database to find the created rule
+      const rules = await system.storage.find(
+        'DeductionRule',
+        MatchExp.atom({ key: 'name', value: ['=', 'Inactive Rule'] }),
+        undefined,
+        ['id', 'name']
+      )
+      expect(rules.length).toBe(1)
+      ruleId2 = rules[0].id
+    }
+    
+    expect(ruleId2).toBeDefined()
+
+    // Verify explicit inactive status
+    let rule2 = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId2] }),
+      undefined,
+      ['id', 'isActive']
+    )
+    expect(rule2).toBeDefined()
+    expect(rule2.isActive).toBe(false)
+
+    // Test 3: Update active status from false to true
+    const updateResult1 = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId2,
+        isActive: true
+      }
+    })
+
+    expect(updateResult1.error).toBeUndefined()
+
+    // Verify updated active status
+    rule2 = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId2] }),
+      undefined,
+      ['id', 'isActive']
+    )
+    expect(rule2.isActive).toBe(true)
+
+    // Test 4: Update active status from true to false
+    const updateResult2 = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId1,
+        isActive: false
+      }
+    })
+
+    expect(updateResult2.error).toBeUndefined()
+
+    // Verify updated inactive status
+    rule1 = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId1] }),
+      undefined,
+      ['id', 'isActive']
+    )
+    expect(rule1.isActive).toBe(false)
+
+    // Test 5: Deactivate rule (should set to false)
+    const deactivateResult = await controller.callInteraction('deactivateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId2
+      }
+    })
+
+    expect(deactivateResult.error).toBeUndefined()
+
+    // Verify deactivated status
+    rule2 = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId2] }),
+      undefined,
+      ['id', 'isActive']
+    )
+    expect(rule2.isActive).toBe(false)
+  })
 }) 

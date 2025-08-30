@@ -214,8 +214,7 @@ export const DeductionRule = Entity.create({
     }),
     Property.create({
       name: 'isActive',
-      type: 'boolean',
-      defaultValue: () => true
+      type: 'boolean'
     }),
     Property.create({
       name: 'createdAt',
@@ -1768,4 +1767,44 @@ DeductionRule.properties.find(p => p.name === 'points').computation = StateMachi
     })
   ],
   defaultState: deductionRulePointsDefaultState
+})
+
+// DeductionRule.isActive StateMachine computation
+const deductionRuleIsActiveDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createDeductionRule') {
+      return event.payload.isActive !== undefined ? event.payload.isActive : true;
+    }
+    if (event && event.interactionName === 'updateDeductionRule' && event.payload.isActive !== undefined) {
+      return event.payload.isActive;
+    }
+    if (event && event.interactionName === 'deactivateDeductionRule') {
+      return false;
+    }
+    return lastValue;
+  }
+});
+
+DeductionRule.properties.find(p => p.name === 'isActive').computation = StateMachine.create({
+  states: [deductionRuleIsActiveDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDeductionRuleInteraction,
+      current: deductionRuleIsActiveDefaultState,
+      next: deductionRuleIsActiveDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    }),
+    StateTransfer.create({
+      trigger: DeactivateDeductionRuleInteraction,
+      current: deductionRuleIsActiveDefaultState,
+      next: deductionRuleIsActiveDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    })
+  ],
+  defaultState: deductionRuleIsActiveDefaultState
 })
