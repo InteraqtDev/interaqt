@@ -494,6 +494,270 @@ export const LeaderMustBeResidentCondition = Condition.create({
   }
 })
 
+// Business rule condition: Cannot exceed dormitory capacity
+export const CannotExceedCapacityCondition = Condition.create({
+  name: 'cannotExceedCapacity',
+  content: async function(this: any, event: any) {
+    const dormitoryId = event.payload.dormitoryId
+    if (!dormitoryId) return false
+    
+    // Get dormitory capacity
+    const dormitory = await this.system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id', 'capacity']
+    )
+    
+    if (!dormitory) return false
+    
+    // Count current beds in dormitory by finding all DormitoryBedRelations for this dormitory
+    const bedRelations = await this.system.storage.findRelationByName(
+      DormitoryBedRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', dormitoryId] }),
+      undefined,
+      ['id']
+    )
+    
+    const bedCount = bedRelations.length
+    
+    // Return true if adding one more bed would not exceed capacity
+    return bedCount < dormitory.capacity
+  }
+})
+
+// Permission condition: Admins can deduct from any user, leaders only from their dormitory residents
+export const CanApplyPointDeductionCondition = Condition.create({
+  name: 'canApplyPointDeduction',
+  content: async function(this: any, event: any) {
+    const user = event.user
+    const targetUserId = event.payload.targetUserId
+    
+    if (!user || !targetUserId) return false
+    
+    // Admins can deduct points from any user
+    if (user.role === 'admin') {
+      return true
+    }
+    
+    // Dormitory leaders can only deduct from their residents
+    if (user.role === 'dormitoryLeader') {
+      // Find the dormitory this user manages
+      const leaderDormitoryRelation = await this.system.storage.findOneRelationByName(
+        UserDormitoryLeaderRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', user.id] }),
+        undefined,
+        [
+          'id',
+          ['target', { attributeQuery: ['id'] }]
+        ]
+      )
+      
+      if (!leaderDormitoryRelation || !leaderDormitoryRelation.target) {
+        return false // Leader is not managing any dormitory
+      }
+      
+      const managedDormitoryId = leaderDormitoryRelation.target.id
+      
+      // Find if target user is assigned to a bed in the managed dormitory
+      const targetUserBedAssignment = await this.system.storage.findOneRelationByName(
+        UserBedAssignmentRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] }),
+        undefined,
+        [
+          'id',
+          ['target', { attributeQuery: ['id'] }]
+        ]
+      )
+      
+      if (!targetUserBedAssignment || !targetUserBedAssignment.target) {
+        return false // Target user is not assigned to any bed
+      }
+      
+      const targetUserBedId = targetUserBedAssignment.target.id
+      
+      // Check if the target user's bed belongs to the managed dormitory
+      const bedDormitoryRelation = await this.system.storage.findOneRelationByName(
+        DormitoryBedRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', managedDormitoryId] })
+          .and({ key: 'target.id', value: ['=', targetUserBedId] }),
+        undefined,
+        ['id']
+      )
+      
+      return !!bedDormitoryRelation
+    }
+    
+    // Regular users cannot deduct points
+    return false
+  }
+})
+
+// Permission condition: Users see own profile, leaders see residents, admins see all
+export const CanViewUserProfileCondition = Condition.create({
+  name: 'canViewUserProfile',
+  content: async function(this: any, event: any) {
+    const user = event.user
+    
+    if (!user) return false
+    
+    // Admins can view any user profile
+    if (user.role === 'admin') {
+      return true
+    }
+    
+    // Get target user ID from query match (expecting query like { key: 'id', value: ['=', userId] })
+    let targetUserId = null
+    if (event.query && event.query.match) {
+      // Handle single match expression
+      if (event.query.match.key === 'id' && Array.isArray(event.query.match.value) && event.query.match.value[0] === '=') {
+        targetUserId = event.query.match.value[1]
+      }
+    }
+    
+    if (!targetUserId) return false
+    
+    // Users can view their own profile
+    if (user.id === targetUserId) {
+      return true
+    }
+    
+    // Dormitory leaders can view their residents' profiles
+    if (user.role === 'dormitoryLeader') {
+      // Find the dormitory this user manages
+      const leaderDormitoryRelation = await this.system.storage.findOneRelationByName(
+        UserDormitoryLeaderRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', user.id] }),
+        undefined,
+        [
+          'id',
+          ['target', { attributeQuery: ['id'] }]
+        ]
+      )
+      
+      if (!leaderDormitoryRelation || !leaderDormitoryRelation.target) {
+        return false // Leader is not managing any dormitory
+      }
+      
+      const managedDormitoryId = leaderDormitoryRelation.target.id
+      
+      // Find if target user is assigned to a bed in the managed dormitory
+      const targetUserBedAssignment = await this.system.storage.findOneRelationByName(
+        UserBedAssignmentRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] }),
+        undefined,
+        [
+          'id',
+          ['target', { attributeQuery: ['id'] }]
+        ]
+      )
+      
+      if (!targetUserBedAssignment || !targetUserBedAssignment.target) {
+        return false // Target user is not assigned to any bed
+      }
+      
+      const targetUserBedId = targetUserBedAssignment.target.id
+      
+      // Check if the target user's bed belongs to the managed dormitory
+      const bedDormitoryRelation = await this.system.storage.findOneRelationByName(
+        DormitoryBedRelation.name,
+        MatchExp.atom({ key: 'source.id', value: ['=', managedDormitoryId] })
+          .and({ key: 'target.id', value: ['=', targetUserBedId] }),
+        undefined,
+        ['id']
+      )
+      
+      return !!bedDormitoryRelation
+    }
+    
+    // Regular users cannot view other profiles
+    return false
+  }
+})
+
+// Business rule condition: Cannot submit multiple pending requests for same user
+export const NoPendingRemovalRequestCondition = Condition.create({
+  name: 'noPendingRemovalRequest',
+  content: async function(this: any, event: any) {
+    const targetUserId = event.payload.targetUserId
+    if (!targetUserId) return false
+    
+    // Check for existing pending removal requests for this target user
+    const existingPendingRequests = await this.system.storage.findRelationByName(
+      UserRemovalRequestTargetRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', targetUserId] }),
+      undefined,
+      [
+        'id',
+        ['target', { attributeQuery: ['id', 'status'] }]
+      ]
+    )
+    
+    // Check if any of the requests are in 'pending' status
+    const hasPendingRequest = existingPendingRequests.some(relation => 
+      relation.target && relation.target.status === 'pending'
+    )
+    
+    // Return true if NO pending request exists (can submit new request)
+    return !hasPendingRequest
+  }
+})
+
+// Business rule condition: Request must be in pending status
+export const RequestMustBePendingCondition = Condition.create({
+  name: 'requestMustBePending',
+  content: async function(this: any, event: any) {
+    const requestId = event.payload.requestId
+    if (!requestId) return false
+    
+    // Get the removal request by ID
+    const removalRequest = await this.system.storage.findOne('RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'status']
+    )
+    
+    if (!removalRequest) return false
+    
+    // Return true only if the request status is 'pending'
+    return removalRequest.status === 'pending'
+  }
+})
+
+// Business rule condition: User points cannot go below zero
+export const PointsCannotGoBelowZeroCondition = Condition.create({
+  name: 'pointsCannotGoBelowZero',
+  content: async function(this: any, event: any) {
+    const targetUserId = event.payload.targetUserId
+    const ruleId = event.payload.ruleId
+    
+    if (!targetUserId || !ruleId) return false
+    
+    // Get the target user's current points
+    const targetUser = await this.system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', targetUserId] }),
+      undefined,
+      ['id', 'points']
+    )
+    
+    if (!targetUser) return false
+    
+    // Get the deduction rule to find out how many points to deduct
+    const deductionRule = await this.system.storage.findOne('DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'points']
+    )
+    
+    if (!deductionRule) return false
+    
+    const currentPoints = targetUser.points || 0
+    const deductionPoints = deductionRule.points || 0
+    
+    // Return true if user has enough points (or exactly enough, allowing balance to reach zero)
+    return currentPoints >= deductionPoints
+  }
+})
+
 // =============================================================================
 // INTERACTIONS
 // =============================================================================
@@ -663,7 +927,9 @@ export const CreateBedInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: IsAdminCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(CannotExceedCapacityCondition))
+  })
 })
 
 export const UpdateBedInteraction = Interaction.create({
@@ -857,7 +1123,11 @@ export const ApplyPointDeductionInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: ActiveRuleCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(CanApplyPointDeductionCondition)
+      .and(BoolExp.atom(ActiveRuleCondition))
+      .and(BoolExp.atom(PointsCannotGoBelowZeroCondition))
+  })
 })
 
 // Removal Request Workflow Interactions
@@ -877,7 +1147,9 @@ export const SubmitRemovalRequestInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: CanSubmitRemovalRequestCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(CanSubmitRemovalRequestCondition).and(BoolExp.atom(NoPendingRemovalRequestCondition))
+  })
 })
 
 export const ProcessRemovalRequestInteraction = Interaction.create({
@@ -899,7 +1171,9 @@ export const ProcessRemovalRequestInteraction = Interaction.create({
       })
     ]
   }),
-  conditions: IsAdminCondition
+  conditions: Conditions.create({
+    content: BoolExp.atom(IsAdminCondition).and(BoolExp.atom(RequestMustBePendingCondition))
+  })
 })
 
 export const DeleteRemovalRequestInteraction = Interaction.create({
@@ -928,7 +1202,8 @@ export const GetUserProfileInteraction = Interaction.create({
         value: ['id', 'name', 'email', 'studentId', 'phone', 'points', 'role', 'createdAt', 'updatedAt', 'isDeleted']
       })
     ]
-  })
+  }),
+  conditions: CanViewUserProfileCondition
 })
 
 export const GetDormitoryInfoInteraction = Interaction.create({

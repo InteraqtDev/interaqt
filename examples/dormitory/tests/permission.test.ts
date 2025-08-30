@@ -1152,4 +1152,1456 @@ describe('Permission and Business Rules', () => {
       })
     })
   })
+
+  describe('BR009: CreateBed - Cannot exceed dormitory capacity', () => {
+    test('Can create bed when under capacity', async () => {
+      // First create a dormitory with capacity 4
+      const dormitoryResult = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin8', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 8',
+          location: 'Building H',
+          capacity: 4
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitory
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name', 'capacity']
+      )
+      
+      const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 8')
+      expect(createdDormitory).toBeDefined()
+      expect(createdDormitory.capacity).toBe(4)
+      const dormitoryId = createdDormitory.id
+
+      // Create first bed - should succeed (1/4)
+      const bedResult1 = await controller.callInteraction('createBed', {
+        user: { id: 'admin8', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-001'
+        }
+      })
+      expect(bedResult1.error).toBeUndefined()
+
+      // Create second bed - should succeed (2/4)  
+      const bedResult2 = await controller.callInteraction('createBed', {
+        user: { id: 'admin8', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-002'
+        }
+      })
+      expect(bedResult2.error).toBeUndefined()
+
+      // Create third bed - should succeed (3/4)
+      const bedResult3 = await controller.callInteraction('createBed', {
+        user: { id: 'admin8', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-003'
+        }
+      })
+      expect(bedResult3.error).toBeUndefined()
+
+      // Create fourth bed - should succeed (4/4)
+      const bedResult4 = await controller.callInteraction('createBed', {
+        user: { id: 'admin8', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-004'
+        }
+      })
+      expect(bedResult4.error).toBeUndefined()
+    })
+
+    test('Cannot create bed when at capacity', async () => {
+      // Create a dormitory with capacity 4
+      const dormitoryResult = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin9', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 9',
+          location: 'Building I', 
+          capacity: 4
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitory
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name', 'capacity']
+      )
+      
+      const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 9')
+      expect(createdDormitory).toBeDefined()
+      const dormitoryId = createdDormitory.id
+
+      // Create 4 beds to reach capacity
+      for (let i = 1; i <= 4; i++) {
+        const bedResult = await controller.callInteraction('createBed', {
+          user: { id: 'admin9', role: 'admin' },
+          payload: {
+            dormitoryId: dormitoryId,
+            number: `BED-${i.toString().padStart(3, '0')}`
+          }
+        })
+        expect(bedResult.error).toBeUndefined()
+      }
+
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Try to create 5th bed - should fail (exceeds capacity)
+      const bedResult5 = await controller.callInteraction('createBed', {
+        user: { id: 'admin9', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-005'
+        }
+      })
+      expect(bedResult5.error).toBeDefined()
+      expect((bedResult5.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('P016: ApplyPointDeduction - Admins can deduct from any user, leaders only from their dormitory residents', () => {
+    test('Admin can deduct points from any user', async () => {
+      // Create a deduction rule first
+      const ruleResult = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin10', role: 'admin' },
+        payload: {
+          name: 'Test Rule 16A',
+          description: 'Test rule for P016',
+          points: 10,
+          isActive: true
+        }
+      })
+      expect(ruleResult.error).toBeUndefined()
+      
+      // Wait for rule creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created rule
+      const allRules = await system.storage.find(
+        'DeductionRule',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdRule = allRules.find(r => r.name === 'Test Rule 16A')
+      expect(createdRule).toBeDefined()
+      const ruleId = createdRule.id
+
+      // Create any user
+      const userResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin10', role: 'admin' },
+        payload: {
+          name: 'Target User 16A',
+          email: 'target16a@university.edu',
+          studentId: '2024016A',
+          role: 'user'
+        }
+      })
+      expect(userResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created user
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const createdUser = allUsers.find(u => u.email === 'target16a@university.edu')
+      expect(createdUser).toBeDefined()
+      const targetUserId = createdUser.id
+
+      // Admin can apply point deduction to any user
+      const deductionResult = await controller.callInteraction('applyPointDeduction', {
+        user: { id: 'admin10', role: 'admin' },
+        payload: {
+          targetUserId: targetUserId,
+          ruleId: ruleId,
+          reason: 'Test deduction by admin'
+        }
+      })
+      expect(deductionResult.error).toBeUndefined()
+    })
+
+    test('Dormitory leader can deduct from their residents', async () => {
+      // Create dormitory
+      const dormitoryResult = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 16B',
+          location: 'Building J',
+          capacity: 4
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitory
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 16B')
+      expect(createdDormitory).toBeDefined()
+      const dormitoryId = createdDormitory.id
+
+      // Create bed in dormitory
+      const bedResult = await controller.callInteraction('createBed', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-16B'
+        }
+      })
+      expect(bedResult.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created bed
+      const allBeds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const createdBed = allBeds.find(b => b.number === 'BED-16B')
+      expect(createdBed).toBeDefined()
+      const bedId = createdBed.id
+
+      // Create dormitory leader
+      const leaderResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          name: 'Leader User 16B',
+          email: 'leader16b@university.edu',
+          studentId: '2024LEADER16B',
+          role: 'user'
+        }
+      })
+      expect(leaderResult.error).toBeUndefined()
+      
+      // Wait for leader creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created leader
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const createdLeader = allUsers.find(u => u.email === 'leader16b@university.edu')
+      expect(createdLeader).toBeDefined()
+      const leaderId = createdLeader.id
+
+      // Create resident user
+      const residentResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          name: 'Resident User 16B',
+          email: 'resident16b@university.edu',
+          studentId: '2024RESIDENT16B',
+          role: 'user'
+        }
+      })
+      expect(residentResult.error).toBeUndefined()
+      
+      // Wait for resident creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created resident
+      const allUsersAfterResident = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const createdResident = allUsersAfterResident.find(u => u.email === 'resident16b@university.edu')
+      expect(createdResident).toBeDefined()
+      const residentId = createdResident.id
+
+      // Assign leader to bed in dormitory first (must be resident)
+      const assignLeaderToBedResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          bedId: bedId
+        }
+      })
+      expect(assignLeaderToBedResult.error).toBeUndefined()
+
+      // Assign user as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Wait for assignments
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Create another bed for the resident
+      const bedResult2 = await controller.callInteraction('createBed', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-16B2'
+        }
+      })
+      expect(bedResult2.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the second bed
+      const allBedsAfter = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const createdBed2 = allBedsAfter.find(b => b.number === 'BED-16B2')
+      expect(createdBed2).toBeDefined()
+      const bedId2 = createdBed2.id
+
+      // Assign resident to bed in same dormitory
+      const assignResidentResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          userId: residentId,
+          bedId: bedId2
+        }
+      })
+      expect(assignResidentResult.error).toBeUndefined()
+
+      // Wait for resident assignment
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Create a deduction rule
+      const ruleResult = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin11', role: 'admin' },
+        payload: {
+          name: 'Test Rule 16B',
+          description: 'Test rule for P016 dormitory leader',
+          points: 5,
+          isActive: true
+        }
+      })
+      expect(ruleResult.error).toBeUndefined()
+      
+      // Wait for rule creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created rule
+      const allRules = await system.storage.find(
+        'DeductionRule',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdRule = allRules.find(r => r.name === 'Test Rule 16B')
+      expect(createdRule).toBeDefined()
+      const ruleId = createdRule.id
+
+      // Dormitory leader can deduct points from their resident
+      const deductionResult = await controller.callInteraction('applyPointDeduction', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        payload: {
+          targetUserId: residentId,
+          ruleId: ruleId,
+          reason: 'Test deduction by dormitory leader'
+        }
+      })
+      expect(deductionResult.error).toBeUndefined()
+    })
+
+    test('Dormitory leader cannot deduct from other dormitory residents', async () => {
+      // Create two dormitories
+      const dormitory1Result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 16C1',
+          location: 'Building K1',
+          capacity: 4
+        }
+      })
+      expect(dormitory1Result.error).toBeUndefined()
+
+      const dormitory2Result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 16C2',
+          location: 'Building K2',
+          capacity: 4
+        }
+      })
+      expect(dormitory2Result.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitories
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const dormitory1 = allDormitories.find(d => d.name === 'Test Dormitory 16C1')
+      const dormitory2 = allDormitories.find(d => d.name === 'Test Dormitory 16C2')
+      expect(dormitory1).toBeDefined()
+      expect(dormitory2).toBeDefined()
+      const dormitory1Id = dormitory1.id
+      const dormitory2Id = dormitory2.id
+
+      // Create beds in both dormitories
+      const bed1Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          dormitoryId: dormitory1Id,
+          number: 'BED-16C1'
+        }
+      })
+      expect(bed1Result.error).toBeUndefined()
+
+      const bed2Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          dormitoryId: dormitory2Id,
+          number: 'BED-16C2'
+        }
+      })
+      expect(bed2Result.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created beds
+      const allBeds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const bed1 = allBeds.find(b => b.number === 'BED-16C1')
+      const bed2 = allBeds.find(b => b.number === 'BED-16C2')
+      expect(bed1).toBeDefined()
+      expect(bed2).toBeDefined()
+      const bed1Id = bed1.id
+      const bed2Id = bed2.id
+
+      // Create leader and resident users
+      const leaderResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          name: 'Leader User 16C',
+          email: 'leader16c@university.edu',
+          studentId: '2024LEADER16C',
+          role: 'user'
+        }
+      })
+      expect(leaderResult.error).toBeUndefined()
+
+      const residentResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          name: 'Resident User 16C',
+          email: 'resident16c@university.edu',
+          studentId: '2024RESIDENT16C',
+          role: 'user'
+        }
+      })
+      expect(residentResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const leader = allUsers.find(u => u.email === 'leader16c@university.edu')
+      const resident = allUsers.find(u => u.email === 'resident16c@university.edu')
+      expect(leader).toBeDefined()
+      expect(resident).toBeDefined()
+      const leaderId = leader.id
+      const residentId = resident.id
+
+      // Assign leader to dormitory 1
+      const assignLeaderToBedResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          bedId: bed1Id
+        }
+      })
+      expect(assignLeaderToBedResult.error).toBeUndefined()
+
+      const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          dormitoryId: dormitory1Id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Assign resident to dormitory 2 (different from leader's dormitory)
+      const assignResidentResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          userId: residentId,
+          bedId: bed2Id
+        }
+      })
+      expect(assignResidentResult.error).toBeUndefined()
+
+      // Wait for assignments
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Create a deduction rule
+      const ruleResult = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin12', role: 'admin' },
+        payload: {
+          name: 'Test Rule 16C',
+          description: 'Test rule for P016 cross-dormitory test',
+          points: 5,
+          isActive: true
+        }
+      })
+      expect(ruleResult.error).toBeUndefined()
+      
+      // Wait for rule creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created rule
+      const allRules = await system.storage.find(
+        'DeductionRule',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdRule = allRules.find(r => r.name === 'Test Rule 16C')
+      expect(createdRule).toBeDefined()
+      const ruleId = createdRule.id
+
+      // Dormitory leader cannot deduct points from resident of different dormitory
+      const deductionResult = await controller.callInteraction('applyPointDeduction', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        payload: {
+          targetUserId: residentId,
+          ruleId: ruleId,
+          reason: 'Test deduction attempt - should fail'
+        }
+      })
+      expect(deductionResult.error).toBeDefined()
+      expect((deductionResult.error as any).type).toBe('condition check failed')
+    })
+
+    test('Regular user cannot deduct points', async () => {
+      // Create a deduction rule first
+      const ruleResult = await controller.callInteraction('createDeductionRule', {
+        user: { id: 'admin13', role: 'admin' },
+        payload: {
+          name: 'Test Rule 16D',
+          description: 'Test rule for P016 regular user test',
+          points: 10,
+          isActive: true
+        }
+      })
+      expect(ruleResult.error).toBeUndefined()
+      
+      // Wait for rule creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created rule
+      const allRules = await system.storage.find(
+        'DeductionRule',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdRule = allRules.find(r => r.name === 'Test Rule 16D')
+      expect(createdRule).toBeDefined()
+      const ruleId = createdRule.id
+
+      // Create regular users
+      const user1Result = await controller.callInteraction('createUser', {
+        user: { id: 'admin13', role: 'admin' },
+        payload: {
+          name: 'User 16D1',
+          email: 'user16d1@university.edu',
+          studentId: '2024USER16D1',
+          role: 'user'
+        }
+      })
+      expect(user1Result.error).toBeUndefined()
+
+      const user2Result = await controller.callInteraction('createUser', {
+        user: { id: 'admin13', role: 'admin' },
+        payload: {
+          name: 'User 16D2',
+          email: 'user16d2@university.edu',
+          studentId: '2024USER16D2',
+          role: 'user'
+        }
+      })
+      expect(user2Result.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const user1 = allUsers.find(u => u.email === 'user16d1@university.edu')
+      const user2 = allUsers.find(u => u.email === 'user16d2@university.edu')
+      expect(user1).toBeDefined()
+      expect(user2).toBeDefined()
+      const user1Id = user1.id
+      const user2Id = user2.id
+
+      // Regular user cannot deduct points from any user
+      const deductionResult = await controller.callInteraction('applyPointDeduction', {
+        user: { id: user1Id, role: 'user' },
+        payload: {
+          targetUserId: user2Id,
+          ruleId: ruleId,
+          reason: 'Test deduction attempt - should fail'
+        }
+      })
+      expect(deductionResult.error).toBeDefined()
+      expect((deductionResult.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('P019: GetUserProfile - Users see own profile, leaders see residents, admins see all', () => {
+    test('Admin can view any user profile', async () => {
+      // Create any user
+      const userResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin19', role: 'admin' },
+        payload: {
+          name: 'Target User 19A',
+          email: 'target19a@university.edu',
+          studentId: '2024019A',
+          role: 'user'
+        }
+      })
+      expect(userResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created user
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const createdUser = allUsers.find(u => u.email === 'target19a@university.edu')
+      expect(createdUser).toBeDefined()
+      const targetUserId = createdUser.id
+
+      // Admin can view any user profile
+      const profileResult = await controller.callInteraction('getUserProfile', {
+        user: { id: 'admin19', role: 'admin' },
+        query: {
+          match: MatchExp.atom({ key: 'id', value: ['=', targetUserId] })
+        }
+      })
+      expect(profileResult.error).toBeUndefined()
+      expect(profileResult.data).toBeDefined()
+      expect(Array.isArray(profileResult.data)).toBe(true)
+      expect((profileResult.data as any[]).length).toBeGreaterThan(0)
+      expect((profileResult.data as any[])[0].id).toBe(targetUserId)
+    })
+
+    test('User can view own profile', async () => {
+      // Create a user
+      const userResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin19b', role: 'admin' },
+        payload: {
+          name: 'Self User 19B',
+          email: 'self19b@university.edu',
+          studentId: '2024019B',
+          role: 'user'
+        }
+      })
+      expect(userResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created user
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const createdUser = allUsers.find(u => u.email === 'self19b@university.edu')
+      expect(createdUser).toBeDefined()
+      const userId = createdUser.id
+
+      // User can view their own profile
+      const profileResult = await controller.callInteraction('getUserProfile', {
+        user: { id: userId, role: 'user' },
+        query: {
+          match: MatchExp.atom({ key: 'id', value: ['=', userId] })
+        }
+      })
+      expect(profileResult.error).toBeUndefined()
+      expect(profileResult.data).toBeDefined()
+      expect(Array.isArray(profileResult.data)).toBe(true)
+      expect((profileResult.data as any[]).length).toBeGreaterThan(0)
+      expect((profileResult.data as any[])[0].id).toBe(userId)
+    })
+
+    test('User cannot view other user profile', async () => {
+      // Create two users
+      const user1Result = await controller.callInteraction('createUser', {
+        user: { id: 'admin19c', role: 'admin' },
+        payload: {
+          name: 'User 19C1',
+          email: 'user19c1@university.edu',
+          studentId: '2024019C1',
+          role: 'user'
+        }
+      })
+      expect(user1Result.error).toBeUndefined()
+
+      const user2Result = await controller.callInteraction('createUser', {
+        user: { id: 'admin19c', role: 'admin' },
+        payload: {
+          name: 'User 19C2',
+          email: 'user19c2@university.edu',
+          studentId: '2024019C2',
+          role: 'user'
+        }
+      })
+      expect(user2Result.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const user1 = allUsers.find(u => u.email === 'user19c1@university.edu')
+      const user2 = allUsers.find(u => u.email === 'user19c2@university.edu')
+      expect(user1).toBeDefined()
+      expect(user2).toBeDefined()
+      const user1Id = user1.id
+      const user2Id = user2.id
+
+      // User 1 cannot view User 2's profile
+      const profileResult = await controller.callInteraction('getUserProfile', {
+        user: { id: user1Id, role: 'user' },
+        query: {
+          match: MatchExp.atom({ key: 'id', value: ['=', user2Id] })
+        }
+      })
+      expect(profileResult.error).toBeDefined()
+      expect((profileResult.error as any).type).toBe('condition check failed')
+    })
+
+    test('Dormitory leader can view resident profiles', async () => {
+      // Create dormitory
+      const dormitoryResult = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 19D',
+          location: 'Building L',
+          capacity: 4
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitory
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 19D')
+      expect(createdDormitory).toBeDefined()
+      const dormitoryId = createdDormitory.id
+
+      // Create beds in dormitory
+      const bed1Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-19D1'
+        }
+      })
+      expect(bed1Result.error).toBeUndefined()
+
+      const bed2Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-19D2'
+        }
+      })
+      expect(bed2Result.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created beds
+      const allBeds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const bed1 = allBeds.find(b => b.number === 'BED-19D1')
+      const bed2 = allBeds.find(b => b.number === 'BED-19D2')
+      expect(bed1).toBeDefined()
+      expect(bed2).toBeDefined()
+      const bed1Id = bed1.id
+      const bed2Id = bed2.id
+
+      // Create leader and resident users
+      const leaderResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          name: 'Leader User 19D',
+          email: 'leader19d@university.edu',
+          studentId: '2024LEADER19D',
+          role: 'user'
+        }
+      })
+      expect(leaderResult.error).toBeUndefined()
+
+      const residentResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          name: 'Resident User 19D',
+          email: 'resident19d@university.edu',
+          studentId: '2024RESIDENT19D',
+          role: 'user'
+        }
+      })
+      expect(residentResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const leader = allUsers.find(u => u.email === 'leader19d@university.edu')
+      const resident = allUsers.find(u => u.email === 'resident19d@university.edu')
+      expect(leader).toBeDefined()
+      expect(resident).toBeDefined()
+      const leaderId = leader.id
+      const residentId = resident.id
+
+      // Assign leader to bed (must be resident first)
+      const assignLeaderToBedResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          bedId: bed1Id
+        }
+      })
+      expect(assignLeaderToBedResult.error).toBeUndefined()
+
+      // Assign user as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Assign resident to bed in same dormitory
+      const assignResidentResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin19d', role: 'admin' },
+        payload: {
+          userId: residentId,
+          bedId: bed2Id
+        }
+      })
+      expect(assignResidentResult.error).toBeUndefined()
+
+      // Wait for assignments
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Dormitory leader can view resident profile
+      const profileResult = await controller.callInteraction('getUserProfile', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        query: {
+          match: MatchExp.atom({ key: 'id', value: ['=', residentId] })
+        }
+      })
+      expect(profileResult.error).toBeUndefined()
+      expect(profileResult.data).toBeDefined()
+      expect(Array.isArray(profileResult.data)).toBe(true)
+      expect((profileResult.data as any[]).length).toBeGreaterThan(0)
+      expect((profileResult.data as any[])[0].id).toBe(residentId)
+    })
+
+    test('Dormitory leader cannot view non-resident profiles', async () => {
+      // Create two dormitories
+      const dormitory1Result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 19E1',
+          location: 'Building M1',
+          capacity: 4
+        }
+      })
+      expect(dormitory1Result.error).toBeUndefined()
+
+      const dormitory2Result = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 19E2',
+          location: 'Building M2',
+          capacity: 4
+        }
+      })
+      expect(dormitory2Result.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitories
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const dormitory1 = allDormitories.find(d => d.name === 'Test Dormitory 19E1')
+      const dormitory2 = allDormitories.find(d => d.name === 'Test Dormitory 19E2')
+      expect(dormitory1).toBeDefined()
+      expect(dormitory2).toBeDefined()
+      const dormitory1Id = dormitory1.id
+      const dormitory2Id = dormitory2.id
+
+      // Create beds in both dormitories
+      const bed1Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          dormitoryId: dormitory1Id,
+          number: 'BED-19E1'
+        }
+      })
+      expect(bed1Result.error).toBeUndefined()
+
+      const bed2Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          dormitoryId: dormitory2Id,
+          number: 'BED-19E2'
+        }
+      })
+      expect(bed2Result.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created beds
+      const allBeds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const bed1 = allBeds.find(b => b.number === 'BED-19E1')
+      const bed2 = allBeds.find(b => b.number === 'BED-19E2')
+      expect(bed1).toBeDefined()
+      expect(bed2).toBeDefined()
+      const bed1Id = bed1.id
+      const bed2Id = bed2.id
+
+      // Create leader and resident users
+      const leaderResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          name: 'Leader User 19E',
+          email: 'leader19e@university.edu',
+          studentId: '2024LEADER19E',
+          role: 'user'
+        }
+      })
+      expect(leaderResult.error).toBeUndefined()
+
+      const residentResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          name: 'Resident User 19E',
+          email: 'resident19e@university.edu',
+          studentId: '2024RESIDENT19E',
+          role: 'user'
+        }
+      })
+      expect(residentResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const leader = allUsers.find(u => u.email === 'leader19e@university.edu')
+      const resident = allUsers.find(u => u.email === 'resident19e@university.edu')
+      expect(leader).toBeDefined()
+      expect(resident).toBeDefined()
+      const leaderId = leader.id
+      const residentId = resident.id
+
+      // Assign leader to dormitory 1
+      const assignLeaderToBedResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          bedId: bed1Id
+        }
+      })
+      expect(assignLeaderToBedResult.error).toBeUndefined()
+
+      const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          dormitoryId: dormitory1Id
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Assign resident to dormitory 2 (different from leader's dormitory)
+      const assignResidentResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin19e', role: 'admin' },
+        payload: {
+          userId: residentId,
+          bedId: bed2Id
+        }
+      })
+      expect(assignResidentResult.error).toBeUndefined()
+
+      // Wait for assignments
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Dormitory leader cannot view resident from different dormitory
+      const profileResult = await controller.callInteraction('getUserProfile', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        query: {
+          match: MatchExp.atom({ key: 'id', value: ['=', residentId] })
+        }
+      })
+      expect(profileResult.error).toBeDefined()
+      expect((profileResult.error as any).type).toBe('condition check failed')
+    })
+  })
+
+  describe('BR022: SubmitRemovalRequest - Cannot submit multiple pending requests for same user', () => {
+    test('Can submit first removal request for user', async () => {
+      // Create dormitory and bed
+      const dormitoryResult = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 22A',
+          location: 'Building N',
+          capacity: 4
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitory
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 22A')
+      expect(createdDormitory).toBeDefined()
+      const dormitoryId = createdDormitory.id
+
+      // Create bed in dormitory
+      const bedResult = await controller.callInteraction('createBed', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-22A'
+        }
+      })
+      expect(bedResult.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created bed
+      const allBeds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const createdBed = allBeds.find(b => b.number === 'BED-22A')
+      expect(createdBed).toBeDefined()
+      const bedId = createdBed.id
+
+      // Create leader and target users
+      const leaderResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          name: 'Leader User 22A',
+          email: 'leader22a@university.edu',
+          studentId: '2024LEADER22A',
+          role: 'user'
+        }
+      })
+      expect(leaderResult.error).toBeUndefined()
+
+      const targetResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          name: 'Target User 22A',
+          email: 'target22a@university.edu',
+          studentId: '2024TARGET22A',
+          role: 'user'
+        }
+      })
+      expect(targetResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const leader = allUsers.find(u => u.email === 'leader22a@university.edu')
+      const target = allUsers.find(u => u.email === 'target22a@university.edu')
+      expect(leader).toBeDefined()
+      expect(target).toBeDefined()
+      const leaderId = leader.id
+      const targetId = target.id
+
+      // Assign leader to bed (must be resident first)
+      const assignLeaderToBedResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          bedId: bedId
+        }
+      })
+      expect(assignLeaderToBedResult.error).toBeUndefined()
+
+      // Assign user as dormitory leader
+      const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      // Wait for assignments
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Create second bed for target user
+      const bedResult2 = await controller.callInteraction('createBed', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-22A2'
+        }
+      })
+      expect(bedResult2.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the second bed
+      const allBedsAfter = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const createdBed2 = allBedsAfter.find(b => b.number === 'BED-22A2')
+      expect(createdBed2).toBeDefined()
+      const bedId2 = createdBed2.id
+
+      // Assign target to bed in same dormitory
+      const assignTargetResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin22', role: 'admin' },
+        payload: {
+          userId: targetId,
+          bedId: bedId2
+        }
+      })
+      expect(assignTargetResult.error).toBeUndefined()
+
+      // Wait for assignment
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Leader can submit first removal request for target user
+      const requestResult = await controller.callInteraction('submitRemovalRequest', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        payload: {
+          targetUserId: targetId,
+          reason: 'First removal request for user 22A'
+        }
+      })
+      expect(requestResult.error).toBeUndefined()
+    })
+
+    test('Cannot submit second pending removal request for same user', async () => {
+      // Create dormitory and bed
+      const dormitoryResult = await controller.callInteraction('createDormitory', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          name: 'Test Dormitory 22B',
+          location: 'Building O',
+          capacity: 4
+        }
+      })
+      expect(dormitoryResult.error).toBeUndefined()
+      
+      // Wait for dormitory creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created dormitory
+      const allDormitories = await system.storage.find(
+        'Dormitory',
+        undefined,
+        undefined,
+        ['id', 'name']
+      )
+      
+      const createdDormitory = allDormitories.find(d => d.name === 'Test Dormitory 22B')
+      expect(createdDormitory).toBeDefined()
+      const dormitoryId = createdDormitory.id
+
+      // Create beds in dormitory
+      const bed1Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-22B1'
+        }
+      })
+      expect(bed1Result.error).toBeUndefined()
+
+      const bed2Result = await controller.callInteraction('createBed', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          dormitoryId: dormitoryId,
+          number: 'BED-22B2'
+        }
+      })
+      expect(bed2Result.error).toBeUndefined()
+      
+      // Wait for bed creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created beds
+      const allBeds = await system.storage.find(
+        'Bed',
+        undefined,
+        undefined,
+        ['id', 'number']
+      )
+      
+      const bed1 = allBeds.find(b => b.number === 'BED-22B1')
+      const bed2 = allBeds.find(b => b.number === 'BED-22B2')
+      expect(bed1).toBeDefined()
+      expect(bed2).toBeDefined()
+      const bed1Id = bed1.id
+      const bed2Id = bed2.id
+
+      // Create leader and target users
+      const leaderResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          name: 'Leader User 22B',
+          email: 'leader22b@university.edu',
+          studentId: '2024LEADER22B',
+          role: 'user'
+        }
+      })
+      expect(leaderResult.error).toBeUndefined()
+
+      const targetResult = await controller.callInteraction('createUser', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          name: 'Target User 22B',
+          email: 'target22b@university.edu',
+          studentId: '2024TARGET22B',
+          role: 'user'
+        }
+      })
+      expect(targetResult.error).toBeUndefined()
+      
+      // Wait for user creation
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Find the created users
+      const allUsers = await system.storage.find(
+        'User',
+        undefined,
+        undefined,
+        ['id', 'email']
+      )
+      
+      const leader = allUsers.find(u => u.email === 'leader22b@university.edu')
+      const target = allUsers.find(u => u.email === 'target22b@university.edu')
+      expect(leader).toBeDefined()
+      expect(target).toBeDefined()
+      const leaderId = leader.id
+      const targetId = target.id
+
+      // Assign leader and target to beds
+      const assignLeaderToBedResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          bedId: bed1Id
+        }
+      })
+      expect(assignLeaderToBedResult.error).toBeUndefined()
+
+      const assignLeaderResult = await controller.callInteraction('assignDormitoryLeader', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          userId: leaderId,
+          dormitoryId: dormitoryId
+        }
+      })
+      expect(assignLeaderResult.error).toBeUndefined()
+
+      const assignTargetResult = await controller.callInteraction('assignUserToBed', {
+        user: { id: 'admin22b', role: 'admin' },
+        payload: {
+          userId: targetId,
+          bedId: bed2Id
+        }
+      })
+      expect(assignTargetResult.error).toBeUndefined()
+
+      // Wait for assignments
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Submit first removal request - should succeed
+      const request1Result = await controller.callInteraction('submitRemovalRequest', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        payload: {
+          targetUserId: targetId,
+          reason: 'First removal request for user 22B'
+        }
+      })
+      expect(request1Result.error).toBeUndefined()
+
+      // Wait for first request
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Try to submit second removal request for same user - should fail
+      const request2Result = await controller.callInteraction('submitRemovalRequest', {
+        user: { id: leaderId, role: 'dormitoryLeader' },
+        payload: {
+          targetUserId: targetId,
+          reason: 'Second removal request for same user - should fail'
+        }
+      })
+      expect(request2Result.error).toBeDefined()
+      expect((request2Result.error as any).type).toBe('condition check failed')
+    })
+  })
 })
