@@ -4998,4 +4998,79 @@ describe('Basic Functionality', () => {
     expect(deletedRequest.isDeleted).toBe(true) // Should be true after deletion
     expect(deletedRequest.reason).toBe('Testing isDeleted computation') // Other fields should remain unchanged
   })
+
+  test('DeductionRule.id property is auto-generated (_owner)', async () => {
+    /**
+     * Test Plan for: DeductionRule.id property computation (_owner)
+     * Dependencies: DeductionRule entity, CreateDeductionRule interaction
+     * Steps: 1) Create deduction rule via interaction 2) Verify id is auto-generated 3) Verify id is unique
+     * Business Logic: The id property is auto-generated when DeductionRule entity is created
+     */
+    
+    // Step 1: Create first deduction rule via CreateDeductionRule interaction
+    const result1 = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' }, // Admin user triggering the creation
+      payload: {
+        name: 'Late Return',
+        description: 'Points deducted for late dormitory return',
+        points: 10,
+        isActive: true
+      }
+    })
+
+    expect(result1.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 2: Create second deduction rule via CreateDeductionRule interaction  
+    const result2 = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' }, // Admin user triggering the creation
+      payload: {
+        name: 'Noise Violation',
+        description: 'Points deducted for excessive noise',
+        points: 15,
+        isActive: true
+      }
+    })
+
+    expect(result2.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 3: Verify both deduction rules have auto-generated unique IDs
+    const rules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(rules.length).toBeGreaterThanOrEqual(2)
+    
+    const rule1 = rules.find(rule => rule.name === 'Late Return')
+    const rule2 = rules.find(rule => rule.name === 'Noise Violation')
+
+    expect(rule1).toBeDefined()
+    expect(rule2).toBeDefined()
+
+    // Verify both rules have valid IDs
+    expect(rule1.id).toBeDefined()
+    expect(rule2.id).toBeDefined()
+    expect(typeof rule1.id).toBe('string')
+    expect(typeof rule2.id).toBe('string')
+    expect(rule1.id.length).toBeGreaterThan(0)
+    expect(rule2.id.length).toBeGreaterThan(0)
+
+    // Verify IDs are unique
+    expect(rule1.id).not.toBe(rule2.id)
+
+    // Verify other properties are correctly set
+    expect(rule1.name).toBe('Late Return')
+    expect(rule1.description).toBe('Points deducted for late dormitory return')
+    expect(rule1.points).toBe(10)
+    expect(rule1.isActive).toBe(true)
+
+    expect(rule2.name).toBe('Noise Violation')
+    expect(rule2.description).toBe('Points deducted for excessive noise')
+    expect(rule2.points).toBe(15)
+    expect(rule2.isActive).toBe(true)
+  })
 }) 
