@@ -4622,4 +4622,143 @@ describe('Basic Functionality', () => {
     const statusValues = allRequests.map(r => r.status).sort()
     expect(statusValues).toEqual(['approved', 'rejected'])
   })
+
+  test('RemovalRequest.processedAt computation sets timestamp when request is processed', async () => {
+    /**
+     * Test Plan for: RemovalRequest.processedAt
+     * Dependencies: RemovalRequest entity, ProcessRemovalRequestInteraction
+     * Steps: 1) Create removal request 2) Process the request with ProcessRemovalRequestInteraction 3) Verify processedAt is set
+     * Business Logic: Set to current timestamp when ProcessRemovalRequest changes status from pending
+     */
+    
+    // Step 1: Create admin user first
+    const createAdminResult = await controller.callInteraction('createUser', {
+      user: { id: 'system' }, // Use system for initial creation
+      payload: {
+        name: 'Admin User',
+        email: 'admin@example.com',
+        studentId: 'ADM001',
+        phone: '123-456-7892',
+        role: 'admin'
+      }
+    })
+    expect(createAdminResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin@example.com'] }),
+      undefined,
+      ['id', 'name', 'role']
+    )
+    expect(adminUser).toBeDefined()
+
+    // Step 2: Create test users
+    const createUserResult1 = await controller.callInteraction('createUser', {
+      user: adminUser,
+      payload: {
+        name: 'Target User',
+        email: 'target@example.com',
+        studentId: 'STU001',
+        phone: '123-456-7890',
+        role: 'user'
+      }
+    })
+    expect(createUserResult1.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const createUserResult2 = await controller.callInteraction('createUser', {
+      user: adminUser,
+      payload: {
+        name: 'Requester User',
+        email: 'requester@example.com',
+        studentId: 'STU002',
+        phone: '123-456-7891',
+        role: 'dormitoryLeader'
+      }
+    })
+    expect(createUserResult2.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target@example.com'] }),
+      undefined,
+      ['id', 'name']
+    )
+    
+    const requesterUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'requester@example.com'] }),
+      undefined,
+      ['id', 'name']
+    )
+
+    expect(targetUser).toBeDefined()
+    expect(requesterUser).toBeDefined()
+
+    // Step 3: Create removal request
+    const submitResult = await controller.callInteraction('submitRemovalRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'ProcessedAt test removal request'
+      }
+    })
+    expect(submitResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify request was created with processedAt as null
+    const createdRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'ProcessedAt test removal request'] }),
+      undefined,
+      ['id', 'reason', 'status', 'requestedAt', 'processedAt']
+    )
+
+    expect(createdRequest).toBeDefined()
+    expect(createdRequest.status).toBe('pending')
+    expect(createdRequest.processedAt).toBeUndefined() // Initially undefined since no computation has run yet
+    expect(createdRequest.requestedAt).toBeGreaterThan(0)
+
+    // Step 4: Process the removal request
+    const beforeProcessTime = Math.floor(Date.now() / 1000)
+    
+    const processResult = await controller.callInteraction('processRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: createdRequest.id,
+        decision: 'approved',
+        adminComment: 'Test processing comment'
+      }
+    })
+    expect(processResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const afterProcessTime = Math.floor(Date.now() / 1000)
+
+    // Step 5: Verify processedAt was set
+    const processedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', createdRequest.id] }),
+      undefined,
+      ['id', 'reason', 'status', 'requestedAt', 'processedAt']
+    )
+
+    expect(processedRequest).toBeDefined()
+    expect(processedRequest.status).toBe('approved')
+    expect(processedRequest.processedAt).toBeDefined()
+    expect(processedRequest.processedAt).not.toBeNull()
+    
+    // Verify processedAt is a reasonable timestamp (within test execution window)
+    expect(processedRequest.processedAt).toBeGreaterThanOrEqual(beforeProcessTime)
+    expect(processedRequest.processedAt).toBeLessThanOrEqual(afterProcessTime)
+    
+    // Verify processedAt is greater than or equal to requestedAt (they could be the same if processed very quickly)
+    expect(processedRequest.processedAt).toBeGreaterThanOrEqual(processedRequest.requestedAt)
+    
+    // Verify other fields remain correct
+    expect(processedRequest.reason).toBe('ProcessedAt test removal request')
+    // Note: adminComment will be tested in the next computation implementation
+  })
 }) 

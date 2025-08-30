@@ -1586,3 +1586,29 @@ RemovalRequest.properties.find(p => p.name === 'status').computation = StateMach
   ],
   defaultState: removalRequestPendingState
 })
+
+// RemovalRequest.processedAt StateMachine computation
+const processedAtNullState = StateNode.create({
+  name: 'null',
+  computeValue: () => null
+});
+
+const processedAtSetState = StateNode.create({
+  name: 'set',
+  computeValue: () => Math.floor(Date.now() / 1000)
+});
+
+RemovalRequest.properties.find(p => p.name === 'processedAt').computation = StateMachine.create({
+  states: [processedAtNullState, processedAtSetState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: processedAtNullState,
+      next: processedAtSetState,
+      computeTarget: (event) => ({
+        id: event.payload.requestId
+      })
+    })
+  ],
+  defaultState: processedAtNullState
+})
