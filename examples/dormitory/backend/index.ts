@@ -175,8 +175,7 @@ export const RemovalRequest = Entity.create({
     }),
     Property.create({
       name: 'status',
-      type: 'string',
-      defaultValue: () => 'pending'
+      type: 'string'
     }),
     Property.create({
       name: 'requestedAt',
@@ -1555,4 +1554,36 @@ PointDeduction.properties.find(p => p.name === 'isDeleted').computation = StateM
     })
   ],
   defaultState: pointDeductionIsDeletedActiveState
+})
+
+// RemovalRequest.status StateMachine computation
+const removalRequestPendingState = StateNode.create({
+  name: 'pending',
+  computeValue: () => 'pending'
+});
+
+const removalRequestProcessedState = StateNode.create({
+  name: 'processed',
+  computeValue: (lastValue, event) => {
+    // Determine the status based on the decision in the event
+    if (event && event.payload && event.payload.decision) {
+      return event.payload.decision; // Will be 'approved' or 'rejected'
+    }
+    return lastValue; // Fallback to previous value
+  }
+});
+
+RemovalRequest.properties.find(p => p.name === 'status').computation = StateMachine.create({
+  states: [removalRequestPendingState, removalRequestProcessedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: removalRequestPendingState,
+      next: removalRequestProcessedState,
+      computeTarget: (event) => ({
+        id: event.payload.requestId
+      })
+    })
+  ],
+  defaultState: removalRequestPendingState
 })

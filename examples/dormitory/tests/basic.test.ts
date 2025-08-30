@@ -4327,4 +4327,199 @@ describe('Basic Functionality', () => {
     expect(typeof createdRequest.reason).toBe('string')
     expect(createdRequest.reason.length).toBeGreaterThan(0)
   })
+
+  test('RemovalRequest.status StateMachine computation handles status transitions', async () => {
+    /**
+     * Test Plan for: RemovalRequest.status StateMachine computation
+     * Dependencies: RemovalRequest entity, User entity, SubmitRemovalRequest interaction, ProcessRemovalRequest interaction
+     * Steps: 1) Create admin user 2) Create requester user 3) Create target user 4) Submit removal request 5) Verify status is 'pending' 6) Process request as approved 7) Verify status is 'approved' 8) Create another request 9) Process as rejected 10) Verify status is 'rejected'
+     * Business Logic: StateMachine manages status transitions from 'pending' to 'approved'/'rejected' via ProcessRemovalRequest interaction with defined state transitions
+     */
+    
+    // Step 1: Create admin user first
+    const adminResult = await controller.callInteraction('createUser', {
+      user: { id: '00000000-0000-0000-0000-000000000000' }, // Use a valid UUID for initial admin
+      payload: {
+        name: 'System Admin',
+        email: 'admin@system.com',
+        studentId: 'ADMIN001',
+        role: 'admin'
+      }
+    })
+    
+    expect(adminResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the admin user from database
+    const adminUsers = await system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin@system.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'role']
+    )
+    expect(adminUsers.length).toBe(1)
+    const adminId = adminUsers[0].id
+    expect(adminId).toBeDefined()
+    
+    // Step 2: Create requester user (dormitory leader)
+    const requesterResult = await controller.callInteraction('createUser', {
+      user: { id: adminId },
+      payload: {
+        name: 'Status Test Requester',
+        email: 'status.requester@example.com',
+        studentId: 'STU_REQ_001',
+        role: 'dormitoryLeader'
+      }
+    })
+    
+    expect(requesterResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the requester user from database
+    const requesterUsers = await system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'status.requester@example.com'] }),
+      undefined,
+      ['id', 'name', 'email']
+    )
+    expect(requesterUsers.length).toBe(1)
+    const requesterId = requesterUsers[0].id
+    expect(requesterId).toBeDefined()
+    
+    // Step 3: Create target user
+    const targetResult = await controller.callInteraction('createUser', {
+      user: { id: adminId },
+      payload: {
+        name: 'Status Test Target',
+        email: 'status.target@example.com',
+        studentId: 'STU_TGT_001'
+      }
+    })
+    
+    expect(targetResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the target user from database
+    const targetUsers = await system.storage.find(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'status.target@example.com'] }),
+      undefined,
+      ['id', 'name', 'email']
+    )
+    expect(targetUsers.length).toBe(1)
+    const targetId = targetUsers[0].id
+    expect(targetId).toBeDefined()
+    
+    // Step 4: Submit removal request (should start in 'pending' status)
+    const submitResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: requesterId },
+      payload: {
+        targetUserId: targetId,
+        reason: 'Status transition test - approval case'
+      }
+    })
+    
+    expect(submitResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the created removal request
+    const requests = await system.storage.find(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Status transition test - approval case'] }),
+      undefined,
+      ['id', 'reason', 'status', 'processedAt', 'adminComment']
+    )
+    
+    expect(requests.length).toBe(1)
+    const requestId = requests[0].id
+    
+    // Step 5: Verify initial status is 'pending' (set by defaultState)
+    expect(requests[0].status).toBe('pending')
+    expect(requests[0].processedAt).toBeUndefined()
+    expect(requests[0].adminComment).toBeUndefined()
+    
+    // Step 6: Process request as approved
+    const approveResult = await controller.callInteraction('processRemovalRequest', {
+      user: { id: adminId },
+      payload: {
+        requestId: requestId,
+        decision: 'approved',
+        adminComment: 'Sufficient evidence for removal'
+      }
+    })
+    
+    expect(approveResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Step 7: Verify status transitioned to 'approved'
+    const approvedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', requestId] }),
+      undefined,
+      ['id', 'reason', 'status', 'processedAt', 'adminComment']
+    )
+    
+    expect(approvedRequest).toBeDefined()
+    expect(approvedRequest.status).toBe('approved')
+    
+    // Step 8: Test rejection case - create another request
+    const submitRejectResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: requesterId },
+      payload: {
+        targetUserId: targetId,
+        reason: 'Status transition test - rejection case'
+      }
+    })
+    
+    expect(submitRejectResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the second request
+    const rejectRequests = await system.storage.find(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Status transition test - rejection case'] }),
+      undefined,
+      ['id', 'reason', 'status']
+    )
+    
+    expect(rejectRequests.length).toBe(1)
+    const rejectRequestId = rejectRequests[0].id
+    expect(rejectRequests[0].status).toBe('pending')
+    
+    // Step 9: Process request as rejected
+    const rejectResult = await controller.callInteraction('processRemovalRequest', {
+      user: { id: adminId },
+      payload: {
+        requestId: rejectRequestId,
+        decision: 'rejected',
+        adminComment: 'Insufficient evidence for removal'
+      }
+    })
+    
+    expect(rejectResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Step 10: Verify status transitioned to 'rejected'
+    const rejectedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', rejectRequestId] }),
+      undefined,
+      ['id', 'reason', 'status', 'processedAt', 'adminComment']
+    )
+    
+    expect(rejectedRequest).toBeDefined()
+    expect(rejectedRequest.status).toBe('rejected')
+    
+    // Verify both requests exist with correct final states
+    const allRequests = await system.storage.find(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['like', 'Status transition test%'] }),
+      undefined,
+      ['id', 'reason', 'status']
+    )
+    
+    expect(allRequests.length).toBe(2)
+    const statusValues = allRequests.map(r => r.status).sort()
+    expect(statusValues).toEqual(['approved', 'rejected'])
+  })
 }) 

@@ -772,7 +772,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property with defined state transitions",
           "calculationMethod": "Set to 'pending' at creation, modified by ProcessRemovalRequest to 'approved' or 'rejected'",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.requestedAt",
