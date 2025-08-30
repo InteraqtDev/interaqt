@@ -4761,4 +4761,171 @@ describe('Basic Functionality', () => {
     expect(processedRequest.reason).toBe('ProcessedAt test removal request')
     // Note: adminComment will be tested in the next computation implementation
   })
+
+  test('RemovalRequest.adminComment StateMachine computation sets comment when request is processed', async () => {
+    /**
+     * Test Plan for: RemovalRequest.adminComment
+     * Dependencies: RemovalRequest entity, ProcessRemovalRequestInteraction
+     * Steps: 1) Create removal request 2) Process with adminComment 3) Verify adminComment is set 4) Process another without adminComment to test optional behavior
+     * Business Logic: Set by ProcessRemovalRequest when admin provides decision comments
+     */
+    
+    // Step 1: Create admin user first
+    const createAdminResult = await controller.callInteraction('createUser', {
+      user: { id: 'system' }, // Use system for initial creation
+      payload: {
+        name: 'Admin User',
+        email: 'admin@example.com',
+        studentId: 'ADM001',
+        phone: '123-456-7892',
+        role: 'admin'
+      }
+    })
+    expect(createAdminResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const adminUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'admin@example.com'] }),
+      undefined,
+      ['id', 'name', 'role']
+    )
+    expect(adminUser).toBeDefined()
+
+    // Step 2: Create test users
+    const createUserResult1 = await controller.callInteraction('createUser', {
+      user: adminUser,
+      payload: {
+        name: 'Target User',
+        email: 'target@example.com',
+        studentId: 'STU001',
+        phone: '123-456-7890',
+        role: 'user'
+      }
+    })
+    expect(createUserResult1.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const createUserResult2 = await controller.callInteraction('createUser', {
+      user: adminUser,
+      payload: {
+        name: 'Requester User',
+        email: 'requester@example.com',
+        studentId: 'STU002',
+        phone: '123-456-7891',
+        role: 'dormitoryLeader'
+      }
+    })
+    expect(createUserResult2.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const targetUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'target@example.com'] }),
+      undefined,
+      ['id', 'name']
+    )
+    
+    const requesterUser = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'email', value: ['=', 'requester@example.com'] }),
+      undefined,
+      ['id', 'name']
+    )
+
+    expect(targetUser).toBeDefined()
+    expect(requesterUser).toBeDefined()
+
+    // Step 3: Create removal request
+    const submitResult = await controller.callInteraction('submitRemovalRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'AdminComment test removal request'
+      }
+    })
+    expect(submitResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify request was created with adminComment as null
+    const createdRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'AdminComment test removal request'] }),
+      undefined,
+      ['id', 'reason', 'status', 'adminComment']
+    )
+
+    expect(createdRequest).toBeDefined()
+    expect(createdRequest.status).toBe('pending')
+    expect(createdRequest.adminComment).toBeUndefined() // Initially undefined since no computation has run yet
+
+    // Step 4: Process the removal request with adminComment
+    const processResult = await controller.callInteraction('processRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: createdRequest.id,
+        decision: 'approved',
+        adminComment: 'This request has been approved after careful review.'
+      }
+    })
+    expect(processResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 5: Verify adminComment was set
+    const processedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', createdRequest.id] }),
+      undefined,
+      ['id', 'reason', 'status', 'adminComment']
+    )
+
+    expect(processedRequest).toBeDefined()
+    expect(processedRequest.status).toBe('approved')
+    expect(processedRequest.adminComment).toBe('This request has been approved after careful review.')
+
+    // Step 6: Test processing without adminComment (optional behavior)
+    // Create another removal request
+    const submitResult2 = await controller.callInteraction('submitRemovalRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'AdminComment test removal request 2'
+      }
+    })
+    expect(submitResult2.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const createdRequest2 = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'AdminComment test removal request 2'] }),
+      undefined,
+      ['id', 'reason', 'status', 'adminComment']
+    )
+
+    expect(createdRequest2).toBeDefined()
+
+    // Process without adminComment
+    const processResult2 = await controller.callInteraction('processRemovalRequest', {
+      user: adminUser,
+      payload: {
+        requestId: createdRequest2.id,
+        decision: 'rejected'
+        // No adminComment provided
+      }
+    })
+    expect(processResult2.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify adminComment remains undefined when not provided
+    const processedRequest2 = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', createdRequest2.id] }),
+      undefined,
+      ['id', 'reason', 'status', 'adminComment']
+    )
+
+    expect(processedRequest2).toBeDefined()
+    expect(processedRequest2.status).toBe('rejected')
+    expect(processedRequest2.adminComment).toBeUndefined() // Should remain undefined when not provided
+  })
 }) 

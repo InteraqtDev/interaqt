@@ -809,7 +809,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that modify the property with timestamp logic",
           "calculationMethod": "Set to current timestamp when ProcessRemovalRequest changes status from pending",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.adminComment",
@@ -829,7 +829,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Set by ProcessRemovalRequest when admin provides decision comments",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.isDeleted",

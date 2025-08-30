@@ -1612,3 +1612,34 @@ RemovalRequest.properties.find(p => p.name === 'processedAt').computation = Stat
   ],
   defaultState: processedAtNullState
 })
+
+// RemovalRequest.adminComment StateMachine computation
+const adminCommentNullState = StateNode.create({
+  name: 'null',
+  computeValue: () => null
+});
+
+const adminCommentSetState = StateNode.create({
+  name: 'set',
+  computeValue: (lastValue, event) => {
+    if (event && event.payload && event.payload.adminComment !== undefined) {
+      return event.payload.adminComment;
+    }
+    return lastValue;
+  }
+});
+
+RemovalRequest.properties.find(p => p.name === 'adminComment').computation = StateMachine.create({
+  states: [adminCommentNullState, adminCommentSetState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: adminCommentNullState,
+      next: adminCommentSetState,
+      computeTarget: (event) => ({
+        id: event.payload.requestId
+      })
+    })
+  ],
+  defaultState: adminCommentNullState
+})
