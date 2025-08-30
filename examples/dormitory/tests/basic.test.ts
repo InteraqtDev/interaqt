@@ -4328,6 +4328,106 @@ describe('Basic Functionality', () => {
     expect(createdRequest.reason.length).toBeGreaterThan(0)
   })
 
+  test('RemovalRequest.requestedAt set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: _owner
+     * This tests that requestedAt is properly set when RemovalRequest is created
+     * Dependencies: RemovalRequest entity, User entity, SubmitRemovalRequest interaction
+     * Steps: 1) Create target user 2) Create requester user 3) Trigger SubmitRemovalRequest interaction 4) Verify requestedAt is set to current timestamp
+     * Business Logic: RemovalRequest's creation computation sets requestedAt timestamp
+     */
+    
+    // Record time before interaction for comparison
+    const beforeTime = Math.floor(Date.now() / 1000)
+    
+    // Step 1: Create target user
+    const targetResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Target User',
+        email: 'target.requestedAt@example.com',
+        studentId: 'STU_REQAT_01'
+      }
+    })
+    
+    expect(targetResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let targetId
+    const targetCreateEffect = targetResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (targetCreateEffect && targetCreateEffect.record.id) {
+      targetId = targetCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const targetUser = users.find(user => user.email === 'target.requestedAt@example.com')
+      expect(targetUser).toBeDefined()
+      targetId = targetUser.id
+    }
+    
+    // Step 2: Create requester user (dormitory leader)
+    const requesterResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Dorm Leader',
+        email: 'leader.requestedAt@example.com',
+        studentId: 'STU_REQAT_02',
+        role: 'dormitoryLeader'
+      }
+    })
+    
+    expect(requesterResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    let requesterId
+    const requesterCreateEffect = requesterResult.effects.find(effect => effect.recordName === 'User' && effect.type === 'create')
+    if (requesterCreateEffect && requesterCreateEffect.record.id) {
+      requesterId = requesterCreateEffect.record.id
+    } else {
+      const users = await system.storage.find('User', undefined, undefined, ['id', 'email'])
+      const requesterUser = users.find(user => user.email === 'leader.requestedAt@example.com')
+      expect(requesterUser).toBeDefined()
+      requesterId = requesterUser.id
+    }
+    
+    // Step 3: Submit removal request
+    const submitResult = await controller.callInteraction('submitRemovalRequest', {
+      user: { id: requesterId },
+      payload: {
+        targetUserId: targetId,
+        reason: 'Testing requestedAt _owner computation'
+      }
+    })
+    
+    expect(submitResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Record time after interaction for comparison
+    const afterTime = Math.floor(Date.now() / 1000)
+    
+    // Step 4: Verify RemovalRequest was created with correct requestedAt
+    const requests = await system.storage.find(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Testing requestedAt _owner computation'] }),
+      undefined,
+      ['id', 'reason', 'requestedAt', 'status']
+    )
+    
+    expect(requests.length).toBe(1)
+    const createdRequest = requests[0]
+    
+    // Verify requestedAt is set and is a reasonable timestamp
+    expect(createdRequest.requestedAt).toBeDefined()
+    expect(typeof createdRequest.requestedAt).toBe('number')
+    
+    // Verify the timestamp is within a reasonable range (between before and after)
+    expect(createdRequest.requestedAt).toBeGreaterThanOrEqual(beforeTime)
+    expect(createdRequest.requestedAt).toBeLessThanOrEqual(afterTime)
+    
+    // Verify other properties are also set correctly
+    expect(createdRequest.reason).toBe('Testing requestedAt _owner computation')
+    expect(createdRequest.status).toBe('pending')
+  })
+
   test('RemovalRequest.status StateMachine computation handles status transitions', async () => {
     /**
      * Test Plan for: RemovalRequest.status StateMachine computation
