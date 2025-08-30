@@ -966,7 +966,7 @@
           ],
           "reasoning": "controlType is creation-only, so property is controlled by entity creation",
           "calculationMethod": "Set to current timestamp when CreateDeductionRule interaction occurs",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DeductionRule.updatedAt",

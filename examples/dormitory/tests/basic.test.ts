@@ -5498,4 +5498,91 @@ describe('Basic Functionality', () => {
     )
     expect(rule2.isActive).toBe(false)
   })
+
+  test('DeductionRule.createdAt set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: _owner
+     * This tests that createdAt is properly set when DeductionRule is created
+     * Steps: 1) Trigger interaction that creates DeductionRule 2) Verify createdAt is set
+     * Business Logic: DeductionRule's creation computation sets createdAt timestamp
+     */
+    
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Step 1: Create deduction rule via CreateDeductionRule interaction
+    const result = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule',
+        description: 'Test description',
+        points: 10,
+        isActive: true
+      }
+    })
+    
+    expect(result.error).toBeUndefined()
+    
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Step 2: Query the database to find the created DeductionRule
+    const allRules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'createdAt', 'description', 'points']
+    )
+    
+    // Find the rule we just created
+    const rule = allRules.find(r => r.name === 'Test Rule')
+    expect(rule).toBeDefined()
+    
+    const ruleId = rule.id
+    
+    expect(rule).toBeDefined()
+    expect(rule.createdAt).toBeDefined()
+    expect(typeof rule.createdAt).toBe('number')
+    
+    // Verify timestamp is reasonable (within the test execution timeframe)
+    expect(rule.createdAt).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(rule.createdAt).toBeLessThanOrEqual(afterTimestamp)
+    
+    // Step 3: Create another rule and verify each has a unique createdAt
+    const result2 = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule 2',
+        description: 'Test description 2',
+        points: 15,
+        isActive: true
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Wait a bit for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Query the database to find the second rule
+    const allRules2 = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'createdAt', 'description', 'points']
+    )
+    
+    const rule2 = allRules2.find(r => r.name === 'Test Rule 2')
+    expect(rule2).toBeDefined()
+    
+    const ruleId2 = rule2.id
+    
+    expect(rule2).toBeDefined()
+    expect(rule2.createdAt).toBeDefined()
+    expect(typeof rule2.createdAt).toBe('number')
+    
+    // Verify second rule's createdAt is greater than or equal to first rule's (since it was created later)
+    expect(rule2.createdAt).toBeGreaterThanOrEqual(rule.createdAt)
+  })
 }) 

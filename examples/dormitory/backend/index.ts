@@ -218,8 +218,7 @@ export const DeductionRule = Entity.create({
     }),
     Property.create({
       name: 'createdAt',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     }),
     Property.create({
       name: 'updatedAt',
