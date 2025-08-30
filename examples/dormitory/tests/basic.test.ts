@@ -6102,4 +6102,110 @@ describe('Basic Functionality', () => {
     )
     expect(dormitory.currentOccupancy).toBe(0)
   })
+
+  test('Bed.status computation automatically updates based on UserBedAssignmentRelation', async () => {
+    /**
+     * Test Plan for: Bed.status
+     * Dependencies: Bed entity, UserBedAssignmentRelation, User entity, Dormitory entity
+     * Steps: 1) Create dormitory and bed 2) Verify bed status is 'vacant' 3) Create user and assign to bed 4) Verify bed status becomes 'occupied' 5) Remove user from bed 6) Verify bed status returns to 'vacant'
+     * Business Logic: Bed status automatically determined: 'occupied' if UserBedAssignmentRelation exists for this bed, otherwise 'vacant'
+     */
+
+    // Create dormitory
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Status Test Dormitory',
+        location: 'Test Building',
+        capacity: 4
+      }
+    })
+
+    expect(dormitoryResult.error).toBeUndefined()
+    const dormitoryId = dormitoryResult.effects?.[0]?.record?.id
+    expect(dormitoryId).toBeTruthy()
+
+    // Create bed
+    const bedResult = await controller.callInteraction('createBed', {
+      user: { id: 'admin' },
+      payload: {
+        dormitoryId: dormitoryId,
+        number: 'StatusTest001'
+      }
+    })
+
+    expect(bedResult.error).toBeUndefined()
+
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // Find the bed by its unique number
+    let bed = await system.storage.findOne('Bed',
+      MatchExp.atom({ key: 'number', value: ['=', 'StatusTest001'] }),
+      undefined,
+      ['id', 'number', 'status']
+    )
+    expect(bed).toBeDefined()
+    const bedId = bed.id
+
+    // Initially, bed status should be 'vacant' since no user is assigned
+    expect(bed.status).toBe('vacant')
+
+    // Create user
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Status Test User',
+        email: 'statustest@example.com',
+        studentId: 'STATUS001'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    const userId = userResult.effects?.[0]?.record?.id
+    expect(userId).toBeTruthy()
+
+    // Assign user to bed
+    const assignResult = await controller.callInteraction('assignUserToBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        bedId: bedId
+      }
+    })
+
+    expect(assignResult.error).toBeUndefined()
+
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // After assignment, bed status should be 'occupied'
+    bed = await system.storage.findOne('Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'status']
+    )
+    expect(bed.status).toBe('occupied')
+
+    // Remove user from bed
+    const removeResult = await controller.callInteraction('removeUserFromBed', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId
+      }
+    })
+
+    expect(removeResult.error).toBeUndefined()
+
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // After removal, bed status should return to 'vacant'
+    bed = await system.storage.findOne('Bed',
+      MatchExp.atom({ key: 'id', value: ['=', bedId] }),
+      undefined,
+      ['id', 'number', 'status']
+    )
+    expect(bed.status).toBe('vacant')
+  })
 }) 

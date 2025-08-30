@@ -122,8 +122,7 @@ export const Bed = Entity.create({
     }),
     Property.create({
       name: 'status',
-      type: 'string',
-      defaultValue: () => 'vacant'
+      type: 'string'
     }),
     Property.create({
       name: 'createdAt',
@@ -1947,5 +1946,34 @@ Dormitory.properties.find(p => p.name === 'currentOccupancy').computation = Coun
     // Count beds that have an occupant (UserBedAssignmentRelation exists)
     // The occupant field should contain the user object if the bed is occupied
     return bed.occupant && bed.occupant.id
+  }
+})
+
+// Bed.status Custom computation
+Bed.properties.find(p => p.name === 'status').computation = Custom.create({
+  name: 'BedStatusCalculator',
+  dataDeps: {
+    currentRecord: {
+      type: 'property',
+      attributeQuery: [
+        'id',
+        ['occupant', { attributeQuery: ['id'] }]
+      ]
+    },
+    // Use global dictionary as trigger to recompute when bed assignments change
+    trigger: {
+      type: 'global',
+      source: bedAssignmentTrigger
+    }
+  },
+  compute: async function(dataDeps, record) {
+    // Check if this bed has an occupant (UserBedAssignmentRelation exists)
+    const hasOccupant = dataDeps.currentRecord?.occupant && dataDeps.currentRecord.occupant.id
+    
+    // Return 'occupied' if UserBedAssignmentRelation exists, otherwise 'vacant'
+    return hasOccupant ? 'occupied' : 'vacant'
+  },
+  getDefaultValue: function() {
+    return 'vacant'
   }
 })

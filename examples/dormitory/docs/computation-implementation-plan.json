@@ -1075,7 +1075,7 @@
           "interactionDependencies": [],
           "reasoning": "controlType is independent, has dataDependencies with relations, and involves conditional logic based on existence of relation",
           "calculationMethod": "Automatically determined: 'occupied' if UserBedAssignmentRelation exists for this bed, otherwise 'vacant'",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 3: 3 property computation(s)"
