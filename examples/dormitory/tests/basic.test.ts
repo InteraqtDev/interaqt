@@ -1785,6 +1785,93 @@ describe('Basic Functionality', () => {
     expect(createdRule.updatedAt).toBeDefined()
   })
 
+  test('DeductionRule.name computation handles creation and updates', async () => {
+    /**
+     * Test Plan for: DeductionRule.name StateMachine computation
+     * Dependencies: DeductionRule entity, InteractionEventEntity
+     * Steps: 1) Create deduction rule 2) Update deduction rule name 3) Verify name changes correctly
+     * Business Logic: Direct assignment from interactions with uniqueness validation
+     */
+
+    // Create deduction rule via interaction
+    const createResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Initial Rule Name',
+        description: 'Initial description',
+        points: 5,
+        isActive: true
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    expect(createResult.effects).toBeDefined()
+
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check if any DeductionRule records were created by querying the database
+    const allRules = await system.storage.find(
+      'DeductionRule',
+      undefined,
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    // Get the created rule ID from effects OR from database query  
+    let ruleCreateEffect = createResult.effects.find(effect => effect.recordName === 'DeductionRule' && effect.type === 'create')
+    let initialRule
+    
+    if (ruleCreateEffect) {
+      expect(ruleCreateEffect.record.id).toBeDefined()
+      initialRule = await system.storage.findOne(
+        'DeductionRule',
+        MatchExp.atom({ key: 'id', value: ['=', ruleCreateEffect.record.id] }),
+        undefined,
+        ['id', 'name', 'description', 'points', 'isActive']
+      )
+    } else {
+      // If no effect, try to find the created rule by name (should be unique)
+      initialRule = allRules.find(rule => rule.name === 'Initial Rule Name')
+      expect(initialRule).toBeDefined()
+    }
+
+    const ruleId = initialRule.id
+
+    expect(initialRule).toBeDefined()
+    expect(initialRule.name).toBe('Initial Rule Name')
+
+    // Update the rule name via interaction
+    const updateResult = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId,
+        name: 'Updated Rule Name'
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Verify the name was updated
+    const updatedRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(updatedRule).toBeDefined()
+    expect(updatedRule.name).toBe('Updated Rule Name')
+    
+    // Verify other properties remained unchanged
+    expect(updatedRule.description).toBe('Initial description')
+    expect(updatedRule.points).toBe(5)
+    expect(updatedRule.isActive).toBe(true)
+  })
+
   test('DeductionRuleApplicationRelation created by PointDeduction Transform (_parent:PointDeduction)', async () => {
     /**
      * Test Plan for: DeductionRuleApplicationRelation (_parent:PointDeduction)

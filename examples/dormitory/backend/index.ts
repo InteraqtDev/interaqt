@@ -1682,3 +1682,32 @@ RemovalRequest.properties.find(p => p.name === 'isDeleted').computation = StateM
   ],
   defaultState: removalRequestIsDeletedActiveState
 })
+
+// DeductionRule.name StateMachine computation
+const deductionRuleNameDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    if (event && event.interactionName === 'createDeductionRule') {
+      return event.payload.name;
+    }
+    if (event && event.interactionName === 'updateDeductionRule' && event.payload.name !== undefined) {
+      return event.payload.name;
+    }
+    return lastValue;
+  }
+});
+
+DeductionRule.properties.find(p => p.name === 'name').computation = StateMachine.create({
+  states: [deductionRuleNameDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: UpdateDeductionRuleInteraction,
+      current: deductionRuleNameDefaultState,
+      next: deductionRuleNameDefaultState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    })
+  ],
+  defaultState: deductionRuleNameDefaultState
+})
