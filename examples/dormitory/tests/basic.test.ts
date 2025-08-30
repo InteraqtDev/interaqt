@@ -5747,4 +5747,139 @@ describe('Basic Functionality', () => {
     expect(deletedRule.name).toBe('Test Rule') // Other properties should remain unchanged
     expect(deletedRule.isActive).toBe(true) // isActive should not be affected by soft deletion
   })
+
+  test('User.points computation calculates correctly', async () => {
+    /**
+     * Test Plan for: User.points
+     * Dependencies: User entity, PointDeduction entity, UserPointDeductionRelation, DeductionRule
+     * Steps: 1) Create user 2) Create deduction rule 3) Apply point deductions 4) Verify points calculation 5) Test soft deletion
+     * Business Logic: User starts with 100 points, deductions are subtracted, deleted deductions don't count
+     */
+
+    // Create a test user
+    const userResult = await controller.callInteraction('createUser', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test User',
+        email: 'pointstest@example.com',
+        studentId: 'STU001',
+        phone: '123-456-7890',
+        role: 'user'
+      }
+    })
+    expect(userResult.error).toBeUndefined()
+    
+    // Wait for computation to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created user by email
+    const initialUser = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'pointstest@example.com'] }),
+      undefined,
+      ['id', 'points', 'name', 'email']
+    )
+    expect(initialUser).toBeDefined()
+    expect(initialUser.points).toBe(100)
+
+    const userId = initialUser.id
+
+    // Create a deduction rule
+    const ruleResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Violation',
+        description: 'Test violation description',
+        points: 10,
+        isActive: true
+      }
+    })
+    expect(ruleResult.error).toBeUndefined()
+    
+    // Wait for rule creation to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the created rule by name to get the correct ID
+    const createdRule = await system.storage.findOne('DeductionRule',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Violation'] }),
+      undefined,
+      ['id', 'name', 'points', 'isActive']
+    )
+    expect(createdRule).toBeDefined()
+    expect(createdRule.points).toBe(10)
+    
+    const ruleId = createdRule.id
+
+    // Apply first point deduction (10 points)
+    const deductionResult = await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'First violation'
+      }
+    })
+    expect(deductionResult.error).toBeUndefined()
+    
+    // Wait for computation to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check points after first deduction (should be 90)
+    const userAfterFirst = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'points']
+    )
+    expect(userAfterFirst.points).toBe(90)
+
+    // Apply second point deduction (10 points)
+    await controller.callInteraction('applyPointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userId,
+        ruleId: ruleId,
+        reason: 'Second violation'
+      }
+    })
+
+    // Check points after second deduction (should be 80)
+    const userAfterSecond = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'points']
+    )
+    expect(userAfterSecond.points).toBe(80)
+
+    // Find one of the point deductions to test soft deletion
+    const allDeductions = await system.storage.find('PointDeduction',
+      MatchExp.atom({ key: 'isDeleted', value: ['=', false] }),
+      undefined,
+      ['id', 'points', 'isDeleted']
+    )
+    expect(allDeductions.length).toBe(2) // Should have 2 deductions
+    const deductionId = allDeductions[0].id
+
+    // Soft delete one deduction
+    await controller.callInteraction('deletePointDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        deductionId: deductionId
+      }
+    })
+
+    // Check points after deletion (should be 90, as one 10-point deduction is deleted)
+    const userAfterDeletion = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'points']
+    )
+    expect(userAfterDeletion.points).toBe(90)
+
+    // Verify the deduction is actually soft deleted
+    const deletedDeduction = await system.storage.findOne('PointDeduction',
+      MatchExp.atom({ key: 'id', value: ['=', deductionId] }),
+      undefined,
+      ['id', 'isDeleted']
+    )
+    expect(deletedDeduction.isDeleted).toBe(true)
+  })
 }) 

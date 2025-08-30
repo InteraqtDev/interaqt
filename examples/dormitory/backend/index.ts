@@ -56,8 +56,7 @@ export const User = Entity.create({
     }),
     Property.create({
       name: 'points',
-      type: 'number',
-      defaultValue: () => 100
+      type: 'number'
     }),
     Property.create({
       name: 'role',
@@ -893,7 +892,18 @@ export const interactions = [
   GetUserListInteraction
 ]
 
-export const dicts = []
+// Global dictionary to trigger User.points computation when PointDeduction changes
+const pointDeductionTrigger = Dictionary.create({
+  name: 'pointDeductionTrigger',
+  type: 'number',
+  collection: false,
+  defaultValue: () => 0,
+  computation: Count.create({
+    record: PointDeduction
+  })
+})
+
+export const dicts = [pointDeductionTrigger]
 
 // =============================================================================
 // COMPUTATIONS
@@ -973,6 +983,7 @@ PointDeduction.computation = Transform.create({
         undefined,
         ['id', 'points']
       )
+      
       
       return {
         reason: event.payload.reason,
@@ -1878,4 +1889,39 @@ DeductionRule.properties.find(p => p.name === 'isDeleted').computation = StateMa
     })
   ],
   defaultState: deductionRuleIsDeletedActiveState
+})
+
+// User.points Custom computation
+User.properties.find(p => p.name === 'points').computation = Custom.create({
+  name: 'UserPointsCalculator',
+  dataDeps: {
+    currentRecord: {
+      type: 'property',
+      attributeQuery: [
+        'id',
+        ['pointDeductions', {
+          attributeQuery: ['points', 'isDeleted']
+        }]
+      ]
+    },
+    // Use global dictionary as trigger
+    trigger: {
+      type: 'global',
+      source: pointDeductionTrigger
+    }
+  },
+  compute: async function(dataDeps, record) {
+    const userDeductions = dataDeps.currentRecord?.pointDeductions || []
+    
+    // Sum all active (non-deleted) point deductions
+    const totalDeductions = userDeductions
+      .filter(deduction => !deduction.isDeleted)
+      .reduce((sum, deduction) => sum + (deduction.points || 0), 0)
+    
+    // Calculate final points: 100 - total deductions
+    return Math.max(0, 100 - totalDeductions)
+  },
+  getDefaultValue: function() {
+    return 100
+  }
 })

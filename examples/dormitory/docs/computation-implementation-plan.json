@@ -1036,7 +1036,7 @@
           ],
           "reasoning": "controlType is independent, has dataDependencies with relations and complex calculation involving initial value and aggregation",
           "calculationMethod": "Starts at 100, automatically calculated as 100 minus sum of all active point deductions for this user",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.currentOccupancy",
