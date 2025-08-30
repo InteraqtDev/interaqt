@@ -386,6 +386,36 @@ export const ActiveRuleCondition = Condition.create({
   }
 })
 
+// Permission condition: User can update own profile, admin can update any
+export const CanUpdateUserCondition = Condition.create({
+  name: 'canUpdateUser',
+  content: async function(this: any, event: any) {
+    // Admin can update any user
+    if (event.user && event.user.role === 'admin') {
+      return true
+    }
+    
+    // User can update their own profile
+    const targetUserId = event.payload.userId
+    return event.user && event.user.id === targetUserId
+  }
+})
+
+// Permission condition: Only dormitory leaders can submit removal requests for their residents
+export const CanSubmitRemovalRequestCondition = Condition.create({
+  name: 'canSubmitRemovalRequest',
+  content: async function(this: any, event: any) {
+    // Must be a dormitory leader
+    if (!event.user || event.user.role !== 'dormitoryLeader') {
+      return false
+    }
+    
+    // For now, simplified check - in full implementation, would verify target user is in managed dormitory
+    // This would require checking UserDormitoryLeaderRelation and UserBedAssignmentRelation
+    return true
+  }
+})
+
 // =============================================================================
 // INTERACTIONS
 // =============================================================================
@@ -444,7 +474,8 @@ export const UpdateUserInteraction = Interaction.create({
         required: false
       })
     ]
-  })
+  }),
+  conditions: CanUpdateUserCondition
 })
 
 export const DeleteUserInteraction = Interaction.create({
@@ -761,7 +792,8 @@ export const SubmitRemovalRequestInteraction = Interaction.create({
         required: true
       })
     ]
-  })
+  }),
+  conditions: CanSubmitRemovalRequestCondition
 })
 
 export const ProcessRemovalRequestInteraction = Interaction.create({

@@ -352,4 +352,68 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).type).toBe('condition check failed')
     })
   })
+
+  describe('Phase 3: User-Specific Permissions', () => {
+    describe('P002: UpdateUser - Users can update own profile, admins can update any', () => {
+      test('Admin can update any user profile', async () => {
+        const result = await controller.callInteraction('updateUser', {
+          user: { id: 'admin1', role: 'admin' },
+          payload: { userId: 'user123', name: 'Updated Name' }
+        })
+        expect(result.error).toBeUndefined()
+        expect(result.effects).toBeDefined()
+      })
+
+      test('User can update own profile', async () => {
+        const result = await controller.callInteraction('updateUser', {
+          user: { id: 'user123', role: 'user' },
+          payload: { userId: 'user123', name: 'Updated Name' }
+        })
+        expect(result.error).toBeUndefined()
+        expect(result.effects).toBeDefined()
+      })
+
+      test('User cannot update other user profile', async () => {
+        const result = await controller.callInteraction('updateUser', {
+          user: { id: 'user123', role: 'user' },
+          payload: { userId: 'user456', name: 'Updated Name' }
+        })
+        expect(result.error).toBeDefined()
+        expect((result.error as any).type).toBe('condition check failed')
+      })
+    })
+
+    describe('P017: SubmitRemovalRequest - Only dormitory leaders can submit requests', () => {
+      test('Dormitory leader can submit removal request', async () => {
+        const result = await controller.callInteraction('submitRemovalRequest', {
+          user: { id: 'leader1', role: 'dormitoryLeader' },
+          payload: { targetUserId: 'user123', reason: 'Repeated violations' }
+        })
+        // May fail due to business logic but permission should pass
+        if (result.error) {
+          expect((result.error as any).type).not.toBe('condition check failed')
+        } else {
+          expect(result.effects).toBeDefined()
+        }
+      })
+
+      test('Regular user cannot submit removal request', async () => {
+        const result = await controller.callInteraction('submitRemovalRequest', {
+          user: { id: 'user1', role: 'user' },
+          payload: { targetUserId: 'user123', reason: 'Repeated violations' }
+        })
+        expect(result.error).toBeDefined()
+        expect((result.error as any).type).toBe('condition check failed')
+      })
+
+      test('Admin cannot submit removal request (not a leader)', async () => {
+        const result = await controller.callInteraction('submitRemovalRequest', {
+          user: { id: 'admin1', role: 'admin' },
+          payload: { targetUserId: 'user123', reason: 'Repeated violations' }
+        })
+        expect(result.error).toBeDefined()
+        expect((result.error as any).type).toBe('condition check failed')
+      })
+    })
+  })
 })

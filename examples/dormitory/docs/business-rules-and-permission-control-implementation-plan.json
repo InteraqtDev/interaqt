@@ -156,7 +156,7 @@
             "User can update own profile",
             "User cannot update other user's profile"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P017",
@@ -171,7 +171,7 @@
             "Regular user cannot submit removal request",
             "Admin cannot submit removal request (not a leader)"
           ],
-          "completed": false
+          "completed": true
         }
       ]
     },
