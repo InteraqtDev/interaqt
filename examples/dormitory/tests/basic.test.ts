@@ -5252,4 +5252,91 @@ describe('Basic Functionality', () => {
     expect(finalRule.description).toBe('Updated test description') // Should remain unchanged
     expect(finalRule.name).toBe('Updated Rule Name') // Should be updated
   })
+
+  test('DeductionRule.points StateMachine computation', async () => {
+    /**
+     * Test Plan for: DeductionRule.points StateMachine computation
+     * Dependencies: DeductionRule entity, CreateDeductionRule interaction, UpdateDeductionRule interaction
+     * Steps: 1) Create deduction rule with valid points 2) Update rule points with valid value 3) Test validation with invalid points 4) Verify points are correctly set
+     * Business Logic: Direct assignment from interactions with positive number validation via interaction conditions, affects future deductions only
+     */
+    
+    // Step 1: Create deduction rule with valid points
+    const createResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Points Test Rule',
+        description: 'Test rule for points validation',
+        points: 10
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    
+    // Wait for computations to process
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created rule
+    const createdRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'name', value: ['=', 'Points Test Rule'] }),
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(createdRule).toBeDefined()
+    const ruleId = createdRule?.id
+    expect(ruleId).toBeDefined()
+
+    // Step 2: Verify points are correctly set on creation
+    expect(createdRule.points).toBe(10)
+
+    // Step 3: Update the points with valid value
+    const updateResult = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId,
+        points: 15
+      }
+    })
+
+    expect(updateResult.error).toBeUndefined()
+
+    // Step 4: Verify points have been updated
+    const updatedRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(updatedRule).toBeDefined()
+    expect(updatedRule.points).toBe(15)
+    // Verify other properties remain unchanged
+    expect(updatedRule.name).toBe('Points Test Rule')
+    expect(updatedRule.description).toBe('Test rule for points validation')
+    expect(updatedRule.isActive).toBe(true)
+
+    // Step 5: Update with undefined points - should not change existing value
+    const updateResult2 = await controller.callInteraction('updateDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId,
+        name: 'Updated Points Rule Name' // Only updating name, not points
+      }
+    })
+
+    expect(updateResult2.error).toBeUndefined()
+
+    const finalRule2 = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'description', 'points', 'isActive']
+    )
+
+    expect(finalRule2).toBeDefined()
+    expect(finalRule2.points).toBe(15) // Should remain unchanged
+    expect(finalRule2.name).toBe('Updated Points Rule Name') // Should be updated
+  })
 }) 

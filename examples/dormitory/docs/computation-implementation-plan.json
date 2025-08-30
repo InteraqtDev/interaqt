@@ -927,7 +927,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property",
           "calculationMethod": "Direct assignment with positive number validation, affects future deductions only",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DeductionRule.isActive",
