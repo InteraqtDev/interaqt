@@ -226,8 +226,7 @@ export const DeductionRule = Entity.create({
     }),
     Property.create({
       name: 'isDeleted',
-      type: 'boolean',
-      defaultValue: () => false
+      type: 'boolean'
     })
   ]
 })
@@ -656,6 +655,19 @@ export const DeactivateDeductionRuleInteraction = Interaction.create({
   })
 })
 
+export const DeleteDeductionRuleInteraction = Interaction.create({
+  name: 'deleteDeductionRule',
+  action: Action.create({ name: 'delete' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'ruleId',
+        required: true
+      })
+    ]
+  })
+})
+
 export const ApplyPointDeductionInteraction = Interaction.create({
   name: 'applyPointDeduction',
   action: Action.create({ name: 'apply' }),
@@ -867,6 +879,7 @@ export const interactions = [
   CreateDeductionRuleInteraction,
   UpdateDeductionRuleInteraction,
   DeactivateDeductionRuleInteraction,
+  DeleteDeductionRuleInteraction,
   ApplyPointDeductionInteraction,
   SubmitRemovalRequestInteraction,
   ProcessRemovalRequestInteraction,
@@ -1839,4 +1852,30 @@ DeductionRule.properties.find(p => p.name === 'updatedAt').computation = StateMa
     })
   ],
   defaultState: deductionRuleUpdatedAtDefaultState
+})
+
+// DeductionRule.isDeleted StateMachine computation
+const deductionRuleIsDeletedActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => false
+});
+
+const deductionRuleIsDeletedDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+});
+
+DeductionRule.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [deductionRuleIsDeletedActiveState, deductionRuleIsDeletedDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteDeductionRuleInteraction,
+      current: deductionRuleIsDeletedActiveState,
+      next: deductionRuleIsDeletedDeletedState,
+      computeTarget: (event) => ({
+        id: event.payload.ruleId
+      })
+    })
+  ],
+  defaultState: deductionRuleIsDeletedActiveState
 })

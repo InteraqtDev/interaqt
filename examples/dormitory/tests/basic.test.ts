@@ -5686,4 +5686,65 @@ describe('Basic Functionality', () => {
     // Verify updatedAt was changed again and is greater than after update timestamp
     expect(deactivatedRule.updatedAt).toBeGreaterThan(afterUpdateTimestamp)
   })
+
+  test('DeductionRule.isDeleted StateMachine computation sets to true when deleted', async () => {
+    /**
+     * Test Plan for: DeductionRule.isDeleted StateMachine computation
+     * Dependencies: DeductionRule entity, DeleteDeductionRule interaction
+     * Steps: 1) Create deduction rule 2) Verify isDeleted is false by default 3) Delete rule 4) Verify isDeleted is true
+     * Business Logic: DeductionRule.isDeleted should be set to true by DeleteDeductionRule interaction
+     */
+    
+    // Create deduction rule first
+    const createResult = await controller.callInteraction('createDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Test Rule',
+        description: 'A test rule for deletion',
+        points: 10,
+        isActive: true
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Find the created rule
+    const createdRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Rule'] }),
+      undefined,
+      ['id', 'name', 'isDeleted', 'isActive']
+    )
+
+    expect(createdRule).toBeDefined()
+    expect(createdRule.isDeleted).toBe(false) // Should be false initially
+    expect(createdRule.isActive).toBe(true)
+    
+    const ruleId = createdRule.id
+
+    // Now delete the rule
+    const deleteResult = await controller.callInteraction('deleteDeductionRule', {
+      user: { id: 'admin' },
+      payload: {
+        ruleId: ruleId
+      }
+    })
+
+    expect(deleteResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Check that isDeleted is now true
+    const deletedRule = await system.storage.findOne(
+      'DeductionRule',
+      MatchExp.atom({ key: 'id', value: ['=', ruleId] }),
+      undefined,
+      ['id', 'name', 'isDeleted', 'isActive']
+    )
+
+    expect(deletedRule).toBeDefined()
+    expect(deletedRule.isDeleted).toBe(true) // Should be true after deletion
+    expect(deletedRule.name).toBe('Test Rule') // Other properties should remain unchanged
+    expect(deletedRule.isActive).toBe(true) // isActive should not be affected by soft deletion
+  })
 }) 

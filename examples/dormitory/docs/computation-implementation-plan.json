@@ -1007,7 +1007,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
           "calculationMethod": "Set to true by DeleteDeductionRule interaction",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 2: 41 property computation(s), 8 relation computation(s)"
