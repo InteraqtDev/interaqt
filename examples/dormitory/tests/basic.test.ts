@@ -4928,4 +4928,74 @@ describe('Basic Functionality', () => {
     expect(processedRequest2.status).toBe('rejected')
     expect(processedRequest2.adminComment).toBeUndefined() // Should remain undefined when not provided
   })
+
+  test('RemovalRequest.isDeleted StateMachine computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.isDeleted StateMachine computation
+     * Dependencies: RemovalRequest entity, InteractionEventEntity, DeleteRemovalRequestInteraction
+     * Steps: 1) Create removal request 2) Verify isDeleted is false 3) Trigger DeleteRemovalRequest 4) Verify isDeleted is true
+     * Business Logic: StateMachine computation sets isDeleted to true when DeleteRemovalRequest interaction occurs
+     */
+    
+    // Step 1: Create required test data (users for removal request creation)
+    const targetUser = await system.storage.create('User', {
+      name: 'Target User',
+      email: 'target@example.com',
+      studentId: 'STU999',
+      phone: '555-0001',
+      role: 'user'
+    })
+
+    const requesterUser = await system.storage.create('User', {
+      name: 'Requester User',
+      email: 'requester@example.com',
+      studentId: 'STU998',
+      phone: '555-0002',
+      role: 'dormitoryLeader'
+    })
+
+    // Step 2: Create removal request via interaction
+    const submitResult = await controller.callInteraction('submitRemovalRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Testing isDeleted computation'
+      }
+    })
+    expect(submitResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 3: Verify removal request was created with isDeleted = false (default state)
+    const createdRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Testing isDeleted computation'] }),
+      undefined,
+      ['id', 'reason', 'status', 'isDeleted']
+    )
+
+    expect(createdRequest).toBeDefined()
+    expect(createdRequest.isDeleted).toBe(false) // Initial state should be false (active)
+
+    // Step 4: Trigger DeleteRemovalRequest interaction to transition isDeleted from false to true
+    const deleteResult = await controller.callInteraction('deleteRemovalRequest', {
+      user: { id: 'admin' }, // Admin triggering the deletion
+      payload: {
+        requestId: createdRequest.id
+      }
+    })
+    expect(deleteResult.error).toBeUndefined()
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Step 5: Verify isDeleted transitioned to true (deleted state)
+    const deletedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', createdRequest.id] }),
+      undefined,
+      ['id', 'reason', 'status', 'isDeleted']
+    )
+
+    expect(deletedRequest).toBeDefined()
+    expect(deletedRequest.isDeleted).toBe(true) // Should be true after deletion
+    expect(deletedRequest.reason).toBe('Testing isDeleted computation') // Other fields should remain unchanged
+  })
 }) 

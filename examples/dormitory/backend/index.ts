@@ -191,8 +191,7 @@ export const RemovalRequest = Entity.create({
     }),
     Property.create({
       name: 'isDeleted',
-      type: 'boolean',
-      defaultValue: () => false
+      type: 'boolean'
     })
   ]
 })
@@ -721,6 +720,19 @@ export const ProcessRemovalRequestInteraction = Interaction.create({
   })
 })
 
+export const DeleteRemovalRequestInteraction = Interaction.create({
+  name: 'deleteRemovalRequest',
+  action: Action.create({ name: 'delete' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'requestId',
+        required: true
+      })
+    ]
+  })
+})
+
 // Query Interactions
 
 export const GetUserProfileInteraction = Interaction.create({
@@ -861,6 +873,7 @@ export const interactions = [
   ApplyPointDeductionInteraction,
   SubmitRemovalRequestInteraction,
   ProcessRemovalRequestInteraction,
+  DeleteRemovalRequestInteraction,
   GetUserProfileInteraction,
   GetDormitoryInfoInteraction,
   GetPointHistoryInteraction,
@@ -1642,4 +1655,30 @@ RemovalRequest.properties.find(p => p.name === 'adminComment').computation = Sta
     })
   ],
   defaultState: adminCommentNullState
+})
+
+// RemovalRequest.isDeleted StateMachine computation
+const removalRequestIsDeletedActiveState = StateNode.create({
+  name: 'active',
+  computeValue: () => false
+});
+
+const removalRequestIsDeletedDeletedState = StateNode.create({
+  name: 'deleted',
+  computeValue: () => true
+});
+
+RemovalRequest.properties.find(p => p.name === 'isDeleted').computation = StateMachine.create({
+  states: [removalRequestIsDeletedActiveState, removalRequestIsDeletedDeletedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteRemovalRequestInteraction,
+      current: removalRequestIsDeletedActiveState,
+      next: removalRequestIsDeletedDeletedState,
+      computeTarget: (event) => ({
+        id: event.payload.requestId
+      })
+    })
+  ],
+  defaultState: removalRequestIsDeletedActiveState
 })

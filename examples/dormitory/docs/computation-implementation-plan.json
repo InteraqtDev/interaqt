@@ -849,7 +849,7 @@
           ],
           "reasoning": "controlType is independent and has interactionDependencies that can modify the property for soft deletion",
           "calculationMethod": "Set to true by DeleteRemovalRequest interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DeductionRule.id",
