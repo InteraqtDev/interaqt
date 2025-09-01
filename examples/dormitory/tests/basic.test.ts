@@ -1360,4 +1360,42 @@ describe('Basic Functionality', () => {
     expect(dormitory.building).toBe('T')
     expect(dormitory.floor).toBe(2)
   })
+
+  test('Dormitory.name is set from payload at creation (_owner)', async () => {
+    /**
+     * Test Plan for: Dormitory.name (_owner)
+     * This tests that Dormitory.name is properly set from payload when Dormitory is created
+     * Steps: 1) Create a Dormitory via CreateDormitory interaction 2) Verify name is set from payload
+     * Business Logic: _owner properties are controlled by entity creation - name is set from interaction payload
+     */
+    
+    // Execute CreateDormitory interaction with specific name
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Unique Dormitory Name 12345',
+        bedCount: 8,
+        building: 'N',
+        floor: 3
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(result).toBeDefined()
+    expect(result.error).toBeUndefined()
+    
+    // Query the created dormitory to verify name is properly set from payload
+    const dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Unique Dormitory Name 12345'] }),
+      undefined,
+      ['id', 'name', 'bedCount', 'building', 'floor']
+    )
+    
+    expect(dormitory).toBeDefined()
+    expect(dormitory.name).toBe('Unique Dormitory Name 12345')
+    expect(dormitory.bedCount).toBe(8)
+    expect(dormitory.building).toBe('N')
+    expect(dormitory.floor).toBe(3)
+    expect(dormitory.id).toBeDefined()
+  })
 }) 
