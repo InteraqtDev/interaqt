@@ -144,8 +144,7 @@ export const ScoreEvent = Entity.create({
     }),
     Property.create({
       name: 'timestamp',
-      type: 'number',
-      defaultValue: () => Math.floor(Date.now() / 1000)
+      type: 'number'
     })
   ],
   computation: Transform.create({

@@ -219,6 +219,78 @@ describe('Basic Functionality', () => {
     expect(typeof scoreEvent.timestamp).toBe('number')
   })
 
+  test('ScoreEvent.timestamp set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: ScoreEvent.timestamp (_owner)
+     * This tests that timestamp is properly set when ScoreEvent is created
+     * Dependencies: User entity, ScoreEvent entity, ApplyScoreDeduction interaction
+     * Steps: 1) Create user 2) Apply score deduction 3) Verify timestamp is set to current time
+     * Business Logic: ScoreEvent's creation computation sets timestamp to current time at creation
+     */
+
+    // Record time before creating the ScoreEvent
+    const beforeTime = Math.floor(Date.now() / 1000)
+
+    // First create a user
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'timestamptestuser',
+        email: 'timestamptest@example.com',
+        password: 'password123',
+        fullName: 'Timestamp Test User',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'timestamptestuser'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const userId = users[0].id
+
+    // Apply score deduction
+    const deductionResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        deductionAmount: 5,
+        reason: 'Late return',
+        category: 'Rules'
+      }
+    })
+
+    expect(deductionResult.error).toBeUndefined()
+
+    // Record time after creating the ScoreEvent
+    const afterTime = Math.floor(Date.now() / 1000)
+
+    // Find the created ScoreEvent
+    const scoreEvents = await system.storage.find('ScoreEvent',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Late return'] }),
+      undefined,
+      ['id', 'amount', 'reason', 'category', 'timestamp']
+    )
+
+    expect(scoreEvents.length).toBe(1)
+    const scoreEvent = scoreEvents[0]
+
+    // Verify the timestamp is set correctly by the owner computation
+    expect(scoreEvent.timestamp).toBeDefined()
+    expect(typeof scoreEvent.timestamp).toBe('number')
+    expect(scoreEvent.timestamp).toBeGreaterThanOrEqual(beforeTime)
+    expect(scoreEvent.timestamp).toBeLessThanOrEqual(afterTime)
+    
+    // Verify other properties are correct
+    expect(scoreEvent.reason).toBe('Late return')
+    expect(scoreEvent.category).toBe('Rules')
+    expect(scoreEvent.amount).toBe(-5) // Negative for deduction
+  })
+
   test('User entity creation via CreateUser interaction', async () => {
     // Execute CreateUser interaction
     const result = await controller.callInteraction('CreateUser', {
