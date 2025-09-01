@@ -648,3 +648,74 @@ export const interactions = [
 // Placeholder exports for upcoming tasks
 export const activities: any[] = []
 export const dicts: any[] = []
+
+// ==================== COMPUTATION ASSIGNMENTS ====================
+
+// State nodes for BedAssignmentRelation
+const bedNotAssignedState = StateNode.create({ 
+  name: 'notAssigned',
+  computeValue: () => null  // No relation exists
+})
+
+const bedAssignedState = StateNode.create({ 
+  name: 'assigned',
+  computeValue: (lastValue, event) => ({
+    bedNumber: event?.payload?.bedNumber,
+    assignedAt: Math.floor(Date.now() / 1000)
+  })
+})
+
+// StateMachine for BedAssignmentRelation
+const BedAssignmentStateMachine = StateMachine.create({
+  states: [bedNotAssignedState, bedAssignedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignUserToBedInteraction,
+      current: bedNotAssignedState,
+      next: bedAssignedState,
+      computeTarget: async function(this, event) {
+        // Find the user and dormitory from the payload
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+          undefined,
+          ['id', 'isActive']
+        )
+        
+        const dormitory = await this.system.storage.findOne('Dormitory',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+          undefined,
+          ['id', 'bedCount', 'occupiedBeds']
+        )
+        
+        // Check if user is active and dormitory has capacity
+        if (user?.isActive && dormitory && (dormitory.occupiedBeds < dormitory.bedCount)) {
+          return {
+            source: { id: user.id },
+            target: { id: dormitory.id }
+          }
+        }
+        
+        return null  // Don't create relation if conditions not met
+      }
+    }),
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitoryInteraction,
+      current: bedAssignedState,
+      next: bedNotAssignedState,
+      computeTarget: async function(this, event) {
+        // Find existing relation to remove
+        const relation = await this.system.storage.findOneRelationByName(BedAssignmentRelation.name,
+          MatchExp.atom({ key: 'source.id', value: ['=', event.payload.userId] }),
+          undefined,
+          ['id']
+        )
+        
+        return relation
+      }
+    })
+  ],
+  defaultState: bedNotAssignedState
+})
+
+// Assign StateMachine computation to BedAssignmentRelation
+BedAssignmentRelation.computation = BedAssignmentStateMachine

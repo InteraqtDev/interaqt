@@ -102,7 +102,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: true and hard-delete - StateMachine handles both creation and deletion",
           "calculationMethod": "Independently created by AssignUserToBed when User is active and Dormitory has available capacity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DormitoryLeadershipRelation",
