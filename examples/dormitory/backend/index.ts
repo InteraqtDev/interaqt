@@ -149,7 +149,22 @@ export const ScoreEvent = Entity.create({
       type: 'number',
       defaultValue: () => Math.floor(Date.now() / 1000)
     })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: (event) => {
+      if (event.interactionName === 'ApplyScoreDeduction') {
+        return {
+          amount: -(event.payload.deductionAmount),  // Negative for deduction
+          reason: event.payload.reason,
+          category: event.payload.category,
+          timestamp: Math.floor(Date.now() / 1000)
+        }
+      }
+      return null
+    }
+  })
 })
 
 // RemovalRequest Entity

@@ -44,7 +44,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: false - Transform with InteractionEventEntity",
           "calculationMethod": "Independently created by ApplyScoreDeduction interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest",

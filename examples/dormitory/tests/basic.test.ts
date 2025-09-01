@@ -107,4 +107,67 @@ describe('Basic Functionality', () => {
     expect(dormitory.occupiedBeds).toBe(0) // Default value
     expect(dormitory.id).toBeDefined()
   })
+
+  test('ScoreEvent entity creation via ApplyScoreDeduction interaction', async () => {
+    /**
+     * Test Plan for: ScoreEvent entity Transform computation
+     * Dependencies: ScoreEvent entity, User entity, ApplyScoreDeduction interaction
+     * Steps: 1) Create a user 2) Execute ApplyScoreDeduction interaction 3) Verify ScoreEvent is created with correct properties
+     * Business Logic: Transform computation creates ScoreEvent from ApplyScoreDeduction interaction with negative amount for deductions
+     */
+    
+    // First create a user to apply deduction to
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password123',
+        fullName: 'Test User',
+        role: 'student'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    const users = await controller.callInteraction('ViewUserList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'username']
+      }
+    })
+    
+    const userId = users.data[0].id
+    
+    // Execute ApplyScoreDeduction interaction
+    const deductionResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: 'admin' }, 
+      payload: {
+        userId: userId,
+        deductionAmount: 15,
+        reason: 'Late night noise violation',
+        category: 'behavior'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(deductionResult).toBeDefined()
+    expect(deductionResult.error).toBeUndefined()
+    
+    // Query created ScoreEvent
+    const scoreEvents = await system.storage.find('ScoreEvent', 
+      undefined,
+      undefined,
+      ['id', 'amount', 'reason', 'category', 'timestamp']
+    )
+
+    expect(scoreEvents).toHaveLength(1)
+    
+    const scoreEvent = scoreEvents[0]
+    expect(scoreEvent.amount).toBe(-15) // Negative for deduction
+    expect(scoreEvent.reason).toBe('Late night noise violation')
+    expect(scoreEvent.category).toBe('behavior')
+    expect(scoreEvent.timestamp).toBeGreaterThan(0)
+    expect(scoreEvent.id).toBeDefined()
+  })
 }) 
