@@ -1244,4 +1244,50 @@ describe('Basic Functionality', () => {
     expect(user.role).toBe('dormitory_leader')
     expect(user.username).toBe('roletestuser')
   })
+
+  test('User.createdAt is set to timestamp at creation (_owner)', async () => {
+    /**
+     * Test Plan for: User.createdAt (_owner)
+     * This tests that User.createdAt is properly set to current timestamp when User is created
+     * Steps: 1) Create a User via CreateUser interaction 2) Verify createdAt is set to a reasonable timestamp
+     * Business Logic: _owner properties are controlled by entity creation - createdAt is set to current timestamp
+     */
+    
+    // Record time before creating user
+    const beforeTime = Math.floor(Date.now() / 1000)
+    
+    // Execute CreateUser interaction
+    const result = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'createdattestuser',
+        email: 'createdat@example.com', 
+        password: 'password123',
+        fullName: 'Created At Test User',
+        role: 'student'
+      }
+    })
+
+    // Record time after creating user
+    const afterTime = Math.floor(Date.now() / 1000)
+
+    // Verify the interaction was successful
+    expect(result).toBeDefined()
+    expect(result.error).toBeUndefined()
+    
+    // Query the created user to verify createdAt is properly set
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'createdattestuser'] }),
+      undefined,
+      ['id', 'username', 'createdAt']
+    )
+    
+    expect(user).toBeDefined()
+    expect(user.createdAt).toBeDefined()
+    expect(typeof user.createdAt).toBe('number')
+    expect(user.createdAt).toBeGreaterThanOrEqual(beforeTime)
+    expect(user.createdAt).toBeLessThanOrEqual(afterTime)
+    expect(user.username).toBe('createdattestuser')
+    expect(user.id).toBeDefined()
+  })
 }) 
