@@ -65,4 +65,46 @@ describe('Basic Functionality', () => {
     expect(user.createdAt).toBeGreaterThan(0)
     expect(user.currentScore).toBe(100) // Default value
   })
+
+  test('Dormitory entity creation via CreateDormitory interaction', async () => {
+    /**
+     * Test Plan for: Dormitory entity Transform computation
+     * Dependencies: Dormitory entity, CreateDormitory interaction
+     * Steps: 1) Execute CreateDormitory interaction 2) Verify dormitory is created with correct properties
+     * Business Logic: Transform computation creates Dormitory from CreateDormitory interaction
+     */
+    
+    // Execute CreateDormitory interaction
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin' }, // user context
+      payload: {
+        name: 'Building A Room 101',
+        bedCount: 4,
+        building: 'A',
+        floor: 1
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(result).toBeDefined()
+    expect(result.error).toBeUndefined()
+    
+    // Query the created dormitory with specific attributes
+    const dormitories = await controller.callInteraction('ViewDormitoryList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'name', 'bedCount', 'building', 'floor', 'occupiedBeds', 'availableBeds']
+      }
+    })
+
+    expect(dormitories.data).toHaveLength(1)
+    
+    const dormitory = dormitories.data[0]
+    expect(dormitory.name).toBe('Building A Room 101')
+    expect(dormitory.bedCount).toBe(4)
+    expect(dormitory.building).toBe('A')
+    expect(dormitory.floor).toBe(1)
+    expect(dormitory.occupiedBeds).toBe(0) // Default value
+    expect(dormitory.id).toBeDefined()
+  })
 }) 

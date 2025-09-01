@@ -110,7 +110,22 @@ export const Dormitory = Entity.create({
       name: 'availableBeds',
       type: 'number'
     })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: (event) => {
+      if (event.interactionName === 'CreateDormitory') {
+        return {
+          name: event.payload.name,
+          bedCount: event.payload.bedCount,
+          building: event.payload.building,
+          floor: event.payload.floor
+        }
+      }
+      return null
+    }
+  })
 })
 
 // ScoreEvent Entity
