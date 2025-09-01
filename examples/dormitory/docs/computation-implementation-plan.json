@@ -177,7 +177,7 @@
           ],
           "reasoning": "created-with-entity type - created by parent AuditLog entity's computation",
           "calculationMethod": "Created together with AuditLog entity when any user performs a tracked action",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.id",

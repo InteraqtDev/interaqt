@@ -419,12 +419,12 @@ describe('Basic Functionality', () => {
     expect(createDormitoryDetails.payload.bedCount).toBe(6)
   })
 
-  test('AuditTrackingRelation creation with AuditLog', async () => {
+  test('AuditTrackingRelation creation with AuditLog (_parent:AuditLog)', async () => {
     /**
-     * Test Plan for: AuditTrackingRelation Transform computation
-     * Dependencies: AuditTrackingRelation, User entity, AuditLog entity, interactions
-     * Steps: 1) Create an admin user 2) Execute interaction with that user 3) Verify AuditTrackingRelation is created linking User to AuditLog
-     * Business Logic: When AuditLog is created through interaction, a relation is created between the acting user and the audit log (only for real User entities)
+     * Test Plan for: AuditTrackingRelation Transform computation (_parent:AuditLog)
+     * Dependencies: AuditTrackingRelation, User entity, AuditLog entity, multiple interactions
+     * Steps: 1) Create admin user 2) Execute multiple auditable interactions 3) Verify AuditTrackingRelations are created for each 4) Test with non-UUID user context (should skip relation creation)
+     * Business Logic: When AuditLog is created through parent AuditLog computation, relations are created between the acting user and audit logs (only for real User entities with UUID format)
      */
     
     // First create an admin user that will perform actions
@@ -452,7 +452,7 @@ describe('Basic Functionality', () => {
     const adminUser = (users.data as any[]).find(u => u.username === 'adminuser')
     expect(adminUser).toBeDefined()
     
-    // Now create another user using the actual admin user as the context
+    // Test 1: CreateUser interaction with real UUID user context
     const targetResult = await controller.callInteraction('CreateUser', {
       user: { id: adminUser.id }, // Use actual user UUID
       payload: {
@@ -465,6 +465,62 @@ describe('Basic Functionality', () => {
     })
     
     expect(targetResult.error).toBeUndefined()
+    
+    // Test 2: CreateDormitory interaction
+    const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: adminUser.id },
+      payload: {
+        name: 'Building D Room 401',
+        bedCount: 6,
+        building: 'D',
+        floor: 4
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    
+    // Get created entities for further testing
+    const targetUsers = await controller.callInteraction('ViewUserList', {
+      user: { id: 'system' },
+      query: {
+        attributeQuery: ['id', 'username']
+      }
+    })
+    
+    const dormitories = await controller.callInteraction('ViewDormitoryList', {
+      user: { id: 'system' },
+      query: {
+        attributeQuery: ['id', 'name']
+      }
+    })
+    
+    const targetUser = (targetUsers.data as any[]).find(u => u.username === 'targetuser')
+    const dormitory = dormitories.data[0]
+    
+    // Test 3: ApplyScoreDeduction interaction
+    const scoreResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: adminUser.id },
+      payload: {
+        userId: targetUser.id,
+        deductionAmount: 25,
+        reason: 'Testing audit trail',
+        category: 'test'
+      }
+    })
+    
+    expect(scoreResult.error).toBeUndefined()
+    
+    // Test 4: AssignUserToBed interaction
+    const assignResult = await controller.callInteraction('AssignUserToBed', {
+      user: { id: adminUser.id },
+      payload: {
+        userId: targetUser.id,
+        dormitoryId: dormitory.id,
+        bedNumber: 1
+      }
+    })
+    
+    expect(assignResult.error).toBeUndefined()
     
     // Query AuditTrackingRelation using the relation instance name
     const { AuditTrackingRelation } = await import('../backend')
@@ -479,25 +535,104 @@ describe('Basic Functionality', () => {
       ]
     )
 
-    // Should have at least one audit tracking relation for the admin user
-    expect(auditRelations.length).toBeGreaterThanOrEqual(1)
+    // Should have multiple audit tracking relations for the admin user
+    expect(auditRelations.length).toBeGreaterThanOrEqual(4)
     
-    const auditRelation = auditRelations.find(rel => 
+    // Verify CreateUser audit relation
+    const createUserRelation = auditRelations.find(rel => 
       rel.target.actionType === 'CreateUser'
     )
     
-    expect(auditRelation).toBeDefined()
-    expect(auditRelation.source.id).toBe(adminUser.id)
-    expect(auditRelation.source.username).toBe('adminuser')
-    expect(auditRelation.target.actionType).toBe('CreateUser')
-    expect(auditRelation.timestamp).toBeGreaterThan(0)
-    expect(auditRelation.target.details).toBeDefined()
+    expect(createUserRelation).toBeDefined()
+    expect(createUserRelation.source.id).toBe(adminUser.id)
+    expect(createUserRelation.source.username).toBe('adminuser')
+    expect(createUserRelation.target.actionType).toBe('CreateUser')
+    expect(createUserRelation.timestamp).toBeGreaterThan(0)
     
-    // Verify the audit log details contain the correct information
-    const details = JSON.parse(auditRelation.target.details)
-    expect(details.userId).toBe(adminUser.id)
-    expect(details.interaction).toBe('CreateUser')
-    expect(details.payload.username).toBe('targetuser')
+    const createUserDetails = JSON.parse(createUserRelation.target.details)
+    expect(createUserDetails.userId).toBe(adminUser.id)
+    expect(createUserDetails.interaction).toBe('CreateUser')
+    expect(createUserDetails.payload.username).toBe('targetuser')
+    
+    // Verify CreateDormitory audit relation
+    const createDormitoryRelation = auditRelations.find(rel => 
+      rel.target.actionType === 'CreateDormitory'
+    )
+    
+    expect(createDormitoryRelation).toBeDefined()
+    expect(createDormitoryRelation.source.id).toBe(adminUser.id)
+    expect(createDormitoryRelation.target.actionType).toBe('CreateDormitory')
+    
+    const createDormitoryDetails = JSON.parse(createDormitoryRelation.target.details)
+    expect(createDormitoryDetails.userId).toBe(adminUser.id)
+    expect(createDormitoryDetails.interaction).toBe('CreateDormitory')
+    expect(createDormitoryDetails.payload.name).toBe('Building D Room 401')
+    
+    // Verify ApplyScoreDeduction audit relation
+    const scoreDeductionRelation = auditRelations.find(rel => 
+      rel.target.actionType === 'ApplyScoreDeduction'
+    )
+    
+    expect(scoreDeductionRelation).toBeDefined()
+    expect(scoreDeductionRelation.source.id).toBe(adminUser.id)
+    expect(scoreDeductionRelation.target.actionType).toBe('ApplyScoreDeduction')
+    
+    const scoreDeductionDetails = JSON.parse(scoreDeductionRelation.target.details)
+    expect(scoreDeductionDetails.userId).toBe(adminUser.id)
+    expect(scoreDeductionDetails.interaction).toBe('ApplyScoreDeduction')
+    expect(scoreDeductionDetails.payload.deductionAmount).toBe(25)
+    
+    // Verify AssignUserToBed audit relation
+    const assignBedRelation = auditRelations.find(rel => 
+      rel.target.actionType === 'AssignUserToBed'
+    )
+    
+    expect(assignBedRelation).toBeDefined()
+    expect(assignBedRelation.source.id).toBe(adminUser.id)
+    expect(assignBedRelation.target.actionType).toBe('AssignUserToBed')
+    
+    const assignBedDetails = JSON.parse(assignBedRelation.target.details)
+    expect(assignBedDetails.userId).toBe(adminUser.id)
+    expect(assignBedDetails.interaction).toBe('AssignUserToBed')
+    expect(assignBedDetails.payload.userId).toBe(targetUser.id)
+    
+    // Test 5: Verify the computation handles non-UUID user contexts correctly
+    // The AuditTrackingRelation computation is designed to skip creating relations
+    // for non-UUID user contexts (like test scenarios), so we just verify 
+    // that AuditLog entities are still created (parent computation works)
+    // but relations are only created for real User entities with UUID format
+    
+    const initialCreateUserLogs = await system.storage.find('AuditLog',
+      MatchExp.atom({ key: 'actionType', value: ['=', 'CreateUser'] }),
+      undefined,
+      ['id', 'actionType']
+    )
+    
+    // Execute interaction with non-UUID user context (like test scenarios)
+    const nonUuidResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'test-admin' }, // Non-UUID format
+      payload: {
+        username: 'testusernonuuid',
+        email: 'testnon@example.com',
+        password: 'password123',
+        fullName: 'Test Non UUID User',
+        role: 'student'  
+      }
+    })
+    
+    expect(nonUuidResult.error).toBeUndefined()
+    
+    // Verify AuditLog was created (parent AuditLog computation still works)
+    const finalCreateUserLogs = await system.storage.find('AuditLog',
+      MatchExp.atom({ key: 'actionType', value: ['=', 'CreateUser'] }),
+      undefined,
+      ['id', 'actionType', 'details']
+    )
+    
+    expect(finalCreateUserLogs.length).toBeGreaterThan(initialCreateUserLogs.length)
+    
+    // The implementation correctly skips creating AuditTrackingRelations for non-UUID users
+    // This is by design - only real User entities (with UUID ids) get tracked in audit relations
   })
 
   test('DormitoryLeadershipRelation StateMachine computation', async () => {
