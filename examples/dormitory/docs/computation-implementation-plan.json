@@ -548,7 +548,7 @@
           ],
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "Set to current timestamp at creation",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.processedAt",

@@ -2184,4 +2184,78 @@ describe('Basic Functionality', () => {
 
     expect(rejectedRequest.status).toBe('rejected')
   })
+
+  test('RemovalRequest.createdAt set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: RemovalRequest.createdAt (_owner)
+     * This tests that createdAt is properly set when RemovalRequest is created
+     * Dependencies: User entity, RemovalRequest entity, CreateRemovalRequest interaction
+     * Steps: 1) Create user 2) Create removal request 3) Verify createdAt is set by owner computation
+     * Business Logic: RemovalRequest's creation computation sets createdAt timestamp
+     */
+
+    // First create a user (this will be the target of removal request)
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'createdattarget',
+        email: 'createdat@example.com',
+        password: 'password123',
+        fullName: 'CreatedAt Target',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'createdattarget'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const targetUserId = users[0].id
+
+    // Record time before creating removal request
+    const beforeTime = Math.floor(Date.now() / 1000)
+
+    // Create removal request
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: 'admin' }, // Requester
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Testing createdAt timestamp',
+        urgency: 'medium'
+      }
+    })
+
+    expect(requestResult.error).toBeUndefined()
+
+    // Record time after creating removal request
+    const afterTime = Math.floor(Date.now() / 1000)
+
+    // Find the created RemovalRequest
+    const requests = await system.storage.find('RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Testing createdAt timestamp'] }),
+      undefined,
+      ['id', 'reason', 'urgency', 'status', 'createdAt']
+    )
+
+    expect(requests.length).toBe(1)
+    const removalRequest = requests[0]
+
+    // Verify the createdAt is set correctly by the owner computation
+    expect(removalRequest.createdAt).toBeDefined()
+    expect(typeof removalRequest.createdAt).toBe('number')
+    
+    // Verify timestamp is reasonable (within the time window)
+    expect(removalRequest.createdAt).toBeGreaterThanOrEqual(beforeTime)
+    expect(removalRequest.createdAt).toBeLessThanOrEqual(afterTime)
+    
+    // Verify other properties are also set correctly
+    expect(removalRequest.reason).toBe('Testing createdAt timestamp')
+    expect(removalRequest.urgency).toBe('medium')
+    expect(removalRequest.status).toBe('pending')
+    expect(removalRequest.id).toBeDefined()
+  })
 }) 
