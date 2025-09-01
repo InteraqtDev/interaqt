@@ -157,6 +157,68 @@ describe('Basic Functionality', () => {
     expect(typeof scoreEvent.timestamp).toBe('number')
   })
 
+  test('ScoreEvent.category set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: ScoreEvent.category (_owner)
+     * This tests that category is properly set when ScoreEvent is created
+     * Dependencies: User entity, ScoreEvent entity, ApplyScoreDeduction interaction
+     * Steps: 1) Create user 2) Apply score deduction with specific category 3) Verify category is set correctly
+     * Business Logic: ScoreEvent's creation computation sets category from interaction payload
+     */
+
+    // First create a user
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'categorytestuser',
+        email: 'categorytest@example.com',
+        password: 'password123',
+        fullName: 'Category Test User',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'categorytestuser'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const userId = users[0].id
+
+    // Apply score deduction with a specific category
+    const deductionResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        deductionAmount: 25,
+        reason: 'Property damage',
+        category: 'Violation'
+      }
+    })
+
+    expect(deductionResult.error).toBeUndefined()
+
+    // Find the created ScoreEvent
+    const scoreEvents = await system.storage.find('ScoreEvent',
+      MatchExp.atom({ key: 'category', value: ['=', 'Violation'] }),
+      undefined,
+      ['id', 'amount', 'reason', 'category', 'timestamp']
+    )
+
+    expect(scoreEvents.length).toBe(1)
+    const scoreEvent = scoreEvents[0]
+
+    // Verify the category is set correctly by the owner computation
+    expect(scoreEvent.category).toBe('Violation')
+    expect(scoreEvent.reason).toBe('Property damage')
+    expect(scoreEvent.amount).toBe(-25) // Negative for deduction
+    expect(scoreEvent.timestamp).toBeDefined()
+    expect(typeof scoreEvent.timestamp).toBe('number')
+  })
+
   test('User entity creation via CreateUser interaction', async () => {
     // Execute CreateUser interaction
     const result = await controller.callInteraction('CreateUser', {
