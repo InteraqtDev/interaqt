@@ -381,7 +381,7 @@
           ],
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "Set once at creation, immutable thereafter",
-          "completed": false
+          "completed": true
         },
         {
           "id": "ScoreEvent.id",
