@@ -48,8 +48,7 @@ export const User = Entity.create({
     }),
     Property.create({
       name: 'currentScore',
-      type: 'number',
-      defaultValue: () => 100
+      type: 'number'
     }),
     Property.create({
       name: 'isActive',
@@ -101,8 +100,7 @@ export const Dormitory = Entity.create({
     }),
     Property.create({
       name: 'occupiedBeds',
-      type: 'number',
-      defaultValue: () => 0
+      type: 'number'
     }),
     Property.create({
       name: 'availableBeds',
@@ -1263,3 +1261,19 @@ const RemovalRequestNotesStateMachine = StateMachine.create({
 
 // Assign StateMachine computation to RemovalRequest.notes property
 RemovalRequest.properties.find(p => p.name === 'notes').computation = RemovalRequestNotesStateMachine
+
+// Assign Summation computation to User.currentScore property
+User.properties.find(p => p.name === 'currentScore').computation = Summation.create({
+  property: 'scoreEvents', // Use property name from UserScoringRelation sourceProperty
+  attributeQuery: ['amount'] // Sum the amount field from related ScoreEvent entities
+})
+
+// Assign Count computation to Dormitory.occupiedBeds property
+Dormitory.properties.find(p => p.name === 'occupiedBeds').computation = Count.create({
+  property: 'residents' // Use property name from BedAssignmentRelation targetProperty
+})
+
+// Assign computed function to Dormitory.availableBeds property
+Dormitory.properties.find(p => p.name === 'availableBeds').computed = function(dormitory) {
+  return (dormitory.bedCount || 0) - (dormitory.occupiedBeds || 0)
+}

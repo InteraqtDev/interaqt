@@ -597,7 +597,7 @@
           "interactionDependencies": null,
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "auto-generated",
-          "completed": false
+          "completed": true
         },
         {
           "id": "AuditLog.actionType",
@@ -621,7 +621,7 @@
           ],
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "Set based on the triggering interaction type",
-          "completed": false
+          "completed": true
         },
         {
           "id": "AuditLog.timestamp",
@@ -645,7 +645,7 @@
           ],
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "Set to current timestamp when audit log is created",
-          "completed": false
+          "completed": true
         },
         {
           "id": "AuditLog.details",
@@ -669,7 +669,7 @@
           ],
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "Serialized information about the action and its context",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 2: 28 property computation(s), 5 relation computation(s)"
@@ -694,7 +694,7 @@
           "interactionDependencies": null,
           "reasoning": "independent property with dataDependencies involving relations for aggregation",
           "calculationMethod": "Summation of all ScoreEvent amounts linked to this user",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.occupiedBeds",
@@ -713,7 +713,7 @@
           "interactionDependencies": null,
           "reasoning": "independent property with dataDependencies involving relations for counting",
           "calculationMethod": "Count of BedAssignmentRelation where target = this dormitory",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 3: 2 property computation(s)"
@@ -739,7 +739,7 @@
           "interactionDependencies": null,
           "reasoning": "independent property that only uses own entity properties for simple derivation",
           "calculationMethod": "Custom: bedCount - occupiedBeds",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 4: 1 property computation(s)"
