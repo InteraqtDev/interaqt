@@ -2258,4 +2258,77 @@ describe('Basic Functionality', () => {
     expect(removalRequest.status).toBe('pending')
     expect(removalRequest.id).toBeDefined()
   })
+
+  test('RemovalRequest.processedAt computation (StateMachine type)', async () => {
+    /**
+     * Test Plan for: RemovalRequest.processedAt
+     * Dependencies: RemovalRequest entity, ProcessRemovalRequest interaction
+     * Steps: 1) Create removal request 2) Process it 3) Verify processedAt timestamp is set
+     * Business Logic: Set to current timestamp when status is updated by ProcessRemovalRequest
+     */
+    
+    // Create test user first
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'testuser_processedAt',
+        email: 'testuser_processedAt@example.com',
+        password: 'password123',
+        fullName: 'Test User ProcessedAt',
+        role: 'student'
+      }
+    })
+    
+    // Create removal request
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: 'admin' },
+      payload: {
+        targetUserId: userResult.effects[0].record.id,
+        reason: 'Test processing timestamp',
+        urgency: 'high'
+      }
+    })
+    
+    // Verify the interaction was successful
+    expect(requestResult).toBeDefined()
+    expect(requestResult.error).toBeUndefined()
+    
+    // Find the created RemovalRequest by unique reason
+    const removalRequests = await system.storage.find('RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Test processing timestamp'] }),
+      undefined,
+      ['id', 'processedAt', 'status', 'reason']
+    )
+    expect(removalRequests).toHaveLength(1)
+    
+    const initialRequest = removalRequests[0]
+    expect(initialRequest).toBeDefined()
+    expect(initialRequest.processedAt).toBeUndefined()
+    
+    // Process the removal request
+    const beforeProcessTime = Math.floor(Date.now() / 1000)
+    
+    await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: 'admin' },
+      payload: {
+        requestId: initialRequest.id,
+        decision: 'approved',
+        notes: 'Test processing'
+      }
+    })
+    
+    const afterProcessTime = Math.floor(Date.now() / 1000)
+    
+    // Verify processedAt timestamp is set
+    const processedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', initialRequest.id] }),
+      undefined,
+      ['id', 'processedAt', 'status']
+    )
+    
+    expect(processedRequest.processedAt).not.toBeNull()
+    expect(processedRequest.processedAt).toBeGreaterThanOrEqual(beforeProcessTime)
+    expect(processedRequest.processedAt).toBeLessThanOrEqual(afterProcessTime)
+  })
 }) 

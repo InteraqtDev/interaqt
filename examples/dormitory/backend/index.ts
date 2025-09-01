@@ -1185,3 +1185,42 @@ const RemovalRequestStatusStateMachine = StateMachine.create({
 
 // Assign StateMachine computation to RemovalRequest.status property
 RemovalRequest.properties.find(p => p.name === 'status').computation = RemovalRequestStatusStateMachine
+
+// State nodes for RemovalRequest.processedAt property
+const processedAtDefaultState = StateNode.create({
+  name: 'unprocessed',
+  computeValue: (lastValue, event) => {
+    // If this is triggered by ProcessRemovalRequest, set timestamp
+    if (event && event.interactionName === 'ProcessRemovalRequest') {
+      return Math.floor(Date.now() / 1000)
+    }
+    // Keep existing value or null if not set
+    return lastValue !== undefined ? lastValue : null
+  }
+})
+
+// StateMachine for RemovalRequest.processedAt property
+const RemovalRequestProcessedAtStateMachine = StateMachine.create({
+  states: [processedAtDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: processedAtDefaultState,
+      next: processedAtDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the removal request being processed
+        const removalRequest = await this.system.storage.findOne('RemovalRequest',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload?.requestId] }),
+          undefined,
+          ['id']
+        )
+        
+        return removalRequest
+      }
+    })
+  ],
+  defaultState: processedAtDefaultState
+})
+
+// Assign StateMachine computation to RemovalRequest.processedAt property
+RemovalRequest.properties.find(p => p.name === 'processedAt').computation = RemovalRequestProcessedAtStateMachine

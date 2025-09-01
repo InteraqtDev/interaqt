@@ -565,7 +565,7 @@
           ],
           "reasoning": "independent property with interactionDependencies that can modify it - timestamp updates",
           "calculationMethod": "Set to current timestamp when status is updated",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.notes",
