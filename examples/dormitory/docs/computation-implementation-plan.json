@@ -153,7 +153,7 @@
           ],
           "reasoning": "created-with-entity type - created by parent RemovalRequest entity's computation",
           "calculationMethod": "Created together with RemovalRequest entity by CreateRemovalRequest interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "AuditTrackingRelation",

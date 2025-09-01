@@ -725,4 +725,129 @@ describe('Basic Functionality', () => {
     expect(scoringRelation.createdAt).toBeGreaterThan(0)
     expect(scoringRelation.id).toBeDefined()
   })
+
+  test('RemovalRequestingRelation creation with RemovalRequest (_parent:RemovalRequest)', async () => {
+    /**
+     * Test Plan for: RemovalRequestingRelation Transform computation
+     * Dependencies: RemovalRequestingRelation, User entity, RemovalRequest entity, CreateRemovalRequest interaction
+     * Steps: 1) Create a requester user and target user 2) Execute CreateRemovalRequest interaction 3) Verify RemovalRequestingRelations are created linking both users to RemovalRequest
+     * Business Logic: When RemovalRequest is created through CreateRemovalRequest interaction, relations are created between both the requesting user and target user with the removal request
+     */
+    
+    // First create a user who will be the requester
+    const requesterResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'requester',
+        email: 'requester@example.com',
+        password: 'password123',
+        fullName: 'Requester User',
+        role: 'admin'
+      }
+    })
+    
+    expect(requesterResult.error).toBeUndefined()
+    
+    // Create a user who will be the target of removal request
+    const targetResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'target',
+        email: 'target@example.com',
+        password: 'password123',
+        fullName: 'Target User',
+        role: 'student'
+      }
+    })
+    
+    expect(targetResult.error).toBeUndefined()
+    
+    // Get the created user IDs
+    const users = await controller.callInteraction('ViewUserList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'username']
+      }
+    })
+    
+    const requesterUser = (users.data as any[]).find(u => u.username === 'requester')
+    const targetUser = (users.data as any[]).find(u => u.username === 'target')
+    
+    expect(requesterUser).toBeDefined()
+    expect(targetUser).toBeDefined()
+    
+    // Execute CreateRemovalRequest interaction with the requester as the user context
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: requesterUser.id }, 
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Serious policy violations',
+        urgency: 'high'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(requestResult).toBeDefined()
+    expect(requestResult.error).toBeUndefined()
+    
+    // Query created RemovalRequest to get its ID
+    const removalRequests = await system.storage.find('RemovalRequest', 
+      undefined,
+      { orderBy: { createdAt: 'desc' }, limit: 1 },
+      ['id', 'reason', 'urgency', 'status', 'createdAt']
+    )
+
+    expect(removalRequests).toHaveLength(1)
+    
+    const removalRequest = removalRequests[0]
+    expect(removalRequest.reason).toBe('Serious policy violations')
+    expect(removalRequest.urgency).toBe('high')
+    expect(removalRequest.status).toBe('pending')
+    
+    // Query RemovalRequestingRelation using the relation instance name
+    const { RemovalRequestingRelation } = await import('../backend')
+    const requestingRelations = await system.storage.find(RemovalRequestingRelation.name, 
+      MatchExp.atom({ key: 'target.id', value: ['=', removalRequest.id] }),
+      undefined,
+      [
+        'id',
+        'role',
+        'createdAt',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'urgency'] }]
+      ]
+    )
+
+    expect(requestingRelations).toHaveLength(2) // One for requester, one for target
+    
+    // Find the requester relation
+    const requesterRelation = requestingRelations.find(rel => 
+      rel.source.id === requesterUser.id && rel.role === 'requester'
+    )
+    
+    expect(requesterRelation).toBeDefined()
+    expect(requesterRelation.source.id).toBe(requesterUser.id)
+    expect(requesterRelation.source.username).toBe('requester')
+    expect(requesterRelation.target.id).toBe(removalRequest.id)
+    expect(requesterRelation.target.reason).toBe('Serious policy violations')
+    expect(requesterRelation.target.urgency).toBe('high')
+    expect(requesterRelation.role).toBe('requester')
+    expect(requesterRelation.createdAt).toBeGreaterThan(0)
+    expect(requesterRelation.id).toBeDefined()
+    
+    // Find the target relation
+    const targetRelation = requestingRelations.find(rel => 
+      rel.source.id === targetUser.id && rel.role === 'target'
+    )
+    
+    expect(targetRelation).toBeDefined()
+    expect(targetRelation.source.id).toBe(targetUser.id)
+    expect(targetRelation.source.username).toBe('target')
+    expect(targetRelation.target.id).toBe(removalRequest.id)
+    expect(targetRelation.target.reason).toBe('Serious policy violations')
+    expect(targetRelation.target.urgency).toBe('high')
+    expect(targetRelation.role).toBe('target')
+    expect(targetRelation.createdAt).toBeGreaterThan(0)
+    expect(targetRelation.id).toBeDefined()
+  })
 }) 

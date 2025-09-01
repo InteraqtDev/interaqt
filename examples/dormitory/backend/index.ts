@@ -878,3 +878,54 @@ UserScoringRelation.computation = Transform.create({
     return null
   }
 })
+
+// Add Transform computation for RemovalRequestingRelation
+// This creates the relation between User and RemovalRequest when RemovalRequest entities are created
+RemovalRequestingRelation.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: async function(this, event) {
+    if (event.interactionName === 'CreateRemovalRequest') {
+      // Find the corresponding RemovalRequest that was created by this interaction
+      const removalRequests = await this.system.storage.find('RemovalRequest',
+        MatchExp.atom({ key: 'reason', value: ['=', event.payload.reason] })
+          .and({ key: 'urgency', value: ['=', event.payload.urgency] })
+          .and({ key: 'status', value: ['=', 'pending'] }),
+        { limit: 1, orderBy: { createdAt: 'desc' } },
+        ['id', 'createdAt']
+      )
+      
+      if (removalRequests.length > 0 && event.payload.targetUserId) {
+        const removalRequest = removalRequests[0]
+        
+        // Check if the requesting user (event.user.id) is a valid UUID format
+        const isUuidFormat = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(event.user.id)
+        
+        // Create relations array
+        const relations = []
+        
+        // Only create relation for requester if it's a valid UUID (real user entity)
+        if (isUuidFormat) {
+          relations.push({
+            source: { id: event.user.id },
+            target: { id: removalRequest.id },
+            role: 'requester',
+            createdAt: Math.floor(Date.now() / 1000)
+          })
+        }
+        
+        // Always create relation for target user (payload contains actual user ID)
+        relations.push({
+          source: { id: event.payload.targetUserId },
+          target: { id: removalRequest.id },
+          role: 'target',
+          createdAt: Math.floor(Date.now() / 1000)
+        })
+        
+        return relations.length > 0 ? relations : null
+      }
+    }
+    
+    return null
+  }
+})
