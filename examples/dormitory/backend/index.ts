@@ -70,10 +70,10 @@ export const User = Entity.create({
         return {
           username: event.payload.username,
           email: event.payload.email,
-          fullName: event.payload.fullName,
           role: event.payload.role,
           isActive: true,
           createdAt: Math.floor(Date.now() / 1000)
+          // Note: fullName is now handled by separate StateMachine computation
         }
       }
       return null
@@ -681,6 +681,64 @@ export const activities: any[] = []
 export const dicts: any[] = []
 
 // ==================== COMPUTATION ASSIGNMENTS ====================
+
+// State nodes for User.fullName property
+const fullNameDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    // Handle initial creation and updates
+    if (event?.interactionName === 'CreateUser') {
+      return event.payload?.fullName
+    }
+    if (event?.interactionName === 'UpdateUserProfile') {
+      return event.payload?.fullName || lastValue
+    }
+    // Return existing value if no specific event
+    return lastValue
+  }
+})
+
+// StateMachine for User.fullName property
+const UserFullNameStateMachine = StateMachine.create({
+  states: [fullNameDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: CreateUserInteraction,
+      current: fullNameDefaultState,
+      next: fullNameDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the user that was just created
+        // Since this runs after entity creation, we can find by username
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'username', value: ['=', event.payload?.username] }),
+          undefined,
+          ['id']
+        )
+        
+        return user
+      }
+    }),
+    StateTransfer.create({
+      trigger: UpdateUserProfileInteraction,
+      current: fullNameDefaultState, 
+      next: fullNameDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the user to update by ID
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload?.userId] }),
+          undefined,
+          ['id']
+        )
+        
+        return user
+      }
+    })
+  ],
+  defaultState: fullNameDefaultState
+})
+
+// Assign StateMachine computation to User.fullName property
+User.properties.find(p => p.name === 'fullName').computation = UserFullNameStateMachine
 
 // State nodes for BedAssignmentRelation
 const bedNotAssignedState = StateNode.create({ 

@@ -1101,4 +1101,64 @@ describe('Basic Functionality', () => {
     expect(user.role).toBe('admin')
     expect(user.id).toBeDefined()
   })
+
+  test('User.fullName StateMachine computation handles CreateUser and UpdateUserProfile', async () => {
+    /**
+     * Test Plan for: User.fullName StateMachine computation
+     * Dependencies: User entity, CreateUser interaction, UpdateUserProfile interaction
+     * Steps: 1) Create a User via CreateUser interaction 2) Verify fullName is set 3) Update profile via UpdateUserProfile 4) Verify fullName is updated
+     * Business Logic: StateMachine handles both creation (CreateUser) and updates (UpdateUserProfile) for fullName property
+     */
+    
+    // Step 1: Execute CreateUser interaction
+    const createResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'fullnametestuser',
+        email: 'fullnametest@example.com', 
+        password: 'password123',
+        fullName: 'Original Full Name',
+        role: 'student'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(createResult).toBeDefined()
+    expect(createResult.error).toBeUndefined()
+    
+    // Step 2: Query the created user to verify fullName is properly set
+    let user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'fullnametestuser'] }),
+      undefined,
+      ['id', 'username', 'fullName']
+    )
+    
+    expect(user).toBeDefined()
+    expect(user.fullName).toBe('Original Full Name')
+    const userId = user.id
+    
+    // Step 3: Execute UpdateUserProfile interaction to update fullName
+    const updateResult = await controller.callInteraction('UpdateUserProfile', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        fullName: 'Updated Full Name'
+      }
+    })
+
+    // Verify the update interaction was successful
+    expect(updateResult).toBeDefined()
+    expect(updateResult.error).toBeUndefined()
+    
+    // Step 4: Query the user again to verify fullName was updated
+    user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'username', 'fullName']
+    )
+    
+    expect(user).toBeDefined()
+    expect(user.fullName).toBe('Updated Full Name')
+    expect(user.username).toBe('fullnametestuser')
+  })
 }) 
