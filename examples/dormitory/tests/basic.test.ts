@@ -1024,4 +1024,42 @@ describe('Basic Functionality', () => {
     expect(user.username).toBe('idtestuser')
     expect(user.email).toBe('idtest@example.com')
   })
+
+  test('User.username is set from payload at creation (_owner)', async () => {
+    /**
+     * Test Plan for: User.username (_owner)
+     * This tests that User.username is properly set from payload when User is created
+     * Steps: 1) Create a User via CreateUser interaction 2) Verify username is set from payload
+     * Business Logic: _owner properties are controlled by entity creation - username is set from interaction payload
+     */
+    
+    // Execute CreateUser interaction with specific username
+    const result = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'uniqueusername123',
+        email: 'unique@example.com', 
+        password: 'password123',
+        fullName: 'Unique Username User',
+        role: 'student'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(result).toBeDefined()
+    expect(result.error).toBeUndefined()
+    
+    // Query the created user to verify username is properly set from payload
+    const user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'uniqueusername123'] }),
+      undefined,
+      ['id', 'username', 'email', 'fullName']
+    )
+    
+    expect(user).toBeDefined()
+    expect(user.username).toBe('uniqueusername123')
+    expect(user.email).toBe('unique@example.com')
+    expect(user.fullName).toBe('Unique Username User')
+    expect(user.id).toBeDefined()
+  })
 }) 
