@@ -1,0 +1,748 @@
+{
+  "totalComputations": 41,
+  "implementationOrder": [
+    {
+      "phase": 1,
+      "computations": [
+        {
+          "id": "User",
+          "type": "entity",
+          "entityName": "User",
+          "computationType": "Transform",
+          "dependencies": [],
+          "expandedDependencies": [],
+          "interactionDependencies": [
+            "CreateUser"
+          ],
+          "reasoning": "interaction-created with soft-delete capability - Transform for creation + status property with StateMachine for soft deletion",
+          "calculationMethod": "Independently created by CreateUser interaction",
+          "completed": false
+        },
+        {
+          "id": "Dormitory",
+          "type": "entity",
+          "entityName": "Dormitory",
+          "computationType": "Transform",
+          "dependencies": [],
+          "expandedDependencies": [],
+          "interactionDependencies": [
+            "CreateDormitory"
+          ],
+          "reasoning": "interaction-created with soft-delete capability - Transform for creation + status property with StateMachine for soft deletion",
+          "calculationMethod": "Independently created by CreateDormitory interaction",
+          "completed": false
+        },
+        {
+          "id": "ScoreEvent",
+          "type": "entity",
+          "entityName": "ScoreEvent",
+          "computationType": "Transform",
+          "dependencies": [],
+          "expandedDependencies": [],
+          "interactionDependencies": [
+            "ApplyScoreDeduction"
+          ],
+          "reasoning": "interaction-created with canBeDeleted: false - Transform with InteractionEventEntity",
+          "calculationMethod": "Independently created by ApplyScoreDeduction interaction",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest",
+          "type": "entity",
+          "entityName": "RemovalRequest",
+          "computationType": "Transform",
+          "dependencies": [],
+          "expandedDependencies": [],
+          "interactionDependencies": [
+            "CreateRemovalRequest"
+          ],
+          "reasoning": "interaction-created with canBeDeleted: false - Transform with InteractionEventEntity",
+          "calculationMethod": "Independently created by CreateRemovalRequest interaction",
+          "completed": false
+        },
+        {
+          "id": "AuditLog",
+          "type": "entity",
+          "entityName": "AuditLog",
+          "computationType": "_parent:Interaction",
+          "dependencies": [],
+          "expandedDependencies": [],
+          "interactionDependencies": [
+            "CreateUser",
+            "CreateDormitory",
+            "AssignUserToBed",
+            "ApplyScoreDeduction",
+            "CreateRemovalRequest",
+            "ProcessRemovalRequest",
+            "RemoveUserFromDormitory",
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "created-with-parent type - created by parent Interaction computation, not by its own computation",
+          "calculationMethod": "Created by system computation when any significant interaction occurs (NOT by AuditLog's own computation)",
+          "completed": false
+        }
+      ],
+      "description": "Phase 1: 5 entity computation(s)"
+    },
+    {
+      "phase": 2,
+      "computations": [
+        {
+          "id": "BedAssignmentRelation",
+          "type": "relation",
+          "relationName": "BedAssignmentRelation",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User",
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "AssignUserToBed"
+          ],
+          "reasoning": "interaction-created with canBeDeleted: true and hard-delete - StateMachine handles both creation and deletion",
+          "calculationMethod": "Independently created by AssignUserToBed when User is active and Dormitory has available capacity",
+          "completed": false
+        },
+        {
+          "id": "DormitoryLeadershipRelation",
+          "type": "relation",
+          "relationName": "DormitoryLeadershipRelation",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User",
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "interaction-created with canBeDeleted: true and hard-delete - StateMachine handles both creation and deletion",
+          "calculationMethod": "Independently created by AssignDormitoryLeader when User.role can be updated to dormitory_leader and Dormitory has no current leader",
+          "completed": false
+        },
+        {
+          "id": "UserScoringRelation",
+          "type": "relation",
+          "relationName": "UserScoringRelation",
+          "computationType": "_parent:ScoreEvent",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User",
+            "ScoreEvent"
+          ],
+          "interactionDependencies": [
+            "ApplyScoreDeduction"
+          ],
+          "reasoning": "created-with-entity type - created by parent ScoreEvent entity's computation",
+          "calculationMethod": "Created together with ScoreEvent entity by ApplyScoreDeduction interaction",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequestingRelation",
+          "type": "relation",
+          "relationName": "RemovalRequestingRelation",
+          "computationType": "_parent:RemovalRequest",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User",
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "CreateRemovalRequest"
+          ],
+          "reasoning": "created-with-entity type - created by parent RemovalRequest entity's computation",
+          "calculationMethod": "Created together with RemovalRequest entity by CreateRemovalRequest interaction",
+          "completed": false
+        },
+        {
+          "id": "AuditTrackingRelation",
+          "type": "relation",
+          "relationName": "AuditTrackingRelation",
+          "computationType": "_parent:AuditLog",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User",
+            "AuditLog"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "CreateDormitory",
+            "AssignUserToBed",
+            "ApplyScoreDeduction",
+            "CreateRemovalRequest",
+            "ProcessRemovalRequest",
+            "RemoveUserFromDormitory",
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "created-with-entity type - created by parent AuditLog entity's computation",
+          "calculationMethod": "Created together with AuditLog entity when any user performs a tracked action",
+          "completed": false
+        },
+        {
+          "id": "User.id",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "id",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "auto-generated",
+          "completed": false
+        },
+        {
+          "id": "User.username",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "username",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": [
+            "CreateUser"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set once at creation, immutable thereafter",
+          "completed": false
+        },
+        {
+          "id": "User.email",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "email",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": [
+            "CreateUser"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set once at creation, immutable thereafter",
+          "completed": false
+        },
+        {
+          "id": "User.fullName",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "fullName",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "UpdateUserProfile"
+          ],
+          "reasoning": "independent property with interactionDependencies that can modify it",
+          "calculationMethod": "Direct assignment from interactions",
+          "completed": false
+        },
+        {
+          "id": "User.role",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "role",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "independent property with interactionDependencies that can modify it",
+          "calculationMethod": "Direct assignment from interactions, can be updated when assigning leadership",
+          "completed": false
+        },
+        {
+          "id": "User.isActive",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "isActive",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "DeactivateUser",
+            "ActivateUser"
+          ],
+          "reasoning": "independent property with interactionDependencies that can modify it - this handles soft delete status",
+          "calculationMethod": "Direct assignment from interactions",
+          "completed": false
+        },
+        {
+          "id": "User.createdAt",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "createdAt",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "User"
+          ],
+          "interactionDependencies": [
+            "CreateUser"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set to current timestamp at creation",
+          "completed": false
+        },
+        {
+          "id": "Dormitory.id",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "id",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "Dormitory"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "auto-generated",
+          "completed": false
+        },
+        {
+          "id": "Dormitory.name",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "name",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "CreateDormitory"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set once at creation, immutable thereafter",
+          "completed": false
+        },
+        {
+          "id": "Dormitory.bedCount",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "bedCount",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "CreateDormitory"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set once at creation, immutable thereafter",
+          "completed": false
+        },
+        {
+          "id": "Dormitory.building",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "building",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "CreateDormitory"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set once at creation, immutable thereafter",
+          "completed": false
+        },
+        {
+          "id": "Dormitory.floor",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "floor",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "Dormitory"
+          ],
+          "interactionDependencies": [
+            "CreateDormitory"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set once at creation, immutable thereafter",
+          "completed": false
+        },
+        {
+          "id": "ScoreEvent.id",
+          "type": "property",
+          "entityName": "ScoreEvent",
+          "propertyName": "id",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "ScoreEvent"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "auto-generated",
+          "completed": false
+        },
+        {
+          "id": "ScoreEvent.amount",
+          "type": "property",
+          "entityName": "ScoreEvent",
+          "propertyName": "amount",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "ScoreEvent"
+          ],
+          "interactionDependencies": [
+            "ApplyScoreDeduction"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set at creation from interaction payload",
+          "completed": false
+        },
+        {
+          "id": "ScoreEvent.reason",
+          "type": "property",
+          "entityName": "ScoreEvent",
+          "propertyName": "reason",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "ScoreEvent"
+          ],
+          "interactionDependencies": [
+            "ApplyScoreDeduction"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set at creation from interaction payload",
+          "completed": false
+        },
+        {
+          "id": "ScoreEvent.category",
+          "type": "property",
+          "entityName": "ScoreEvent",
+          "propertyName": "category",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "ScoreEvent"
+          ],
+          "interactionDependencies": [
+            "ApplyScoreDeduction"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set at creation from interaction payload",
+          "completed": false
+        },
+        {
+          "id": "ScoreEvent.timestamp",
+          "type": "property",
+          "entityName": "ScoreEvent",
+          "propertyName": "timestamp",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "ScoreEvent"
+          ],
+          "interactionDependencies": [
+            "ApplyScoreDeduction"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set to current timestamp at creation",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.id",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "id",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "auto-generated",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.reason",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "reason",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "CreateRemovalRequest"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set at creation from interaction payload",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.urgency",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "urgency",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "CreateRemovalRequest"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set at creation from interaction payload",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.status",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "status",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "CreateRemovalRequest",
+            "ProcessRemovalRequest"
+          ],
+          "reasoning": "independent property with interactionDependencies that can modify it - status transitions",
+          "calculationMethod": "Set to 'pending' at creation, updated by ProcessRemovalRequest",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.createdAt",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "createdAt",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "CreateRemovalRequest"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set to current timestamp at creation",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.processedAt",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "processedAt",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "ProcessRemovalRequest"
+          ],
+          "reasoning": "independent property with interactionDependencies that can modify it - timestamp updates",
+          "calculationMethod": "Set to current timestamp when status is updated",
+          "completed": false
+        },
+        {
+          "id": "RemovalRequest.notes",
+          "type": "property",
+          "entityName": "RemovalRequest",
+          "propertyName": "notes",
+          "computationType": "StateMachine",
+          "dependencies": [],
+          "expandedDependencies": [
+            "RemovalRequest"
+          ],
+          "interactionDependencies": [
+            "ProcessRemovalRequest"
+          ],
+          "reasoning": "independent property with interactionDependencies that can modify it",
+          "calculationMethod": "Set from interaction payload when processing",
+          "completed": false
+        },
+        {
+          "id": "AuditLog.id",
+          "type": "property",
+          "entityName": "AuditLog",
+          "propertyName": "id",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "AuditLog"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "auto-generated",
+          "completed": false
+        },
+        {
+          "id": "AuditLog.actionType",
+          "type": "property",
+          "entityName": "AuditLog",
+          "propertyName": "actionType",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "AuditLog"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "CreateDormitory",
+            "AssignUserToBed",
+            "ApplyScoreDeduction",
+            "CreateRemovalRequest",
+            "ProcessRemovalRequest",
+            "RemoveUserFromDormitory",
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set based on the triggering interaction type",
+          "completed": false
+        },
+        {
+          "id": "AuditLog.timestamp",
+          "type": "property",
+          "entityName": "AuditLog",
+          "propertyName": "timestamp",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "AuditLog"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "CreateDormitory",
+            "AssignUserToBed",
+            "ApplyScoreDeduction",
+            "CreateRemovalRequest",
+            "ProcessRemovalRequest",
+            "RemoveUserFromDormitory",
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Set to current timestamp when audit log is created",
+          "completed": false
+        },
+        {
+          "id": "AuditLog.details",
+          "type": "property",
+          "entityName": "AuditLog",
+          "propertyName": "details",
+          "computationType": "_owner",
+          "dependencies": [],
+          "expandedDependencies": [
+            "AuditLog"
+          ],
+          "interactionDependencies": [
+            "CreateUser",
+            "CreateDormitory",
+            "AssignUserToBed",
+            "ApplyScoreDeduction",
+            "CreateRemovalRequest",
+            "ProcessRemovalRequest",
+            "RemoveUserFromDormitory",
+            "AssignDormitoryLeader"
+          ],
+          "reasoning": "creation-only properties are controlled by entity creation",
+          "calculationMethod": "Serialized information about the action and its context",
+          "completed": false
+        }
+      ],
+      "description": "Phase 2: 28 property computation(s), 5 relation computation(s)"
+    },
+    {
+      "phase": 3,
+      "computations": [
+        {
+          "id": "User.currentScore",
+          "type": "property",
+          "entityName": "User",
+          "propertyName": "currentScore",
+          "computationType": "Summation",
+          "dependencies": [
+            "UserScoringRelation.target.amount"
+          ],
+          "expandedDependencies": [
+            "User",
+            "UserScoringRelation.target.amount",
+            "UserScoringRelation"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "independent property with dataDependencies involving relations for aggregation",
+          "calculationMethod": "Summation of all ScoreEvent amounts linked to this user",
+          "completed": false
+        },
+        {
+          "id": "Dormitory.occupiedBeds",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "occupiedBeds",
+          "computationType": "Count",
+          "dependencies": [
+            "BedAssignmentRelation.source"
+          ],
+          "expandedDependencies": [
+            "Dormitory",
+            "BedAssignmentRelation.source",
+            "BedAssignmentRelation"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "independent property with dataDependencies involving relations for counting",
+          "calculationMethod": "Count of BedAssignmentRelation where target = this dormitory",
+          "completed": false
+        }
+      ],
+      "description": "Phase 3: 2 property computation(s)"
+    },
+    {
+      "phase": 4,
+      "computations": [
+        {
+          "id": "Dormitory.availableBeds",
+          "type": "property",
+          "entityName": "Dormitory",
+          "propertyName": "availableBeds",
+          "computationType": "computed",
+          "dependencies": [
+            "_self.bedCount",
+            "_self.occupiedBeds"
+          ],
+          "expandedDependencies": [
+            "Dormitory",
+            "Dormitory.bedCount",
+            "Dormitory.occupiedBeds"
+          ],
+          "interactionDependencies": null,
+          "reasoning": "independent property that only uses own entity properties for simple derivation",
+          "calculationMethod": "Custom: bedCount - occupiedBeds",
+          "completed": false
+        }
+      ],
+      "description": "Phase 4: 1 property computation(s)"
+    }
+  ]
+}
