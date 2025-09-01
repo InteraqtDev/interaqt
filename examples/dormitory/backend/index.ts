@@ -262,6 +262,295 @@ export const AuditTrackingRelation = Relation.create({
   ]
 })
 
+// ==================== INTERACTIONS ====================
+
+// CreateUser Interaction
+export const CreateUserInteraction = Interaction.create({
+  name: 'CreateUser',
+  action: Action.create({ name: 'create' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'username',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'email',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'password',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'fullName',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'role',
+        required: true
+      })
+    ]
+  })
+})
+
+// CreateDormitory Interaction
+export const CreateDormitoryInteraction = Interaction.create({
+  name: 'CreateDormitory',
+  action: Action.create({ name: 'create' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'name',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'bedCount',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'building',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'floor',
+        required: true
+      })
+    ]
+  })
+})
+
+// AssignDormitoryLeader Interaction
+export const AssignDormitoryLeaderInteraction = Interaction.create({
+  name: 'AssignDormitoryLeader',
+  action: Action.create({ name: 'assign' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'dormitoryId',
+        required: true
+      })
+    ]
+  })
+})
+
+// AssignUserToBed Interaction
+export const AssignUserToBedInteraction = Interaction.create({
+  name: 'AssignUserToBed',
+  action: Action.create({ name: 'assign' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'dormitoryId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'bedNumber',
+        required: true
+      })
+    ]
+  })
+})
+
+// ApplyScoreDeduction Interaction
+export const ApplyScoreDeductionInteraction = Interaction.create({
+  name: 'ApplyScoreDeduction',
+  action: Action.create({ name: 'apply' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'deductionAmount',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'reason',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'category',
+        required: true
+      })
+    ]
+  })
+})
+
+// CreateRemovalRequest Interaction
+export const CreateRemovalRequestInteraction = Interaction.create({
+  name: 'CreateRemovalRequest',
+  action: Action.create({ name: 'create' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'targetUserId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'reason',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'urgency',
+        required: true
+      })
+    ]
+  })
+})
+
+// ProcessRemovalRequest Interaction
+export const ProcessRemovalRequestInteraction = Interaction.create({
+  name: 'ProcessRemovalRequest',
+  action: Action.create({ name: 'process' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'requestId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'decision',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'notes',
+        required: false
+      })
+    ]
+  })
+})
+
+// RemoveUserFromDormitory Interaction
+export const RemoveUserFromDormitoryInteraction = Interaction.create({
+  name: 'RemoveUserFromDormitory',
+  action: Action.create({ name: 'remove' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'effective',
+        required: false
+      })
+    ]
+  })
+})
+
+// ViewUserList Interaction
+export const ViewUserListInteraction = Interaction.create({
+  name: 'ViewUserList',
+  action: GetAction,
+  data: User
+})
+
+// ViewDormitoryList Interaction
+export const ViewDormitoryListInteraction = Interaction.create({
+  name: 'ViewDormitoryList',
+  action: GetAction,
+  data: Dormitory
+})
+
+// ViewMyDormitoryUsers Interaction
+export const ViewMyDormitoryUsersInteraction = Interaction.create({
+  name: 'ViewMyDormitoryUsers',
+  action: GetAction,
+  data: User
+})
+
+// ViewMyProfile Interaction
+export const ViewMyProfileInteraction = Interaction.create({
+  name: 'ViewMyProfile',
+  action: GetAction,
+  data: User
+})
+
+// ViewAuditLog Interaction
+export const ViewAuditLogInteraction = Interaction.create({
+  name: 'ViewAuditLog',
+  action: GetAction,
+  data: AuditLog
+})
+
+// LogAuditEvent Interaction
+export const LogAuditEventInteraction = Interaction.create({
+  name: 'LogAuditEvent',
+  action: Action.create({ name: 'log' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'actionType',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'actorId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'details',
+        required: false
+      })
+    ]
+  })
+})
+
+// UpdateUserProfile Interaction
+export const UpdateUserProfileInteraction = Interaction.create({
+  name: 'UpdateUserProfile',
+  action: Action.create({ name: 'update' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'fullName',
+        required: false
+      })
+    ]
+  })
+})
+
+// UpdateSystemSettings Interaction
+export const UpdateSystemSettingsInteraction = Interaction.create({
+  name: 'UpdateSystemSettings',
+  action: Action.create({ name: 'update' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'settings',
+        required: true
+      })
+    ]
+  })
+})
+
+// UpdateScoreThresholds Interaction
+export const UpdateScoreThresholdsInteraction = Interaction.create({
+  name: 'UpdateScoreThresholds',
+  action: Action.create({ name: 'update' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'thresholds',
+        required: true
+      })
+    ]
+  })
+})
+
 // ==================== EXPORTS ====================
 
 export const entities = [User, Dormitory, ScoreEvent, RemovalRequest, AuditLog]
@@ -273,7 +562,26 @@ export const relations = [
   AuditTrackingRelation
 ]
 
+export const interactions = [
+  CreateUserInteraction,
+  CreateDormitoryInteraction,
+  AssignDormitoryLeaderInteraction,
+  AssignUserToBedInteraction,
+  ApplyScoreDeductionInteraction,
+  CreateRemovalRequestInteraction,
+  ProcessRemovalRequestInteraction,
+  RemoveUserFromDormitoryInteraction,
+  ViewUserListInteraction,
+  ViewDormitoryListInteraction,
+  ViewMyDormitoryUsersInteraction,
+  ViewMyProfileInteraction,
+  ViewAuditLogInteraction,
+  LogAuditEventInteraction,
+  UpdateUserProfileInteraction,
+  UpdateSystemSettingsInteraction,
+  UpdateScoreThresholdsInteraction
+]
+
 // Placeholder exports for upcoming tasks
-export const interactions: any[] = []
 export const activities: any[] = []
 export const dicts: any[] = []
