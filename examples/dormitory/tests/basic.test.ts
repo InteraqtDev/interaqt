@@ -1963,4 +1963,66 @@ describe('Basic Functionality', () => {
     expect(typeof removalRequest.createdAt).toBe('number')
     expect(removalRequest.id).toBeDefined()
   })
+
+  test('RemovalRequest.urgency set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: RemovalRequest.urgency (_owner)
+     * This tests that urgency is properly set when RemovalRequest is created
+     * Dependencies: User entity, RemovalRequest entity, CreateRemovalRequest interaction
+     * Steps: 1) Create target user 2) Create removal request with specific urgency 3) Verify urgency is set correctly
+     * Business Logic: RemovalRequest's creation computation sets urgency from interaction payload
+     */
+
+    // First create a user (needed as target for removal request)
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'urgencyremovaltarget',
+        email: 'urgencyremoval@example.com',
+        password: 'password123',
+        fullName: 'Urgency Removal Target',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID (this will be the target of removal request)
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'urgencyremovaltarget'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const targetUserId = users[0].id
+
+    // Create removal request with a specific urgency
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: 'admin' }, // Requester
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Safety concerns and immediate risk',
+        urgency: 'high'
+      }
+    })
+
+    expect(requestResult.error).toBeUndefined()
+
+    // Find the created RemovalRequest
+    const requests = await system.storage.find('RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Safety concerns and immediate risk'] }),
+      undefined,
+      ['id', 'reason', 'urgency', 'status', 'createdAt']
+    )
+
+    expect(requests.length).toBe(1)
+    const removalRequest = requests[0]
+
+    // Verify the urgency is set correctly by the owner computation
+    expect(removalRequest.urgency).toBe('high')
+    expect(removalRequest.reason).toBe('Safety concerns and immediate risk')
+    expect(removalRequest.status).toBe('pending') // Default status
+    expect(removalRequest.createdAt).toBeDefined()
+    expect(typeof removalRequest.createdAt).toBe('number')
+    expect(removalRequest.id).toBeDefined()
+  })
 }) 
