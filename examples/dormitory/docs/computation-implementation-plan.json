@@ -79,7 +79,7 @@
           ],
           "reasoning": "created-with-parent type - created by parent Interaction computation, not by its own computation",
           "calculationMethod": "Created by system computation when any significant interaction occurs (NOT by AuditLog's own computation)",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 1: 5 entity computation(s)"

@@ -344,4 +344,159 @@ describe('Basic Functionality', () => {
 
     expect(removedAssignments).toHaveLength(0)
   })
+
+  test('AuditLog entity creation via system interactions (_parent:Interaction)', async () => {
+    /**
+     * Test Plan for: AuditLog entity Transform computation
+     * Dependencies: AuditLog entity, User entity, Dormitory entity, various interactions
+     * Steps: 1) Execute CreateUser interaction 2) Execute CreateDormitory interaction 3) Verify AuditLog entries are created for each interaction
+     * Business Logic: AuditLog entity's Transform computation monitors InteractionEventEntity and creates audit records for significant interactions
+     */
+    
+    // Execute CreateUser interaction
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'audituser',
+        email: 'audit@example.com',
+        password: 'password123',
+        fullName: 'Audit User',
+        role: 'student'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    // Execute CreateDormitory interaction
+    const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin' }, 
+      payload: {
+        name: 'Building B Room 202',
+        bedCount: 6,
+        building: 'B',
+        floor: 2
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    
+    // Query created AuditLog entries
+    const auditLogs = await system.storage.find('AuditLog', 
+      undefined,
+      { orderBy: { timestamp: 'asc' } },
+      ['id', 'actionType', 'timestamp', 'details']
+    )
+
+    // Should have audit logs for both CreateUser and CreateDormitory interactions
+    expect(auditLogs.length).toBeGreaterThanOrEqual(2)
+    
+    // Find the CreateUser audit log
+    const createUserAudit = auditLogs.find(log => log.actionType === 'CreateUser')
+    expect(createUserAudit).toBeDefined()
+    expect(createUserAudit.actionType).toBe('CreateUser')
+    expect(createUserAudit.timestamp).toBeGreaterThan(0)
+    expect(createUserAudit.details).toBeDefined()
+    
+    // Parse and verify audit details for CreateUser
+    const createUserDetails = JSON.parse(createUserAudit.details)
+    expect(createUserDetails.userId).toBe('admin')
+    expect(createUserDetails.interaction).toBe('CreateUser')
+    expect(createUserDetails.payload.username).toBe('audituser')
+    expect(createUserDetails.payload.email).toBe('audit@example.com')
+    
+    // Find the CreateDormitory audit log
+    const createDormitoryAudit = auditLogs.find(log => log.actionType === 'CreateDormitory')
+    expect(createDormitoryAudit).toBeDefined()
+    expect(createDormitoryAudit.actionType).toBe('CreateDormitory')
+    expect(createDormitoryAudit.timestamp).toBeGreaterThan(0)
+    expect(createDormitoryAudit.details).toBeDefined()
+    
+    // Parse and verify audit details for CreateDormitory
+    const createDormitoryDetails = JSON.parse(createDormitoryAudit.details)
+    expect(createDormitoryDetails.userId).toBe('admin')
+    expect(createDormitoryDetails.interaction).toBe('CreateDormitory')
+    expect(createDormitoryDetails.payload.name).toBe('Building B Room 202')
+    expect(createDormitoryDetails.payload.bedCount).toBe(6)
+  })
+
+  test('AuditTrackingRelation creation with AuditLog', async () => {
+    /**
+     * Test Plan for: AuditTrackingRelation Transform computation
+     * Dependencies: AuditTrackingRelation, User entity, AuditLog entity, interactions
+     * Steps: 1) Create an admin user 2) Execute interaction with that user 3) Verify AuditTrackingRelation is created linking User to AuditLog
+     * Business Logic: When AuditLog is created through interaction, a relation is created between the acting user and the audit log (only for real User entities)
+     */
+    
+    // First create an admin user that will perform actions
+    const adminResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'system' }, 
+      payload: {
+        username: 'adminuser',
+        email: 'admin@example.com',
+        password: 'password123',
+        fullName: 'Admin User',
+        role: 'admin'
+      }
+    })
+    
+    expect(adminResult.error).toBeUndefined()
+    
+    // Get the created admin user ID
+    const users = await controller.callInteraction('ViewUserList', {
+      user: { id: 'system' },
+      query: {
+        attributeQuery: ['id', 'username', 'role']
+      }
+    })
+    
+    const adminUser = (users.data as any[]).find(u => u.username === 'adminuser')
+    expect(adminUser).toBeDefined()
+    
+    // Now create another user using the actual admin user as the context
+    const targetResult = await controller.callInteraction('CreateUser', {
+      user: { id: adminUser.id }, // Use actual user UUID
+      payload: {
+        username: 'targetuser',
+        email: 'target@example.com',
+        password: 'password123',
+        fullName: 'Target User',
+        role: 'student'
+      }
+    })
+    
+    expect(targetResult.error).toBeUndefined()
+    
+    // Query AuditTrackingRelation using the relation instance name
+    const { AuditTrackingRelation } = await import('../backend')
+    const auditRelations = await system.storage.find(AuditTrackingRelation.name, 
+      MatchExp.atom({ key: 'source.id', value: ['=', adminUser.id] }),
+      undefined,
+      [
+        'id',
+        'timestamp',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'actionType', 'details'] }]
+      ]
+    )
+
+    // Should have at least one audit tracking relation for the admin user
+    expect(auditRelations.length).toBeGreaterThanOrEqual(1)
+    
+    const auditRelation = auditRelations.find(rel => 
+      rel.target.actionType === 'CreateUser'
+    )
+    
+    expect(auditRelation).toBeDefined()
+    expect(auditRelation.source.id).toBe(adminUser.id)
+    expect(auditRelation.source.username).toBe('adminuser')
+    expect(auditRelation.target.actionType).toBe('CreateUser')
+    expect(auditRelation.timestamp).toBeGreaterThan(0)
+    expect(auditRelation.target.details).toBeDefined()
+    
+    // Verify the audit log details contain the correct information
+    const details = JSON.parse(auditRelation.target.details)
+    expect(details.userId).toBe(adminUser.id)
+    expect(details.interaction).toBe('CreateUser')
+    expect(details.payload.username).toBe('targetuser')
+  })
 }) 
