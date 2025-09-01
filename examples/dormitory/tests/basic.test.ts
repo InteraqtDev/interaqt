@@ -1578,4 +1578,66 @@ describe('Basic Functionality', () => {
     expect(dormitory.building).toBe('EAST')
     expect(dormitory.id).toBeDefined()
   })
+
+  test('ScoreEvent.amount is set from payload at creation (_owner)', async () => {
+    /**
+     * Test Plan for: ScoreEvent.amount (_owner)
+     * Dependencies: ScoreEvent entity, User entity, ApplyScoreDeduction interaction
+     * Steps: 1) Create user 2) Apply score deduction 3) Verify ScoreEvent amount is set from interaction payload
+     * Business Logic: _owner properties are controlled by entity creation - amount is set from interaction payload (negative for deductions)
+     */
+
+    // First create a user
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'amounttestuser',
+        email: 'amounttest@example.com',
+        password: 'password123',
+        fullName: 'Amount Test User',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'amounttestuser'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const userId = users[0].id
+
+    // Apply score deduction to create a ScoreEvent
+    const scoreResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        deductionAmount: 30,
+        reason: 'Testing amount property',
+        category: 'test'
+      }
+    })
+
+    expect(scoreResult.error).toBeUndefined()
+
+    // Verify ScoreEvent was created with correct amount from payload
+    const scoreEvents = await system.storage.find('ScoreEvent',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Testing amount property'] }),
+      undefined,
+      ['id', 'amount', 'reason', 'category', 'timestamp']
+    )
+
+    expect(scoreEvents.length).toBe(1)
+    const scoreEvent = scoreEvents[0]
+    
+    // Verify amount is set correctly from payload (negative for deduction)
+    expect(scoreEvent.amount).toBe(-30) // Negative for deduction as per Transform logic
+    expect(scoreEvent.reason).toBe('Testing amount property')
+    expect(scoreEvent.category).toBe('test')
+    expect(scoreEvent.timestamp).toBeDefined()
+    expect(typeof scoreEvent.timestamp).toBe('number')
+    expect(scoreEvent.id).toBeDefined()
+  })
 }) 
