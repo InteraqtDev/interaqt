@@ -1277,3 +1277,18 @@ Dormitory.properties.find(p => p.name === 'occupiedBeds').computation = Count.cr
 Dormitory.properties.find(p => p.name === 'availableBeds').computed = function(dormitory) {
   return (dormitory.bedCount || 0) - (dormitory.occupiedBeds || 0)
 }
+
+// ========= ADD CONDITIONS BELOW THIS LINE (append to file) =========
+// DO NOT modify any code above this line
+// All conditions are added via assignment pattern below
+
+// P001: Only admin can create users
+const isAdministrator = Condition.create({
+  name: 'isAdministrator',
+  content: function(this: Controller, event: any) {
+    return event.user?.role === 'administrator'
+  }
+})
+
+// Assign condition to existing interaction
+CreateUserInteraction.conditions = isAdministrator
