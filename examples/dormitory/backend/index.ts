@@ -70,10 +70,9 @@ export const User = Entity.create({
         return {
           username: event.payload.username,
           email: event.payload.email,
-          role: event.payload.role,
           isActive: true,
           createdAt: Math.floor(Date.now() / 1000)
-          // Note: fullName is now handled by separate StateMachine computation
+          // Note: fullName and role are now handled by separate StateMachine computations
         }
       }
       return null
@@ -739,6 +738,64 @@ const UserFullNameStateMachine = StateMachine.create({
 
 // Assign StateMachine computation to User.fullName property
 User.properties.find(p => p.name === 'fullName').computation = UserFullNameStateMachine
+
+// State nodes for User.role property
+const roleDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    // Handle initial creation and role updates
+    if (event?.interactionName === 'CreateUser') {
+      return event.payload?.role
+    }
+    if (event?.interactionName === 'AssignDormitoryLeader') {
+      // When assigned as dormitory leader, update role to 'dormitory_leader'
+      return 'dormitory_leader'
+    }
+    // Return existing value if no specific event
+    return lastValue
+  }
+})
+
+// StateMachine for User.role property
+const UserRoleStateMachine = StateMachine.create({
+  states: [roleDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: CreateUserInteraction,
+      current: roleDefaultState,
+      next: roleDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the user that was just created
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'username', value: ['=', event.payload?.username] }),
+          undefined,
+          ['id']
+        )
+        
+        return user
+      }
+    }),
+    StateTransfer.create({
+      trigger: AssignDormitoryLeaderInteraction,
+      current: roleDefaultState, 
+      next: roleDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the user being assigned as leader
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload?.userId] }),
+          undefined,
+          ['id']
+        )
+        
+        return user
+      }
+    })
+  ],
+  defaultState: roleDefaultState
+})
+
+// Assign StateMachine computation to User.role property
+User.properties.find(p => p.name === 'role').computation = UserRoleStateMachine
 
 // State nodes for BedAssignmentRelation
 const bedNotAssignedState = StateNode.create({ 

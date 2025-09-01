@@ -262,7 +262,7 @@
           ],
           "reasoning": "independent property with interactionDependencies that can modify it",
           "calculationMethod": "Direct assignment from interactions, can be updated when assigning leadership",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.isActive",

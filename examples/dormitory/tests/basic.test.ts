@@ -1161,4 +1161,87 @@ describe('Basic Functionality', () => {
     expect(user.fullName).toBe('Updated Full Name')
     expect(user.username).toBe('fullnametestuser')
   })
+
+  test('User.role StateMachine computation handles CreateUser and AssignDormitoryLeader', async () => {
+    /**
+     * Test Plan for: User.role StateMachine computation
+     * Dependencies: User entity, Dormitory entity, CreateUser interaction, AssignDormitoryLeader interaction
+     * Steps: 1) Create a User and Dormitory 2) Verify role is set from payload 3) Assign user as dormitory leader 4) Verify role is updated to 'dormitory_leader'
+     * Business Logic: StateMachine handles both creation (CreateUser) and leadership assignment (AssignDormitoryLeader) for role property
+     */
+    
+    // Step 1: Execute CreateUser interaction
+    const createUserResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'roletestuser',
+        email: 'roletest@example.com', 
+        password: 'password123',
+        fullName: 'Role Test User',
+        role: 'student'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(createUserResult).toBeDefined()
+    expect(createUserResult.error).toBeUndefined()
+    
+    // Create a dormitory for leadership assignment
+    const createDormitoryResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Leadership Test Dormitory',
+        bedCount: 4,
+        building: 'L',
+        floor: 1
+      }
+    })
+    
+    expect(createDormitoryResult.error).toBeUndefined()
+    
+    // Step 2: Query the created user to verify role is properly set
+    let user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'roletestuser'] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    expect(user).toBeDefined()
+    expect(user.role).toBe('student')
+    const userId = user.id
+    
+    // Get dormitory ID
+    const dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Leadership Test Dormitory'] }),
+      undefined,
+      ['id', 'name']
+    )
+    
+    expect(dormitory).toBeDefined()
+    const dormitoryId = dormitory.id
+    
+    // Step 3: Execute AssignDormitoryLeader interaction to update role
+    const assignLeaderResult = await controller.callInteraction('AssignDormitoryLeader', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        dormitoryId: dormitoryId
+      }
+    })
+
+    // Verify the assign leader interaction was successful
+    expect(assignLeaderResult).toBeDefined()
+    expect(assignLeaderResult.error).toBeUndefined()
+    
+    // Step 4: Query the user again to verify role was updated
+    user = await system.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', userId] }),
+      undefined,
+      ['id', 'username', 'role']
+    )
+    
+    expect(user).toBeDefined()
+    expect(user.role).toBe('dormitory_leader')
+    expect(user.username).toBe('roletestuser')
+  })
 }) 
