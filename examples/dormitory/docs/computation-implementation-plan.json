@@ -192,7 +192,7 @@
           "interactionDependencies": null,
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "auto-generated",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.username",
