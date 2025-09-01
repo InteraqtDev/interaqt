@@ -58,7 +58,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: false - Transform with InteractionEventEntity",
           "calculationMethod": "Independently created by CreateRemovalRequest interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "AuditLog",

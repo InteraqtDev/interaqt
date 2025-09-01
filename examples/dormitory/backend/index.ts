@@ -197,7 +197,22 @@ export const RemovalRequest = Entity.create({
       name: 'notes',
       type: 'string'
     })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: (event) => {
+      if (event.interactionName === 'CreateRemovalRequest') {
+        return {
+          reason: event.payload.reason,
+          urgency: event.payload.urgency,
+          status: 'pending',
+          createdAt: Math.floor(Date.now() / 1000)
+        }
+      }
+      return null
+    }
+  })
 })
 
 // AuditLog Entity

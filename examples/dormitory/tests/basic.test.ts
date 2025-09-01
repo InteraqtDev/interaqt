@@ -170,4 +170,66 @@ describe('Basic Functionality', () => {
     expect(scoreEvent.timestamp).toBeGreaterThan(0)
     expect(scoreEvent.id).toBeDefined()
   })
+
+  test('RemovalRequest entity creation via CreateRemovalRequest interaction', async () => {
+    /**
+     * Test Plan for: RemovalRequest entity Transform computation
+     * Dependencies: RemovalRequest entity, User entity, CreateRemovalRequest interaction
+     * Steps: 1) Create a user 2) Execute CreateRemovalRequest interaction 3) Verify RemovalRequest is created with correct properties
+     * Business Logic: Transform computation creates RemovalRequest from CreateRemovalRequest interaction with pending status
+     */
+    
+    // First create a user to target for removal
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'targetuser',
+        email: 'target@example.com',
+        password: 'password123',
+        fullName: 'Target User',
+        role: 'student'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    const users = await controller.callInteraction('ViewUserList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'username']
+      }
+    })
+    
+    const targetUserId = users.data[0].id
+    
+    // Execute CreateRemovalRequest interaction
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: 'admin' }, 
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Repeated noise violations after warnings',
+        urgency: 'high'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(requestResult).toBeDefined()
+    expect(requestResult.error).toBeUndefined()
+    
+    // Query created RemovalRequest
+    const removalRequests = await system.storage.find('RemovalRequest', 
+      undefined,
+      undefined,
+      ['id', 'reason', 'urgency', 'status', 'createdAt']
+    )
+
+    expect(removalRequests).toHaveLength(1)
+    
+    const removalRequest = removalRequests[0]
+    expect(removalRequest.reason).toBe('Repeated noise violations after warnings')
+    expect(removalRequest.urgency).toBe('high')
+    expect(removalRequest.status).toBe('pending')
+    expect(removalRequest.createdAt).toBeGreaterThan(0)
+    expect(removalRequest.id).toBeDefined()
+  })
 }) 
