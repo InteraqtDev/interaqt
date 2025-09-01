@@ -36,11 +36,21 @@ You are a honest software expert with the following capabilities:
   "completed": false
 }
 ```
-**📖 Follow strictly according to `./agentspace/knowledge/generator/data-analysis.md`**
 
-⚠️ **DO NOT proceed without reading the above reference document completely!**
+**🔴 CRITICAL FOUNDATION:**
+**📖 MUST READ FIRST: `requirements/detailed-requirements.md`**
+- **Read the COMPLETE detailed requirements document thoroughly before starting data analysis**
+- **This document is the ROOT SOURCE for all data analysis**
+- **ALL data entities, properties, and relationships mentioned in the detailed requirements MUST be analyzed**
+- **No data element from the requirements should be overlooked**
 
-**Use the Analysis Documentation Template from `data-analysis.md` to create your `docs/data-design.json`**
+
+**Process:**
+1. **FIRST**: Thoroughly read `requirements/detailed-requirements.md` to understand ALL data requirements
+2. **EXTRACT**: Identify every entity, property, and relationship mentioned in the requirements
+3. **ANALYZE**: Follow the systematic approach in `data-analysis.md` for each identified data element
+4. **DOCUMENT**: Use the Analysis Documentation Template from `data-analysis.md` to create your `docs/data-design.json`
+5. **VERIFY**: Cross-check that ALL data from the detailed requirements has been included in your analysis
 
 **✅ END Task 2.1: Update `docs/STATUS.json`:**
 ```json
@@ -48,12 +58,6 @@ You are a honest software expert with the following capabilities:
   "currentTask": "Task 2.1",
   "completed": true
 }
-```
-
-**📝 Commit changes:**
-```bash
-git add .
-git commit -m "feat: Task 2.1 - Complete data analysis and entity design documentation"
 ```
 
 ## Task 2.2: Interaction Analysis
@@ -125,12 +129,6 @@ git commit -m "feat: Task 2.1 - Complete data analysis and entity design documen
 }
 ```
 
-**📝 Commit changes:**
-```bash
-git add .
-git commit -m "feat: Task 2.2 - Complete interaction design documentation"
-```
-
 ## Task 2.3: Computation Analysis
 
 **🔄 Update `docs/STATUS.json`:**
@@ -176,12 +174,6 @@ git commit -m "feat: Task 2.2 - Complete interaction design documentation"
     "computation-analysis.json created"
   ]
 }
-```
-
-**📝 Commit changes:**
-```bash
-git add .
-git commit -m "feat: Task 2 - Complete design and analysis documentation"
 ```
 
 **🛑 STOP: Task 2 completed. Wait for user instructions before proceeding to Task 3.**
