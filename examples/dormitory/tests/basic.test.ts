@@ -2331,4 +2331,78 @@ describe('Basic Functionality', () => {
     expect(processedRequest.processedAt).toBeGreaterThanOrEqual(beforeProcessTime)
     expect(processedRequest.processedAt).toBeLessThanOrEqual(afterProcessTime)
   })
+
+  test('RemovalRequest.notes StateMachine computation', async () => {
+    /**
+     * Test Plan for: RemovalRequest.notes
+     * Dependencies: RemovalRequest entity, ProcessRemovalRequest interaction
+     * Steps: 1) Create removal request 2) Process request with notes 3) Verify notes are set
+     * Business Logic: Notes are set from ProcessRemovalRequest interaction payload
+     */
+    
+    // Create test users first
+    const testUser = await system.storage.create('User', {
+      username: 'testuser',
+      email: 'test@example.com',
+      fullName: 'Test User',
+      role: 'student',
+      isActive: true
+    })
+    
+    const targetUser = await system.storage.create('User', {
+      username: 'targetuser', 
+      email: 'target@example.com',
+      fullName: 'Target User',
+      role: 'student',
+      isActive: true
+    })
+
+    // Create removal request
+    const createResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: testUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Disciplinary action required',
+        urgency: 'high'
+      }
+    })
+
+    expect(createResult.error).toBeUndefined()
+
+    // Find the created removal request
+    const createdRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Disciplinary action required'] }),
+      undefined,
+      ['id', 'status', 'notes']
+    )
+
+    expect(createdRequest).toBeTruthy()
+    expect(createdRequest.status).toBe('pending')
+    expect(createdRequest.notes).toBeUndefined() // Initially no notes (StateMachine hasn't run yet)
+
+    // Process the request with notes
+    const processResult = await controller.callInteraction('ProcessRemovalRequest', {
+      user: testUser,
+      payload: {
+        requestId: createdRequest.id,
+        decision: 'approved',
+        notes: 'Approved after review. User will be relocated to different facility.'
+      }
+    })
+
+    expect(processResult.error).toBeUndefined()
+
+    // Verify notes were set
+    const processedRequest = await system.storage.findOne(
+      'RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', createdRequest.id] }),
+      undefined,
+      ['id', 'status', 'notes', 'processedAt']
+    )
+
+    expect(processedRequest.status).toBe('approved')
+    expect(processedRequest.notes).toBe('Approved after review. User will be relocated to different facility.')
+    expect(processedRequest.processedAt).toBeGreaterThan(0)
+  })
 }) 

@@ -1224,3 +1224,42 @@ const RemovalRequestProcessedAtStateMachine = StateMachine.create({
 
 // Assign StateMachine computation to RemovalRequest.processedAt property
 RemovalRequest.properties.find(p => p.name === 'processedAt').computation = RemovalRequestProcessedAtStateMachine
+
+// State nodes for RemovalRequest.notes property
+const notesDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    // Set notes from ProcessRemovalRequest interaction payload
+    if (event && event.interactionName === 'ProcessRemovalRequest') {
+      return event.payload?.notes || lastValue
+    }
+    // Keep existing value
+    return lastValue || null
+  }
+})
+
+// StateMachine for RemovalRequest.notes property
+const RemovalRequestNotesStateMachine = StateMachine.create({
+  states: [notesDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: notesDefaultState,
+      next: notesDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the removal request being processed
+        const removalRequest = await this.system.storage.findOne('RemovalRequest',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload?.requestId] }),
+          undefined,
+          ['id']
+        )
+        
+        return removalRequest
+      }
+    })
+  ],
+  defaultState: notesDefaultState
+})
+
+// Assign StateMachine computation to RemovalRequest.notes property
+RemovalRequest.properties.find(p => p.name === 'notes').computation = RemovalRequestNotesStateMachine

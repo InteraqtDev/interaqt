@@ -582,7 +582,7 @@
           ],
           "reasoning": "independent property with interactionDependencies that can modify it",
           "calculationMethod": "Set from interaction payload when processing",
-          "completed": false
+          "completed": true
         },
         {
           "id": "AuditLog.id",
