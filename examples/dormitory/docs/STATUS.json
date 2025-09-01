@@ -1,5 +1,4 @@
 {
   "currentTask": "Task 1.0",
-  "completed": true,
-  "completedItems": ["goal-clarification.md reviewed and validated"]
+  "completed": true
 }
