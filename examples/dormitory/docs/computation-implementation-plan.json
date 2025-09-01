@@ -16,7 +16,7 @@
           ],
           "reasoning": "interaction-created with soft-delete capability - Transform for creation + status property with StateMachine for soft deletion",
           "calculationMethod": "Independently created by CreateUser interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory",

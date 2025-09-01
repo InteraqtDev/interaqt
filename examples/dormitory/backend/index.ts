@@ -20,7 +20,8 @@ import {
   StateNode,
   StateTransfer,
   MatchExp,
-  GetAction
+  GetAction,
+  InteractionEventEntity
 } from 'interaqt'
 
 // ==================== ENTITIES ====================
@@ -60,7 +61,24 @@ export const User = Entity.create({
       type: 'number',
       defaultValue: () => Math.floor(Date.now() / 1000)
     })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: (event) => {
+      if (event.interactionName === 'CreateUser') {
+        return {
+          username: event.payload.username,
+          email: event.payload.email,
+          fullName: event.payload.fullName,
+          role: event.payload.role,
+          isActive: true,
+          createdAt: Math.floor(Date.now() / 1000)
+        }
+      }
+      return null
+    }
+  })
 })
 
 // Dormitory Entity
