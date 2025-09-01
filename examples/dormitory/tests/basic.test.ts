@@ -1901,4 +1901,66 @@ describe('Basic Functionality', () => {
     expect(typeof scoreEvent.timestamp).toBe('number')
     expect(scoreEvent.id).toBeDefined()
   })
+
+  test('RemovalRequest.reason set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: RemovalRequest.reason (_owner)
+     * This tests that reason is properly set when RemovalRequest is created
+     * Dependencies: User entity, RemovalRequest entity, CreateRemovalRequest interaction
+     * Steps: 1) Create target user 2) Create removal request with specific reason 3) Verify reason is set correctly
+     * Business Logic: RemovalRequest's creation computation sets reason from interaction payload
+     */
+
+    // First create a user (needed as target for removal request)
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'reasonremovaltarget',
+        email: 'reasonremoval@example.com',
+        password: 'password123',
+        fullName: 'Reason Removal Target',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID (this will be the target of removal request)
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'reasonremovaltarget'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const targetUserId = users[0].id
+
+    // Create removal request with a specific reason
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: 'admin' }, // Requester
+      payload: {
+        targetUserId: targetUserId,
+        reason: 'Persistent disruptive behavior and policy violations',
+        urgency: 'medium'
+      }
+    })
+
+    expect(requestResult.error).toBeUndefined()
+
+    // Find the created RemovalRequest
+    const requests = await system.storage.find('RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Persistent disruptive behavior and policy violations'] }),
+      undefined,
+      ['id', 'reason', 'urgency', 'status', 'createdAt']
+    )
+
+    expect(requests.length).toBe(1)
+    const removalRequest = requests[0]
+
+    // Verify the reason is set correctly by the owner computation
+    expect(removalRequest.reason).toBe('Persistent disruptive behavior and policy violations')
+    expect(removalRequest.urgency).toBe('medium')
+    expect(removalRequest.status).toBe('pending') // Default status
+    expect(removalRequest.createdAt).toBeDefined()
+    expect(typeof removalRequest.createdAt).toBe('number')
+    expect(removalRequest.id).toBeDefined()
+  })
 }) 

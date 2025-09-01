@@ -496,7 +496,7 @@
           ],
           "reasoning": "creation-only properties are controlled by entity creation",
           "calculationMethod": "Set at creation from interaction payload",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.urgency",
