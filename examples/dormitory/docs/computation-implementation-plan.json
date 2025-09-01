@@ -136,7 +136,7 @@
           ],
           "reasoning": "created-with-entity type - created by parent ScoreEvent entity's computation",
           "calculationMethod": "Created together with ScoreEvent entity by ApplyScoreDeduction interaction",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequestingRelation",

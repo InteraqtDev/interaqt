@@ -848,3 +848,33 @@ AuditTrackingRelation.computation = Transform.create({
     return null
   }
 })
+
+// Add Transform computation for UserScoringRelation
+// This creates the relation between User and ScoreEvent when ScoreEvent entities are created
+UserScoringRelation.computation = Transform.create({
+  record: InteractionEventEntity,
+  attributeQuery: ['interactionName', 'payload', 'user'],
+  callback: async function(this, event) {
+    if (event.interactionName === 'ApplyScoreDeduction') {
+      // Find the corresponding ScoreEvent that was created by this interaction
+      const scoreEvents = await this.system.storage.find('ScoreEvent',
+        MatchExp.atom({ key: 'reason', value: ['=', event.payload.reason] })
+          .and({ key: 'category', value: ['=', event.payload.category] })
+          .and({ key: 'amount', value: ['=', -(event.payload.deductionAmount)] }),
+        { limit: 1, orderBy: { timestamp: 'desc' } },
+        ['id', 'timestamp']
+      )
+      
+      if (scoreEvents.length > 0 && event.payload.userId) {
+        const scoreEvent = scoreEvents[0]
+        return {
+          source: { id: event.payload.userId },
+          target: { id: scoreEvent.id },
+          createdAt: Math.floor(Date.now() / 1000)
+        }
+      }
+    }
+    
+    return null
+  }
+})

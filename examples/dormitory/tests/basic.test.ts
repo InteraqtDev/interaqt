@@ -638,4 +638,91 @@ describe('Basic Functionality', () => {
     expect(finalLeadershipRelations).toHaveLength(1)
     expect(finalLeadershipRelations[0].source.username).toBe('leader1') // Original leader remains
   })
+
+  test('UserScoringRelation creation with ScoreEvent (_parent:ScoreEvent)', async () => {
+    /**
+     * Test Plan for: UserScoringRelation Transform computation
+     * Dependencies: UserScoringRelation, User entity, ScoreEvent entity, ApplyScoreDeduction interaction
+     * Steps: 1) Create a user 2) Execute ApplyScoreDeduction interaction 3) Verify UserScoringRelation is created linking User to ScoreEvent
+     * Business Logic: When ScoreEvent is created through ApplyScoreDeduction interaction, a relation is created between the affected user and the score event
+     */
+    
+    // First create a user to apply score deduction to
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'scoreduser',
+        email: 'scored@example.com',
+        password: 'password123',
+        fullName: 'Scored User',
+        role: 'student'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID
+    const users = await controller.callInteraction('ViewUserList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'username']
+      }
+    })
+    
+    const userId = users.data[0].id
+    
+    // Execute ApplyScoreDeduction interaction
+    const deductionResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: 'admin' }, 
+      payload: {
+        userId: userId,
+        deductionAmount: 20,
+        reason: 'Missed mandatory meeting',
+        category: 'attendance'
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(deductionResult).toBeDefined()
+    expect(deductionResult.error).toBeUndefined()
+    
+    // Query created ScoreEvent to get its ID
+    const scoreEvents = await system.storage.find('ScoreEvent', 
+      undefined,
+      { orderBy: { timestamp: 'desc' }, limit: 1 },
+      ['id', 'amount', 'reason', 'category', 'timestamp']
+    )
+
+    expect(scoreEvents).toHaveLength(1)
+    
+    const scoreEvent = scoreEvents[0]
+    expect(scoreEvent.amount).toBe(-20) // Negative for deduction
+    expect(scoreEvent.reason).toBe('Missed mandatory meeting')
+    expect(scoreEvent.category).toBe('attendance')
+    
+    // Query UserScoringRelation using the relation instance name
+    const { UserScoringRelation } = await import('../backend')
+    const scoringRelations = await system.storage.find(UserScoringRelation.name, 
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] })
+        .and({ key: 'target.id', value: ['=', scoreEvent.id] }),
+      undefined,
+      [
+        'id',
+        'createdAt',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'amount', 'reason'] }]
+      ]
+    )
+
+    expect(scoringRelations).toHaveLength(1)
+    
+    const scoringRelation = scoringRelations[0]
+    expect(scoringRelation.source.id).toBe(userId)
+    expect(scoringRelation.source.username).toBe('scoreduser')
+    expect(scoringRelation.target.id).toBe(scoreEvent.id)
+    expect(scoringRelation.target.amount).toBe(-20)
+    expect(scoringRelation.target.reason).toBe('Missed mandatory meeting')
+    expect(scoringRelation.createdAt).toBeGreaterThan(0)
+    expect(scoringRelation.id).toBeDefined()
+  })
 }) 
