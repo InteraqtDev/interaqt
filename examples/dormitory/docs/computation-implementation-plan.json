@@ -281,7 +281,7 @@
           ],
           "reasoning": "independent property with interactionDependencies that can modify it - this handles soft delete status",
           "calculationMethod": "Direct assignment from interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.createdAt",

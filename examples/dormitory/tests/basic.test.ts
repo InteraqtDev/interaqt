@@ -66,6 +66,36 @@ describe('Basic Functionality', () => {
     expect(user.currentScore).toBe(100) // Default value
   })
 
+  test('User.isActive StateMachine computation sets active status correctly', async () => {
+    /**
+     * Test Plan for: User.isActive
+     * Dependencies: User entity, CreateUser interaction  
+     * Steps: 1) Create user 2) Verify isActive is set to true by StateMachine
+     * Business Logic: StateMachine handles soft delete status - users are active when created
+     */
+    const result = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'activeuser',
+        email: 'active@test.com',
+        password: 'testpass',
+        fullName: 'Active User',
+        role: 'student'
+      }
+    })
+
+    expect(result.error).toBeUndefined()
+    
+    const user = await system.storage.findOne(
+      'User',
+      MatchExp.atom({ key: 'username', value: ['=', 'activeuser'] }),
+      undefined,
+      ['id', 'isActive']
+    )
+
+    expect(user.isActive).toBe(true)
+  })
+
   test('Dormitory entity creation via CreateDormitory interaction', async () => {
     /**
      * Test Plan for: Dormitory entity Transform computation

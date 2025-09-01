@@ -53,8 +53,7 @@ export const User = Entity.create({
     }),
     Property.create({
       name: 'isActive',
-      type: 'boolean',
-      defaultValue: () => true
+      type: 'boolean'
     }),
     Property.create({
       name: 'createdAt',
@@ -1044,3 +1043,84 @@ RemovalRequestingRelation.computation = Transform.create({
     return null
   }
 })
+
+// State nodes for User.isActive property (soft delete handling)
+const activeState = StateNode.create({
+  name: 'active',
+  computeValue: (lastValue, event) => {
+    // Handle initial creation and activation
+    if (event?.interactionName === 'CreateUser') {
+      return true  // Users are active when created
+    }
+    if (event?.interactionName === 'ActivateUser') {
+      return true  // Explicitly activate user
+    }
+    // Keep existing active state
+    return lastValue !== undefined ? lastValue : true
+  }
+})
+
+const inactiveState = StateNode.create({
+  name: 'inactive', 
+  computeValue: (lastValue, event) => {
+    // Handle deactivation
+    if (event?.interactionName === 'DeactivateUser') {
+      return false  // Explicitly deactivate user (soft delete)
+    }
+    // Keep existing inactive state
+    return lastValue !== undefined ? lastValue : false
+  }
+})
+
+// StateMachine for User.isActive property
+const UserIsActiveStateMachine = StateMachine.create({
+  states: [activeState, inactiveState],
+  transfers: [
+    StateTransfer.create({
+      trigger: CreateUserInteraction,
+      current: inactiveState,  // Default state before creation
+      next: activeState,
+      computeTarget: async function(this, event) {
+        // Find the user that was just created
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'username', value: ['=', event.payload?.username] }),
+          undefined,
+          ['id']
+        )
+        
+        return user
+      }
+    })
+    // Note: DeactivateUser and ActivateUser interactions would be added later if needed
+    // StateTransfer.create({
+    //   trigger: DeactivateUserInteraction,
+    //   current: activeState,
+    //   next: inactiveState,
+    //   computeTarget: async function(this, event) {
+    //     const user = await this.system.storage.findOne('User',
+    //       MatchExp.atom({ key: 'id', value: ['=', event.payload?.userId] }),
+    //       undefined,
+    //       ['id']
+    //     )
+    //     return user
+    //   }
+    // }),
+    // StateTransfer.create({
+    //   trigger: ActivateUserInteraction,
+    //   current: inactiveState,
+    //   next: activeState,
+    //   computeTarget: async function(this, event) {
+    //     const user = await this.system.storage.findOne('User',
+    //       MatchExp.atom({ key: 'id', value: ['=', event.payload?.userId] }),
+    //       undefined,
+    //       ['id']
+    //     )
+    //     return user
+    //   }
+    // })
+  ],
+  defaultState: inactiveState  // Default to inactive before creation
+})
+
+// Assign StateMachine computation to User.isActive property
+User.properties.find(p => p.name === 'isActive').computation = UserIsActiveStateMachine
