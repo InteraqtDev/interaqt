@@ -751,6 +751,66 @@ const BedAssignmentStateMachine = StateMachine.create({
 // Assign StateMachine computation to BedAssignmentRelation
 BedAssignmentRelation.computation = BedAssignmentStateMachine
 
+// State nodes for DormitoryLeadershipRelation
+const leaderNotAssignedState = StateNode.create({ 
+  name: 'notAssigned',
+  computeValue: () => null  // No relation exists
+})
+
+const leaderAssignedState = StateNode.create({ 
+  name: 'assigned',
+  computeValue: (lastValue, event) => ({
+    assignedAt: Math.floor(Date.now() / 1000)
+  })
+})
+
+// StateMachine for DormitoryLeadershipRelation
+const DormitoryLeadershipStateMachine = StateMachine.create({
+  states: [leaderNotAssignedState, leaderAssignedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignDormitoryLeaderInteraction,
+      current: leaderNotAssignedState,
+      next: leaderAssignedState,
+      computeTarget: async function(this, event) {
+        // Find the user and check if they can be a leader
+        const user = await this.system.storage.findOne('User',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+          undefined,
+          ['id', 'role', 'isActive']
+        )
+        
+        const dormitory = await this.system.storage.findOne('Dormitory',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload.dormitoryId] }),
+          undefined,
+          ['id']
+        )
+        
+        // Check if dormitory already has a leader
+        const existingLeader = await this.system.storage.findOneRelationByName(DormitoryLeadershipRelation.name,
+          MatchExp.atom({ key: 'target.id', value: ['=', event.payload.dormitoryId] }),
+          undefined,
+          ['id']
+        )
+        
+        // Can assign if user is active, dormitory exists, and no current leader
+        if (user?.isActive && dormitory && !existingLeader) {
+          return {
+            source: { id: user.id },
+            target: { id: dormitory.id }
+          }
+        }
+        
+        return null  // Don't create relation if conditions not met
+      }
+    })
+  ],
+  defaultState: leaderNotAssignedState
+})
+
+// Assign StateMachine computation to DormitoryLeadershipRelation
+DormitoryLeadershipRelation.computation = DormitoryLeadershipStateMachine
+
 // Add Transform computation for AuditTrackingRelation
 // This creates the relation between User and AuditLog when AuditLog entities exist
 AuditTrackingRelation.computation = Transform.create({

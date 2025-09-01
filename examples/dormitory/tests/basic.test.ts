@@ -499,4 +499,143 @@ describe('Basic Functionality', () => {
     expect(details.interaction).toBe('CreateUser')
     expect(details.payload.username).toBe('targetuser')
   })
+
+  test('DormitoryLeadershipRelation StateMachine computation', async () => {
+    /**
+     * Test Plan for: DormitoryLeadershipRelation StateMachine computation
+     * Dependencies: DormitoryLeadershipRelation, User, Dormitory, AssignDormitoryLeader interaction
+     * Steps: 1) Create user and dormitory 2) Execute AssignDormitoryLeader interaction 3) Verify relation is created 4) Test that second leader assignment is rejected
+     * Business Logic: StateMachine creates relation when user is active and dormitory has no current leader
+     */
+    
+    // Create a user who will be the leader
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'leader1',
+        email: 'leader1@example.com',
+        password: 'password123',
+        fullName: 'Leader One',
+        role: 'student'
+      }
+    })
+    
+    expect(userResult.error).toBeUndefined()
+    
+    // Create a dormitory
+    const dormitoryResult = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin' }, 
+      payload: {
+        name: 'Building C Room 301',
+        bedCount: 4,
+        building: 'C',
+        floor: 3
+      }
+    })
+    
+    expect(dormitoryResult.error).toBeUndefined()
+    
+    // Get the created user and dormitory IDs
+    const users = await controller.callInteraction('ViewUserList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'username', 'isActive', 'role']
+      }
+    })
+    
+    const dormitories = await controller.callInteraction('ViewDormitoryList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'name']
+      }
+    })
+    
+    const userId = users.data[0].id
+    const dormitoryId = dormitories.data[0].id
+    
+    // Execute AssignDormitoryLeader interaction to create relation
+    const assignResult = await controller.callInteraction('AssignDormitoryLeader', {
+      user: { id: 'admin' }, 
+      payload: {
+        userId: userId,
+        dormitoryId: dormitoryId
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(assignResult).toBeDefined()
+    expect(assignResult.error).toBeUndefined()
+    
+    // Query created DormitoryLeadershipRelation using the relation instance name
+    const { DormitoryLeadershipRelation } = await import('../backend')
+    const leadershipRelations = await system.storage.find(DormitoryLeadershipRelation.name, 
+      MatchExp.atom({ key: 'source.id', value: ['=', userId] }),
+      undefined,
+      [
+        'id',
+        'assignedAt',
+        ['source', { attributeQuery: ['id', 'username'] }],
+        ['target', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+
+    expect(leadershipRelations).toHaveLength(1)
+    
+    const leadershipRelation = leadershipRelations[0]
+    expect(leadershipRelation.assignedAt).toBeGreaterThan(0)
+    expect(leadershipRelation.source.id).toBe(userId)
+    expect(leadershipRelation.target.id).toBe(dormitoryId)
+    expect(leadershipRelation.id).toBeDefined()
+
+    // Test that a second leader assignment to the same dormitory is rejected
+    // Create another user
+    const secondUserResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' }, 
+      payload: {
+        username: 'leader2',
+        email: 'leader2@example.com',
+        password: 'password123',
+        fullName: 'Leader Two',
+        role: 'student'
+      }
+    })
+    
+    expect(secondUserResult.error).toBeUndefined()
+    
+    // Get the second user ID
+    const updatedUsers = await controller.callInteraction('ViewUserList', {
+      user: { id: 'admin' },
+      query: {
+        attributeQuery: ['id', 'username']
+      }
+    })
+    
+    const secondUserId = (updatedUsers.data as any[]).find(u => u.username === 'leader2').id
+    
+    // Try to assign second leader to same dormitory - should fail
+    const secondAssignResult = await controller.callInteraction('AssignDormitoryLeader', {
+      user: { id: 'admin' }, 
+      payload: {
+        userId: secondUserId,
+        dormitoryId: dormitoryId
+      }
+    })
+
+    // This should succeed as an interaction but not create a relation due to StateMachine logic
+    expect(secondAssignResult).toBeDefined()
+    expect(secondAssignResult.error).toBeUndefined()
+    
+    // Verify that there's still only one leadership relation for the dormitory
+    const finalLeadershipRelations = await system.storage.find(DormitoryLeadershipRelation.name, 
+      MatchExp.atom({ key: 'target.id', value: ['=', dormitoryId] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'username'] }]
+      ]
+    )
+
+    expect(finalLeadershipRelations).toHaveLength(1)
+    expect(finalLeadershipRelations[0].source.username).toBe('leader1') // Original leader remains
+  })
 }) 

@@ -119,7 +119,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: true and hard-delete - StateMachine handles both creation and deletion",
           "calculationMethod": "Independently created by AssignDormitoryLeader when User.role can be updated to dormitory_leader and Dormitory has no current leader",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserScoringRelation",
