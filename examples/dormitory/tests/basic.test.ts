@@ -2025,4 +2025,163 @@ describe('Basic Functionality', () => {
     expect(typeof removalRequest.createdAt).toBe('number')
     expect(removalRequest.id).toBeDefined()
   })
+
+  test('RemovalRequest.status transitions correctly via StateMachine', async () => {
+    /**
+     * Test Plan for: RemovalRequest.status (StateMachine type)
+     * Dependencies: User entity, RemovalRequest entity, CreateRemovalRequest, ProcessRemovalRequest interactions
+     * Steps: 1) Create users 2) Create removal request 3) Verify status is pending 4) Process request with approval 5) Verify status changes to approved 6) Create another request and reject it 7) Verify status changes to rejected
+     * Business Logic: RemovalRequest status transitions from pending -> approved/rejected based on ProcessRemovalRequest decision
+     */
+
+    // First create users
+    const userResult1 = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'targetuser',
+        email: 'target@example.com',
+        password: 'password123',
+        fullName: 'Target User',
+        role: 'student'
+      }
+    })
+
+    const userResult2 = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'requesteruser',
+        email: 'requester@example.com',
+        password: 'password123',
+        fullName: 'Requester User',
+        role: 'dormitory_leader'
+      }
+    })
+
+    expect(userResult1.error).toBeUndefined()
+    expect(userResult2.error).toBeUndefined()
+    
+    // Get the created user IDs
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['in', ['targetuser', 'requesteruser']] }),
+      undefined,
+      ['id', 'username']
+    )
+    
+    const targetUser = users.find(u => u.username === 'targetuser')
+    const requesterUser = users.find(u => u.username === 'requesteruser')
+
+    // Create removal request
+    const requestResult = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: requesterUser.id },
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Repeated violations',
+        urgency: 'high'
+      }
+    })
+
+    expect(requestResult.error).toBeUndefined()
+
+    // Find the created RemovalRequest
+    const removalRequests = await system.storage.find('RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Repeated violations'] }),
+      undefined,
+      ['id', 'reason', 'urgency', 'status', 'createdAt']
+    )
+
+    expect(removalRequests.length).toBe(1)
+    const removalRequest = removalRequests[0]
+    
+    // Verify status is initially pending
+    expect(removalRequest.status).toBe('pending')
+    expect(removalRequest.reason).toBe('Repeated violations')
+    expect(removalRequest.urgency).toBe('high')
+
+    // Process the request with approval
+    const approvalResult = await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: 'admin' },
+      payload: {
+        requestId: removalRequest.id,
+        decision: 'approved',
+        notes: 'Valid reason for removal'
+      }
+    })
+
+    expect(approvalResult.error).toBeUndefined()
+
+    // Verify status changed to approved
+    const approvedRequest = await system.storage.findOne('RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', removalRequest.id] }),
+      undefined,
+      ['id', 'status', 'processedAt', 'notes']
+    )
+
+    expect(approvedRequest.status).toBe('approved')
+
+    // Create another removal request to test rejection
+    const userResult3 = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'anothertarget',
+        email: 'another@example.com',
+        password: 'password123',
+        fullName: 'Another Target',
+        role: 'student'
+      }
+    })
+
+    expect(userResult3.error).toBeUndefined()
+
+    const anotherUsers = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'anothertarget'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const anotherTargetUser = anotherUsers[0]
+
+    const requestResult2 = await controller.callInteraction('CreateRemovalRequest', {
+      user: { id: requesterUser.id },
+      payload: {
+        targetUserId: anotherTargetUser.id,
+        reason: 'Minor issue',
+        urgency: 'low'
+      }
+    })
+
+    expect(requestResult2.error).toBeUndefined()
+
+    // Find the second removal request
+    const removalRequests2 = await system.storage.find('RemovalRequest',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Minor issue'] }),
+      undefined,
+      ['id', 'reason', 'status']
+    )
+
+    expect(removalRequests2.length).toBe(1)
+    const removalRequest2 = removalRequests2[0]
+    
+    // Verify status is initially pending
+    expect(removalRequest2.status).toBe('pending')
+
+    // Process the request with rejection
+    const rejectionResult = await controller.callInteraction('ProcessRemovalRequest', {
+      user: { id: 'admin' },
+      payload: {
+        requestId: removalRequest2.id,
+        decision: 'rejected',
+        notes: 'Insufficient evidence'
+      }
+    })
+
+    expect(rejectionResult.error).toBeUndefined()
+
+    // Verify status changed to rejected
+    const rejectedRequest = await system.storage.findOne('RemovalRequest',
+      MatchExp.atom({ key: 'id', value: ['=', removalRequest2.id] }),
+      undefined,
+      ['id', 'status', 'processedAt', 'notes']
+    )
+
+    expect(rejectedRequest.status).toBe('rejected')
+  })
 }) 

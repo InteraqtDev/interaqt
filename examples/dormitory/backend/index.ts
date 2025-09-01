@@ -178,8 +178,7 @@ export const RemovalRequest = Entity.create({
     }),
     Property.create({
       name: 'status',
-      type: 'string',
-      defaultValue: () => 'pending'
+      type: 'string'
     }),
     Property.create({
       name: 'createdAt',
@@ -1123,3 +1122,67 @@ const UserIsActiveStateMachine = StateMachine.create({
 
 // Assign StateMachine computation to User.isActive property
 User.properties.find(p => p.name === 'isActive').computation = UserIsActiveStateMachine
+
+// State nodes for RemovalRequest.status property
+const statusDefaultState = StateNode.create({
+  name: 'default',
+  computeValue: (lastValue, event) => {
+    // Handle initial creation
+    if (event?.interactionName === 'CreateRemovalRequest') {
+      return 'pending'  // All removal requests start as pending
+    }
+    // Handle status updates through ProcessRemovalRequest
+    if (event?.interactionName === 'ProcessRemovalRequest') {
+      if (event.payload?.decision === 'approved') {
+        return 'approved'
+      }
+      if (event.payload?.decision === 'rejected') {
+        return 'rejected'
+      }
+    }
+    // Keep existing value
+    return lastValue || 'pending'
+  }
+})
+
+// StateMachine for RemovalRequest.status property
+const RemovalRequestStatusStateMachine = StateMachine.create({
+  states: [statusDefaultState],
+  transfers: [
+    StateTransfer.create({
+      trigger: CreateRemovalRequestInteraction,
+      current: statusDefaultState,
+      next: statusDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the removal request that was just created
+        const removalRequest = await this.system.storage.findOne('RemovalRequest',
+          MatchExp.atom({ key: 'reason', value: ['=', event.payload?.reason] })
+            .and({ key: 'urgency', value: ['=', event.payload?.urgency] }),
+          undefined,
+          ['id']
+        )
+        
+        return removalRequest
+      }
+    }),
+    StateTransfer.create({
+      trigger: ProcessRemovalRequestInteraction,
+      current: statusDefaultState,
+      next: statusDefaultState,
+      computeTarget: async function(this, event) {
+        // Find the removal request being processed
+        const removalRequest = await this.system.storage.findOne('RemovalRequest',
+          MatchExp.atom({ key: 'id', value: ['=', event.payload?.requestId] }),
+          undefined,
+          ['id']
+        )
+        
+        return removalRequest
+      }
+    })
+  ],
+  defaultState: statusDefaultState
+})
+
+// Assign StateMachine computation to RemovalRequest.status property
+RemovalRequest.properties.find(p => p.name === 'status').computation = RemovalRequestStatusStateMachine

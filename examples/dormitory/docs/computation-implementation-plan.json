@@ -531,7 +531,7 @@
           ],
           "reasoning": "independent property with interactionDependencies that can modify it - status transitions",
           "calculationMethod": "Set to 'pending' at creation, updated by ProcessRemovalRequest",
-          "completed": false
+          "completed": true
         },
         {
           "id": "RemovalRequest.createdAt",
