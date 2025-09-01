@@ -95,6 +95,68 @@ describe('Basic Functionality', () => {
     expect(typeof scoreEvent.timestamp).toBe('number')
   })
 
+  test('ScoreEvent.reason set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: ScoreEvent.reason (_owner)
+     * This tests that reason is properly set when ScoreEvent is created
+     * Dependencies: User entity, ScoreEvent entity, ApplyScoreDeduction interaction
+     * Steps: 1) Create user 2) Apply score deduction with specific reason 3) Verify reason is set correctly
+     * Business Logic: ScoreEvent's creation computation sets reason from interaction payload
+     */
+
+    // First create a user
+    const userResult = await controller.callInteraction('CreateUser', {
+      user: { id: 'admin' },
+      payload: {
+        username: 'reasontestuser',
+        email: 'reasontest@example.com',
+        password: 'password123',
+        fullName: 'Reason Test User',
+        role: 'student'
+      }
+    })
+
+    expect(userResult.error).toBeUndefined()
+    
+    // Get the created user ID
+    const users = await system.storage.find('User',
+      MatchExp.atom({ key: 'username', value: ['=', 'reasontestuser'] }),
+      undefined,
+      ['id', 'username']
+    )
+    const userId = users[0].id
+
+    // Apply score deduction with a specific reason
+    const deductionResult = await controller.callInteraction('ApplyScoreDeduction', {
+      user: { id: 'admin' },
+      payload: {
+        userId: userId,
+        deductionAmount: 15,
+        reason: 'Unauthorized guest access',
+        category: 'Security'
+      }
+    })
+
+    expect(deductionResult.error).toBeUndefined()
+
+    // Find the created ScoreEvent
+    const scoreEvents = await system.storage.find('ScoreEvent',
+      MatchExp.atom({ key: 'reason', value: ['=', 'Unauthorized guest access'] }),
+      undefined,
+      ['id', 'amount', 'reason', 'category', 'timestamp']
+    )
+
+    expect(scoreEvents.length).toBe(1)
+    const scoreEvent = scoreEvents[0]
+
+    // Verify the reason is set correctly by the owner computation
+    expect(scoreEvent.reason).toBe('Unauthorized guest access')
+    expect(scoreEvent.category).toBe('Security')
+    expect(scoreEvent.amount).toBe(-15) // Negative for deduction
+    expect(scoreEvent.timestamp).toBeDefined()
+    expect(typeof scoreEvent.timestamp).toBe('number')
+  })
+
   test('User entity creation via CreateUser interaction', async () => {
     // Execute CreateUser interaction
     const result = await controller.callInteraction('CreateUser', {
