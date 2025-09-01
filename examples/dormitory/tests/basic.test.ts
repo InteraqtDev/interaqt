@@ -1398,4 +1398,42 @@ describe('Basic Functionality', () => {
     expect(dormitory.floor).toBe(3)
     expect(dormitory.id).toBeDefined()
   })
+
+  test('Dormitory.bedCount is set from payload at creation (_owner)', async () => {
+    /**
+     * Test Plan for: Dormitory.bedCount (_owner)
+     * This tests that Dormitory.bedCount is properly set from payload when Dormitory is created
+     * Steps: 1) Create a Dormitory via CreateDormitory interaction 2) Verify bedCount is set from payload
+     * Business Logic: _owner properties are controlled by entity creation - bedCount is set from interaction payload
+     */
+    
+    // Execute CreateDormitory interaction with specific bedCount
+    const result = await controller.callInteraction('CreateDormitory', {
+      user: { id: 'admin' },
+      payload: {
+        name: 'Bed Count Test Dormitory',
+        bedCount: 12,
+        building: 'B',
+        floor: 4
+      }
+    })
+
+    // Verify the interaction was successful
+    expect(result).toBeDefined()
+    expect(result.error).toBeUndefined()
+    
+    // Query the created dormitory to verify bedCount is properly set from payload
+    const dormitory = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Bed Count Test Dormitory'] }),
+      undefined,
+      ['id', 'name', 'bedCount', 'building', 'floor']
+    )
+    
+    expect(dormitory).toBeDefined()
+    expect(dormitory.bedCount).toBe(12)
+    expect(dormitory.name).toBe('Bed Count Test Dormitory')
+    expect(dormitory.building).toBe('B')
+    expect(dormitory.floor).toBe(4)
+    expect(dormitory.id).toBeDefined()
+  })
 }) 
