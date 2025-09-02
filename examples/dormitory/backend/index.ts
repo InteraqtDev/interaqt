@@ -1311,3 +1311,6 @@ RemoveUserFromDormitoryInteraction.conditions = isAdministrator
 
 // P007: Only admin can view all users
 ViewUserListInteraction.conditions = isAdministrator
+
+// P008: Only admin can view audit logs
+ViewAuditLogInteraction.conditions = isAdministrator

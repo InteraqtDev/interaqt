@@ -429,4 +429,39 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('isAdministrator')
     })
   })
+
+  describe('P008: Only admin can view audit logs', () => {
+    test('Admin can view audit logs', async () => {
+      // Admin user context
+      const adminUser = { id: 'admin1', role: 'administrator' }
+      
+      // Test viewing audit logs as admin
+      const result = await controller.callInteraction('ViewAuditLog', {
+        user: adminUser,
+        query: {
+          attributeQuery: ['id', 'actionType', 'timestamp', 'details']
+        }
+      })
+      
+      // Should succeed - no error
+      expect(result.error).toBeUndefined()
+    })
+    
+    test('Non-admin cannot view audit logs', async () => {
+      // Non-admin user context  
+      const regularUser = { id: 'user1', role: 'regular_user' }
+      
+      const result = await controller.callInteraction('ViewAuditLog', {
+        user: regularUser,
+        query: {
+          attributeQuery: ['id', 'actionType', 'timestamp']
+        }
+      })
+      
+      // Should fail with condition check failed error (permission denied before query)
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdministrator')
+    })
+  })
 })

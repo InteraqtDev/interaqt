@@ -100,7 +100,7 @@
             "Admin can view audit logs",
             "Non-admin cannot view audit logs"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P009",
