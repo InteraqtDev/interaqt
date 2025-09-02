@@ -1897,4 +1897,115 @@ describe('Basic Functionality', () => {
     )
     expect(finalDormitories.length).toBe(3)
   })
+
+  test('Dormitory.location set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: Dormitory.location _owner computation
+     * This tests that location is properly set when Dormitory is created
+     * Dependencies: Dormitory entity, createDormitory interaction (I101)
+     * Steps: 1) Trigger createDormitory interaction with location 2) Verify Dormitory.location is set from payload 3) Test with different locations to ensure variation
+     * Business Logic: Dormitory's creation computation sets location from interaction payload
+     */
+    
+    // Create test dormitory with specific location
+    const result1 = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Test Dormitory Alpha',
+        location: 'Building A, Floor 3, East Wing',
+        bedCount: 5
+      }
+    })
+    
+    expect(result1.error).toBeUndefined()
+    
+    // Verify dormitory was created with correct location
+    const dormitory1 = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory Alpha'] }),
+      undefined,
+      ['id', 'name', 'location', 'maxBeds', 'status']
+    )
+    
+    expect(dormitory1).toBeDefined()
+    expect(dormitory1.name).toBe('Test Dormitory Alpha')
+    expect(dormitory1.location).toBe('Building A, Floor 3, East Wing')  // _owner computation sets from payload
+    expect(dormitory1.maxBeds).toBe(5)  // bedCount mapped to maxBeds
+    expect(dormitory1.status).toBe('active')
+    expect(dormitory1.id).toBeDefined()
+    
+    // Test with different location to verify variation
+    const result2 = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-2' },
+      payload: {
+        name: 'Test Dormitory Beta',
+        location: 'Building B, Ground Floor, West Wing',
+        bedCount: 4
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Verify second dormitory has different location
+    const dormitory2 = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory Beta'] }),
+      undefined,
+      ['id', 'name', 'location', 'maxBeds']
+    )
+    
+    expect(dormitory2).toBeDefined()
+    expect(dormitory2.name).toBe('Test Dormitory Beta')
+    expect(dormitory2.location).toBe('Building B, Ground Floor, West Wing')  // _owner computation sets from payload
+    expect(dormitory2.maxBeds).toBe(4)
+    
+    // Verify both dormitories exist with different locations
+    const allDormitories = await system.storage.find('Dormitory',
+      undefined,
+      undefined,
+      ['id', 'name', 'location']
+    )
+    
+    expect(allDormitories.length).toBe(2)
+    const dormitoryLocations = allDormitories.map(d => d.location).sort()
+    expect(dormitoryLocations).toEqual([
+      'Building A, Floor 3, East Wing',
+      'Building B, Ground Floor, West Wing'
+    ])
+    
+    // Test with location containing special characters and numbers
+    const result3 = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-3' },
+      payload: {
+        name: 'Test Dormitory Gamma',
+        location: 'Campus Center #7 - Suite "A&B"',  // Location with special characters
+        bedCount: 6
+      }
+    })
+    
+    expect(result3.error).toBeUndefined()
+    
+    const dormitory3 = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Test Dormitory Gamma'] }),
+      undefined,
+      ['id', 'name', 'location']
+    )
+    
+    expect(dormitory3).toBeDefined()
+    expect(dormitory3.name).toBe('Test Dormitory Gamma')
+    expect(dormitory3.location).toBe('Campus Center #7 - Suite "A&B"')  // _owner computation preserves special characters from payload
+    
+    // Verify final count and all locations are unique
+    const finalDormitories = await system.storage.find('Dormitory',
+      undefined,
+      undefined,
+      ['id', 'location']
+    )
+    expect(finalDormitories.length).toBe(3)
+    
+    const allLocations = finalDormitories.map(d => d.location)
+    const uniqueLocations = [...new Set(allLocations)]
+    expect(uniqueLocations.length).toBe(3)  // All locations should be unique
+    expect(uniqueLocations).toContain('Building A, Floor 3, East Wing')
+    expect(uniqueLocations).toContain('Building B, Ground Floor, West Wing')
+    expect(uniqueLocations).toContain('Campus Center #7 - Suite "A&B"')
+  })
 }) 
