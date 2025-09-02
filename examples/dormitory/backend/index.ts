@@ -55,6 +55,7 @@ const Dormitory = Entity.create({
     Property.create({
       name: 'name',
       type: 'string'
+      // Note: No defaultValue - _owner computation handles this via Dormitory entity creation
     }),
     Property.create({
       name: 'location',

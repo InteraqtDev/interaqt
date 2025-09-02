@@ -307,7 +307,7 @@
           ],
           "reasoning": "controlType is creation-only, controlled by entity creation",
           "calculationMethod": "Set directly from creation payload",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.location",

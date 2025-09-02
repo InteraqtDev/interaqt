@@ -1796,4 +1796,105 @@ describe('Basic Functionality', () => {
     expect(phoneNumberProperty).toBeDefined()
     expect(phoneNumberProperty.defaultValue).toBeUndefined()  // No defaultValue - _owner computation controls it
   })
+
+  test('Dormitory.name set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: Dormitory.name _owner computation
+     * This tests that name is properly set when Dormitory is created
+     * Dependencies: Dormitory entity, createDormitory interaction (I101)
+     * Steps: 1) Trigger createDormitory interaction with name 2) Verify Dormitory.name is set from payload 3) Test with different names to ensure uniqueness
+     * Business Logic: Dormitory's creation computation sets name from interaction payload
+     */
+    
+    // Create test dormitory with specific name
+    const result1 = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'North Building A',
+        location: 'North Campus',
+        bedCount: 6
+      }
+    })
+    
+    expect(result1.error).toBeUndefined()
+    
+    // Verify dormitory was created with correct name
+    const dormitory1 = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'North Building A'] }),
+      undefined,
+      ['id', 'name', 'location', 'maxBeds', 'status']
+    )
+    
+    expect(dormitory1).toBeDefined()
+    expect(dormitory1.name).toBe('North Building A')  // _owner computation sets from payload
+    expect(dormitory1.location).toBe('North Campus')
+    expect(dormitory1.maxBeds).toBe(6)  // bedCount mapped to maxBeds
+    expect(dormitory1.status).toBe('active')
+    expect(dormitory1.id).toBeDefined()
+    
+    // Test with different name to verify uniqueness
+    const result2 = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-2' },
+      payload: {
+        name: 'South Building Complex 2',
+        location: 'South Campus',
+        bedCount: 4
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Verify second dormitory has different name
+    const dormitory2 = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'South Building Complex 2'] }),
+      undefined,
+      ['id', 'name', 'location', 'maxBeds']
+    )
+    
+    expect(dormitory2).toBeDefined()
+    expect(dormitory2.name).toBe('South Building Complex 2')  // _owner computation sets from payload
+    expect(dormitory2.location).toBe('South Campus')
+    expect(dormitory2.maxBeds).toBe(4)
+    
+    // Verify both dormitories exist with different names
+    const allDormitories = await system.storage.find('Dormitory',
+      undefined,
+      undefined,
+      ['id', 'name', 'location']
+    )
+    
+    expect(allDormitories.length).toBe(2)
+    const dormitoryNames = allDormitories.map(d => d.name).sort()
+    expect(dormitoryNames).toEqual(['North Building A', 'South Building Complex 2'])
+    
+    // Test with name containing special characters
+    const result3 = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-3' },
+      payload: {
+        name: 'Building "Excellence" Hall #1',  // Name with quotes and special characters
+        location: 'Main Campus',
+        bedCount: 8
+      }
+    })
+    
+    expect(result3.error).toBeUndefined()
+    
+    const dormitory3 = await system.storage.findOne('Dormitory',
+      MatchExp.atom({ key: 'name', value: ['=', 'Building "Excellence" Hall #1'] }),
+      undefined,
+      ['id', 'name', 'location']
+    )
+    
+    expect(dormitory3).toBeDefined()
+    expect(dormitory3.name).toBe('Building "Excellence" Hall #1')  // _owner computation preserves special characters from payload
+    expect(dormitory3.location).toBe('Main Campus')
+    
+    // Verify final count
+    const finalDormitories = await system.storage.find('Dormitory',
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(finalDormitories.length).toBe(3)
+  })
 }) 
