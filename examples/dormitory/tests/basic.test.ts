@@ -225,4 +225,128 @@ describe('Basic Functionality', () => {
     
     expect(users.length).toBe(0)
   })
+
+  test('Dormitory entity Transform computation creates dormitories from createDormitory interaction', async () => {
+    /**
+     * Test Plan for: Dormitory entity Transform computation
+     * Dependencies: Dormitory entity, InteractionEventEntity
+     * Steps: 1) Call createDormitory interaction (I101) 2) Verify dormitory entity is created 3) Verify properties are set correctly from payload
+     * Business Logic: Dormitory entities are created through Transform computation from InteractionEventEntity when createDormitory interaction occurs
+     */
+    
+    // Call the createDormitory interaction (I101)
+    const result = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Building A',
+        location: 'Campus North',
+        bedCount: 4
+      }
+    })
+    
+    // Verify dormitory was created via Transform computation
+    const dormitories = await system.storage.find('Dormitory', 
+      undefined,
+      undefined,
+      ['id', 'name', 'location', 'maxBeds', 'status']
+    )
+    
+    expect(dormitories.length).toBe(1)
+    const dormitory = dormitories[0]
+    
+    // Verify all properties are set correctly from the payload
+    expect(dormitory.name).toBe('Building A')
+    expect(dormitory.location).toBe('Campus North')
+    expect(dormitory.maxBeds).toBe(4)  // bedCount mapped to maxBeds
+    expect(dormitory.status).toBe('active')  // Default value from Transform
+    expect(dormitory.id).toBeDefined()  // System generated
+  })
+
+  test('Dormitory entity Transform ignores non-createDormitory interactions', async () => {
+    /**
+     * Test Plan for: Dormitory entity Transform computation - selective processing
+     * Dependencies: Dormitory entity, InteractionEventEntity
+     * Steps: 1) Call non-dormitory creation interactions 2) Verify no dormitories are created 3) Verify Transform returns null for irrelevant events
+     * Business Logic: Transform should only create dormitories for the createDormitory interaction
+     */
+    
+    // Call non-dormitory creation interactions
+    await controller.callInteraction('modifyBehaviorScore', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        userId: 'user123',
+        newScore: 85,
+        reason: 'Test reason'
+      }
+    })
+    
+    await controller.callInteraction('assignUserToBed', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        userId: 'user123',
+        bedId: 'bed456'
+      }
+    })
+    
+    // Verify no dormitories were created by these non-dormitory creation interactions
+    const dormitories = await system.storage.find('Dormitory', 
+      undefined,
+      undefined,
+      ['id', 'name']
+    )
+    
+    expect(dormitories.length).toBe(0)
+  })
+
+  test('Dormitory entity Transform handles multiple dormitory creations', async () => {
+    /**
+     * Test Plan for: Dormitory entity Transform computation - multiple creations
+     * Dependencies: Dormitory entity, InteractionEventEntity
+     * Steps: 1) Create multiple dormitories with different payloads 2) Verify all are created 3) Verify each has correct properties
+     * Business Logic: Transform should handle multiple separate dormitory creation events
+     */
+    
+    // Create first dormitory
+    await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Building A',
+        location: 'Campus North',
+        bedCount: 4
+      }
+    })
+    
+    // Create second dormitory  
+    await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-2' },
+      payload: {
+        name: 'Building B',
+        location: 'Campus South',
+        bedCount: 6
+      }
+    })
+    
+    // Verify both dormitories were created
+    const dormitories = await system.storage.find('Dormitory', 
+      undefined,
+      undefined,
+      ['id', 'name', 'location', 'maxBeds', 'status']
+    )
+    
+    expect(dormitories.length).toBe(2)
+    
+    // Verify first dormitory
+    const buildingA = dormitories.find(d => d.name === 'Building A')
+    expect(buildingA).toBeDefined()
+    expect(buildingA.location).toBe('Campus North')
+    expect(buildingA.maxBeds).toBe(4)
+    expect(buildingA.status).toBe('active')
+    
+    // Verify second dormitory
+    const buildingB = dormitories.find(d => d.name === 'Building B')
+    expect(buildingB).toBeDefined()
+    expect(buildingB.location).toBe('Campus South')
+    expect(buildingB.maxBeds).toBe(6)
+    expect(buildingB.status).toBe('active')
+  })
 }) 

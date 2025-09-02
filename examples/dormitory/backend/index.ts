@@ -678,3 +678,24 @@ export const interactions = [
   ValidateEvictionEligibility
 ]
 export const dicts = [SystemConfig, ViolationRules]
+
+// =========================
+// COMPUTATION ASSIGNMENTS
+// =========================
+
+// Dormitory entity computation - Transform for creation from InteractionEventEntity
+Dormitory.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    // Handle dormitory creation from createDormitory interaction (I101)
+    if (event.interactionName === 'createDormitory') {
+      return {
+        name: event.payload.name,
+        location: event.payload.location,
+        maxBeds: event.payload.bedCount,  // Map bedCount to maxBeds
+        status: 'active'  // Default to active status
+      };
+    }
+    return null;
+  }
+})

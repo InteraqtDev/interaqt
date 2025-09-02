@@ -28,7 +28,7 @@
           ],
           "reasoning": "interaction-created with soft-delete allows Transform for creation + status StateMachine for deletion",
           "calculationMethod": "interaction-created",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Bed",
