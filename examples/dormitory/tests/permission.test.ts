@@ -240,4 +240,84 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('isAdministrator')
     })
   })
+
+  describe('P005: Only admin can process removal requests', () => {
+    test('Admin can process removal request', async () => {
+      // Admin user context
+      const adminUser = { id: 'admin1', role: 'administrator' }
+      
+      // First create a user, dormitory, and removal request to process
+      const createUserResult = await controller.callInteraction('CreateUser', {
+        user: adminUser,
+        payload: {
+          username: 'usertoremove',
+          email: 'remove@example.com',
+          password: 'password123',
+          fullName: 'User To Remove',
+          role: 'regular_user'
+        }
+      })
+      expect(createUserResult.error).toBeUndefined()
+      
+      const createDormResult = await controller.callInteraction('CreateDormitory', {
+        user: adminUser,
+        payload: {
+          name: 'Removal Test Dorm',
+          bedCount: 4,
+          building: 'Building C',
+          floor: 3
+        }
+      })
+      expect(createDormResult.error).toBeUndefined()
+      
+      // Get the created user ID
+      const createdUserId = createUserResult.effects?.[0]?.record?.id
+      
+      // Create a removal request (assume we need to test permission first, so create as admin)
+      const createRequestResult = await controller.callInteraction('CreateRemovalRequest', {
+        user: adminUser,  // Admin creating the request
+        payload: {
+          targetUserId: createdUserId,
+          reason: 'Test removal',
+          urgency: 'medium'
+        }
+      })
+      expect(createRequestResult.error).toBeUndefined()
+      
+      // Get the created request ID
+      const createdRequestId = createRequestResult.effects?.[0]?.record?.id
+      
+      // Now test processing the removal request as admin
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: adminUser,
+        payload: {
+          requestId: createdRequestId,
+          decision: 'approved',
+          notes: 'Approved by admin'
+        }
+      })
+      
+      // Should succeed - no error
+      expect(result.error).toBeUndefined()
+    })
+    
+    test('Non-admin cannot process removal request', async () => {
+      // Non-admin user context  
+      const regularUser = { id: 'user1', role: 'regular_user' }
+      
+      const result = await controller.callInteraction('ProcessRemovalRequest', {
+        user: regularUser,
+        payload: {
+          requestId: 'some-request-id',  // Using string ID for permission test (before validation)
+          decision: 'approved',
+          notes: 'Should not work'
+        }
+      })
+      
+      // Should fail with condition check failed error (permission denied before validation)
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdministrator')
+    })
+  })
 })

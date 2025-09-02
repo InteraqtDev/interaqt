@@ -64,7 +64,7 @@
             "Admin can process removal request",
             "Non-admin cannot process removal request"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P006",
