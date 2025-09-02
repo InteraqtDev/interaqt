@@ -658,7 +658,7 @@ export const relations = [
 ]
 
 // Export individual relations for testing
-export { BedDormitory }
+export { BedDormitory, UserViolationRelation, ViolationReporterRelation }
 export const activities = []
 export const interactions = [
   CreateDormitory,
@@ -711,6 +711,39 @@ Dormitory.computation = Transform.create({
         maxBeds: event.payload.bedCount,  // Map bedCount to maxBeds
         status: 'active',  // Default to active status
         beds: beds  // Create beds via the 'beds' relation property
+      };
+    }
+    return null;
+  }
+})
+
+// BehaviorViolation entity computation - Transform for creation from InteractionEventEntity
+// Also creates UserViolationRelation and ViolationReporterRelation via relation properties
+BehaviorViolation.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: async function(event) {
+    // Handle behavior violation recording from recordBehaviorViolation interaction (I201)
+    if (event.interactionName === 'recordBehaviorViolation') {
+      // Get violation rules to lookup score deduction
+      const violationRules = await this.system.storage.get('DICTIONARY_RECORD', 'ViolationRules', {
+        noiseViolation: 10,
+        cleanlinessViolation: 15,
+        guestPolicyViolation: 20
+      });
+      
+      const violationType = event.payload.violationType;
+      const scoreDeduction = violationRules[violationType] || 0;
+      
+      // Return BehaviorViolation object with relations
+      return {
+        violationType: violationType,
+        description: event.payload.description,
+        scoreDeduction: scoreDeduction,  // Looked up from ViolationRules
+        timestamp: Math.floor(Date.now() / 1000),  // Current timestamp in seconds
+        evidenceUrl: event.payload.evidenceUrl,
+        status: 'active',  // Default to active status
+        violator: { id: event.payload.userId },  // Create UserViolationRelation via 'violator' property
+        reporter: event.user  // Create ViolationReporterRelation via 'reporter' property
       };
     }
     return null;

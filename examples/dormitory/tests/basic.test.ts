@@ -425,4 +425,221 @@ describe('Basic Functionality', () => {
       expect(['1', '2', '3', '4', '5']).toContain(relation.source.number)
     })
   })
+
+  test('BehaviorViolation Transform computation creates violations from interaction events', async () => {
+    /**
+     * Test Plan for: BehaviorViolation Transform computation
+     * Dependencies: User entity (for violator and reporter relations), BehaviorViolation entity, UserViolationRelation, ViolationReporterRelation, ViolationRules dictionary
+     * Steps: 1) Create test users 2) Trigger recordBehaviorViolation interaction 3) Verify BehaviorViolation entity is created 4) Verify scoreDeduction lookup from ViolationRules 5) Verify timestamp is set 6) Verify UserViolationRelation 7) Verify ViolationReporterRelation
+     * Business Logic: Transform creates BehaviorViolation entity when recording violation, with scoreDeduction from ViolationRules dictionary
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Use the existing interactions from backend (including RecordBehaviorViolation)
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions,  // Use existing interactions
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // First create test users (violator and reporter)
+    const violatorUser = await testSystem.storage.create('User', {
+      name: 'John Violator',
+      email: 'violator@example.com',
+      role: 'student',
+      status: 'active'
+    })
+    
+    const reporterUser = await testSystem.storage.create('User', {
+      name: 'Jane Reporter',
+      email: 'reporter@example.com',
+      role: 'dormitory_leader',
+      status: 'active'
+    })
+    
+    // Call the recordBehaviorViolation interaction
+    const result = await testController.callInteraction('recordBehaviorViolation', {
+      user: reporterUser,
+      payload: {
+        userId: violatorUser.id,
+        violationType: 'noiseViolation',
+        description: 'Playing loud music after quiet hours',
+        evidenceUrl: 'https://example.com/evidence/noise1.mp4'
+      }
+    })
+    
+    // Verify BehaviorViolation entity was created
+    const violations = await testSystem.storage.find('BehaviorViolation', 
+      undefined,
+      undefined,
+      ['id', 'violationType', 'description', 'scoreDeduction', 'timestamp', 'evidenceUrl', 'status']
+    )
+    
+    expect(violations.length).toBe(1)
+    const violation = violations[0]
+    
+    // Verify all properties are set correctly
+    expect(violation.violationType).toBe('noiseViolation')
+    expect(violation.description).toBe('Playing loud music after quiet hours')
+    expect(violation.scoreDeduction).toBe(10)  // From ViolationRules dictionary
+    expect(violation.evidenceUrl).toBe('https://example.com/evidence/noise1.mp4')
+    expect(violation.status).toBe('active')
+    expect(violation.id).toBeDefined()
+    
+    // Verify timestamp is recent (within last minute)
+    const now = Math.floor(Date.now() / 1000)
+    expect(violation.timestamp).toBeGreaterThan(now - 60)
+    expect(violation.timestamp).toBeLessThanOrEqual(now)
+    
+    // Import UserViolationRelation to get its name
+    const { UserViolationRelation, ViolationReporterRelation } = await import('../backend')
+    
+    // Verify UserViolationRelation was created (violator relation)
+    const violatorRelations = await testSystem.storage.find(UserViolationRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', violatorUser.id] })
+        .and({ key: 'target.id', value: ['=', violation.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'violationType'] }]
+      ]
+    )
+    
+    expect(violatorRelations.length).toBe(1)
+    const violatorRelation = violatorRelations[0]
+    expect(violatorRelation.source.id).toBe(violatorUser.id)
+    expect(violatorRelation.target.id).toBe(violation.id)
+    
+    // Verify ViolationReporterRelation was created (reporter relation)
+    const reporterRelations = await testSystem.storage.find(ViolationReporterRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', reporterUser.id] })
+        .and({ key: 'target.id', value: ['=', violation.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'violationType'] }]
+      ]
+    )
+    
+    expect(reporterRelations.length).toBe(1)
+    const reporterRelation = reporterRelations[0]
+    expect(reporterRelation.source.id).toBe(reporterUser.id)
+    expect(reporterRelation.target.id).toBe(violation.id)
+  })
+
+  test('BehaviorViolation Transform looks up different violation types correctly', async () => {
+    /**
+     * Test Plan for: BehaviorViolation scoreDeduction lookup from ViolationRules
+     * Dependencies: ViolationRules dictionary with different violation types and scores
+     * Steps: 1) Create users 2) Record violations of different types 3) Verify scoreDeduction matches ViolationRules 4) Test unknown violation type defaults to 0
+     * Business Logic: scoreDeduction should be looked up from ViolationRules dictionary based on violationType
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Use the existing interactions from backend (including RecordBehaviorViolation)
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions,  // Use existing interactions
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Create test users
+    const violatorUser = await testSystem.storage.create('User', {
+      name: 'Test Violator',
+      email: 'violator@example.com',
+      role: 'student',
+      status: 'active'
+    })
+    
+    const reporterUser = await testSystem.storage.create('User', {
+      name: 'Test Reporter',
+      email: 'reporter@example.com',
+      role: 'dormitory_leader',
+      status: 'active'
+    })
+    
+    // Test different violation types from ViolationRules
+    
+    // 1. Test noiseViolation (score: 10)
+    await testController.callInteraction('recordBehaviorViolation', {
+      user: reporterUser,
+      payload: {
+        userId: violatorUser.id,
+        violationType: 'noiseViolation',
+        description: 'Noise violation test'
+      }
+    })
+    
+    // 2. Test cleanlinessViolation (score: 15)
+    await testController.callInteraction('recordBehaviorViolation', {
+      user: reporterUser,
+      payload: {
+        userId: violatorUser.id,
+        violationType: 'cleanlinessViolation',
+        description: 'Cleanliness violation test'
+      }
+    })
+    
+    // 3. Test guestPolicyViolation (score: 20)
+    await testController.callInteraction('recordBehaviorViolation', {
+      user: reporterUser,
+      payload: {
+        userId: violatorUser.id,
+        violationType: 'guestPolicyViolation',
+        description: 'Guest policy violation test'
+      }
+    })
+    
+    // 4. Test unknown violation type (should default to 0)
+    await testController.callInteraction('recordBehaviorViolation', {
+      user: reporterUser,
+      payload: {
+        userId: violatorUser.id,
+        violationType: 'unknownViolationType',
+        description: 'Unknown violation type test'
+      }
+    })
+    
+    // Verify all violations were created with correct scoreDeduction
+    const violations = await testSystem.storage.find('BehaviorViolation', 
+      undefined,
+      undefined,  // Remove orderBy to avoid SQL column issues
+      ['id', 'violationType', 'scoreDeduction', 'description']
+    )
+    
+    expect(violations.length).toBe(4)
+    
+    // Verify scores match ViolationRules dictionary - find each violation type
+    const noiseViolation = violations.find(v => v.violationType === 'noiseViolation')
+    expect(noiseViolation).toBeDefined()
+    expect(noiseViolation.scoreDeduction).toBe(10)
+    
+    const cleanlinessViolation = violations.find(v => v.violationType === 'cleanlinessViolation')
+    expect(cleanlinessViolation).toBeDefined()
+    expect(cleanlinessViolation.scoreDeduction).toBe(15)
+    
+    const guestPolicyViolation = violations.find(v => v.violationType === 'guestPolicyViolation')
+    expect(guestPolicyViolation).toBeDefined()
+    expect(guestPolicyViolation.scoreDeduction).toBe(20)
+    
+    const unknownViolation = violations.find(v => v.violationType === 'unknownViolationType')
+    expect(unknownViolation).toBeDefined()
+    expect(unknownViolation.scoreDeduction).toBe(0)  // Default for unknown types
+  })
 }) 
