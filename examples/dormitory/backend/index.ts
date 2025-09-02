@@ -308,8 +308,303 @@ const ViolationRules = Dictionary.create({
 // Note: SystemStats dictionary with computations will be added later in Task 3.1.4
 
 // =========================
-// INTERACTIONS (Empty for now - will be populated in Task 3.1.3)
+// INTERACTIONS
 // =========================
+
+// Core Business Logic Interactions
+
+const CreateDormitory = Interaction.create({
+  name: 'createDormitory',
+  action: Action.create({ name: 'create' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'name',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'location',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'bedCount',
+        required: true
+      })
+    ]
+  })
+})
+
+const AssignUserToBed = Interaction.create({
+  name: 'assignUserToBed',
+  action: Action.create({ name: 'assign' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'bedId',
+        required: true
+      })
+    ]
+  })
+})
+
+const RemoveUserFromDormitory = Interaction.create({
+  name: 'removeUserFromDormitory',
+  action: Action.create({ name: 'remove' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'reason',
+        required: true
+      })
+    ]
+  })
+})
+
+const RecordBehaviorViolation = Interaction.create({
+  name: 'recordBehaviorViolation',
+  action: Action.create({ name: 'record' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'violationType',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'description',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'evidenceUrl',
+        required: false
+      })
+    ]
+  })
+})
+
+const ModifyBehaviorScore = Interaction.create({
+  name: 'modifyBehaviorScore',
+  action: Action.create({ name: 'modify' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'newScore',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'reason',
+        required: true
+      })
+    ]
+  })
+})
+
+const AssignDormitoryLeader = Interaction.create({
+  name: 'assignDormitoryLeader',
+  action: Action.create({ name: 'assign' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'dormitoryId',
+        required: true
+      })
+    ]
+  })
+})
+
+const RemoveDormitoryLeader = Interaction.create({
+  name: 'removeDormitoryLeader',
+  action: Action.create({ name: 'remove' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'reason',
+        required: true
+      })
+    ]
+  })
+})
+
+const SubmitEvictionRequest = Interaction.create({
+  name: 'submitEvictionRequest',
+  action: Action.create({ name: 'submit' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'targetUserId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'reason',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'supportingEvidence',
+        required: false
+      })
+    ]
+  })
+})
+
+const ProcessEvictionRequest = Interaction.create({
+  name: 'processEvictionRequest',
+  action: Action.create({ name: 'process' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'requestId',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'decision',
+        required: true
+      }),
+      PayloadItem.create({
+        name: 'adminNotes',
+        required: true
+      })
+    ]
+  })
+})
+
+// Read Interactions
+
+const ViewDormitoryFacilities = Interaction.create({
+  name: 'viewDormitoryFacilities',
+  action: Action.create({ name: 'view' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'filters',
+        required: false
+      })
+    ]
+  })
+})
+
+const ViewUserBehaviorScores = Interaction.create({
+  name: 'viewUserBehaviorScores',
+  action: Action.create({ name: 'view' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'dormitoryId',
+        required: true
+      })
+    ]
+  })
+})
+
+const ViewManagementHierarchy = Interaction.create({
+  name: 'viewManagementHierarchy',
+  action: Action.create({ name: 'view' }),
+  payload: Payload.create({
+    items: []
+  })
+})
+
+const ViewEvictionRequests = Interaction.create({
+  name: 'viewEvictionRequests',
+  action: Action.create({ name: 'view' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'status',
+        required: false
+      })
+    ]
+  })
+})
+
+// Support/Validation Interactions
+
+const ValidateDormitoryCreation = Interaction.create({
+  name: 'validateDormitoryCreation',
+  action: Action.create({ name: 'validate' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'name',
+        required: true
+      })
+    ]
+  })
+})
+
+const CheckUserAssignmentEligibility = Interaction.create({
+  name: 'checkUserAssignmentEligibility',
+  action: Action.create({ name: 'check' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      })
+    ]
+  })
+})
+
+const VerifyBedAvailability = Interaction.create({
+  name: 'verifyBedAvailability',
+  action: Action.create({ name: 'verify' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'bedId',
+        required: true
+      })
+    ]
+  })
+})
+
+const GetCurrentBehaviorScore = Interaction.create({
+  name: 'getCurrentBehaviorScore',
+  action: Action.create({ name: 'get' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      })
+    ]
+  })
+})
+
+const ValidateEvictionEligibility = Interaction.create({
+  name: 'validateEvictionEligibility',
+  action: Action.create({ name: 'validate' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({
+        name: 'userId',
+        required: true
+      })
+    ]
+  })
+})
 
 // Export all entities, relations, and other components
 export const entities = [User, Dormitory, Bed, BehaviorViolation, EvictionRequest]
@@ -324,5 +619,24 @@ export const relations = [
   EvictionDeciderRelation
 ]
 export const activities = []
-export const interactions = []
+export const interactions = [
+  CreateDormitory,
+  AssignUserToBed,
+  RemoveUserFromDormitory,
+  RecordBehaviorViolation,
+  ModifyBehaviorScore,
+  AssignDormitoryLeader,
+  RemoveDormitoryLeader,
+  SubmitEvictionRequest,
+  ProcessEvictionRequest,
+  ViewDormitoryFacilities,
+  ViewUserBehaviorScores,
+  ViewManagementHierarchy,
+  ViewEvictionRequests,
+  ValidateDormitoryCreation,
+  CheckUserAssignmentEligibility,
+  VerifyBedAvailability,
+  GetCurrentBehaviorScore,
+  ValidateEvictionEligibility
+]
 export const dicts = [SystemConfig, ViolationRules]
