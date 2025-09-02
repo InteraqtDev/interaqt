@@ -40,7 +40,7 @@
             "Admin can assign leader",
             "Non-admin cannot assign leader"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P004",

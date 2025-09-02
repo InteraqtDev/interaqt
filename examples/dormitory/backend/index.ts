@@ -1296,3 +1296,6 @@ CreateUserInteraction.conditions = isAdministrator
 // P002: Only admin can create dormitories
 // Reuse the same condition since both CreateUser and CreateDormitory require administrator role
 CreateDormitoryInteraction.conditions = isAdministrator
+
+// P003: Only admin can assign leaders
+AssignDormitoryLeaderInteraction.conditions = isAdministrator
