@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserBedAssignment } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -780,5 +780,103 @@ describe('Basic Functionality', () => {
     const secondRequest = allEvictionRequests.find(r => r.reason === 'Another eviction request')
     expect(secondRequest).toBeDefined()
     expect(secondRequest.supportingEvidence).toBeUndefined()  // Optional field not provided
+  })
+
+  test('UserBedAssignment relation StateMachine computation', async () => {
+    /**
+     * Test Plan for: UserBedAssignment relation StateMachine
+     * Dependencies: User entity, Bed entity
+     * Steps: 1) Create user and bed 2) Verify no initial assignment 3) Trigger assignUserToBed to create relation 4) Verify relation created 5) Trigger removeUserFromDormitory to delete relation 6) Verify relation deleted
+     * Business Logic: StateMachine manages UserBedAssignment relation lifecycle - creation via AssignUserToBed and deletion via RemoveUserFromDormitory
+     */
+    
+    // Create test user and bed first via createDormitory (which creates beds)
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Test Building',
+        bedCount: 2
+      }
+    })
+    
+    // Get the created beds
+    const beds = await system.storage.find('Bed', 
+      undefined,
+      undefined,
+      ['id', 'number', 'status']
+    )
+    expect(beds.length).toBe(2)
+    const testBed = beds[0]
+    
+    // Create test user directly via storage since createUser interaction doesn't exist
+    const testUser = await system.storage.create('User', {
+      name: 'Test User',
+      email: 'test@example.com',
+      role: 'student',
+      status: 'active'
+    })
+    expect(testUser).toBeDefined()
+    
+    // Initial state: No UserBedAssignment relation should exist
+    const initialRelations = await system.storage.find(UserBedAssignment.name,
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(initialRelations.length).toBe(0)
+    
+    // Test assignUserToBed interaction - notAssigned → assigned state transition
+    const assignResult = await controller.callInteraction('assignUserToBed', {
+      user: { id: 'admin-user' },
+      payload: {
+        userId: testUser.id,
+        bedId: testBed.id
+      }
+    })
+    
+    expect(assignResult.error).toBeUndefined()
+    
+    // Verify UserBedAssignment relation was created
+    const assignments = await system.storage.find(UserBedAssignment.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', testUser.id] }),
+      undefined,
+      [
+        'id',
+        'assignmentDate',
+        'status', 
+        'assignedBy',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'number'] }]
+      ]
+    )
+    
+    expect(assignments.length).toBe(1)
+    const assignment = assignments[0]
+    expect(assignment.status).toBe('active')
+    expect(assignment.assignedBy).toBe('admin-user')
+    expect(assignment.assignmentDate).toBeTypeOf('number')
+    expect(assignment.source.id).toBe(testUser.id)
+    expect(assignment.target.id).toBe(testBed.id)
+    
+    // Test removeUserFromDormitory interaction - assigned → notAssigned state transition  
+    const removeResult = await controller.callInteraction('removeUserFromDormitory', {
+      user: { id: 'admin-user' },
+      payload: {
+        userId: testUser.id,
+        reason: 'Test removal'
+      }
+    })
+    
+    expect(removeResult.error).toBeUndefined()
+    
+    // Verify UserBedAssignment relation was deleted
+    const assignmentsAfterRemoval = await system.storage.find(UserBedAssignment.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', testUser.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(assignmentsAfterRemoval.length).toBe(0)
   })
 }) 

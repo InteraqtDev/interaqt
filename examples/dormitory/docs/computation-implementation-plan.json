@@ -93,7 +93,7 @@
           ],
           "reasoning": "interaction-created with canBeDeleted: true and hard-delete requires StateMachine only",
           "calculationMethod": "interaction-created",
-          "completed": false
+          "completed": true
         },
         {
           "id": "DormitoryLeadership",

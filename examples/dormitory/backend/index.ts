@@ -658,7 +658,7 @@ export const relations = [
 ]
 
 // Export individual relations for testing
-export { BedDormitory, UserViolationRelation, ViolationReporterRelation, EvictionTargetRelation, EvictionRequesterRelation }
+export { UserBedAssignment, BedDormitory, UserViolationRelation, ViolationReporterRelation, EvictionTargetRelation, EvictionRequesterRelation }
 export const activities = []
 export const interactions = [
   CreateDormitory,
@@ -685,6 +685,88 @@ export const dicts = [SystemConfig, ViolationRules]
 // =========================
 // COMPUTATION ASSIGNMENTS
 // =========================
+
+// UserBedAssignment relation StateMachine computation - handles creation and deletion
+const notAssignedState = StateNode.create({ 
+  name: 'notAssigned',
+  computeValue: () => null  // Return null means no relation exists
+});
+
+const assignedState = StateNode.create({ 
+  name: 'assigned',
+  computeValue: (lastValue, event) => {
+    // Store assignment details when relation is created
+    return {
+      assignmentDate: Math.floor(Date.now() / 1000),  // Current timestamp in seconds
+      status: 'active',
+      assignedBy: event?.user?.id || 'system'
+    };
+  }
+});
+
+const UserBedAssignmentStateMachine = StateMachine.create({
+  states: [notAssignedState, assignedState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignUserToBed,
+      current: notAssignedState,
+      next: assignedState,
+      computeTarget: async function(event) {
+        // Validate UUIDs before querying (PostgreSQL requires valid UUID format)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        
+        if (!uuidRegex.test(event.payload.userId) || !uuidRegex.test(event.payload.bedId)) {
+          // Return null if IDs are not valid UUIDs (no relation will be created)
+          return null;
+        }
+        
+        // Verify that both user and bed exist before creating relation
+        const user = await this.system.storage.findOne('User',
+          this.globals.MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+          undefined,
+          ['id']
+        );
+        
+        const bed = await this.system.storage.findOne('Bed',
+          this.globals.MatchExp.atom({ key: 'id', value: ['=', event.payload.bedId] }),
+          undefined,
+          ['id']
+        );
+        
+        // Only return target if both entities exist
+        if (user && bed) {
+          return {
+            source: { id: event.payload.userId },  // User being assigned
+            target: { id: event.payload.bedId }    // Bed being assigned to
+          };
+        }
+        
+        // Return null if entities don't exist (no relation will be created)
+        return null;
+      }
+    }),
+    StateTransfer.create({
+      trigger: RemoveUserFromDormitory,
+      current: assignedState,
+      next: notAssignedState,
+      computeTarget: async function(event) {
+        // Find existing UserBedAssignment relation for the user
+        const relation = await this.system.storage.findOneRelationByName(UserBedAssignment.name,
+          this.globals.MatchExp.atom({
+            key: 'source.id',
+            value: ['=', event.payload.userId]
+          }),
+          undefined,
+          ['id']
+        );
+        return relation;  // Return existing relation to remove
+      }
+    })
+  ],
+  defaultState: notAssignedState
+});
+
+UserBedAssignment.computation = UserBedAssignmentStateMachine;
 
 // Dormitory entity computation - Transform for creation from InteractionEventEntity
 // Also creates Bed entities via the 'beds' relation property (_parent:Dormitory pattern)
