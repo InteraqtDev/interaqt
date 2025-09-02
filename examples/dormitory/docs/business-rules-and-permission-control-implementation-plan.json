@@ -76,7 +76,7 @@
             "Admin can remove user from dormitory",
             "Non-admin cannot remove user from dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P007",

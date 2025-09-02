@@ -320,4 +320,78 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('isAdministrator')
     })
   })
+
+  describe('P006: Only admin can remove users from dormitories', () => {
+    test('Admin can remove user from dormitory', async () => {
+      // Admin user context
+      const adminUser = { id: 'admin1', role: 'administrator' }
+      
+      // First create a user and dormitory, then assign user to bed
+      const createUserResult = await controller.callInteraction('CreateUser', {
+        user: adminUser,
+        payload: {
+          username: 'usertoremovefromdorm',
+          email: 'removefromdorm@example.com',
+          password: 'password123',
+          fullName: 'User To Remove From Dorm',
+          role: 'regular_user'
+        }
+      })
+      expect(createUserResult.error).toBeUndefined()
+      
+      const createDormResult = await controller.callInteraction('CreateDormitory', {
+        user: adminUser,
+        payload: {
+          name: 'Removal From Dorm Test',
+          bedCount: 4,
+          building: 'Building D',
+          floor: 4
+        }
+      })
+      expect(createDormResult.error).toBeUndefined()
+      
+      // Get the created entities to get their IDs
+      const createdUserId = createUserResult.effects?.[0]?.record?.id
+      const createdDormId = createDormResult.effects?.[0]?.record?.id
+      
+      // First assign user to bed so we can remove them
+      const assignResult = await controller.callInteraction('AssignUserToBed', {
+        user: adminUser,
+        payload: {
+          userId: createdUserId,
+          dormitoryId: createdDormId,
+          bedNumber: 1
+        }
+      })
+      expect(assignResult.error).toBeUndefined()
+      
+      // Now test removing the user from dormitory as admin
+      const result = await controller.callInteraction('RemoveUserFromDormitory', {
+        user: adminUser,
+        payload: {
+          userId: createdUserId
+        }
+      })
+      
+      // Should succeed - no error
+      expect(result.error).toBeUndefined()
+    })
+    
+    test('Non-admin cannot remove user from dormitory', async () => {
+      // Non-admin user context  
+      const regularUser = { id: 'user1', role: 'regular_user' }
+      
+      const result = await controller.callInteraction('RemoveUserFromDormitory', {
+        user: regularUser,
+        payload: {
+          userId: 'some-user-id'  // Using string ID for permission test (before validation)
+        }
+      })
+      
+      // Should fail with condition check failed error (permission denied before validation)
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdministrator')
+    })
+  })
 })

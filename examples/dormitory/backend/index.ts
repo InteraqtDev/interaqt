@@ -1305,3 +1305,6 @@ AssignUserToBedInteraction.conditions = isAdministrator
 
 // P005: Only admin can process removal requests
 ProcessRemovalRequestInteraction.conditions = isAdministrator
+
+// P006: Only admin can remove users from dormitories
+RemoveUserFromDormitoryInteraction.conditions = isAdministrator
