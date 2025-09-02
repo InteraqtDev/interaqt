@@ -349,4 +349,80 @@ describe('Basic Functionality', () => {
     expect(buildingB.maxBeds).toBe(6)
     expect(buildingB.status).toBe('active')
   })
+
+  test('Bed entities created through Dormitory Transform computation (_parent:Dormitory)', async () => {
+    /**
+     * Test Plan for: _parent:Dormitory
+     * This tests the Dormitory's Transform computation that creates Bed entities
+     * Dependencies: Dormitory entity, Bed entity, BedDormitory relation, createDormitory interaction (I101)
+     * Steps: 1) Trigger createDormitory interaction with bedCount 2) Verify dormitory is created 3) Verify beds are created 4) Verify bed properties and relations
+     * Business Logic: When a dormitory is created with bedCount=N, exactly N beds should be created and linked to that dormitory
+     */
+    
+    // Call the createDormitory interaction (I101) with specific bedCount
+    const result = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Test Building',
+        location: 'Test Campus',
+        bedCount: 5
+      }
+    })
+    
+    // Verify dormitory was created
+    const dormitories = await system.storage.find('Dormitory', 
+      undefined,
+      undefined,
+      ['id', 'name', 'location', 'maxBeds', 'status']
+    )
+    
+    expect(dormitories.length).toBe(1)
+    const dormitory = dormitories[0]
+    expect(dormitory.name).toBe('Test Building')
+    expect(dormitory.maxBeds).toBe(5)
+    
+    // Verify beds were created via the parent Dormitory's Transform computation
+    const beds = await system.storage.find('Bed', 
+      undefined,
+      undefined,
+      ['id', 'number', 'status']
+    )
+    
+    expect(beds.length).toBe(5)
+    
+    // Verify bed properties - should be numbered 1, 2, 3, 4, 5
+    const bedNumbers = beds.map(b => b.number).sort()
+    expect(bedNumbers).toEqual(['1', '2', '3', '4', '5'])
+    
+    // Verify all beds have active status
+    beds.forEach(bed => {
+      expect(bed.status).toBe('active')
+      expect(bed.id).toBeDefined()
+    })
+    
+    // Import the relation to test the link between beds and dormitory
+    const { BedDormitory } = await import('../backend')
+    
+    // Verify BedDormitory relations were created linking beds to dormitory
+    const bedDormitoryRelations = await system.storage.find(BedDormitory.name,
+      undefined,
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'number'] }],
+        ['target', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+    
+    expect(bedDormitoryRelations.length).toBe(5)
+    
+    // Verify each relation links a bed to the dormitory
+    bedDormitoryRelations.forEach(relation => {
+      expect(relation.source).toBeDefined()
+      expect(relation.target).toBeDefined()
+      expect(relation.target.id).toBe(dormitory.id)
+      expect(relation.target.name).toBe('Test Building')
+      expect(['1', '2', '3', '4', '5']).toContain(relation.source.number)
+    })
+  })
 }) 

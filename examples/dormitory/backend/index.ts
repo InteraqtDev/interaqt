@@ -656,6 +656,9 @@ export const relations = [
   EvictionRequesterRelation,
   EvictionDeciderRelation
 ]
+
+// Export individual relations for testing
+export { BedDormitory }
 export const activities = []
 export const interactions = [
   CreateDormitory,
@@ -684,16 +687,30 @@ export const dicts = [SystemConfig, ViolationRules]
 // =========================
 
 // Dormitory entity computation - Transform for creation from InteractionEventEntity
+// Also creates Bed entities via the 'beds' relation property (_parent:Dormitory pattern)
 Dormitory.computation = Transform.create({
   record: InteractionEventEntity,
   callback: function(event) {
     // Handle dormitory creation from createDormitory interaction (I101)
     if (event.interactionName === 'createDormitory') {
+      const bedCount = event.payload.bedCount;
+      const beds = [];
+      
+      // Create bedCount number of beds to be created via relation
+      for (let i = 1; i <= bedCount; i++) {
+        beds.push({
+          number: i.toString(),  // Generated sequence: "1", "2", "3", etc.
+          status: 'active'  // Default to active status
+        });
+      }
+      
+      // Return dormitory object with beds to be created via BedDormitory relation
       return {
         name: event.payload.name,
         location: event.payload.location,
         maxBeds: event.payload.bedCount,  // Map bedCount to maxBeds
-        status: 'active'  // Default to active status
+        status: 'active',  // Default to active status
+        beds: beds  // Create beds via the 'beds' relation property
       };
     }
     return null;

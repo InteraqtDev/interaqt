@@ -42,7 +42,7 @@
           ],
           "reasoning": "lifecycle.creation.type is created-with-parent, created by parent's computation",
           "calculationMethod": "created-with-parent",
-          "completed": false
+          "completed": true
         },
         {
           "id": "BehaviorViolation",
