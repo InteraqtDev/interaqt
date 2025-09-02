@@ -1299,3 +1299,6 @@ CreateDormitoryInteraction.conditions = isAdministrator
 
 // P003: Only admin can assign leaders
 AssignDormitoryLeaderInteraction.conditions = isAdministrator
+
+// P004: Only admin can assign users to beds
+AssignUserToBedInteraction.conditions = isAdministrator

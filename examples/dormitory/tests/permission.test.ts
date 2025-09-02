@@ -173,4 +173,71 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('isAdministrator')
     })
   })
+
+  describe('P004: Only admin can assign users to beds', () => {
+    test('Admin can assign user to bed', async () => {
+      // Admin user context
+      const adminUser = { id: 'admin1', role: 'administrator' }
+      
+      // First create a user and dormitory to assign
+      const createUserResult = await controller.callInteraction('CreateUser', {
+        user: adminUser,
+        payload: {
+          username: 'testbeduser',
+          email: 'beduser@example.com',
+          password: 'password123',
+          fullName: 'Test Bed User',
+          role: 'regular_user'
+        }
+      })
+      expect(createUserResult.error).toBeUndefined()
+      
+      const createDormResult = await controller.callInteraction('CreateDormitory', {
+        user: adminUser,
+        payload: {
+          name: 'Test Dorm for Bed',
+          bedCount: 4,
+          building: 'Building B',
+          floor: 2
+        }
+      })
+      expect(createDormResult.error).toBeUndefined()
+      
+      // Get the created entities to get their IDs
+      const createdUserId = createUserResult.effects?.[0]?.record?.id
+      const createdDormId = createDormResult.effects?.[0]?.record?.id
+      
+      // Now test assigning user to bed
+      const result = await controller.callInteraction('AssignUserToBed', {
+        user: adminUser,
+        payload: {
+          userId: createdUserId,
+          dormitoryId: createdDormId,
+          bedNumber: 1
+        }
+      })
+      
+      // Should succeed - no error
+      expect(result.error).toBeUndefined()
+    })
+    
+    test('Non-admin cannot assign user to bed', async () => {
+      // Non-admin user context  
+      const regularUser = { id: 'user1', role: 'regular_user' }
+      
+      const result = await controller.callInteraction('AssignUserToBed', {
+        user: regularUser,
+        payload: {
+          userId: 'some-user-id',  // Using string IDs for permission test (before validation)
+          dormitoryId: 'some-dorm-id',
+          bedNumber: 1
+        }
+      })
+      
+      // Should fail with condition check failed error (permission denied before validation)
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdministrator')
+    })
+  })
 })

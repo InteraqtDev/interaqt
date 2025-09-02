@@ -52,7 +52,7 @@
             "Admin can assign user to bed",
             "Non-admin cannot assign user to bed"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P005",
