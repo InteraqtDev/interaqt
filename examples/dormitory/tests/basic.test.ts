@@ -1408,4 +1408,104 @@ describe('Basic Functionality', () => {
     )
     expect(finalDeciderRelations.length).toBe(2)  // Still only 2 relations
   })
+
+  test('User.email set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: _owner
+     * This tests that email is properly set when User is created
+     * Steps: 1) Trigger interaction that creates User 2) Verify email is set from payload
+     * Business Logic: User's creation computation sets email from interaction payload
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Create CreateUser interaction to test with
+    const CreateUserInteraction = Interaction.create({
+      name: 'CreateUser',
+      action: Action.create({ name: 'create' }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({ name: 'name', required: true }),
+          PayloadItem.create({ name: 'email', required: true }),
+          PayloadItem.create({ name: 'role', required: false }),
+          PayloadItem.create({ name: 'phoneNumber', required: false })
+        ]
+      })
+    })
+    
+    // Add this interaction to the controller
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions: [...interactions, CreateUserInteraction],
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Call the user creation interaction with email data
+    const result = await testController.callInteraction('CreateUser', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Jane Smith',
+        email: 'jane.smith@university.edu',
+        role: 'student',
+        phoneNumber: '+1-555-123-4567'
+      }
+    })
+    
+    expect(result.error).toBeUndefined()
+    
+    // Verify user was created and email property is set correctly
+    const users = await testSystem.storage.find('User', 
+      undefined,
+      undefined,
+      ['id', 'name', 'email', 'role', 'status', 'phoneNumber']
+    )
+    
+    expect(users.length).toBe(1)
+    const user = users[0]
+    
+    // Verify email is set correctly from payload (_owner computation)
+    expect(user.email).toBe('jane.smith@university.edu')
+    expect(user.name).toBe('Jane Smith')
+    expect(user.role).toBe('student')
+    expect(user.status).toBe('active')  // Default from Transform
+    expect(user.phoneNumber).toBe('+1-555-123-4567')
+    expect(user.id).toBeDefined()  // System generated
+    
+    // Test with different email to ensure it's properly controlled by creation payload
+    const result2 = await testController.callInteraction('CreateUser', {
+      user: { id: 'admin-user-2' },
+      payload: {
+        name: 'Bob Johnson',
+        email: 'bob.johnson@university.edu',
+        role: 'admin'
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Verify second user has correct email
+    const allUsers = await testSystem.storage.find('User', 
+      undefined,
+      { orderBy: { name: 'asc' } },
+      ['id', 'name', 'email', 'role']
+    )
+    
+    expect(allUsers.length).toBe(2)
+    
+    const bob = allUsers.find(u => u.name === 'Bob Johnson')
+    expect(bob).toBeDefined()
+    expect(bob.email).toBe('bob.johnson@university.edu')
+    expect(bob.role).toBe('admin')
+    
+    const jane = allUsers.find(u => u.name === 'Jane Smith')
+    expect(jane).toBeDefined()
+    expect(jane.email).toBe('jane.smith@university.edu')
+    expect(jane.role).toBe('student')
+  })
 }) 
