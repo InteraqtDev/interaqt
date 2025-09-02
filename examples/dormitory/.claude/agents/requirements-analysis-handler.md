@@ -310,12 +310,21 @@ git commit -m "feat: Task 1.2 - Complete functional requirements analysis"
 
 Extract all necessary data concepts from requirements using supported data types.
 
+**⚠️ CRITICAL DESIGN PRINCIPLE: Entity Property Design**
+- **Entities MUST NOT contain foreign key properties** (e.g., no `userId`, `bookId`, `dormitoryId` properties)
+- **All relationships between entities MUST be defined through explicit Relations**
+- **Entity properties should only contain intrinsic attributes** of that entity
+- **Example:**
+  - ❌ WRONG: Book entity with `authorId` property
+  - ✅ CORRECT: Book entity with `title` property + BookAuthorRelation connecting Book and Author
+
 ### Step 1: Entity Identification and Analysis
 
 Extract nouns as potential entities:
 - Identify main business objects
 - Determine data needing persistence and tracking
 - Identify objects with unique identity and lifecycle
+- **Ensure NO foreign key properties** - move these to Relations
 
 ### Step 2: Property Analysis
 
@@ -327,10 +336,30 @@ For each entity property:
 
 ### Step 3: Relation Identification and Analysis
 
-From verb phrases in requirements:
-- Determine relation type (1:1, 1:n, n:1, n:n)
-- Analyze relation lifecycle
-- Identify relation properties
+**Relations are the ONLY way to connect entities** - they replace traditional foreign key patterns.
+
+From verb phrases in requirements, identify relations with these key attributes:
+- **type**: Cardinality (1:1, 1:n, n:1, n:n)
+- **sourceEntity**: The entity where the relation originates
+- **targetEntity**: The entity where the relation points to
+- **sourceProperty**: Property name on source entity to access this relation (e.g., "posts" on User)
+- **targetProperty**: Property name on target entity to access inverse relation (e.g., "author" on Post)
+
+**Example:**
+```json
+{
+  "name": "UserPostRelation",
+  "type": "1:n",
+  "sourceEntity": "User",
+  "targetEntity": "Post",
+  "sourceProperty": "posts",
+  "targetProperty": "author"
+}
+```
+
+Additional analysis:
+- Analyze relation lifecycle (when created/deleted)
+- Identify relation-specific properties (e.g., "joinDate" on MembershipRelation)
 
 ### Step 4: Dictionary (Global Data) Identification
 
@@ -376,6 +405,18 @@ Create `requirements/data-concepts.json`:
           "computed": false
         },
         {
+          "name": "isbn",
+          "type": "string",
+          "required": true,
+          "computed": false
+        },
+        {
+          "name": "publishYear",
+          "type": "number",
+          "required": false,
+          "computed": false
+        },
+        {
           "name": "availableCount",
           "type": "number",
           "required": true,
@@ -387,15 +428,44 @@ Create `requirements/data-concepts.json`:
           }
         }
       ],
-      "referenced_in": ["R001", "R101", "R201"]
+      "referenced_in": ["R001", "R101", "R201"],
+      "note": "No authorId or publisherId - use BookAuthorRelation and BookPublisherRelation instead"
+    },
+    {
+      "name": "Reader",
+      "description": "Library reader/member entity",
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "computed": false
+        },
+        {
+          "name": "membershipNumber",
+          "type": "string",
+          "required": true,
+          "computed": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "computed": false
+        }
+      ],
+      "referenced_in": ["R002", "R102"],
+      "note": "No references to borrowed books - use BorrowRecord relation"
     }
   ],
   "relations": [
     {
       "name": "BorrowRecord",
-      "from": "Reader",
-      "to": "Book",
-      "cardinality": "many-to-many",
+      "type": "n:n",
+      "sourceEntity": "Reader",
+      "targetEntity": "Book",
+      "sourceProperty": "borrowedBooks",
+      "targetProperty": "borrowers",
       "properties": [
         {
           "name": "borrowDate",
@@ -406,10 +476,26 @@ Create `requirements/data-concepts.json`:
           "name": "returnDate",
           "type": "date",
           "required": false
+        },
+        {
+          "name": "dueDate",
+          "type": "date",
+          "required": true
         }
       ],
       "lifecycle": "Created on borrow, updated on return",
       "referenced_in": ["R102", "R103"]
+    },
+    {
+      "name": "BookAuthorRelation",
+      "type": "n:1",
+      "sourceEntity": "Book",
+      "targetEntity": "Author",
+      "sourceProperty": "author",
+      "targetProperty": "books",
+      "properties": [],
+      "lifecycle": "Created with book",
+      "referenced_in": ["R101"]
     }
   ],
   "views": [

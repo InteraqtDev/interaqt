@@ -185,12 +185,6 @@
           "computed": false
         },
         {
-          "name": "dormitoryId",
-          "type": "string",
-          "required": true,
-          "computed": false
-        },
-        {
           "name": "isOccupied",
           "type": "boolean",
           "required": true,
@@ -208,18 +202,13 @@
           "computed": false
         }
       ],
-      "referenced_in": ["R001", "R102", "R103", "R503"]
+      "referenced_in": ["R001", "R102", "R103", "R503"],
+      "note": "No dormitoryId property - use BedDormitoryRelation instead"
     },
     {
       "name": "BehaviorViolation",
       "description": "Records of student behavior violations and score deductions",
       "properties": [
-        {
-          "name": "userId",
-          "type": "string",
-          "required": true,
-          "computed": false
-        },
         {
           "name": "violationType",
           "type": "string",
@@ -245,12 +234,6 @@
           "computed": false
         },
         {
-          "name": "reportedBy",
-          "type": "string",
-          "required": true,
-          "computed": false
-        },
-        {
           "name": "evidenceUrl",
           "type": "string",
           "required": false,
@@ -263,24 +246,13 @@
           "computed": false
         }
       ],
-      "referenced_in": ["R002", "R201", "R504", "R505"]
+      "referenced_in": ["R002", "R201", "R504", "R505"],
+      "note": "No userId or reportedBy properties - use UserViolationRelation and ViolationReporterRelation instead"
     },
     {
       "name": "EvictionRequest",
       "description": "Requests to evict users from dormitories",
       "properties": [
-        {
-          "name": "targetUserId",
-          "type": "string",
-          "required": true,
-          "computed": false
-        },
-        {
-          "name": "requestedBy",
-          "type": "string",
-          "required": true,
-          "computed": false
-        },
         {
           "name": "reason",
           "type": "string",
@@ -306,12 +278,6 @@
           "computed": false
         },
         {
-          "name": "decisionBy",
-          "type": "string",
-          "required": false,
-          "computed": false
-        },
-        {
           "name": "adminNotes",
           "type": "string",
           "required": false,
@@ -324,7 +290,8 @@
           "computed": false
         }
       ],
-      "referenced_in": ["R004", "R401", "R402", "R505"]
+      "referenced_in": ["R004", "R401", "R402", "R505"],
+      "note": "No targetUserId, requestedBy, or decisionBy properties - use EvictionTargetRelation, EvictionRequesterRelation, and EvictionDeciderRelation instead"
     }
   ],
   "relations": [
@@ -392,6 +359,69 @@
       ],
       "lifecycle": "Created when bed is added to dormitory, permanent relationship",
       "referenced_in": ["R101"]
+    },
+    {
+      "name": "UserViolationRelation",
+      "from": "User",
+      "to": "BehaviorViolation",
+      "cardinality": "one-to-many",
+      "properties": [],
+      "lifecycle": "Created when violation is recorded against user",
+      "referenced_in": ["R201", "R504"]
+    },
+    {
+      "name": "ViolationReporterRelation",
+      "from": "User",
+      "to": "BehaviorViolation", 
+      "cardinality": "one-to-many",
+      "properties": [
+        {
+          "name": "reporterRole",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "lifecycle": "Created when user reports a violation",
+      "referenced_in": ["R201"]
+    },
+    {
+      "name": "EvictionTargetRelation",
+      "from": "User",
+      "to": "EvictionRequest",
+      "cardinality": "one-to-many",
+      "properties": [],
+      "lifecycle": "Created when eviction request targets a user",
+      "referenced_in": ["R401", "R505"]
+    },
+    {
+      "name": "EvictionRequesterRelation",
+      "from": "User",
+      "to": "EvictionRequest",
+      "cardinality": "one-to-many",
+      "properties": [
+        {
+          "name": "requesterRole",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "lifecycle": "Created when user submits eviction request",
+      "referenced_in": ["R401"]
+    },
+    {
+      "name": "EvictionDeciderRelation",
+      "from": "User",
+      "to": "EvictionRequest",
+      "cardinality": "one-to-many",
+      "properties": [
+        {
+          "name": "decisionRole",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "lifecycle": "Created when admin makes decision on eviction request",
+      "referenced_in": ["R402"]
     }
   ],
   "views": [
@@ -424,7 +454,7 @@
       "base_entity": "Bed",
       "description": "Available beds across all active dormitories",
       "filters": ["isOccupied = false", "status = 'active'"],
-      "sorting": "dormitoryId ASC, number ASC",
+      "sorting": "number ASC",
       "referenced_in": ["R503"]
     },
     {

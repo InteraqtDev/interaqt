@@ -1,209 +1,183 @@
-# Data Analysis Guide for interaqt Projects
+# Data Analysis Guide for interaqt Projects (v2)
+
+## Overview
+
+This guide explains how to analyze data requirements using the new requirement artifacts (`data-concepts.json` and `interactions-design.json`) to produce a comprehensive data design for interaqt implementations. The analysis leverages pre-extracted data concepts and interaction specifications to determine entity lifecycles, property dependencies, and computation methods.
+
+## Input Artifacts
+
+### 1. data-concepts.json
+Contains pre-extracted data concepts:
+- **Entities**: Core business objects with their properties
+- **Relations**: Connections between entities 
+- **Dictionaries**: Global data and system-wide configurations
+- **Views**: Pre-defined data queries and filters
+
+### 2. interactions-design.json
+Contains interaction specifications showing:
+- **Data operations**: What each interaction creates, reads, updates, or deletes
+- **Data constraints**: How data is modified or created
+- **Validation rules**: Business rules and constraints
 
 ## Analysis Process
 
-### Step 1: Extract Core Business Objects
+### Step 1: Import Core Data Concepts
 
-#### 1.1 Identify Entities from Use Cases
+#### 1.1 Import Entities from data-concepts.json
 
-**Extract nouns** as potential entities from requirements:
-- "User creates style" → User, Style
-- "Admin publishes version" → User (with admin role), Version
-- "Style has versions" → Style, Version
+Read the entities directly from `data-concepts.json`. Each entity already includes:
+- Name and description
+- Properties with types and purposes
+- Computed property indicators
+- Reference information
 
-**Key Questions:**
-- What are the main business objects?
-- What needs to be tracked and persisted?
-- What has a unique identity and lifecycle?
+**No extraction needed** - the entities are already identified and structured.
 
-#### 1.2 Entity Lifecycle Analysis
+#### 1.2 Import Dictionaries
 
-For **EACH entity**, determine its lifecycle pattern:
+Read dictionaries from `data-concepts.json`. These represent:
+- System-wide configurations
+- Global statistics 
+- Shared validation rules
+- Cross-entity aggregates
 
-**Creation Patterns**:
-Identify how the entity comes into existence:
-- **interaction-created**: Created independently by specific interactions
-- **derived**: Automatically derived from other data (follows source data lifecycle)
-- **created-with-parent**: Created together with another entity (e.g., audit log with transaction)
+### Step 2: Analyze Entity Lifecycles Using Interactions
 
-**For interaction-created entities**:
-- List all interactions that can create this entity in `lifecycle.creation.creationInteractions`
-- Document any prerequisites in `dataDependencies` (entities that must exist first)
-- Describe creation logic in `computationMethod`
+For **EACH entity** in data-concepts.json:
 
-**For derived entities**:
-- List source data in `dataDependencies`
-- Leave `lifecycle.creation.creationInteractions` empty or minimal
-- Describe derivation rules in `computationMethod`
-- These entities appear/disappear automatically with their source data
+#### 2.1 Determine Creation Pattern
 
-**For created-with-parent entities**:
-- List parent entity in `dataDependencies`
-- Include parent's creation interactions in `lifecycle.creation.creationInteractions`
-- **CRITICAL**: The creation logic is NOT in this entity's own computation, but in the parent entity's computation
-- Must clearly state in `computationMethod`: "Created by [ParentEntity]'s computation when [condition]"
-- Example: AuditLog's `computationMethod` should be "Created by Transaction's computation when Transaction is created or updated"
+Analyze `interactions-design.json` to identify how entities are created:
 
-**Deletion Patterns**:
-Only relevant for interaction-created entities:
-- **Can be deleted**: true/false
-- **Deletion type**: 
-  - `soft-delete`: Entity marked as deleted but preserved in storage
-  - `hard-delete`: Entity completely removed from storage
-  - `auto-delete`: Automatically deleted when parent/dependency is deleted
-- **Deletion interactions**: List interactions that trigger deletion
+**Step A: Find Creation Interactions**
+1. Search all interactions where the entity appears in `data.creates`
+2. List these as `creationInteractions`
 
-**🔴 IMPORTANT: Updates Analysis at Property Level**
-Entity updates should NOT be analyzed at the entity level. Instead, analyze updates for each individual property in the Property Analysis section. This granular approach provides clearer understanding of data flow and enables precise computation selection.
+**Step B: Determine Creation Type**
+Analyze the creation pattern:
 
-#### 1.3 Identify Global Data (Dictionaries)
-
-**Look for system-wide data that:**
-- Doesn't belong to any specific entity instance
-- Represents global statistics or aggregates
-- Tracks system-wide settings or configurations
-- Examples: total user count, system status, global configurations
-
-**Dictionary Criteria:**
-- Data that spans across all instances
-- System-level metrics and counters
-- Global lookup tables or mappings
-- Shared configuration values
-
-**Dictionary Analysis:**
-For each dictionary, analyze using the same pattern as entity properties:
-- **Data Dependencies**: List entities or relations it aggregates from (as string array)
-- **Interaction Dependencies**: List interactions that directly modify it (as string array)
-- **Computation Method**: Describe in one place how it's calculated or updated
-- **Type**: The data type stored (number, string, object, etc.)
-- **Purpose**: What global data this tracks
-
-Dictionaries follow the same dependency pattern as properties:
-- Can be purely computed from entity/relation data
-- Can be purely interaction-driven (manual counters)
-- Can be mixed (computed but overridable)
-
-### Step 2: Property Analysis
-
-**🔴 CRITICAL PRINCIPLE: Analyze Updates at Property Level**
-All update behaviors MUST be analyzed at the individual property level, NOT at the entity or relation level. This means:
-- Document which interactions can modify each specific property
-- Specify update constraints for each property individually
-- Identify whether each property is mutable or immutable
-- Track dependencies separately for each property
-
-This granular approach is essential because:
-- Different properties have different mutability rules
-- A single interaction may update some properties but not others
-- Each property may have unique validation rules
-- This precision enables optimal computation selection
-
-For **EACH property** of every entity, analyze:
-
-#### 2.1 Basic Property Information
-- **Name**: Property identifier
-- **Type**: string, number, boolean, object, or collection
-- **Purpose**: Business meaning and usage
-- **Required**: Is this property mandatory?
-
-#### 2.2 Data Source Analysis
-
-Analyze the source of data for each property by identifying dependencies:
-
-**Data Dependencies** (for computed properties):
-- List all data sources this property depends on as a simple string array
-- Include other properties in the same entity, properties from related entities, or global data from dictionaries
-- Just list the names, don't describe how they're used
-
-**Interaction Dependencies** (for event-driven properties):
-- List all interactions that can modify this property as a simple string array
-- Include interactions that set the initial value and those that update it later
-- Just list the interaction names
-
-**Computation Method**:
-- Describe in one place how the property is computed or modified
-- For computed properties: explain the calculation logic (e.g., "Count of UserPostRelation where target = this user")
-- For interaction-driven properties: explain how interactions change the value (e.g., "Direct assignment from CreateUser and UpdateUserProfile")
-- For mixed dependencies: explain both the computation and how interactions can override it
-
-**Key Questions**:
-- Is this property computed from other data (data dependency)?
-- Is this property modified by interactions (interaction dependency)?
-- What is the initial value or creation logic?
-
-**Note**: Some properties may have both types of dependencies. For example, a property might be computed from other data but can also be overridden by specific interactions. Document both arrays and explain the combined behavior in the computationMethod field.
-
-#### 2.3 Property Control Type
-
-Determine how each property's value is controlled:
-
-**Control Types**:
-- **creation-only**: Set during entity/relation creation and never modified separately
-  - Examples: creation timestamps, immutable IDs, business constants
-  - These don't need separate computation control
-  - Logic is embedded in the entity/relation creation process
+- **interaction-created**: Entity is created independently by interactions
+  - Entity appears alone in `data.creates` 
+  - Or is the primary entity being created
   
-- **derived-with-parent**: Property belongs to a derived entity/relation and is computed as part of the parent's overall derivation
-  - Maintains strong consistency with parent computation
-  - Cannot be modified independently of parent's computation rules
-  - Examples: all properties of a filtered/derived entity
+- **created-with-parent**: Entity is created as part of another entity's creation
+  - Multiple entities appear in same interaction's `data.creates`
+  - Check `dataConstraints` for phrases like "automatically create", "create for each"
+  - The parent is the primary entity, child entities are secondary
   
-- **independent**: Requires separate computation control
-  - Can be modified after creation
-  - Has its own update logic separate from entity/relation creation
-  - Examples: status fields, counters, mutable business data
+- **derived**: Entity is filtered/computed from other entities
+  - No interactions directly create it
+  - Views in data-concepts.json are typically derived
 
-**Key Questions**:
-- Is this property only set at creation and never changed?
-- Is this property part of a derived entity/relation's computation?
-- Does this property need independent update control?
+**Example Analysis**:
+```json
+// In interaction I101 (CreateDormitory):
+"data": {
+  "creates": ["Dormitory", "Bed"]
+},
+"dataConstraints": [
+  "Automatically create individual bed entities for each bed"
+]
+// Result: Dormitory is interaction-created, Bed is created-with-parent (parent: Dormitory)
+```
 
-### Step 3: Relation Analysis
+#### 2.2 Determine Deletion Pattern
 
-#### 3.1 Identify Relations from Interactions
+Search interactions for deletion operations:
+1. Find interactions where entity appears in `data.deletes`
+2. Determine deletion type:
+   - **hard-delete**: Entity removed from storage
+   - **soft-delete**: Entity marked as deleted (status change)
+   - **auto-delete**: Deleted when parent/dependency is deleted
 
-**Analyze verb phrases** to find relationships:
-- "User creates Style" → UserStyleRelation (n:1)
-- "Style has Versions" → StyleVersionRelation (1:n)
-- "User publishes Version" → UserVersionRelation (n:1)
+### Step 3: Analyze Property Dependencies
 
-#### 3.2 Relation Lifecycle Analysis
+For **EACH property** of every entity:
 
-For **EACH relation**, determine its lifecycle pattern:
+#### 3.1 Identify Data Dependencies
 
-**Creation Patterns**:
-Relations follow similar patterns to entities:
-- **interaction-created**: Created independently by specific interactions (e.g., "Follow" relation)
-- **derived**: Automatically derived from conditions (e.g., "Manager" relation from org hierarchy)
-- **created-with-entity**: Created when source or target entity is created (e.g., author relation with post)
+From data-concepts.json, check if property is marked as `computed`:
+- If `computed: true`, examine the `computation` field
+- List all entities/relations/properties mentioned in `computation.dependencies`
+- These become the property's `dataDependencies`
 
-**Dependencies**:
-- **dataDependencies**: Always includes source and target entities, plus any other required data
-- **lifecycle.creation.creationInteractions**: Interactions that create this relation
-- **computationMethod**: Describes how and when the relation is established
+**Important**: Consider if this property could be decomposed:
+- Could parts of the computation be extracted as separate properties?
+- Are there reusable metrics hidden in the computation?
+- Would intermediate properties make the logic clearer?
 
-**Deletion Patterns**:
-- **Can be deleted**: true/false
-- **Deletion type**:
-  - `hard-delete`: Relation removed from storage
-  - `auto-delete`: Automatically deleted when source or target entity is deleted
-  - `soft-delete`: Rarely used for relations
-- **Deletion interactions**: List interactions that remove the relation
+#### 3.2 Identify Interaction Dependencies
 
-**Examples**:
-- **UserFollowRelation**: interaction-created by Follow/Unfollow interactions
-- **PostAuthorRelation**: created-with-entity when Post is created
-- **ManagerEmployeeRelation**: derived from User.managerId field
+Search interactions-design.json to find which interactions modify this property:
+1. Look for entity property in `data.updates` (e.g., "User.behaviorScore")
+2. Look for entity in `data.creates` (properties set at creation)
+3. List all matching interactions as `interactionDependencies`
 
-**🔴 IMPORTANT: Updates Analysis at Property Level**
-Relation updates should NOT be analyzed at the relation level. Analyze updates for each individual relation property separately. This granular approach enables better computation selection and clearer dependency tracking.
+#### 3.3 Determine Computation Method
 
-#### 3.3 Relation Properties
+Transform the computation description using semantic best practices:
+- **Don't copy directly** from data-concepts.json
+- Apply the "Best Practices for Computation Design" principles
+- Use semantic computations (Count, Every, Any, Summation, etc.) where possible
+- Decompose complex calculations into intermediate properties
+- Make the computation intent clear and implementation-ready
 
-Analyze properties that belong to the relation itself:
-- Timestamps (createdAt, updatedAt)
-- Status or state information
-- Metadata about the relationship
+#### 3.4 Determine Control Type
+
+Based on the analysis:
+- **creation-only**: Only set when entity is created (no updates found)
+- **derived-with-parent**: Property of a derived entity
+- **independent**: Has separate update logic (found in `data.updates`)
+
+### Step 4: Analyze Relations
+
+#### 4.1 Import Relation Structure
+
+Read relations from data-concepts.json:
+- Source and target entities
+- Cardinality
+- Relation properties
+
+#### 4.2 Determine Relation Lifecycle
+
+Similar to entities, analyze how relations are created:
+
+**Find Creation Interactions**:
+1. Search for relation name in `data.creates`
+2. Analyze creation context
+
+**Determine Creation Type**:
+- **interaction-created**: Relation created independently
+- **created-with-entity**: Created when source/target entity is created
+- **derived**: Computed from data conditions
+
+**Example**:
+```json
+// UserBedAssignment appears in:
+// I102: "data": { "creates": ["UserBedAssignment"] }
+// Result: interaction-created
+
+// If it appeared with entity creation:
+// "data": { "creates": ["Post", "PostAuthorRelation"] }
+// Result: PostAuthorRelation is created-with-entity (Post)
+```
+
+### Step 5: Transform Dictionaries to Analysis Format
+
+For each dictionary in data-concepts.json:
+
+#### 5.1 Analyze Usage Patterns
+
+Search interactions for dictionary usage:
+1. Find where dictionary appears in `data.reads`
+2. Find where dictionary values are used in conditions
+3. Determine if values are static or computed
+
+#### 5.2 Determine Dependencies
+
+- **Data Dependencies**: If dictionary aggregates from entities
+- **Interaction Dependencies**: If interactions update dictionary values
+- **Computation Method**: How the value is calculated or maintained
 
 ## Best Practices for Computation Design
 
@@ -272,20 +246,6 @@ Decompose into intermediate semantic computations:
     "interactionDependencies": [],
     "computationMethod": "Count of OrderItemRelation where Item.status = 'shipped'"
   },
-  "totalValue": {
-    "type": "number",
-    "purpose": "Total value of all items",
-    "dataDependencies": ["OrderItemRelation.item.price", "OrderItemRelation.quantity"],
-    "interactionDependencies": [],
-    "computationMethod": "Summation of (item.price * quantity) across all OrderItemRelation"
-  },
-  "averageItemPrice": {
-    "type": "number",
-    "purpose": "Average price per item type",
-    "dataDependencies": ["OrderItemRelation.item.price"],
-    "interactionDependencies": [],
-    "computationMethod": "Average of item.price across all OrderItemRelation"
-  },
   "allItemsShipped": {
     "type": "boolean",
     "purpose": "Whether all items are shipped",
@@ -293,19 +253,12 @@ Decompose into intermediate semantic computations:
     "interactionDependencies": [],
     "computationMethod": "Every(item => item.status === 'shipped')"
   },
-  "hasDelayedItems": {
-    "type": "boolean",
-    "purpose": "Whether any items are delayed",
-    "dataDependencies": ["OrderItemRelation", "Item.expectedDate", "Item.status"],
-    "interactionDependencies": [],
-    "computationMethod": "Any(item => item.expectedDate < now && item.status !== 'delivered')"
-  },
   "fulfillmentStatus": {
     "type": "string",
     "purpose": "Overall order fulfillment status",
-    "dataDependencies": ["allItemsShipped", "hasDelayedItems", "shippedItems", "totalItems"],
+    "dataDependencies": ["allItemsShipped", "shippedItems", "totalItems"],
     "interactionDependencies": [],
-    "computationMethod": "Custom: if (allItemsShipped) return 'complete'; if (hasDelayedItems) return 'delayed'; if (shippedItems > 0) return 'partial'; return 'pending'"
+    "computationMethod": "Custom: if (allItemsShipped) return 'complete'; if (shippedItems > 0) return 'partial'; return 'pending'"
   }
 }
 ```
@@ -328,408 +281,169 @@ Create intermediate computed properties when you find yourself:
 
 Remember: It's better to have several simple, semantic computations than one complex custom calculation.
 
-### Additional Example: Student GPA Calculation
+## Output Generation
 
-Using `WeightedSummation` for weighted calculations:
+### Generate Analysis JSON
 
-```json
-"properties": {
-  "totalCredits": {
-    "type": "number",
-    "purpose": "Total credit hours",
-    "dataDependencies": ["StudentCourseRelation.course.credits"],
-    "interactionDependencies": [],
-    "computationMethod": "Summation of course.credits across all StudentCourseRelation"
-  },
-  "totalGradePoints": {
-    "type": "number",
-    "purpose": "Total grade points (grade * credits)",
-    "dataDependencies": ["StudentCourseRelation.grade", "StudentCourseRelation.course.credits"],
-    "interactionDependencies": [],
-    "computationMethod": "WeightedSummation(grade, course.credits) across all StudentCourseRelation"
-  },
-  "gpa": {
-    "type": "number",
-    "purpose": "Grade Point Average",
-    "dataDependencies": ["totalGradePoints", "totalCredits"],
-    "interactionDependencies": [],
-    "computationMethod": "Custom: totalGradePoints / totalCredits"
-  }
-}
-```
-
-This example shows how `WeightedSummation` simplifies weighted calculations that would otherwise require complex custom logic.
-
-## Analysis Documentation Template
-
-Use this JSON template to document your analysis results.
-
-**Key Principles of the Simplified Structure**:
-1. **All dependencies are string arrays**: List names only, describe usage in `computationMethod`
-2. **Lifecycle is structured**: Creation is an object with `type` (interaction-created, derived, or created-with-parent/entity), `parent` (entity name when type is created-with-*), and `creationInteractions` (list of interactions that create the entity/relation)
-3. **Updates are property-level**: Never analyze updates at entity/relation level
-4. **Creation patterns are clear**: interaction-created, derived, or created-with-parent/entity
-5. **Deletion is straightforward**: Can delete? Type? Which interactions?
+Transform the analyzed data into the standard output format:
 
 ```json
 {
   "entities": {
-    "[entityName]": {
-      "purpose": "[Business purpose and meaning]",
-      "dataDependencies": ["dependency1", "dependency2"],
-      "computationMethod": "[How this entity is created: 'interaction-created' | 'derived from X' | 'created with parent entity Y']",
+    "[EntityName]": {
+      "purpose": "[From data-concepts.json description]",
+      "dataDependencies": "[Dependencies identified in Step 2]",
+      "computationMethod": "[Creation pattern description]",
       "lifecycle": {
         "creation": {
           "type": "[interaction-created | derived | created-with-parent]",
-          "parent": "[ParentEntityName if type is created-with-parent, null otherwise]",
-          "creationInteractions": ["interaction1", "interaction2"]
+          "parent": "[Parent entity name if created-with-parent]",
+          "creationInteractions": "[List from Step 2.1]"
         },
         "deletion": {
-          "canBeDeleted": true,
-          "deletionType": "[soft-delete | hard-delete]",
-          "deletionInteractions": ["DeleteEntity", "PurgeEntity"]
+          "canBeDeleted": "[true/false based on Step 2.2]",
+          "deletionType": "[soft-delete | hard-delete | auto-delete]",
+          "deletionInteractions": "[List from Step 2.2]"
         }
       },
       "properties": {
-        "id": {
-          "type": "string",
-          "purpose": "System-generated unique identifier",
-          "controlType": "creation-only",
-          "dataDependencies": null,
-          "interactionDependencies": null,
-          "initialValue": "auto-generated"
-        },
         "[propertyName]": {
-          "type": "[string/number/boolean/object]",
-          "purpose": "[What this property represents]",
-          "controlType": "[creation-only | derived-with-parent | independent]",
-          "dataDependencies": ["dependency1", "dependency2"],
-          "interactionDependencies": ["interaction1", "interaction2"],
-          "computationMethod": "[how this property is computed from data dependencies OR how interactions modify it]",
-          "initialValue": "[default or creation logic]"
-        }
-      }
-    }
-
-    "user": {
-      "purpose": "System users with different roles",
-      "dataDependencies": [],
-      "computationMethod": "Independently created by CreateUser, BulkImportUsers, or RegisterUser interactions",
-      "lifecycle": {
-        "creation": {
-          "type": "interaction-created",
-          "parent": null,
-          "creationInteractions": ["CreateUser", "BulkImportUsers", "RegisterUser"]
-        },
-        "deletion": {
-          "canBeDeleted": true,
-          "deletionType": "soft-delete",
-          "deletionInteractions": ["DeleteUser", "BanUser"]
-        }
-      },
-      "properties": {
-        "id": {
-          "type": "string",
-          "purpose": "System-generated unique identifier",
-          "controlType": "creation-only",
-          "dataDependencies": null,
-          "interactionDependencies": null,
-          "initialValue": "auto-generated"
-        },
-        "name": {
-          "type": "string",
-          "purpose": "User's display name",
-          "controlType": "independent",
-          "dataDependencies": [],
-          "interactionDependencies": ["CreateUser", "UpdateUserProfile"],
-          "computationMethod": "Direct assignment from interactions",
-          "initialValue": "Required at creation"
-        },
-        "email": {
-          "type": "string",
-          "purpose": "Unique identifier and contact",
-          "controlType": "creation-only",
-          "dataDependencies": [],
-          "interactionDependencies": ["CreateUser"],
-          "computationMethod": "Set once at creation, immutable thereafter",
-          "initialValue": "Required at creation"
-        },
-        "postCount": {
-          "type": "number",
-          "purpose": "Total posts created by user",
-          "controlType": "independent",
-          "dataDependencies": ["UserPostRelation"],
-          "interactionDependencies": [],
-          "computationMethod": "Count of UserPostRelation where target = this user",
-          "initialValue": 0
-        },
-        "status": {
-          "type": "string",
-          "purpose": "User account status (example of mixed dependencies)",
-          "controlType": "independent",
-          "dataDependencies": ["lastLoginDate"],
-          "interactionDependencies": ["CreateUser", "ActivateUser", "DeactivateUser", "BanUser"],
-          "computationMethod": "Set to 'inactive' if lastLoginDate > 90 days ago, but can be overridden by direct interaction updates",
-          "initialValue": "active"
+          "type": "[From data-concepts.json]",
+          "purpose": "[From data-concepts.json or inferred]",
+          "controlType": "[From Step 3.4]",
+          "dataDependencies": "[From Step 3.1]",
+          "interactionDependencies": "[From Step 3.2]",
+          "computationMethod": "[From Step 3.3]",
+          "initialValue": "[Default or creation logic]"
         }
       }
     }
   },
-
   "relations": {
-    "[relationName]": {
-      "type": "[1:1/1:n/n:1/n:n]",
-      "purpose": "[Business meaning of the relationship]",
-      "sourceEntity": "[EntityName]",
-      "targetEntity": "[EntityName]",
-      "sourceProperty": "[property name on source entity]",
-      "targetProperty": "[property name on target entity]",
-      "dataDependencies": ["sourceEntity", "targetEntity"],
-      "computationMethod": "[How this relation is created: 'interaction-created' | 'derived from conditions' | 'created with entity X']",
+    "[RelationName]": {
+      "type": "[From data-concepts.json cardinality]",
+      "purpose": "[From data-concepts.json description]",
+      "sourceEntity": "[From data-concepts.json]",
+      "targetEntity": "[From data-concepts.json]",
+      "sourceProperty": "[Inferred or specified]",
+      "targetProperty": "[Inferred or specified]",
+      "dataDependencies": "[Always includes source and target entities]",
+      "computationMethod": "[From Step 4.2]",
       "lifecycle": {
         "creation": {
-          "type": "[interaction-created | derived | created-with-entity]",
-          "parent": "[ParentEntityName if type is created-with-entity, null otherwise]",
-          "creationInteractions": ["interaction1", "interaction2"]
+          "type": "[From Step 4.2]",
+          "parent": "[If created-with-entity]",
+          "creationInteractions": "[From Step 4.2]"
         },
         "deletion": {
-          "canBeDeleted": true,
-          "deletionType": "[soft-delete | hard-delete | auto-delete]",
-          "deletionInteractions": ["DeleteRelation", "UnlinkEntities"]
+          "canBeDeleted": "[Based on analysis]",
+          "deletionType": "[Type identified]",
+          "deletionInteractions": "[List of interactions]"
         }
       },
       "properties": {
         "[propertyName]": {
-          "type": "[string/number/boolean]",
-          "purpose": "[meaning in the relationship context]",
-          "controlType": "[creation-only | derived-with-parent | independent]",
-          "dataDependencies": ["dependency1", "dependency2"],
-          "interactionDependencies": ["interaction1", "interaction2"],
-          "computationMethod": "[how this property is computed from data dependencies OR how interactions modify it]",
-          "initialValue": "[default or creation logic]"
-        }
-      }
-    },
-
-    "userPostRelation": {
-      "type": "n:1",
-      "purpose": "Links posts to their authors",
-      "sourceEntity": "Post",
-      "targetEntity": "User",
-      "sourceProperty": "author",
-      "targetProperty": "posts",
-      "dataDependencies": ["Post", "User"],
-      "computationMethod": "Created together with Post entity by CreatePost or ImportPost interactions",
-      "lifecycle": {
-        "creation": {
-          "type": "created-with-entity",
-          "parent": "Post",
-          "creationInteractions": ["CreatePost", "ImportPost"]
-        },
-        "deletion": {
-          "canBeDeleted": true,
-          "deletionType": "auto-delete",
-          "deletionInteractions": ["DeletePost", "PurgeUserContent"]
-        }
-      },
-      "properties": {
-        "createdAt": {
-          "type": "number",
-          "purpose": "Timestamp of post creation",
-          "controlType": "creation-only",
-          "dataDependencies": [],
-          "interactionDependencies": ["CreatePost"],
-          "computationMethod": "Set to current timestamp when CreatePost creates the relation",
-          "initialValue": "Current timestamp at creation"
-        }
-      }
-    },
-
-    "dormitoryAssignmentRelation": {
-      "type": "n:1",
-      "purpose": "Assigns students to dormitory rooms",
-      "sourceEntity": "User",
-      "targetEntity": "Dormitory",
-      "sourceProperty": "dormitory",
-      "targetProperty": "residents",
-      "dataDependencies": ["User", "Dormitory"],
-      "computationMethod": "Independently created by AssignDormitory or BulkAssignStudents when User.role='student' and Dormitory has capacity",
-      "lifecycle": {
-        "creation": {
-          "type": "interaction-created",
-          "parent": null,
-          "creationInteractions": ["AssignDormitory", "BulkAssignStudents"]
-        },
-        "deletion": {
-          "canBeDeleted": true,
-          "deletionType": "hard-delete",
-          "deletionInteractions": ["UnassignDormitory", "GraduateStudent", "TransferDormitory"]
-        }
-      },
-      "properties": {
-        "assignedAt": {
-          "type": "number",
-          "purpose": "Timestamp of assignment",
-          "controlType": "creation-only",
-          "dataDependencies": [],
-          "interactionDependencies": ["AssignDormitory"],
-          "computationMethod": "Set to current timestamp when AssignDormitory creates the relation",
-          "initialValue": "Current timestamp"
-        },
-        "status": {
-          "type": "string",
-          "purpose": "Assignment status",
-          "controlType": "independent",
-          "dataDependencies": ["User.enrollmentStatus"],
-          "interactionDependencies": ["CheckInStudent", "CheckOutStudent"],
-          "computationMethod": "Set to 'inactive' if User.enrollmentStatus is not 'enrolled', can be directly set to 'checked-in' or 'checked-out' by interactions",
-          "initialValue": "pending"
-        }
-      }
-    },
-    
-    "activeUser": {
-      "purpose": "Users who have logged in within last 30 days (example of derived entity)",
-      "dataDependencies": ["User", "User.lastLoginDate"],
-      "computationMethod": "Derived from User where lastLoginDate > (now - 30 days)",
-      "lifecycle": {
-        "creation": {
-          "type": "derived",
-          "parent": null,
-          "creationInteractions": []
-        },
-        "deletion": {
-          "canBeDeleted": false,
-          "deletionType": "auto-delete",
-          "deletionInteractions": []
-        }
-      },
-      "properties": {
-        "id": {
-          "type": "string",
-          "purpose": "User's ID (inherited)",
-          "controlType": "derived-with-parent",
-          "dataDependencies": ["User.id"],
-          "interactionDependencies": [],
-          "computationMethod": "Inherited from User entity during derivation",
-          "initialValue": "from User"
-        },
-        "name": {
-          "type": "string",
-          "purpose": "User's name (inherited)",
-          "controlType": "derived-with-parent",
-          "dataDependencies": ["User.name"],
-          "interactionDependencies": [],
-          "computationMethod": "Inherited from User entity during derivation",
-          "initialValue": "from User"
-        },
-        "lastLoginDate": {
-          "type": "number",
-          "purpose": "Last login timestamp (inherited)",
-          "controlType": "derived-with-parent",
-          "dataDependencies": ["User.lastLoginDate"],
-          "interactionDependencies": [],
-          "computationMethod": "Inherited from User entity during derivation",
-          "initialValue": "from User"
-        }
-      }
-    },
-    
-    "auditLog": {
-      "purpose": "Audit trail for important operations (example of created-with-parent)",
-      "dataDependencies": ["Transaction"],
-      "computationMethod": "Created by Transaction's computation when Transaction is created or updated (NOT by AuditLog's own computation)",
-      "lifecycle": {
-        "creation": {
-          "type": "created-with-parent",
-          "parent": "Transaction",
-          "creationInteractions": ["CreateTransaction", "UpdateTransaction"]
-        },
-        "deletion": {
-          "canBeDeleted": false,
-          "deletionType": "none",
-          "deletionInteractions": []
-        }
-      },
-      "properties": {
-        "action": {
-          "type": "string",
-          "purpose": "The action performed",
-          "controlType": "creation-only",
-          "dataDependencies": [],
-          "interactionDependencies": ["CreateTransaction", "UpdateTransaction"],
-          "computationMethod": "Set based on the triggering interaction type",
-          "initialValue": "Required at creation"
+          // Same structure as entity properties
         }
       }
     }
   },
   "dictionaries": {
-    "[dictionaryName]": {
-      "purpose": "[What global data this tracks]",
-      "type": "[data type stored]",
-      "dataDependencies": ["dependency1", "dependency2"],
-      "interactionDependencies": ["interaction1", "interaction2"],
-      "computationMethod": "[how this dictionary value is computed from data OR modified by interactions]"
-    },
-    "systemUserCount": {
-      "purpose": "Track total number of users in the system",
-      "type": "number",
-      "dataDependencies": [],
-      "interactionDependencies": ["CreateUser", "DeleteUser", "BulkImportUsers"],
-      "computationMethod": "Incremented by 1 on CreateUser, decremented by 1 on DeleteUser, incremented by import count on BulkImportUsers"
-    },
-    "totalRevenue": {
-      "purpose": "Total revenue across all orders",
-      "type": "number",
-      "dataDependencies": ["Order.totalAmount"],
-      "interactionDependencies": [],
-      "computationMethod": "Summation of Order.totalAmount where Order.status = 'completed'"
+    "[DictionaryName]": {
+      "purpose": "[From data-concepts.json description]",
+      "type": "[object with key types]",
+      "dataDependencies": "[From Step 5.2]",
+      "interactionDependencies": "[From Step 5.2]",
+      "computationMethod": "[From Step 5.2]"
     }
   }
 }
 ```
 
+## Best Practices for Analysis
 
+### 1. Cross-Reference Data Operations
 
-## Common Patterns to Look For
+Always verify entity/property modifications by:
+- Checking all interactions that mention the entity
+- Looking for indirect updates through relations
+- Identifying cascade effects in dataConstraints
 
-1. **Counters and Aggregations**
-   - User post counts, comment counts
-   - Category item counts
-   - Total system metrics
+### 2. Identify Computation Patterns
 
-2. **Status/State Tracking**
-   - Draft → Published → Archived workflows
-   - Active/Inactive states
-   - Multi-step approval processes
+When analyzing computed properties:
+- Look for standard patterns (Count, Sum, Average, etc.)
+- Identify if computation can use built-in interaqt computations
+- Document complex custom logic clearly
 
-3. **Temporal Data**
-   - Creation/modification timestamps
-   - Scheduled events
-   - Time-based state changes
+### 3. Track Dependency Chains
 
-4. **Hierarchical Relationships**
-   - Parent-child structures
-   - Category trees
-   - Organizational hierarchies
+Ensure all dependencies are identified:
+- Direct data dependencies from computation logic
+- Indirect dependencies through relations
+- Interaction chains that affect the data
 
-5. **Many-to-Many Relationships**
-   - User-Role assignments
-   - Tag associations
-   - Group memberships
+### 4. Validate Lifecycle Consistency
+
+Verify that:
+- Creation patterns match the business logic
+- Deletion handling preserves data integrity
+- Parent-child relationships are properly maintained
+
+## Common Analysis Patterns
+
+### 1. Aggregation Properties
+Properties that count or sum related data:
+```json
+"currentOccupancy": {
+  "dataDependencies": ["Bed", "UserBedAssignment"],
+  "computationMethod": "Count of occupied beds (Bed.isOccupied = true)"
+}
+```
+
+### 2. Status-Driven Properties
+Properties that change based on interactions:
+```json
+"status": {
+  "interactionDependencies": ["CreateUser", "ActivateUser", "DeactivateUser"],
+  "computationMethod": "Set by interactions, defaults to 'active' on creation"
+}
+```
+
+### 3. Cascading Updates
+Properties affected by multiple sources:
+```json
+"behaviorScore": {
+  "dataDependencies": ["BehaviorViolation"],
+  "interactionDependencies": ["ModifyBehaviorScore"],
+  "computationMethod": "Base score minus sum of violations, can be overridden by admin"
+}
+```
+
+### 4. Derived Entities
+Entities filtered from base entities:
+```json
+"ActiveUser": {
+  "computationMethod": "Derived from User where lastLoginDate > (now - 30 days)",
+  "lifecycle": {
+    "creation": {
+      "type": "derived",
+      "parent": null,
+      "creationInteractions": []
+    }
+  }
+}
+```
 
 ## Validation Checklist
 
-- [ ] Every entity has documented data dependencies and creation interactions in lifecycle.creation.creationInteractions
-- [ ] Every relation has documented data dependencies and creation interactions in lifecycle.creation.creationInteractions
-- [ ] Every entity property has clear dependency documentation
-- [ ] All computed properties list complete data dependencies with computation methods
-- [ ] Event-driven properties specify all interaction dependencies with change patterns
-- [ ] Entity lifecycle constraints are clearly specified
-- [ ] Relation lifecycle constraints are clearly specified
-- [ ] Relations document complete lifecycle (create/update/delete)
-- [ ] Dictionaries are identified for global data
-- [ ] No circular dependencies without resolution strategy
-
-```
+- [ ] All entities from data-concepts.json are analyzed
+- [ ] All relations from data-concepts.json are analyzed
+- [ ] All dictionaries from data-concepts.json are analyzed
+- [ ] Creation patterns identified for each entity/relation
+- [ ] Interaction dependencies found by searching interactions-design.json
+- [ ] Data dependencies match computed property definitions
+- [ ] Lifecycle patterns are consistent with business logic
+- [ ] Parent-child relationships properly identified
+- [ ] All properties have defined control types
+- [ ] Computation methods clearly documented
