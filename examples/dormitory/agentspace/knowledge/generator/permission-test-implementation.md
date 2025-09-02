@@ -6,8 +6,8 @@ Permission testing verifies that conditions correctly control access to interact
 ### Key Testing Pattern
 When testing permission failures, always verify:
 1. **Error exists**: `expect(result.error).toBeDefined()`
-2. **Error type**: `expect(result.error.type).toBe('condition check failed')`
-3. **Which condition failed**: `expect(result.error.error.data.name).toBe('ConditionName')`
+2. **Error type**: `expect((result.error as ConditionError).type).toBe('condition check failed')`
+3. **Which condition failed**: `expect((result.error as ConditionError).error.data.name).toBe('ConditionName')`
 
 This detailed verification helps identify exactly which permission check failed, making debugging easier.
 
@@ -27,14 +27,15 @@ try {
 }
 
 // ✅ CORRECT: Check error in result with detailed verification
+import {ConditionError} from "interaqt"
 const result = await controller.callInteraction('DeleteStyle', { 
   user: viewer,
   payload: { style: { id: styleId } }
 })
 expect(result.error).toBeDefined()
-expect(result.error.type).toBe('condition check failed')
+expect((result.error as ConditionError).type).toBe('condition check failed')
 // Verify which specific condition failed
-expect(result.error.error.data.name).toBe('AdminRole')
+expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
 ```
 
 ### Common Error Types
@@ -48,7 +49,7 @@ expect(result.error.error.data.name).toBe('AdminRole')
 Define permissions:
 
 ```typescript
-import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp } from 'interaqt'
+import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp, Controller, ConditionError } from 'interaqt'
 
 // Step 1: Define Conditions
 export const AdminRole = Condition.create({
@@ -137,8 +138,8 @@ test('role-based permission', async () => {
     payload: { style: { id: style.id } }
   })
   expect(operatorResult.error).toBeDefined()
-  expect(operatorResult.error.type).toBe('condition check failed')
-  expect(operatorResult.error.error.data.name).toBe('AdminRole')
+  expect((operatorResult.error as ConditionError).type).toBe('condition check failed')
+  expect((operatorResult.error as ConditionError).error.data.name).toBe('AdminRole')
   
   // Step 5: Test viewer (denied)
   const viewerResult = await controller.callInteraction('DeleteStyle', {
@@ -146,8 +147,8 @@ test('role-based permission', async () => {
     payload: { style: { id: style.id } }
   })
   expect(viewerResult.error).toBeDefined()
-  expect(viewerResult.error.type).toBe('condition check failed')
-  expect(viewerResult.error.error.data.name).toBe('AdminRole')
+  expect((viewerResult.error as ConditionError).type).toBe('condition check failed')
+  expect((viewerResult.error as ConditionError).error.data.name).toBe('AdminRole')
 })
 ```
 
@@ -224,9 +225,9 @@ test('combined permissions with BoolExp', async () => {
     payload: { style: { id: publishedStyle.id } }
   })
   expect(result3.error).toBeDefined()
-  expect(result3.error.type).toBe('condition check failed')
+  expect((result3.error as ConditionError).type).toBe('condition check failed')
   // With combined conditions, the first failing condition is reported
-  expect(result3.error.error.data.name).toBeDefined()
+  expect((result3.error as ConditionError).error.data.name).toBeDefined()
   
   // Test admin with offline style (denied - even admin can't update offline)
   const result4 = await controller.callInteraction('UpdateStyle', {
@@ -234,8 +235,8 @@ test('combined permissions with BoolExp', async () => {
     payload: { style: { id: offlineStyle.id } }
   })
   expect(result4.error).toBeDefined()
-  expect(result4.error.type).toBe('condition check failed')
-  expect(result4.error.error.data.name).toBe('StyleNotOffline')
+  expect((result4.error as ConditionError).type).toBe('condition check failed')
+  expect((result4.error as ConditionError).error.data.name).toBe('StyleNotOffline')
 })
 ```
 
@@ -314,9 +315,9 @@ test('resource ownership permission', async () => {
     payload: { style: { id: style.id } }
   })
   expect(otherResult.error).toBeDefined()
-  expect(otherResult.error.type).toBe('condition check failed')
+  expect((otherResult.error as ConditionError).type).toBe('condition check failed')
   // Should fail on OwnerOnly condition
-  expect(otherResult.error.error.data.name).toBe('OwnerOnly')
+  expect((otherResult.error as ConditionError).error.data.name).toBe('OwnerOnly')
   
   // Admin can delete any style (allowed)
   const adminResult = await controller.callInteraction('DeleteOwnStyle', {
@@ -332,7 +333,7 @@ test('resource ownership permission', async () => {
 Test permissions for data retrieval interactions using GetAction:
 
 ```typescript
-import { GetAction, Query, QueryItem } from 'interaqt'
+import { GetAction, Query, QueryItem, Condition, Controller, MatchExp, ConditionError } from 'interaqt'
 
 // Check query-based permissions
 export const CanViewPrivateData = Condition.create({
@@ -432,8 +433,8 @@ test('data retrieval permissions based on query', async () => {
     }
   })
   expect(othersResult.error).toBeDefined()
-  expect(othersResult.error.type).toBe('condition check failed')
-  expect(othersResult.error.error.data.name).toBe('CanViewPrivateData')
+  expect((othersResult.error as ConditionError).type).toBe('condition check failed')
+  expect((othersResult.error as ConditionError).error.data.name).toBe('CanViewPrivateData')
 })
 
 // Pagination limits based on user role
@@ -524,9 +525,9 @@ test('payload validation in conditions', async () => {
     payload: { style: { id: draftStyle.id } }
   })
   expect(result2.error).toBeDefined()
-  expect(result2.error.type).toBe('condition check failed')
+  expect((result2.error as ConditionError).type).toBe('condition check failed')
   // Should fail on CheckPublishedStyle condition
-  expect(result2.error.error.data.name).toBe('CheckPublishedStyle')
+  expect((result2.error as ConditionError).error.data.name).toBe('CheckPublishedStyle')
 })
 ```
 
@@ -552,8 +553,8 @@ test('comprehensive permission coverage', async () => {
       expect(result.error).toBeUndefined()
     } else {
       expect(result.error).toBeDefined()
-      expect(result.error.type).toBe('condition check failed')
-      expect(result.error.error.data.name).toBe('AdminRole')
+      expect((result.error as ConditionError).type).toBe('condition check failed')
+      expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
     }
   }
 })
@@ -642,19 +643,19 @@ test('verify detailed condition error information', async () => {
   
   // Basic error checks
   expect(result.error).toBeDefined()
-  expect(result.error.type).toBe('condition check failed')
+  expect((result.error as ConditionError).type).toBe('condition check failed')
   
   // Detailed error verification - identify which condition failed
-  expect(result.error.error.data.name).toBe('AdminRole')
+  expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
   
   // For combined conditions, test each failure scenario
   const complexResult = await controller.callInteraction('ComplexAction', {
     user: unverifiedAdmin  // Admin but not verified
   })
   expect(complexResult.error).toBeDefined()
-  expect(complexResult.error.type).toBe('condition check failed')
+  expect((complexResult.error as ConditionError).type).toBe('condition check failed')
   // Should report the specific condition that failed
-  expect(complexResult.error.error.data.name).toBe('EmailVerified')
+  expect((complexResult.error as ConditionError).error.data.name).toBe('EmailVerified')
 })
 
 test('meaningful error messages', async () => {
@@ -684,9 +685,9 @@ test('meaningful error messages', async () => {
   })
   
   expect(result.error).toBeDefined()
-  expect(result.error.type).toBe('condition check failed')
-  expect(result.error.error.data.name).toBe('CustomError')
-  expect(result.error.message).toContain('Insufficient credits')
+  expect((result.error as ConditionError).type).toBe('condition check failed')
+  expect((result.error as ConditionError).error.data.name).toBe('CustomError')
+  expect((result.error as ConditionError).message).toContain('Insufficient credits')
 })
 ```
 
@@ -839,16 +840,16 @@ const style = await system.storage.findOne('Style',
 ### 2. Wrong Error Expectations
 ```typescript
 // ❌ WRONG: Expecting wrong error type or incomplete verification
-expect(result.error.type).toBe('no permission')
+expect((result.error as ConditionError).type).toBe('no permission')
 
 // ❌ INCOMPLETE: Only checking error type
 expect(result.error).toBeDefined()
-expect(result.error.type).toBe('condition check failed')
+expect((result.error as ConditionError).type).toBe('condition check failed')
 
 // ✅ CORRECT: Complete error verification including which condition failed
 expect(result.error).toBeDefined()
-expect(result.error.type).toBe('condition check failed')
-expect(result.error.error.data.name).toBe('AdminRole')  // Verify specific condition
+expect((result.error as ConditionError).type).toBe('condition check failed')
+expect((result.error as ConditionError).error.data.name).toBe('AdminRole')  // Verify specific condition
 ```
 
 ### 3. Incomplete Test Coverage

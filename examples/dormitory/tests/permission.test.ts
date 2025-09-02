@@ -3,7 +3,10 @@ import {
   Entity, Property, Relation, Interaction, Action, Payload, PayloadItem,
   Transform, StateMachine, StateNode, StateTransfer, Count, MatchExp,
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
-  Condition, Conditions, BoolExp
+  Condition, Conditions, BoolExp,
+  ConditionInstance,
+  EvaluateError,
+  ConditionError
 } from 'interaqt'
 import { entities, relations, interactions, activities, dicts } from '../backend'
 
@@ -64,8 +67,8 @@ describe('Permission and Business Rules', () => {
       
       // Should fail with condition check failed error
       expect(result.error).toBeDefined()
-      expect((result.error as any).type).toBe('condition check failed')
-      expect((result.error as any).error.data.name).toBe('isAdministrator')
+      expect((result.error as ConditionError).type).toBe('condition check failed')
+      expect((result.error as ConditionError).error.data.name).toBe('isAdministrator')
     })
   })
 

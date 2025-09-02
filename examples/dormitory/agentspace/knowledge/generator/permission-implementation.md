@@ -3,6 +3,11 @@
 ## Overview
 Permissions in interaqt are implemented through conditions in interactions. These control who can perform actions and under what circumstances.
 
+**Important**: Conditions can return:
+- `true` - Permission granted
+- `false` - Permission denied (generic error)  
+- A string - Permission denied with specific error message (recommended)
+
 ## 🔴 CRITICAL: Common Mistakes
 
 ### Don't Check Permissions in Computations
@@ -130,7 +135,7 @@ export const OwnerOnly = Condition.create({
   name: 'OwnerOnly',
   content: async function(this: Controller, event) {
     const styleId = event.payload?.style?.id;
-    if (!styleId) return false;
+    if (!styleId) return 'Style ID is required';
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -138,7 +143,11 @@ export const OwnerOnly = Condition.create({
       ['creator']  // Must include creator field
     );
     
-    return style?.creator?.id === event.user?.id;
+    if (style?.creator?.id !== event.user?.id) {
+      return 'You can only modify your own styles';
+    }
+    
+    return true;
   }
 });
 
@@ -170,7 +179,7 @@ export const PublishedOnly = Condition.create({
   name: 'PublishedOnly',
   content: async function(this: Controller, event) {
     const styleId = event.payload?.style?.id;
-    if (!styleId) return false;
+    if (!styleId) return 'Style ID is required';
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -178,7 +187,11 @@ export const PublishedOnly = Condition.create({
       ['status']  // Include status field
     );
     
-    return style?.status === 'published';
+    if (style?.status !== 'published') {
+      return 'Style must be published to perform this action';
+    }
+    
+    return true;
   }
 });
 
@@ -199,7 +212,8 @@ export const SameDepartment = Condition.create({
   name: 'SameDepartment',
   content: async function(this: Controller, event) {
     const targetUserId = event.payload?.targetUser?.id;
-    if (!targetUserId || !event.user?.department) return false;
+    if (!targetUserId) return 'Target user ID is required';
+    if (!event.user?.department) return 'Your department information is missing';
     
     const targetUser = await this.system.storage.findOne('User',
       MatchExp.atom({ key: 'id', value: ['=', targetUserId] }),
@@ -207,7 +221,11 @@ export const SameDepartment = Condition.create({
       ['department']
     );
     
-    return targetUser?.department === event.user.department;
+    if (targetUser?.department !== event.user.department) {
+      return 'You can only perform this action on users in your department';
+    }
+    
+    return true;
   }
 });
 ```
@@ -219,10 +237,14 @@ export const ValidateStyleType = Condition.create({
   name: 'ValidateStyleType',
   content: async function(this: Controller, event) {
     const styleData = event.payload?.styleData;
-    if (!styleData) return false;
+    if (!styleData) return 'Style data is required';
     
     const validTypes = ['theme', 'component', 'template'];
-    return validTypes.includes(styleData.type);
+    if (!validTypes.includes(styleData.type)) {
+      return `Invalid style type '${styleData.type}'. Must be one of: ${validTypes.join(', ')}`;
+    }
+    
+    return true;
   }
 });
 
@@ -252,21 +274,30 @@ import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadIt
 export const AuthenticatedUser = Condition.create({
   name: 'AuthenticatedUser',
   content: async function(this: Controller, event) {
-    return !!event.user && !!event.user.id;
+    if (!event.user || !event.user.id) {
+      return 'Authentication required';
+    }
+    return true;
   }
 });
 
 export const ActiveUser = Condition.create({
   name: 'ActiveUser',
   content: async function(this: Controller, event) {
-    return event.user?.status === 'active';
+    if (event.user?.status !== 'active') {
+      return 'Your account is not active';
+    }
+    return true;
   }
 });
 
 export const AdminRole = Condition.create({
   name: 'AdminRole',
   content: async function(this: Controller, event) {
-    return event.user?.role === 'admin';
+    if (event.user?.role !== 'admin') {
+      return 'Admin privileges required';
+    }
+    return true;
   }
 });
 
@@ -275,7 +306,7 @@ export const StyleExists = Condition.create({
   name: 'StyleExists',
   content: async function(this: Controller, event) {
     const styleId = event.payload?.style?.id;
-    if (!styleId) return false;
+    if (!styleId) return 'Style ID is required';
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -283,7 +314,11 @@ export const StyleExists = Condition.create({
       ['id']
     );
     
-    return !!style;
+    if (!style) {
+      return 'Style not found';
+    }
+    
+    return true;
   }
 });
 
@@ -291,7 +326,7 @@ export const StyleNotOffline = Condition.create({
   name: 'StyleNotOffline',
   content: async function(this: Controller, event) {
     const styleId = event.payload?.style?.id;
-    if (!styleId) return false;
+    if (!styleId) return 'Style ID is required';
     
     const style = await this.system.storage.findOne('Style',
       MatchExp.atom({ key: 'id', value: ['=', styleId] }),
@@ -299,7 +334,11 @@ export const StyleNotOffline = Condition.create({
       ['status']
     );
     
-    return style?.status !== 'offline';
+    if (style?.status === 'offline') {
+      return 'Cannot perform this action on offline styles';
+    }
+    
+    return true;
   }
 });
 

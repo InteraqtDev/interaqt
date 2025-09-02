@@ -1314,3 +1314,18 @@ ViewUserListInteraction.conditions = isAdministrator
 
 // P008: Only admin can view audit logs
 ViewAuditLogInteraction.conditions = isAdministrator
+
+// P009: Admin can update any user or users can update their own profile
+const canUpdateUserProfile = Condition.create({
+  name: 'canUpdateUserProfile',
+  content: function(this: Controller, event: any) {
+    // Admin can update any user profile
+    if (event.user?.role === 'administrator') {
+      return true
+    }
+    // Users can update their own profile
+    return event.payload?.userId === event.user?.id
+  }
+})
+
+UpdateUserProfileInteraction.conditions = canUpdateUserProfile
