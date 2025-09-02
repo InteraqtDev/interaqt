@@ -260,7 +260,7 @@
           ],
           "reasoning": "Has interactionDependencies that can modify the property (I301, I302)",
           "calculationMethod": "Set on creation, updated by role assignment interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.status",

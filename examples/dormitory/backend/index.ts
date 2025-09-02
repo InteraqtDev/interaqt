@@ -28,8 +28,8 @@ const User = Entity.create({
     }),
     Property.create({
       name: 'role',
-      type: 'string',
-      defaultValue: () => 'student'
+      type: 'string'
+      // Note: No defaultValue - StateMachine computation handles this with defaultState
     }),
     Property.create({
       name: 'status',
@@ -636,7 +636,7 @@ User.computation = Transform.create({
       return {
         name: event.payload.name,
         email: event.payload.email,
-        role: event.payload.role || 'student',  // Default to student
+        // Note: role is controlled by StateMachine computation, not set here
         status: 'active',  // Default to active
         phoneNumber: event.payload.phoneNumber
       };
@@ -969,3 +969,57 @@ EvictionDeciderRelation.computation = Transform.create({
     return null;
   }
 })
+
+// User.role property StateMachine computation - handles role changes via dormitory leadership interactions
+const studentRoleState = StateNode.create({ 
+  name: 'student',
+  computeValue: (lastValue) => {
+    // If there's already a role value set during entity creation, use it as default
+    // Otherwise, default to 'student'
+    return lastValue || 'student';
+  }
+});
+
+const leaderRoleState = StateNode.create({ 
+  name: 'leader',
+  computeValue: () => 'leader'  // Leader role when assigned to dormitory
+});
+
+const UserRoleStateMachine = StateMachine.create({
+  states: [studentRoleState, leaderRoleState],
+  transfers: [
+    StateTransfer.create({
+      trigger: AssignDormitoryLeader,
+      current: studentRoleState,
+      next: leaderRoleState,
+      computeTarget: async function(event) {
+        // Find the user being assigned as leader
+        const user = await this.system.storage.findOne('User',
+          this.globals.MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+          undefined,
+          ['id']
+        );
+        
+        return user;  // Return the user whose role should change
+      }
+    }),
+    StateTransfer.create({
+      trigger: RemoveDormitoryLeader,
+      current: leaderRoleState,
+      next: studentRoleState,
+      computeTarget: async function(event) {
+        // Find the user being removed as leader
+        const user = await this.system.storage.findOne('User',
+          this.globals.MatchExp.atom({ key: 'id', value: ['=', event.payload.userId] }),
+          undefined,
+          ['id']
+        );
+        
+        return user;  // Return the user whose role should change
+      }
+    })
+  ],
+  defaultState: studentRoleState
+});
+
+User.properties.find(p => p.name === 'role').computation = UserRoleStateMachine;

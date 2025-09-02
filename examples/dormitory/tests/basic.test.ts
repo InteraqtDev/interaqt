@@ -1508,4 +1508,121 @@ describe('Basic Functionality', () => {
     expect(jane.email).toBe('jane.smith@university.edu')
     expect(jane.role).toBe('student')
   })
+
+  test('User.role StateMachine computation handles role transitions via dormitory leadership interactions', async () => {
+    /**
+     * Test Plan for: User.role StateMachine computation
+     * Dependencies: User entity, AssignDormitoryLeader interaction, RemoveDormitoryLeader interaction
+     * Steps: 1) Create user with default 'student' role 2) Create dormitory 3) Assign user as dormitory leader 4) Verify role changes to 'leader' 5) Remove user as leader 6) Verify role changes back to 'student'
+     * Business Logic: User role transitions between 'student' and 'leader' based on dormitory leadership assignment/removal interactions
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Create CreateUser interaction to test with
+    const CreateUserInteraction = Interaction.create({
+      name: 'CreateUser',
+      action: Action.create({ name: 'create' }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({ name: 'name', required: true }),
+          PayloadItem.create({ name: 'email', required: true }),
+          PayloadItem.create({ name: 'role', required: false })
+        ]
+      })
+    })
+    
+    // Add this interaction to the controller
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions: [...interactions, CreateUserInteraction],
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Create test user first 
+    const createUserResult = await testController.callInteraction('CreateUser', {
+      user: { id: 'test-admin' },
+      payload: {
+        name: 'Test Student',
+        email: 'student@university.edu'
+      }
+    })
+    
+    // Verify user was created via Transform computation
+    const users = await testSystem.storage.find('User', 
+      undefined,
+      undefined,
+      ['id', 'name', 'email', 'role', 'status']
+    )
+    
+    expect(users.length).toBe(1)
+    const user = users[0]
+    
+    // Verify all properties are set correctly
+    expect(user.name).toBe('Test Student')
+    expect(user.email).toBe('student@university.edu')
+    expect(user.role).toBe('student') // Default from StateMachine defaultState
+    expect(user.status).toBe('active')
+    expect(user.id).toBeDefined()
+    
+    const testUserId = user.id
+    
+    // Create a dormitory for leadership assignment
+    const dormitoryResult = await testController.callInteraction('createDormitory', {
+      user: { id: 'test-admin' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Test Building',
+        bedCount: 4
+      }
+    })
+    
+    const dormitoryId = dormitoryResult.effects[0].record.id
+    
+    // Assign user as dormitory leader (should change role to 'leader')
+    await testController.callInteraction('assignDormitoryLeader', {
+      user: { id: 'test-admin' },
+      payload: {
+        userId: testUserId,
+        dormitoryId: dormitoryId
+      }
+    })
+    
+    // Verify role changed to 'leader'
+    const leaderUser = await testSystem.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', testUserId] }),
+      undefined,
+      ['id', 'name', 'role']
+    )
+    
+    expect(leaderUser.role).toBe('leader')
+    
+    // Remove user as dormitory leader (should change role back to 'student')
+    const removeResult = await testController.callInteraction('removeDormitoryLeader', {
+      user: { id: 'test-admin' },
+      payload: {
+        userId: testUserId,
+        reason: 'Test removal'
+      }
+    })
+    
+    // Debug: Check if removal worked
+    console.log('Remove leader result effects:', removeResult.effects)
+    
+    // Verify role changed back to 'student'
+    const finalUser = await testSystem.storage.findOne('User',
+      MatchExp.atom({ key: 'id', value: ['=', testUserId] }),
+      undefined,
+      ['id', 'name', 'role']
+    )
+    
+    console.log('Final user after removal:', finalUser)
+    expect(finalUser.role).toBe('student')
+  })
 }) 
