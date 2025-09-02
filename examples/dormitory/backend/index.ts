@@ -1292,3 +1292,7 @@ const isAdministrator = Condition.create({
 
 // Assign condition to existing interaction
 CreateUserInteraction.conditions = isAdministrator
+
+// P002: Only admin can create dormitories
+// Reuse the same condition since both CreateUser and CreateDormitory require administrator role
+CreateDormitoryInteraction.conditions = isAdministrator

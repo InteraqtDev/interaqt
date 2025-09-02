@@ -171,7 +171,7 @@ Identify data concepts used in requirements:
 
 ### Output Format
 
-Create `requirements/detailed-requirements.md` with the following JSON structure:
+Create `requirements/detailed-requirements.json` with the following JSON structure:
 
 ```json
 {
@@ -326,10 +326,10 @@ git commit -m "feat: Task 1.1 - Complete deep requirements analysis with read-ce
 }
 ```
 
-Create `requirements/test-cases.md` document with complete test cases.
+Create `requirements/test-cases.json` document with complete test cases.
 
 **🔴 CRITICAL: All test cases MUST be:**
-1. **Based on Interactions from Task 1.1 output** - Use the interactions defined in detailed-requirements.md
+1. **Based on Interactions from Task 1.1 output** - Use the interactions defined in detailed-requirements.json
 2. **Organized by interaction priorities** - Test critical interactions first
 3. **Cover all roles and permissions** - Ensure each role's interactions are tested
 4. **Include both success and failure scenarios**
@@ -506,7 +506,7 @@ git commit -m "feat: Task 1.3 - Complete interaction matrix synthesis"
   "completed": true,
   "completedItems": [
     "goal-clarification.md created",
-    "detailed-requirements.md created (JSON format)",
+    "detailed-requirements.json created (JSON format)",
     "test-cases.md created",
     "interaction-matrix.md created"
   ],
@@ -523,7 +523,7 @@ git commit -m "feat: Task 1 - Complete requirements analysis with read-centric m
 
 **🛑 STOP: Task 1 completed. All requirements have been analyzed using the read-centric methodology. The output includes:**
 1. **goal-clarification.md** - Refined and completed goals
-2. **detailed-requirements.md** - Structured JSON with complete requirement analysis
+2. **detailed-requirements.json** - Structured JSON with complete requirement analysis
 3. **test-cases.md** - Test cases derived from interactions
 4. **interaction-matrix.md** - Comprehensive coverage matrix
 

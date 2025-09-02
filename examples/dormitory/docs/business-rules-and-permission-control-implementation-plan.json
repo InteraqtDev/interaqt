@@ -28,7 +28,7 @@
             "Admin can create dormitory",
             "Non-admin cannot create dormitory"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P003",

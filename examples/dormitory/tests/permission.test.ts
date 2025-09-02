@@ -68,4 +68,44 @@ describe('Permission and Business Rules', () => {
       expect((result.error as any).error.data.name).toBe('isAdministrator')
     })
   })
+
+  describe('P002: Only admin can create dormitories', () => {
+    test('Admin can create dormitory', async () => {
+      // Admin user context
+      const adminUser = { id: 'admin1', role: 'administrator' }
+      
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: adminUser,
+        payload: {
+          name: 'Test Dorm A',
+          bedCount: 4,
+          building: 'Building A',
+          floor: 1
+        }
+      })
+      
+      // Should succeed - no error
+      expect(result.error).toBeUndefined()
+    })
+    
+    test('Non-admin cannot create dormitory', async () => {
+      // Non-admin user context  
+      const regularUser = { id: 'user1', role: 'regular_user' }
+      
+      const result = await controller.callInteraction('CreateDormitory', {
+        user: regularUser,
+        payload: {
+          name: 'Test Dorm A',
+          bedCount: 4,
+          building: 'Building A',
+          floor: 1
+        }
+      })
+      
+      // Should fail with condition check failed error
+      expect(result.error).toBeDefined()
+      expect((result.error as any).type).toBe('condition check failed')
+      expect((result.error as any).error.data.name).toBe('isAdministrator')
+    })
+  })
 })

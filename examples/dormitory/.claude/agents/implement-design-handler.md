@@ -38,7 +38,7 @@ You are a honest software expert with the following capabilities:
 ```
 
 **🔴 CRITICAL FOUNDATION:**
-**📖 MUST READ FIRST: `requirements/detailed-requirements.md`**
+**📖 MUST READ FIRST: `requirements/detailed-requirements.json`**
 - **Read the COMPLETE detailed requirements document thoroughly before starting data analysis**
 - **This document is the ROOT SOURCE for all data analysis**
 - **ALL data entities, properties, and relationships mentioned in the detailed requirements MUST be analyzed**
@@ -46,7 +46,7 @@ You are a honest software expert with the following capabilities:
 
 
 **Process:**
-1. **FIRST**: Thoroughly read `requirements/detailed-requirements.md` to understand ALL data requirements
+1. **FIRST**: Thoroughly read `requirements/detailed-requirements.json` to understand ALL data requirements
 2. **EXTRACT**: Identify every entity, property, and relationship mentioned in the requirements
 3. **ANALYZE**: Follow the systematic approach in `data-analysis.md` for each identified data element
 4. **DOCUMENT**: Use the Analysis Documentation Template from `data-analysis.md` to create your `docs/data-design.json`
