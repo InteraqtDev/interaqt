@@ -238,7 +238,7 @@ export type EvaluateError<T> = {
 
 export type ExpressionData<T> = BoolExpressionRawData<T> | AtomData<T>
 
-export type AtomHandle<T> = (arg:T) => boolean|Promise<boolean>
+export type AtomHandle<T> = (arg:T) => boolean|string|Promise<boolean|string>
 
 type MapFn<T, U> = (object: BoolExp<T>, context :string[]) => U | BoolExp<U>
 
@@ -380,7 +380,11 @@ export class BoolExp<T> {
 
     if (this.isAtom()) {
       const data = (this.raw as AtomData<T>).data
-      const result = atomHandle(data)
+      const resultOrErrorMessage = atomHandle(data)
+      if (typeof resultOrErrorMessage === 'string') {
+        return { data, inverse, stack, error: resultOrErrorMessage }
+      }
+      const result = resultOrErrorMessage
       const error: EvaluateError<T> = { data, inverse, stack, error: 'atom evaluate error' }
       return (result && !inverse || !result && inverse) ? true : error
     }
