@@ -127,7 +127,7 @@
           ],
           "reasoning": "lifecycle.creation.type is created-with-entity, created by parent entity's computation",
           "calculationMethod": "created-with-entity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "UserViolationRelation",
