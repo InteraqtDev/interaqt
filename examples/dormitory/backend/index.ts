@@ -20,6 +20,7 @@ const User = Entity.create({
     Property.create({
       name: 'name',
       type: 'string'
+      // Note: No defaultValue - _owner computation handles this via User entity creation
     }),
     Property.create({
       name: 'email',

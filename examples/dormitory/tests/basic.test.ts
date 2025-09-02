@@ -1097,6 +1097,136 @@ describe('Basic Functionality', () => {
     expect(allBedDormitoryRelations.length).toBe(5)  // 3 + 2 = 5 total relations
   })
 
+  test('User.name property set by _owner computation via User entity creation', async () => {
+    /**
+     * Test Plan for: User.name _owner computation
+     * This tests that the User.name property is properly set when the User entity is created
+     * Dependencies: User entity Transform computation
+     * Steps: 1) Create user with specific name 2) Verify User.name property is correctly set from payload 3) Test with different names
+     * Business Logic: User.name is controlled by the User entity's creation computation (_owner pattern)
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // First create a CreateUser interaction to test with
+    const CreateUserInteraction = Interaction.create({
+      name: 'CreateUser',
+      action: Action.create({ name: 'create' }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({ name: 'name', required: true }),
+          PayloadItem.create({ name: 'email', required: true }),
+          PayloadItem.create({ name: 'role', required: false })
+        ]
+      })
+    })
+    
+    // Add this interaction to the controller
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions: [...interactions, CreateUserInteraction],
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Test 1: Create user with name "Alice Johnson"
+    const result1 = await testController.callInteraction('CreateUser', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Alice Johnson',
+        email: 'alice.johnson@example.com',
+        role: 'student'
+      }
+    })
+    
+    expect(result1.error).toBeUndefined()
+    
+    // Verify User.name is set correctly
+    const users1 = await testSystem.storage.find('User', 
+      MatchExp.atom({ key: 'email', value: ['=', 'alice.johnson@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'role', 'status']
+    )
+    
+    expect(users1.length).toBe(1)
+    const user1 = users1[0]
+    expect(user1.name).toBe('Alice Johnson')  // _owner computation sets from payload
+    expect(user1.email).toBe('alice.johnson@example.com')
+    expect(user1.role).toBe('student')
+    expect(user1.status).toBe('active')  // Default from Transform
+    
+    // Test 2: Create user with different name to verify uniqueness
+    const result2 = await testController.callInteraction('CreateUser', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'Dr. Robert Smith Jr.',
+        email: 'robert.smith@example.com'
+        // No role provided - should default to 'student'
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Verify second user's name is set correctly  
+    const users2 = await testSystem.storage.find('User', 
+      MatchExp.atom({ key: 'email', value: ['=', 'robert.smith@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'role']
+    )
+    
+    expect(users2.length).toBe(1)
+    const user2 = users2[0]
+    expect(user2.name).toBe('Dr. Robert Smith Jr.')  // _owner computation sets from payload
+    expect(user2.email).toBe('robert.smith@example.com')
+    expect(user2.role).toBe('student')  // Default when not provided
+    
+    // Test 3: Verify both users exist with different names
+    const allUsers = await testSystem.storage.find('User', 
+      undefined,
+      undefined,
+      ['id', 'name', 'email']
+    )
+    
+    expect(allUsers.length).toBe(2)
+    const userNames = allUsers.map(u => u.name).sort()
+    expect(userNames).toEqual(['Alice Johnson', 'Dr. Robert Smith Jr.'])
+    
+    // Test 4: Create user with special characters in name
+    const result3 = await testController.callInteraction('CreateUser', {
+      user: { id: 'admin-user-1' },
+      payload: {
+        name: 'María José García-López',  // Name with accents and special characters
+        email: 'maria.garcia@example.com'
+      }
+    })
+    
+    expect(result3.error).toBeUndefined()
+    
+    const users3 = await testSystem.storage.find('User', 
+      MatchExp.atom({ key: 'email', value: ['=', 'maria.garcia@example.com'] }),
+      undefined,
+      ['id', 'name', 'email']
+    )
+    
+    expect(users3.length).toBe(1)
+    const user3 = users3[0]
+    expect(user3.name).toBe('María José García-López')  // _owner computation preserves special characters from payload
+    expect(user3.email).toBe('maria.garcia@example.com')
+    
+    // Verify final count
+    const finalUsers = await testSystem.storage.find('User', 
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(finalUsers.length).toBe(3)
+  })
+
   test('EvictionDeciderRelation Transform computation creates relations from processEvictionRequest interaction', async () => {
     /**
      * Test Plan for: EvictionDeciderRelation Transform computation

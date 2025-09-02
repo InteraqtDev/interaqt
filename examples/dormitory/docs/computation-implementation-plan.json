@@ -227,7 +227,7 @@
           "interactionDependencies": [],
           "reasoning": "controlType is creation-only, controlled by entity creation",
           "calculationMethod": "Set directly on creation",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.email",
