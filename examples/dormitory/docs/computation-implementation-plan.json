@@ -290,7 +290,7 @@
           "interactionDependencies": [],
           "reasoning": "controlType is creation-only, controlled by entity creation",
           "calculationMethod": "Set directly on creation if provided",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory.name",

@@ -1703,4 +1703,97 @@ describe('Basic Functionality', () => {
     // Most importantly: verify the StateMachine successfully provides the default 'active' status
     // when a user is created (which is the core business requirement)
   })
+
+  test('User.phoneNumber property set by owner computation (_owner)', async () => {
+    /**
+     * Test Plan for: User.phoneNumber _owner computation
+     * This tests that phoneNumber is properly set when User is created (owner computation)
+     * Dependencies: User entity creation Transform
+     * Steps: 1) Create user with phoneNumber 2) Verify phoneNumber is set 3) Create user without phoneNumber 4) Verify phoneNumber is undefined
+     * Business Logic: User's creation computation sets phoneNumber when provided in payload
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Create a CreateUser interaction for testing
+    const CreateUserInteraction = Interaction.create({
+      name: 'CreateUser',
+      action: Action.create({ name: 'create' }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({ name: 'name', required: true }),
+          PayloadItem.create({ name: 'email', required: true }),
+          PayloadItem.create({ name: 'phoneNumber', required: false })
+        ]
+      })
+    })
+    
+    // Add this interaction to the controller
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions: [...interactions, CreateUserInteraction],
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Test Case 1: User with phoneNumber provided
+    const result1 = await testController.callInteraction('CreateUser', {
+      user: { id: 'test-admin-1' },
+      payload: {
+        name: 'John Doe',
+        email: 'john@example.com',
+        phoneNumber: '+1-234-567-8900'
+      }
+    })
+    
+    expect(result1.error).toBeUndefined()
+    
+    // Verify user was created with phoneNumber
+    const user1 = await testSystem.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'john@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'phoneNumber']
+    )
+    
+    expect(user1).toBeDefined()
+    expect(user1.name).toBe('John Doe')
+    expect(user1.email).toBe('john@example.com')
+    expect(user1.phoneNumber).toBe('+1-234-567-8900')  // phoneNumber set by _owner computation
+    
+    // Test Case 2: User without phoneNumber provided
+    const result2 = await testController.callInteraction('CreateUser', {
+      user: { id: 'test-admin-2' },
+      payload: {
+        name: 'Jane Smith',
+        email: 'jane@example.com'
+        // No phoneNumber provided
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Verify user was created without phoneNumber
+    const user2 = await testSystem.storage.findOne('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'jane@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'phoneNumber']
+    )
+    
+    expect(user2).toBeDefined()
+    expect(user2.name).toBe('Jane Smith')
+    expect(user2.email).toBe('jane@example.com')
+    expect(user2.phoneNumber).toBeUndefined()  // phoneNumber not set when not provided
+    
+    // Verify that phoneNumber property exists but has no default value (managed by _owner computation)
+    const userEntity = entities.find(e => e.name === 'User')
+    expect(userEntity).toBeDefined()
+    const phoneNumberProperty = userEntity.properties.find(p => p.name === 'phoneNumber')
+    expect(phoneNumberProperty).toBeDefined()
+    expect(phoneNumberProperty.defaultValue).toBeUndefined()  // No defaultValue - _owner computation controls it
+  })
 }) 
