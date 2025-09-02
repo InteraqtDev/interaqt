@@ -144,7 +144,7 @@
           ],
           "reasoning": "lifecycle.creation.type is created-with-entity, created by parent entity's computation",
           "calculationMethod": "created-with-entity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "ViolationReporterRelation",
@@ -161,7 +161,7 @@
           ],
           "reasoning": "lifecycle.creation.type is created-with-entity, created by parent entity's computation",
           "calculationMethod": "created-with-entity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "EvictionTargetRelation",
@@ -178,7 +178,7 @@
           ],
           "reasoning": "lifecycle.creation.type is created-with-entity, created by parent entity's computation",
           "calculationMethod": "created-with-entity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "EvictionRequesterRelation",
@@ -195,7 +195,7 @@
           ],
           "reasoning": "lifecycle.creation.type is created-with-entity, created by parent entity's computation",
           "calculationMethod": "created-with-entity",
-          "completed": false
+          "completed": true
         },
         {
           "id": "EvictionDeciderRelation",
@@ -212,7 +212,7 @@
           ],
           "reasoning": "interaction-created with auto-delete (no explicit deletion interactions) allows Transform",
           "calculationMethod": "interaction-created",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.name",

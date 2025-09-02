@@ -1096,4 +1096,186 @@ describe('Basic Functionality', () => {
     )
     expect(allBedDormitoryRelations.length).toBe(5)  // 3 + 2 = 5 total relations
   })
+
+  test('EvictionDeciderRelation Transform computation creates relations from processEvictionRequest interaction', async () => {
+    /**
+     * Test Plan for: EvictionDeciderRelation Transform computation
+     * Dependencies: EvictionDeciderRelation, EvictionRequest entity, User entity, ProcessEvictionRequest interaction
+     * Steps: 1) Create users and eviction request 2) Call processEvictionRequest interaction 3) Verify EvictionDeciderRelation is created 4) Verify relation links correct entities
+     * Business Logic: EvictionDeciderRelation is created when an admin processes an eviction request, linking the deciding admin to the request
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Use the existing interactions from backend (including ProcessEvictionRequest)
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions,  // Use existing interactions
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Create test users
+    const targetUser = await testSystem.storage.create('User', {
+      name: 'Target User',
+      email: 'target@example.com',
+      role: 'student',
+      status: 'active'
+    })
+    
+    const requesterUser = await testSystem.storage.create('User', {
+      name: 'Requester User',
+      email: 'requester@example.com',
+      role: 'dormitory_leader',
+      status: 'active'
+    })
+    
+    const adminUser = await testSystem.storage.create('User', {
+      name: 'Admin User',
+      email: 'admin@example.com',
+      role: 'administrator',
+      status: 'active'
+    })
+    
+    // First create an eviction request via SubmitEvictionRequest interaction
+    const submitResult = await testController.callInteraction('submitEvictionRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Behavior issues requiring immediate action',
+        supportingEvidence: 'Multiple violation reports'
+      }
+    })
+    
+    expect(submitResult.error).toBeUndefined()
+    
+    // Get the created EvictionRequest
+    const evictionRequests = await testSystem.storage.find('EvictionRequest', 
+      undefined,
+      undefined,
+      ['id', 'reason', 'status']
+    )
+    
+    expect(evictionRequests.length).toBe(1)
+    const evictionRequest = evictionRequests[0]
+    expect(evictionRequest.status).toBe('pending')
+    
+    // Import EvictionDeciderRelation to get its name
+    const { EvictionDeciderRelation } = await import('../backend')
+    
+    // Verify no EvictionDeciderRelation exists yet
+    const initialDeciderRelations = await testSystem.storage.find(EvictionDeciderRelation.name,
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(initialDeciderRelations.length).toBe(0)
+    
+    // Now process the eviction request (this should create EvictionDeciderRelation)
+    const processResult = await testController.callInteraction('processEvictionRequest', {
+      user: adminUser,
+      payload: {
+        requestId: evictionRequest.id,
+        decision: 'approved',
+        adminNotes: 'Approved due to documented behavior violations'
+      }
+    })
+    
+    expect(processResult.error).toBeUndefined()
+    
+    // Verify EvictionDeciderRelation was created
+    const deciderRelations = await testSystem.storage.find(EvictionDeciderRelation.name,
+      MatchExp.atom({ key: 'target.id', value: ['=', evictionRequest.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name', 'role'] }],
+        ['target', { attributeQuery: ['id', 'reason', 'status'] }]
+      ]
+    )
+    
+    expect(deciderRelations.length).toBe(1)
+    const deciderRelation = deciderRelations[0]
+    
+    // Verify the relation links the correct entities
+    expect(deciderRelation.source.id).toBe(adminUser.id)
+    expect(deciderRelation.source.name).toBe('Admin User')
+    expect(deciderRelation.source.role).toBe('administrator')
+    expect(deciderRelation.target.id).toBe(evictionRequest.id)
+    expect(deciderRelation.target.reason).toBe('Behavior issues requiring immediate action')
+    
+    // Test edge case: Process another eviction request with same admin
+    const submitResult2 = await testController.callInteraction('submitEvictionRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Second eviction request',
+        supportingEvidence: 'Additional violations'
+      }
+    })
+    
+    expect(submitResult2.error).toBeUndefined()
+    
+    const allEvictionRequests = await testSystem.storage.find('EvictionRequest', 
+      undefined,
+      undefined,
+      ['id', 'reason']
+    )
+    expect(allEvictionRequests.length).toBe(2)
+    
+    const secondRequest = allEvictionRequests.find(r => r.reason === 'Second eviction request')
+    expect(secondRequest).toBeDefined()
+    
+    // Process the second request
+    await testController.callInteraction('processEvictionRequest', {
+      user: adminUser,
+      payload: {
+        requestId: secondRequest.id,
+        decision: 'rejected',
+        adminNotes: 'Insufficient evidence for eviction'
+      }
+    })
+    
+    // Verify we now have two EvictionDeciderRelations
+    const allDeciderRelations = await testSystem.storage.find(EvictionDeciderRelation.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', adminUser.id] }),
+      undefined,
+      ['id', ['target', { attributeQuery: ['id', 'reason'] }]]
+    )
+    
+    expect(allDeciderRelations.length).toBe(2)
+    
+    // Verify both relations link to different eviction requests
+    const linkedRequestReasons = allDeciderRelations.map(r => r.target.reason).sort()
+    expect(linkedRequestReasons).toEqual([
+      'Behavior issues requiring immediate action',
+      'Second eviction request'
+    ])
+    
+    // Test edge case: Try to process non-existent eviction request
+    const invalidProcessResult = await testController.callInteraction('processEvictionRequest', {
+      user: adminUser,
+      payload: {
+        requestId: 'non-existent-id',
+        decision: 'approved',
+        adminNotes: 'This should not create a relation'
+      }
+    })
+    
+    // The interaction should still succeed (no error), but no relation should be created
+    expect(invalidProcessResult.error).toBeUndefined()
+    
+    // Verify relation count hasn't changed
+    const finalDeciderRelations = await testSystem.storage.find(EvictionDeciderRelation.name,
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(finalDeciderRelations.length).toBe(2)  // Still only 2 relations
+  })
 }) 

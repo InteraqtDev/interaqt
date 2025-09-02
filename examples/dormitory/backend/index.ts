@@ -658,7 +658,7 @@ export const relations = [
 ]
 
 // Export individual relations for testing
-export { UserBedAssignment, DormitoryLeadership, BedDormitory, UserViolationRelation, ViolationReporterRelation, EvictionTargetRelation, EvictionRequesterRelation }
+export { UserBedAssignment, DormitoryLeadership, BedDormitory, UserViolationRelation, ViolationReporterRelation, EvictionTargetRelation, EvictionRequesterRelation, EvictionDeciderRelation }
 export const activities = []
 export const interactions = [
   CreateDormitory,
@@ -930,6 +930,40 @@ EvictionRequest.computation = Transform.create({
         targetUser: { id: event.payload.targetUserId },  // Create EvictionTargetRelation via 'targetUser' property
         requester: event.user  // Create EvictionRequesterRelation via 'requester' property
       };
+    }
+    return null;
+  }
+})
+
+// EvictionDeciderRelation computation - Transform for creation from InteractionEventEntity
+// Creates relation between the deciding admin and the EvictionRequest being processed
+EvictionDeciderRelation.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: async function(event) {
+    // Handle eviction request processing from processEvictionRequest interaction (I402)
+    if (event.interactionName === 'processEvictionRequest') {
+      // Validate UUID format before querying (PostgreSQL requires valid UUID format)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
+      if (!uuidRegex.test(event.payload.requestId)) {
+        // Return null if requestId is not a valid UUID (no relation will be created)
+        return null;
+      }
+      
+      // Find the EvictionRequest being processed
+      const evictionRequest = await this.system.storage.findOne('EvictionRequest',
+        this.globals.MatchExp.atom({ key: 'id', value: ['=', event.payload.requestId] }),
+        undefined,
+        ['id']
+      );
+      
+      // Only create relation if the EvictionRequest exists
+      if (evictionRequest) {
+        return {
+          source: event.user,  // The admin/user making the decision
+          target: evictionRequest  // The EvictionRequest being processed
+        };
+      }
     }
     return null;
   }
