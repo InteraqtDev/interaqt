@@ -606,6 +606,44 @@ const ValidateEvictionEligibility = Interaction.create({
   })
 })
 
+// =========================
+// COMPUTATIONS
+// =========================
+
+// Import computation types
+import {
+  Transform,
+  StateMachine,
+  StateNode,
+  StateTransfer,
+  Count,
+  Summation,
+  Any,
+  Custom,
+  InteractionEventEntity
+} from 'interaqt'
+
+// User entity computation - Transform for creation from InteractionEventEntity
+User.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    // Handle various user creation scenarios
+    if (event.interactionName === 'createUser' || 
+        event.interactionName === 'CreateUser' ||
+        event.interactionName === 'registerUser' ||
+        event.interactionName === 'RegisterUser') {
+      return {
+        name: event.payload.name,
+        email: event.payload.email,
+        role: event.payload.role || 'student',  // Default to student
+        status: 'active',  // Default to active
+        phoneNumber: event.payload.phoneNumber
+      };
+    }
+    return null;
+  }
+})
+
 // Export all entities, relations, and other components
 export const entities = [User, Dormitory, Bed, BehaviorViolation, EvictionRequest]
 export const relations = [

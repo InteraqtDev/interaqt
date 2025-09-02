@@ -14,7 +14,7 @@
           "interactionDependencies": [],
           "reasoning": "interaction-created with canBeDeleted: false requires Transform with InteractionEventEntity",
           "calculationMethod": "interaction-created",
-          "completed": false
+          "completed": true
         },
         {
           "id": "Dormitory",
