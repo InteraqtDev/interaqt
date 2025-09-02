@@ -33,8 +33,8 @@ const User = Entity.create({
     }),
     Property.create({
       name: 'status',
-      type: 'string',
-      defaultValue: () => 'active'
+      type: 'string'
+      // Note: No defaultValue - StateMachine computation handles this with defaultState
     }),
     Property.create({
       name: 'behaviorScore',
@@ -1023,3 +1023,34 @@ const UserRoleStateMachine = StateMachine.create({
 });
 
 User.properties.find(p => p.name === 'role').computation = UserRoleStateMachine;
+
+// User.status property StateMachine computation - handles status transitions
+const activeStatusState = StateNode.create({ 
+  name: 'active',
+  computeValue: (lastValue) => {
+    // If there's already a status value set during entity creation, use it as default
+    // Otherwise, default to 'active'
+    return lastValue || 'active';
+  }
+});
+
+const inactiveStatusState = StateNode.create({ 
+  name: 'inactive',
+  computeValue: () => 'inactive'  // Inactive status
+});
+
+const suspendedStatusState = StateNode.create({ 
+  name: 'suspended',
+  computeValue: () => 'suspended'  // Suspended status
+});
+
+const UserStatusStateMachine = StateMachine.create({
+  states: [activeStatusState, inactiveStatusState, suspendedStatusState],
+  transfers: [
+    // Note: No specific interaction dependencies in the computation plan
+    // This StateMachine provides the structure for potential future status change interactions
+  ],
+  defaultState: activeStatusState
+});
+
+User.properties.find(p => p.name === 'status').computation = UserStatusStateMachine;

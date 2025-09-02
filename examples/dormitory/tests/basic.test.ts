@@ -1625,4 +1625,82 @@ describe('Basic Functionality', () => {
     console.log('Final user after removal:', finalUser)
     expect(finalUser.role).toBe('student')
   })
+
+  test('User.status StateMachine computation provides default status value', async () => {
+    /**
+     * Test Plan for: User.status StateMachine computation
+     * Dependencies: User entity, StateMachine computation with states
+     * Steps: 1) Create user via interaction 2) Verify default status is 'active' 3) Verify StateMachine structure
+     * Business Logic: StateMachine provides default status value and structure for potential future status transitions
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Create a CreateUser interaction to test with
+    const CreateUserInteraction = Interaction.create({
+      name: 'CreateUser',
+      action: Action.create({ name: 'create' }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({ name: 'name', required: true }),
+          PayloadItem.create({ name: 'email', required: true })
+        ]
+      })
+    })
+    
+    // Add this interaction to the controller
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions: [...interactions, CreateUserInteraction],
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Call the user creation interaction
+    const result = await testController.callInteraction('CreateUser', {
+      user: { id: 'test-admin' },
+      payload: {
+        name: 'Test User Status',
+        email: 'status@example.com'
+      }
+    })
+    
+    expect(result.error).toBeUndefined()
+    expect(result.effects).toBeDefined()
+    expect(result.effects.length).toBeGreaterThan(0)
+    
+    // Wait a moment for the Transform computation to complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Find the created user directly from the database
+    const users = await testSystem.storage.find('User',
+      MatchExp.atom({ key: 'email', value: ['=', 'status@example.com'] }),
+      undefined,
+      ['id', 'name', 'email', 'status']
+    )
+    
+    expect(users.length).toBe(1)
+    const user = users[0]
+    
+    expect(user).toBeDefined()
+    expect(user.name).toBe('Test User Status')
+    expect(user.email).toBe('status@example.com')
+    expect(user.status).toBe('active')  // Default state from StateMachine computation
+    
+    // Verify that the status property has computation assigned
+    // This tests that the computation structure is correctly in place
+    const userEntity = entities.find(e => e.name === 'User')
+    expect(userEntity).toBeDefined()
+    const statusProperty = userEntity.properties.find(p => p.name === 'status')
+    expect(statusProperty).toBeDefined()
+    expect(statusProperty.computation).toBeDefined()
+    
+    // Most importantly: verify the StateMachine successfully provides the default 'active' status
+    // when a user is created (which is the core business requirement)
+  })
 }) 

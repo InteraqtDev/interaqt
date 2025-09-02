@@ -275,7 +275,7 @@
           "interactionDependencies": [],
           "reasoning": "Has potential interaction dependencies for status changes",
           "calculationMethod": "Set on creation, can be updated by status change interactions",
-          "completed": false
+          "completed": true
         },
         {
           "id": "User.phoneNumber",
