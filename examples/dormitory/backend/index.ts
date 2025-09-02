@@ -1308,3 +1308,6 @@ ProcessRemovalRequestInteraction.conditions = isAdministrator
 
 // P006: Only admin can remove users from dormitories
 RemoveUserFromDormitoryInteraction.conditions = isAdministrator
+
+// P007: Only admin can view all users
+ViewUserListInteraction.conditions = isAdministrator

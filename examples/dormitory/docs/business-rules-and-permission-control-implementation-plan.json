@@ -88,7 +88,7 @@
             "Admin can view user list",
             "Non-admin cannot view user list"
           ],
-          "completed": false
+          "completed": true
         },
         {
           "id": "P008",
