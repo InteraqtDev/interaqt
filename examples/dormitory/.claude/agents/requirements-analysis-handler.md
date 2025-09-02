@@ -1,5 +1,5 @@
 ---
-name: requirements-analysis-agent
+name: requirements-analysis-handler
 description: Requirements analysis using goal-driven methodology
 model: inherit
 color: green
@@ -271,16 +271,6 @@ Create `requirements/requirements-analysis.json`:
         "constraints": []
       }
     ]
-  },
-  "requirement_tree": {
-    "R001": {
-      "children": ["R101", "R102"],
-      "depth": 0
-    },
-    "R101": {
-      "children": ["R201"],
-      "depth": 1
-    }
   },
   "completeness_check": {
     "total_requirements": 10,

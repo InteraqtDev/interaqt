@@ -1,0 +1,673 @@
+{
+  "design_metadata": {
+    "timestamp": "2025-09-02 00:00:00",
+    "source_requirements": "requirements-analysis.json",
+    "source_data": "data-concepts.json",
+    "version": "1.0.0"
+  },
+  "interactions": [
+    {
+      "id": "I001",
+      "name": "ViewDormitoryFacilities",
+      "fulfills_requirements": ["R001"],
+      "type": "read",
+      "specification": {
+        "role": "Administrator",
+        "action": "view",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'"
+        ],
+        "payload": {
+          "filters": {
+            "type": "object",
+            "description": "Optional filters for dormitory search",
+            "properties": {
+              "status": "string",
+              "location": "string"
+            }
+          }
+        },
+        "data": {
+          "reads": ["DormitoryOccupancyView"],
+          "returns": "DormitoryOccupancyView"
+        },
+        "dataConstraints": [
+          "Only show active dormitories",
+          "Include real-time occupancy information",
+          "Show bed assignment details"
+        ]
+      }
+    },
+    {
+      "id": "I002",
+      "name": "ViewUserBehaviorScores",
+      "fulfills_requirements": ["R002"],
+      "type": "read",
+      "specification": {
+        "role": "Dormitory Leader",
+        "action": "view",
+        "conditions": [
+          "User.role = 'dormitory_leader'",
+          "User.status = 'active'",
+          "Target users must be in leader's assigned dormitory"
+        ],
+        "payload": {
+          "dormitoryId": {
+            "type": "string",
+            "description": "ID of dormitory to view users for",
+            "required": true
+          }
+        },
+        "data": {
+          "reads": ["UserBehaviorSummaryView", "DormitoryMembersView"],
+          "returns": "UserBehaviorSummaryView"
+        },
+        "dataConstraints": [
+          "Only show data for users in leader's assigned dormitory",
+          "Include score calculation details",
+          "Show recent violation history"
+        ]
+      }
+    },
+    {
+      "id": "I003",
+      "name": "ViewManagementHierarchy",
+      "fulfills_requirements": ["R003"],
+      "type": "read",
+      "specification": {
+        "role": "Administrator",
+        "action": "view",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'"
+        ],
+        "payload": {},
+        "data": {
+          "reads": ["User", "DormitoryLeadership"],
+          "returns": "ManagementHierarchyView"
+        },
+        "dataConstraints": [
+          "Show role assignment history",
+          "Include permission levels for each role",
+          "Display current active assignments"
+        ]
+      }
+    },
+    {
+      "id": "I004",
+      "name": "ViewEvictionRequests",
+      "fulfills_requirements": ["R004"],
+      "type": "read",
+      "specification": {
+        "role": "Administrator",
+        "action": "view",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'"
+        ],
+        "payload": {
+          "status": {
+            "type": "string",
+            "description": "Filter by request status",
+            "required": false
+          }
+        },
+        "data": {
+          "reads": ["PendingEvictionsView", "EvictionRequest"],
+          "returns": "PendingEvictionsView"
+        },
+        "dataConstraints": [
+          "Include behavior score justification",
+          "Show request timeline and status",
+          "Display supporting evidence"
+        ]
+      }
+    },
+    {
+      "id": "I101",
+      "name": "CreateDormitory",
+      "fulfills_requirements": ["R101"],
+      "type": "create",
+      "specification": {
+        "role": "Administrator",
+        "action": "create",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "bedCount >= SystemConfig.minBedsPerDormitory",
+          "bedCount <= SystemConfig.maxBedsPerDormitory",
+          "Dormitory name must be unique"
+        ],
+        "payload": {
+          "name": {
+            "type": "string",
+            "description": "Unique name for the dormitory",
+            "required": true
+          },
+          "location": {
+            "type": "string",
+            "description": "Physical location of dormitory",
+            "required": true
+          },
+          "bedCount": {
+            "type": "number",
+            "description": "Number of beds (4-6)",
+            "required": true
+          }
+        },
+        "data": {
+          "creates": ["Dormitory", "Bed"],
+          "reads": ["SystemConfig"]
+        },
+        "dataConstraints": [
+          "Automatically create individual bed entities for each bed",
+          "Set initial occupancy to 0",
+          "Set dormitory status to 'active'",
+          "Generate unique bed numbers within dormitory"
+        ]
+      },
+      "validation_rules": [
+        "Check for duplicate dormitory names",
+        "Verify bed count is within allowed range",
+        "Ensure location is not empty"
+      ]
+    },
+    {
+      "id": "I102",
+      "name": "AssignUserToBed",
+      "fulfills_requirements": ["R102"],
+      "type": "create",
+      "specification": {
+        "role": "Administrator",
+        "action": "assign",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "Target user has no existing bed assignment",
+          "Target bed is available",
+          "Target user status = 'active'"
+        ],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "description": "ID of user to assign",
+            "required": true
+          },
+          "bedId": {
+            "type": "string",
+            "description": "ID of bed to assign",
+            "required": true
+          }
+        },
+        "data": {
+          "creates": ["UserBedAssignment"],
+          "updates": ["Bed.isOccupied", "Dormitory.currentOccupancy"],
+          "reads": ["User", "Bed"]
+        },
+        "dataConstraints": [
+          "Update bed occupancy status to true",
+          "Record assignment timestamp",
+          "Set assignment status to 'active'",
+          "Increment dormitory occupancy count"
+        ]
+      },
+      "validation_rules": [
+        "Verify user exists and is active",
+        "Verify bed exists and is available",
+        "Check user has no current assignment"
+      ]
+    },
+    {
+      "id": "I103",
+      "name": "RemoveUserFromDormitory",
+      "fulfills_requirements": ["R103"],
+      "type": "delete",
+      "specification": {
+        "role": "Administrator",
+        "action": "remove",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "Removal is due to approved eviction or user request"
+        ],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "description": "ID of user to remove",
+            "required": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for removal",
+            "required": true
+          }
+        },
+        "data": {
+          "deletes": ["UserBedAssignment"],
+          "updates": ["Bed.isOccupied", "Dormitory.currentOccupancy"],
+          "reads": ["User", "UserBedAssignment"]
+        },
+        "dataConstraints": [
+          "Update bed availability status to false",
+          "Archive assignment history",
+          "Decrement dormitory occupancy count",
+          "Record removal timestamp and reason"
+        ]
+      }
+    },
+    {
+      "id": "I201",
+      "name": "RecordBehaviorViolation",
+      "fulfills_requirements": ["R201"],
+      "type": "create",
+      "specification": {
+        "role": "Dormitory Leader",
+        "action": "record",
+        "conditions": [
+          "User.role = 'dormitory_leader'",
+          "User.status = 'active'",
+          "Target user is in leader's assigned dormitory",
+          "Violation type exists in ViolationRules"
+        ],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "description": "ID of user who violated rules",
+            "required": true
+          },
+          "violationType": {
+            "type": "string",
+            "description": "Type of violation from predefined rules",
+            "required": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the violation",
+            "required": true
+          },
+          "evidenceUrl": {
+            "type": "string",
+            "description": "URL to supporting evidence",
+            "required": false
+          }
+        },
+        "data": {
+          "creates": ["BehaviorViolation"],
+          "updates": ["User.behaviorScore"],
+          "reads": ["User", "ViolationRules"]
+        },
+        "dataConstraints": [
+          "Automatically calculate new total behavior score",
+          "Send notification to user about violation",
+          "Set violation status to 'active'",
+          "Record current timestamp"
+        ]
+      }
+    },
+    {
+      "id": "I202",
+      "name": "ModifyBehaviorScore",
+      "fulfills_requirements": ["R202"],
+      "type": "update",
+      "specification": {
+        "role": "Administrator",
+        "action": "modify",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "Modification reason must be provided"
+        ],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "description": "ID of user whose score to modify",
+            "required": true
+          },
+          "newScore": {
+            "type": "number",
+            "description": "New behavior score value",
+            "required": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for score modification",
+            "required": true
+          }
+        },
+        "data": {
+          "updates": ["User.behaviorScore"],
+          "reads": ["User"]
+        },
+        "dataConstraints": [
+          "Log score modification reason in audit trail",
+          "Maintain score history for tracking",
+          "Send notification about score change"
+        ]
+      }
+    },
+    {
+      "id": "I301",
+      "name": "AssignDormitoryLeader",
+      "fulfills_requirements": ["R301"],
+      "type": "create",
+      "specification": {
+        "role": "Administrator",
+        "action": "assign",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "Target user is resident of the target dormitory",
+          "Target dormitory has no current leader"
+        ],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "description": "ID of user to assign as leader",
+            "required": true
+          },
+          "dormitoryId": {
+            "type": "string",
+            "description": "ID of dormitory to lead",
+            "required": true
+          }
+        },
+        "data": {
+          "creates": ["DormitoryLeadership"],
+          "updates": ["User.role"],
+          "reads": ["User", "Dormitory", "UserBedAssignment"]
+        },
+        "dataConstraints": [
+          "Remove previous leader assignment if exists",
+          "Grant leader permissions to user",
+          "Set leadership status to 'active'",
+          "Record assignment timestamp"
+        ]
+      }
+    },
+    {
+      "id": "I302",
+      "name": "RemoveDormitoryLeader",
+      "fulfills_requirements": ["R302"],
+      "type": "delete",
+      "specification": {
+        "role": "Administrator",
+        "action": "remove",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "New leader must be assigned before removing current one"
+        ],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "description": "ID of current leader to remove",
+            "required": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for removal",
+            "required": true
+          }
+        },
+        "data": {
+          "deletes": ["DormitoryLeadership"],
+          "updates": ["User.role"],
+          "reads": ["User", "DormitoryLeadership"]
+        },
+        "dataConstraints": [
+          "Revoke leader permissions from user",
+          "Archive leadership history",
+          "Update user role back to 'student'"
+        ]
+      }
+    },
+    {
+      "id": "I401",
+      "name": "SubmitEvictionRequest",
+      "fulfills_requirements": ["R401"],
+      "type": "create",
+      "specification": {
+        "role": "Dormitory Leader",
+        "action": "request",
+        "conditions": [
+          "User.role = 'dormitory_leader'",
+          "User.status = 'active'",
+          "Target user's behavior score < SystemConfig.evictionScoreThreshold",
+          "Target user is in leader's assigned dormitory"
+        ],
+        "payload": {
+          "targetUserId": {
+            "type": "string",
+            "description": "ID of user to be evicted",
+            "required": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "Detailed justification for eviction",
+            "required": true
+          },
+          "supportingEvidence": {
+            "type": "string",
+            "description": "URLs or references to supporting evidence",
+            "required": false
+          }
+        },
+        "data": {
+          "creates": ["EvictionRequest"],
+          "reads": ["User", "SystemConfig"]
+        },
+        "dataConstraints": [
+          "Include current behavior score in request",
+          "Set request status to 'pending'",
+          "Record current timestamp as request date",
+          "Generate notification to administrators"
+        ]
+      }
+    },
+    {
+      "id": "I402",
+      "name": "ProcessEvictionRequest",
+      "fulfills_requirements": ["R402"],
+      "type": "update",
+      "specification": {
+        "role": "Administrator",
+        "action": "decide",
+        "conditions": [
+          "User.role = 'administrator'",
+          "User.status = 'active'",
+          "Eviction request status = 'pending'"
+        ],
+        "payload": {
+          "requestId": {
+            "type": "string",
+            "description": "ID of eviction request to process",
+            "required": true
+          },
+          "decision": {
+            "type": "string",
+            "description": "approved or rejected",
+            "required": true
+          },
+          "adminNotes": {
+            "type": "string",
+            "description": "Administrator's notes on the decision",
+            "required": true
+          }
+        },
+        "data": {
+          "updates": ["EvictionRequest.status", "EvictionRequest.decisionDate", "EvictionRequest.adminNotes"],
+          "reads": ["EvictionRequest"]
+        },
+        "dataConstraints": [
+          "If approved, trigger user removal process automatically",
+          "Record decision timestamp and administrator ID",
+          "Send notification to dormitory leader and target user",
+          "Update request status to 'approved' or 'rejected'"
+        ]
+      }
+    }
+  ],
+  "support_interactions": [
+    {
+      "id": "I501",
+      "name": "ValidateDormitoryCreation",
+      "fulfills_requirements": ["R501"],
+      "type": "read",
+      "specification": {
+        "role": "Administrator",
+        "action": "validate",
+        "conditions": [],
+        "payload": {
+          "name": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "data": {
+          "reads": ["Dormitory", "SystemStats"]
+        },
+        "dataConstraints": [
+          "Check for duplicate dormitory names",
+          "Verify system capacity limits"
+        ]
+      }
+    },
+    {
+      "id": "I502",
+      "name": "CheckUserAssignmentEligibility",
+      "fulfills_requirements": ["R502"],
+      "type": "read",
+      "specification": {
+        "role": "Administrator",
+        "action": "check",
+        "conditions": [],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "data": {
+          "reads": ["User", "UserBedAssignment"]
+        },
+        "dataConstraints": [
+          "User must not have existing assignment",
+          "User must be active"
+        ]
+      }
+    },
+    {
+      "id": "I503",
+      "name": "VerifyBedAvailability",
+      "fulfills_requirements": ["R503"],
+      "type": "read",
+      "specification": {
+        "role": "Administrator",
+        "action": "verify",
+        "conditions": [],
+        "payload": {
+          "bedId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "data": {
+          "reads": ["Bed", "Dormitory"]
+        },
+        "dataConstraints": [
+          "Bed must be unoccupied",
+          "Bed must be in active dormitory"
+        ]
+      }
+    },
+    {
+      "id": "I504",
+      "name": "GetCurrentBehaviorScore",
+      "fulfills_requirements": ["R504"],
+      "type": "read",
+      "specification": {
+        "role": "Dormitory Leader",
+        "action": "get",
+        "conditions": [],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "data": {
+          "reads": ["User"]
+        },
+        "dataConstraints": [
+          "User must be in leader's dormitory"
+        ]
+      }
+    },
+    {
+      "id": "I505",
+      "name": "ValidateEvictionEligibility",
+      "fulfills_requirements": ["R505"],
+      "type": "read",
+      "specification": {
+        "role": "Dormitory Leader",
+        "action": "validate",
+        "conditions": [],
+        "payload": {
+          "userId": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "data": {
+          "reads": ["User", "BehaviorViolation", "SystemConfig"]
+        },
+        "dataConstraints": [
+          "Score must be below eviction threshold",
+          "Must have recent violation history"
+        ]
+      }
+    }
+  ],
+  "interaction_matrix": {
+    "by_requirement": {
+      "R001": ["I001"],
+      "R002": ["I002"],
+      "R003": ["I003"],
+      "R004": ["I004"],
+      "R101": ["I101"],
+      "R102": ["I102"],
+      "R103": ["I103"],
+      "R201": ["I201"],
+      "R202": ["I202"],
+      "R301": ["I301"],
+      "R302": ["I302"],
+      "R401": ["I401"],
+      "R402": ["I402"],
+      "R501": ["I501"],
+      "R502": ["I502"],
+      "R503": ["I503"],
+      "R504": ["I504"],
+      "R505": ["I505"]
+    },
+    "by_role": {
+      "Administrator": ["I001", "I003", "I004", "I101", "I102", "I103", "I202", "I301", "I302", "I402", "I501", "I502", "I503"],
+      "Dormitory Leader": ["I002", "I201", "I401", "I504", "I505"]
+    },
+    "by_data_entity": {
+      "User": ["I002", "I102", "I103", "I201", "I202", "I301", "I302", "I401", "I502", "I504", "I505"],
+      "Dormitory": ["I001", "I101", "I301", "I501", "I503"],
+      "Bed": ["I001", "I102", "I103", "I502", "I503"],
+      "BehaviorViolation": ["I201", "I505"],
+      "EvictionRequest": ["I004", "I401", "I402"],
+      "UserBedAssignment": ["I102", "I103", "I301", "I502"],
+      "DormitoryLeadership": ["I301", "I302"]
+    }
+  },
+  "coverage_analysis": {
+    "total_requirements": 21,
+    "covered_requirements": 21,
+    "coverage_percentage": 100,
+    "uncovered_requirements": []
+  }
+}
