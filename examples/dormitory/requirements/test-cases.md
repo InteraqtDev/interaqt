@@ -3,9 +3,9 @@
 ## Test Suite Organization
 Based on the interactions identified in our requirements analysis:
 - Total Interactions: 13
-- Critical Priority: I001, I003, I004, I005, I006, I007, I008 (Core CRUD and workflow operations)
-- High Priority: I009, I010, I011 (Administrative and monitoring functions)
-- Medium Priority: I002, I012, I013 (Secondary management and self-service functions)
+- Critical Priority: I001, I003, I004, I005, I007, I008 (Core business logic)
+- High Priority: I002, I006, I009, I010, I011 (Management operations)
+- Medium Priority: I012, I013 (Reporting and self-service)
 
 ## Phase 1: Core Business Logic Tests
 
@@ -13,8 +13,8 @@ Based on the interactions identified in our requirements analysis:
 - **Interaction ID**: I001
 - **Fulfills Requirements**: WR001, RR001
 - **Role**: Global Administrator
-- **Preconditions**: Administrator is authenticated and has valid permissions
-- **Input Data**: 
+- **Preconditions**: System is initialized, admin is authenticated
+- **Input Data**:
   ```json
   {
     "username": "john_doe",
@@ -25,373 +25,321 @@ Based on the interactions identified in our requirements analysis:
   }
   ```
 - **Expected Results**:
-  1. New user account is created with unique ID
+  1. New user account created successfully
   2. User appears in system user list (RR001)
-  3. User can authenticate with provided credentials
-  4. User role is correctly assigned
-- **Post Validation**: ViewUserList (I009) should show the new user
+  3. User has default score of 100
+  4. User status is active
+  5. Creation timestamp recorded
+- **Post Validation**: User can be retrieved via ViewUserList interaction
 
-### TC002: CreateUser - Validation Error Scenario
+### TC002: CreateUser - Validation Error Scenarios
 - **Interaction ID**: I001
 - **Test Type**: Negative test for validation
 - **Role**: Global Administrator
-- **Preconditions**: System has existing users for uniqueness validation
-- **Input Data**: 
-  ```json
-  {
-    "username": "existing_user",
-    "email": "invalid-email",
-    "password": "weak",
-    "role": "invalid_role",
-    "fullName": ""
-  }
-  ```
+- **Preconditions**: System has existing user with username "existing_user"
+- **Input Data**: Various invalid payloads (duplicate username, invalid email, invalid role)
 - **Expected Results**:
-  1. Interaction returns validation errors
+  1. Interaction returns appropriate error messages
   2. No user account is created
-  3. Error messages indicate specific validation failures (unique username, valid email format, password strength, valid role)
+  3. System maintains data integrity
 
 ### TC003: CreateDormitory - Success Scenario
 - **Interaction ID**: I003
 - **Fulfills Requirements**: WR003, RR002
 - **Role**: Global Administrator
-- **Preconditions**: Administrator is authenticated
-- **Input Data**: 
+- **Preconditions**: System is initialized, admin is authenticated
+- **Input Data**:
   ```json
   {
-    "name": "Building A - Floor 1",
-    "bedCount": 6,
+    "name": "Building A - Room 101",
+    "bedCount": 4,
     "building": "Building A",
     "floor": 1
   }
   ```
 - **Expected Results**:
-  1. New dormitory is created with specified configuration
-  2. Dormitory appears in system dormitory list (RR002)
-  3. All beds are marked as available initially
-  4. Occupancy counters are properly initialized
-- **Post Validation**: ViewDormitoryList (I010) should show the new dormitory
+  1. New dormitory created with 4 beds
+  2. All beds are initially unoccupied
+  3. occupiedBeds = 0, availableBeds = 4
+  4. Dormitory appears in dormitory list (RR002)
+- **Post Validation**: Dormitory shows in ViewDormitoryList with correct bed counts
 
-### TC004: CreateDormitory - Bed Count Validation Error
+### TC004: CreateDormitory - Invalid Bed Count
 - **Interaction ID**: I003
 - **Test Type**: Negative test for business rule validation
 - **Role**: Global Administrator
-- **Preconditions**: Administrator is authenticated
-- **Input Data**: 
+- **Preconditions**: System is initialized, admin is authenticated
+- **Input Data**:
   ```json
   {
-    "name": "Invalid Dormitory",
-    "bedCount": 8,
+    "name": "Invalid Room",
+    "bedCount": 3,
     "building": "Building B",
     "floor": 2
   }
   ```
 - **Expected Results**:
-  1. Interaction returns error indicating invalid bed count
-  2. No dormitory is created
-  3. Error message specifies bed count must be between 4-6
+  1. Error returned: "Bed count must be between 4 and 6 inclusive"
+  2. No dormitory created
+  3. System data unchanged
 
 ### TC005: AssignUserToBed - Success Scenario
 - **Interaction ID**: I004
 - **Fulfills Requirements**: WR004, RR003
 - **Role**: Global Administrator
 - **Preconditions**: 
-  - User exists and is unassigned
+  - Active user exists with no current assignment
   - Dormitory exists with available beds
-- **Input Data**: 
+- **Input Data**:
   ```json
   {
-    "userId": "user123",
-    "dormitoryId": "dorm456",
-    "bedNumber": 3
+    "userId": "user_123",
+    "dormitoryId": "dorm_456",
+    "bedNumber": 1
   }
   ```
 - **Expected Results**:
-  1. User is successfully assigned to specified bed
-  2. User's profile shows dormitory assignment (RR008)
-  3. Dormitory occupancy count is updated
-  4. Bed is no longer available for assignment
-- **Post Validation**: ViewUserList (I009) and ViewDormitoryList (I010) reflect the assignment
+  1. BedAssignment relation created
+  2. User's assignment status updated
+  3. Dormitory occupiedBeds incremented, availableBeds decremented
+  4. Assignment timestamp recorded
+- **Post Validation**: User shows assigned status in ViewUserList, bed shows occupied in ViewDormitoryList
 
-### TC006: AssignUserToBed - Double Assignment Error
+### TC006: AssignUserToBed - Bed Already Occupied
 - **Interaction ID**: I004
-- **Test Type**: Negative test for constraint violation
+- **Test Type**: Negative test for constraint validation
 - **Role**: Global Administrator
-- **Preconditions**: User is already assigned to a bed
-- **Input Data**: 
-  ```json
-  {
-    "userId": "already_assigned_user",
-    "dormitoryId": "dorm789",
-    "bedNumber": 2
-  }
-  ```
+- **Preconditions**: Bed is already occupied by another user
+- **Input Data**: Assignment to occupied bed
 - **Expected Results**:
-  1. Interaction returns error indicating user already assigned
-  2. No new assignment is created
-  3. Original assignment remains unchanged
+  1. Error returned: "Bed must exist and be unoccupied"
+  2. No assignment created
+  3. Existing assignment unchanged
 
 ### TC007: ApplyScoreDeduction - Success Scenario
 - **Interaction ID**: I005
 - **Fulfills Requirements**: WR005, RR004
 - **Role**: Dormitory Leader
 - **Preconditions**: 
-  - Leader is assigned to a dormitory
-  - Target user is assigned to leader's dormitory
-- **Input Data**: 
+  - User is assigned to leader's dormitory
+  - Leader is authenticated and assigned to dormitory
+- **Input Data**:
   ```json
   {
-    "userId": "resident_user",
+    "userId": "user_123",
     "deductionAmount": 10,
-    "reason": "Noise violation during quiet hours",
-    "category": "noise"
+    "reason": "Late return to dormitory",
+    "category": "curfew_violation"
   }
   ```
 - **Expected Results**:
-  1. Score deduction event is recorded
-  2. User's current score is decreased by specified amount
+  1. ScoreEvent created with deduction details
+  2. User's currentScore reduced by deduction amount
   3. Score event appears in user's scoring history (RR004)
-  4. Audit log entry is created
-- **Post Validation**: ViewMyDormitoryUsers (I011) shows updated score
+  4. Timestamp recorded for audit trail
+- **Post Validation**: User score reflects deduction in ViewMyDormitoryUsers
 
-### TC008: ApplyScoreDeduction - Unauthorized Access Error
+### TC008: ApplyScoreDeduction - User Not in Leader's Dormitory
 - **Interaction ID**: I005
-- **Test Type**: Negative test for authorization
+- **Test Type**: Negative test for permission validation
 - **Role**: Dormitory Leader
-- **Preconditions**: Leader attempts to deduct score from user in different dormitory
-- **Input Data**: 
-  ```json
-  {
-    "userId": "other_dorm_user",
-    "deductionAmount": 15,
-    "reason": "Unauthorized attempt",
-    "category": "behavior"
-  }
-  ```
+- **Preconditions**: User is assigned to different dormitory
+- **Input Data**: Attempt to deduct score for user in other dormitory
 - **Expected Results**:
-  1. Interaction returns authorization error
-  2. No score deduction is applied
-  3. No score event is created
+  1. Error returned: "User must be assigned to requester's dormitory"
+  2. No score event created
+  3. User score unchanged
 
 ### TC009: CreateRemovalRequest - Success Scenario
 - **Interaction ID**: I006
 - **Fulfills Requirements**: WR006, RR005
 - **Role**: Dormitory Leader
 - **Preconditions**: 
-  - Target user's score is below removal threshold
-  - No existing pending removal request for user
-- **Input Data**: 
+  - Target user's score is below removal threshold (e.g., < 50)
+  - User is assigned to leader's dormitory
+- **Input Data**:
   ```json
   {
-    "targetUserId": "problematic_user",
-    "reason": "Repeated violations despite warnings, current score below threshold",
+    "targetUserId": "user_123",
+    "reason": "Repeated policy violations and low behavior score",
     "urgency": "high"
   }
   ```
 - **Expected Results**:
-  1. Removal request is created with pending status
-  2. Request appears in removal requests list (RR005)
-  3. Notification is sent to administrators
-  4. Audit log entry is created
-- **Post Validation**: Administrator can see request in pending status
+  1. RemovalRequest created with pending status
+  2. Request appears in pending requests list (RR005)
+  3. Creation timestamp recorded
+- **Post Validation**: Request shows in system for administrator review
 
-### TC010: CreateRemovalRequest - Score Threshold Error
+### TC010: CreateRemovalRequest - Score Above Threshold
 - **Interaction ID**: I006
 - **Test Type**: Negative test for business rule validation
 - **Role**: Dormitory Leader
 - **Preconditions**: Target user's score is above removal threshold
-- **Input Data**: 
-  ```json
-  {
-    "targetUserId": "good_standing_user",
-    "reason": "Personal dislike",
-    "urgency": "low"
-  }
-  ```
+- **Input Data**: Removal request for user with acceptable score
 - **Expected Results**:
-  1. Interaction returns error indicating score above threshold
-  2. No removal request is created
-  3. Error message explains threshold requirement
+  1. Error returned: "Target user's score must be below removal threshold"
+  2. No removal request created
 
 ### TC011: ProcessRemovalRequest - Approval Scenario
 - **Interaction ID**: I007
 - **Fulfills Requirements**: WR007, RR005
 - **Role**: Global Administrator
 - **Preconditions**: Pending removal request exists
-- **Input Data**: 
+- **Input Data**:
   ```json
   {
-    "requestId": "req123",
+    "requestId": "request_789",
     "decision": "approved",
-    "notes": "Reviewed evidence, removal justified due to multiple violations"
+    "notes": "Score consistently below threshold, multiple violations confirmed"
   }
   ```
 - **Expected Results**:
-  1. Request status is updated to approved
-  2. User becomes eligible for removal
-  3. Approval timestamp and notes are recorded
-  4. Notifications are sent to relevant parties
-- **Post Validation**: Request status change is visible in system
+  1. Request status updated to "approved"
+  2. Processing timestamp recorded
+  3. Notes stored for audit trail
+  4. Request no longer appears in pending list
+- **Post Validation**: Request status updated, can proceed with user removal
 
 ### TC012: ProcessRemovalRequest - Rejection Scenario
 - **Interaction ID**: I007
 - **Test Type**: Alternative flow test
 - **Role**: Global Administrator
 - **Preconditions**: Pending removal request exists
-- **Input Data**: 
+- **Input Data**:
   ```json
   {
-    "requestId": "req456",
+    "requestId": "request_789",
     "decision": "rejected",
-    "notes": "Insufficient evidence, recommend counseling instead"
+    "notes": "Insufficient evidence, recommend additional counseling instead"
   }
   ```
 - **Expected Results**:
-  1. Request status is updated to rejected
-  2. User remains in dormitory assignment
-  3. Rejection reason is recorded
-  4. Notifications are sent explaining decision
+  1. Request status updated to "rejected"
+  2. Processing timestamp recorded
+  3. Rejection notes stored
+  4. User remains in dormitory assignment
 
 ### TC013: RemoveUserFromDormitory - Success Scenario
 - **Interaction ID**: I008
 - **Fulfills Requirements**: WR008, RR003
 - **Role**: Global Administrator
-- **Preconditions**: User has approved removal request or administrative override
-- **Input Data**: 
+- **Preconditions**: 
+  - User has current bed assignment
+  - Approved removal request exists OR administrative override
+- **Input Data**:
   ```json
   {
-    "userId": "removed_user",
-    "effective": "2025-09-15T00:00:00Z"
+    "userId": "user_123",
+    "effective": "2025-09-03"
   }
   ```
 - **Expected Results**:
-  1. User's bed assignment is removed
-  2. Bed becomes available for new assignment (RR003)
-  3. Dormitory occupancy count is decreased
-  4. User profile shows no current assignment
-- **Post Validation**: ViewDormitoryList (I010) shows freed bed
+  1. BedAssignment relation removed
+  2. User no longer shows dormitory assignment
+  3. Bed becomes available for new assignment
+  4. Dormitory bed counts updated
+- **Post Validation**: Bed shows available in ViewDormitoryList, user shows unassigned
 
 ## Phase 2: Permission and Access Control Tests
 
-### TC014: ViewUserList - Administrator Access
-- **Interaction ID**: I009
-- **Fulfills Requirements**: RR001
+### TC014: Role-Based Access Control - Administrator Actions
+- **Interaction IDs**: I001, I002, I003, I004, I007, I008, I009, I010, I013
+- **Test Type**: Permission validation
 - **Role**: Global Administrator
-- **Preconditions**: Administrator is authenticated
-- **Input Data**: 
-  ```json
-  {
-    "filters": {"role": "regular_user"},
-    "sortBy": "fullName",
-    "sortOrder": "asc"
-  }
-  ```
-- **Expected Results**:
-  1. Complete user list is returned with filtering and sorting applied
-  2. All user fields are accessible
-  3. Assignment and score information is included
+- **Preconditions**: User authenticated with administrator role
+- **Expected Results**: All administrative interactions succeed with valid data
 
-### TC015: ViewUserList - Unauthorized Access
-- **Interaction ID**: I009
-- **Test Type**: Negative test for permission
-- **Role**: Regular User
-- **Preconditions**: Regular user attempts to access admin function
-- **Input Data**: 
-  ```json
-  {
-    "filters": {},
-    "sortBy": "fullName",
-    "sortOrder": "asc"
-  }
-  ```
-- **Expected Results**:
-  1. Interaction returns permission denied error
-  2. No user data is returned
-  3. Security event is logged
-
-### TC016: ViewMyDormitoryUsers - Leader Access
-- **Interaction ID**: I011
-- **Fulfills Requirements**: RR007
+### TC015: Role-Based Access Control - Dormitory Leader Restrictions
+- **Interaction IDs**: I005, I006, I010, I011, I012
+- **Test Type**: Permission validation  
 - **Role**: Dormitory Leader
-- **Preconditions**: Leader is assigned to a dormitory with residents
-- **Input Data**: 
-  ```json
-  {}
-  ```
-- **Expected Results**:
-  1. List of users in leader's dormitory is returned
-  2. Current scores and assignment details are included
-  3. Only users from leader's dormitory are visible
+- **Preconditions**: User authenticated with dormitory_leader role
+- **Expected Results**: 
+  1. Can perform allowed interactions for own dormitory
+  2. Cannot access administrative functions (I001, I003, etc.)
+  3. Cannot perform actions on other dormitories
 
-### TC017: ViewMyProfile - User Self-Service
-- **Interaction ID**: I012
-- **Fulfills Requirements**: RR008
+### TC016: Role-Based Access Control - Regular User Limitations
+- **Interaction IDs**: I012 (only)
+- **Test Type**: Permission validation
 - **Role**: Regular User
-- **Preconditions**: User is authenticated
-- **Input Data**: 
-  ```json
-  {}
-  ```
+- **Preconditions**: User authenticated with regular_user role
 - **Expected Results**:
-  1. User's own profile information is returned
-  2. Current dormitory assignment is shown
-  3. Current behavior score is displayed
-  4. No other users' information is accessible
+  1. Can view own profile only
+  2. Cannot perform any administrative or leadership actions
+  3. All other interactions return permission errors
+
+### TC017: ViewMyDormitoryUsers - Scope Limitation Test
+- **Interaction ID**: I011
+- **Test Type**: Data access boundary test
+- **Role**: Dormitory Leader
+- **Preconditions**: Leader assigned to specific dormitory with users
+- **Expected Results**:
+  1. Returns only users from leader's assigned dormitory
+  2. Does not include users from other dormitories
+  3. Includes current scores and assignment details
 
 ## Phase 3: Business Rule Validation Tests
 
-### TC018: AssignDormitoryLeader - Constraint Validation
-- **Interaction ID**: I002
-- **Fulfills Requirements**: WR002, RR001
-- **Role**: Global Administrator
-- **Preconditions**: User is currently assigned to a bed
-- **Input Data**: 
-  ```json
-  {
-    "userId": "bed_assigned_user",
-    "dormitoryId": "target_dorm"
-  }
-  ```
-- **Expected Results**:
-  1. Interaction returns error indicating user cannot be leader while assigned to bed
-  2. No leadership assignment is created
-  3. Error message explains the constraint
+### TC018: Unique Constraint Validations
+- **Interactions**: I001 (username/email), I003 (dormitory name)
+- **Test Type**: Data integrity validation
+- **Expected Results**: System prevents duplicate usernames, emails, and dormitory names
 
-### TC019: Multiple Leadership Assignment Prevention
-- **Interaction ID**: I002
-- **Test Type**: Negative test for business rule
-- **Role**: Global Administrator
-- **Preconditions**: Dormitory already has an assigned leader
-- **Input Data**: 
-  ```json
-  {
-    "userId": "potential_leader",
-    "dormitoryId": "dormitory_with_leader"
-  }
-  ```
-- **Expected Results**:
-  1. Interaction returns error indicating dormitory already has leader
-  2. No new leadership assignment is created
-  3. Existing leadership assignment remains unchanged
+### TC019: Bed Assignment Constraints
+- **Interaction**: I004
+- **Test Type**: Business rule validation
+- **Scenarios**:
+  1. User already assigned to a bed (should fail)
+  2. Bed number exceeds dormitory capacity (should fail)
+  3. Multiple users assigned to same bed (should fail)
 
-### TC020: ViewAuditLog - Compliance Verification
-- **Interaction ID**: I013
-- **Fulfills Requirements**: RR006
-- **Role**: Global Administrator
-- **Preconditions**: System has recorded various actions
-- **Input Data**: 
-  ```json
-  {
-    "dateRange": {"start": "2025-09-01", "end": "2025-09-30"},
-    "actionType": "user_assignment",
-    "userId": null
-  }
-  ```
+### TC020: Score Threshold Business Rules
+- **Interactions**: I005, I006
+- **Test Type**: Scoring system validation
+- **Scenarios**:
+  1. Score deductions apply correctly to running total
+  2. Removal threshold enforcement
+  3. Score cannot go below zero
+
+### TC021: Dormitory Leadership Assignment Rules
+- **Interaction**: I002
+- **Test Type**: Assignment constraint validation
+- **Scenarios**:
+  1. User cannot be leader if already assigned to bed
+  2. Dormitory cannot have multiple leaders
+  3. Leader role assignment updates user permissions
+
+### TC022: Workflow State Validations
+- **Interactions**: I006, I007, I008
+- **Test Type**: State transition validation
 - **Expected Results**:
-  1. Filtered audit log entries are returned
-  2. All user assignment actions within date range are shown
-  3. Each entry includes timestamp, actor, and details
-  4. Data is sorted chronologically
+  1. Removal requests follow proper pending -> approved/rejected flow
+  2. User removal requires approved request or override
+  3. Cannot process already processed requests
+
+## Phase 4: Integration and End-to-End Tests
+
+### TC023: Complete User Lifecycle Test
+- **Interactions**: I001 -> I004 -> I005 -> I006 -> I007 -> I008
+- **Test Type**: End-to-end workflow
+- **Scenario**: Full lifecycle from user creation to removal
+- **Expected Results**: Each step properly enables the next with consistent data
+
+### TC024: Dormitory Management Workflow
+- **Interactions**: I003 -> I002 -> I004 -> I005 -> I011
+- **Test Type**: End-to-end management workflow  
+- **Scenario**: Create dormitory, assign leader, assign users, manage scoring
+- **Expected Results**: Complete dormitory setup and management functions properly
+
+### TC025: Audit Trail Verification
+- **Interaction**: I013
+- **Test Type**: Compliance and tracking validation
+- **Expected Results**:
+  1. All significant actions logged with proper details
+  2. Timestamps accurate and sequential
+  3. User actions traceable through audit log
 
 ## Traceability Matrix
 
@@ -401,30 +349,32 @@ Based on the interactions identified in our requirements analysis:
 | TC003, TC004 | I003 | WR003, RR002 | Dormitory |
 | TC005, TC006 | I004 | WR004, RR003 | User, Dormitory, BedAssignment |
 | TC007, TC008 | I005 | WR005, RR004 | User, ScoreEvent, UserScoring |
-| TC009, TC010 | I006 | WR006, RR005 | User, RemovalRequest, RemovalRequesting |
+| TC009, TC010 | I006 | WR006, RR005 | RemovalRequest, RemovalRequesting |
 | TC011, TC012 | I007 | WR007, RR005 | RemovalRequest |
-| TC013 | I008 | WR008, RR003 | User, BedAssignment |
-| TC014, TC015 | I009 | RR001 | User |
-| TC016 | I011 | RR007 | User, Dormitory, DormitoryLeadership |
-| TC017 | I012 | RR008 | User |
-| TC018, TC019 | I002 | WR002, RR001 | User, Dormitory, DormitoryLeadership |
-| TC020 | I013 | RR006 | AuditLog, AuditTracking |
-
-## Test Execution Priority
-
-### Phase 1 (Critical): TC001-TC013
-Core business functionality that must work for system to be functional
-
-### Phase 2 (High): TC014-TC017
-Permission and access control ensuring security
-
-### Phase 3 (Medium): TC018-TC020
-Business rule enforcement and compliance features
+| TC013 | I008 | WR008, RR003 | BedAssignment |
+| TC014-TC016 | Various | Permission requirements | Role-based access |
+| TC017 | I011 | RR007 | User, Dormitory, BedAssignment |
+| TC018-TC022 | Various | Business rule validation | Multiple entities |
+| TC023-TC025 | Multiple | Integration requirements | All concepts |
 
 ## Test Data Requirements
 
-- Minimum 10 test users with different roles
-- At least 3 dormitories with varying occupancy
-- Historical score events for behavioral testing
-- Sample removal requests in different states
-- Audit log entries spanning multiple action types
+### Users
+- Administrator account: admin@university.edu
+- Dormitory leader account: leader1@university.edu  
+- Regular user accounts: user1@university.edu, user2@university.edu, user3@university.edu
+- User with low score (for removal testing): lowscore@university.edu
+
+### Dormitories
+- Building A Room 101 (4 beds)
+- Building A Room 102 (6 beds)
+- Building B Room 201 (5 beds)
+
+### Score Events
+- Various deduction categories and amounts
+- Score history for threshold testing
+
+### System Settings
+- Removal threshold: 50
+- Bed count limits: 4-6
+- Score deduction categories: curfew_violation, noise_complaint, cleanliness_issue, property_damage
