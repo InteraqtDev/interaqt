@@ -5,7 +5,7 @@ import {
   InteractionEventEntity, Controller, MonoSystem, PGLiteDB,
   Condition, Conditions, BoolExp
 } from 'interaqt'
-import { entities, relations, interactions, activities, dicts, UserBedAssignment } from '../backend'
+import { entities, relations, interactions, activities, dicts, UserBedAssignment, DormitoryLeadership } from '../backend'
 
 describe('Basic Functionality', () => {
   let system: MonoSystem
@@ -878,5 +878,103 @@ describe('Basic Functionality', () => {
     )
     
     expect(assignmentsAfterRemoval.length).toBe(0)
+  })
+
+  test('DormitoryLeadership relation StateMachine computation', async () => {
+    /**
+     * Test Plan for: DormitoryLeadership relation StateMachine
+     * Dependencies: User entity, Dormitory entity
+     * Steps: 1) Create user and dormitory 2) Verify no initial leadership 3) Trigger assignDormitoryLeader to create relation 4) Verify relation created 5) Trigger removeDormitoryLeader to delete relation 6) Verify relation deleted
+     * Business Logic: StateMachine manages DormitoryLeadership relation lifecycle - creation via AssignDormitoryLeader and deletion via RemoveDormitoryLeader
+     */
+    
+    // Create test dormitory first via createDormitory interaction
+    const dormitoryResult = await controller.callInteraction('createDormitory', {
+      user: { id: 'admin-user' },
+      payload: {
+        name: 'Test Dormitory',
+        location: 'Test Building',
+        bedCount: 2
+      }
+    })
+    
+    // Get the created dormitory
+    const dormitories = await system.storage.find('Dormitory', 
+      undefined,
+      undefined,
+      ['id', 'name', 'location', 'status']
+    )
+    expect(dormitories.length).toBe(1)
+    const testDormitory = dormitories[0]
+    
+    // Create test user directly via storage since createUser interaction doesn't exist
+    const testUser = await system.storage.create('User', {
+      name: 'Test Leader',
+      email: 'leader@example.com',
+      role: 'student',
+      status: 'active'
+    })
+    expect(testUser).toBeDefined()
+    
+    // Initial state: No DormitoryLeadership relation should exist
+    const initialRelations = await system.storage.find(DormitoryLeadership.name,
+      undefined,
+      undefined,
+      ['id']
+    )
+    expect(initialRelations.length).toBe(0)
+    
+    // Test assignDormitoryLeader interaction - leaderNotAssigned → leaderAssigned state transition
+    const assignResult = await controller.callInteraction('assignDormitoryLeader', {
+      user: { id: 'admin-user' },
+      payload: {
+        userId: testUser.id,
+        dormitoryId: testDormitory.id
+      }
+    })
+    
+    expect(assignResult.error).toBeUndefined()
+    
+    // Verify DormitoryLeadership relation was created
+    const leaderships = await system.storage.find(DormitoryLeadership.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', testUser.id] }),
+      undefined,
+      [
+        'id',
+        'assignmentDate',
+        'status', 
+        'assignedBy',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'name'] }]
+      ]
+    )
+    
+    expect(leaderships.length).toBe(1)
+    const leadership = leaderships[0]
+    expect(leadership.status).toBe('active')
+    expect(leadership.assignedBy).toBe('admin-user')
+    expect(leadership.assignmentDate).toBeTypeOf('number')
+    expect(leadership.source.id).toBe(testUser.id)
+    expect(leadership.target.id).toBe(testDormitory.id)
+    
+    // Test removeDormitoryLeader interaction - leaderAssigned → leaderNotAssigned state transition  
+    const removeResult = await controller.callInteraction('removeDormitoryLeader', {
+      user: { id: 'admin-user' },
+      payload: {
+        userId: testUser.id,
+        reason: 'Test removal'
+      }
+    })
+    
+    expect(removeResult.error).toBeUndefined()
+    
+    // Verify DormitoryLeadership relation was deleted
+    const leadershipsAfterRemoval = await system.storage.find(DormitoryLeadership.name,
+      MatchExp.atom({ key: 'source.id', value: ['=', testUser.id] }),
+      undefined,
+      ['id']
+    )
+    
+    expect(leadershipsAfterRemoval.length).toBe(0)
   })
 }) 
