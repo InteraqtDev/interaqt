@@ -70,7 +70,7 @@
           ],
           "reasoning": "interaction-created with soft-delete allows Transform for creation + status StateMachine for deletion",
           "calculationMethod": "interaction-created",
-          "completed": false
+          "completed": true
         }
       ],
       "description": "Phase 1: 5 entity computation(s)"

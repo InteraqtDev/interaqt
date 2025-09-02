@@ -642,4 +642,143 @@ describe('Basic Functionality', () => {
     expect(unknownViolation).toBeDefined()
     expect(unknownViolation.scoreDeduction).toBe(0)  // Default for unknown types
   })
+
+  test('EvictionRequest entity Transform computation creates eviction requests from interaction events', async () => {
+    /**
+     * Test Plan for: EvictionRequest entity Transform computation
+     * Dependencies: EvictionRequest entity, EvictionTargetRelation, EvictionRequesterRelation, User entity
+     * Steps: 1) Create test users 2) Call submitEvictionRequest interaction 3) Verify EvictionRequest entity is created 4) Verify EvictionTargetRelation and EvictionRequesterRelation are created 5) Verify all _owner properties are set correctly
+     * Business Logic: EvictionRequest entities are created through Transform computation from InteractionEventEntity when submitEvictionRequest interaction occurs, creating relations to target user and requester
+     */
+    
+    // Create a dedicated system for this test
+    const testSystem = new MonoSystem(new PGLiteDB())
+    
+    // Use the existing interactions from backend (including SubmitEvictionRequest)
+    const testController = new Controller({
+      system: testSystem,
+      entities,
+      relations,
+      interactions,  // Use existing interactions
+      activities,
+      dict: dicts,
+      ignorePermission: true
+    })
+    await testController.setup(true)
+    
+    // Create test users
+    const targetUser = await testSystem.storage.create('User', {
+      name: 'Target User',
+      email: 'target@example.com',
+      role: 'student',
+      status: 'active',
+      behaviorScore: 30  // Low score to justify eviction
+    })
+    
+    const requesterUser = await testSystem.storage.create('User', {
+      name: 'Requester User',
+      email: 'requester@example.com',
+      role: 'dormitory_leader',
+      status: 'active'
+    })
+    
+    // Record the timestamp before the interaction to verify requestDate
+    const beforeTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Call submitEvictionRequest interaction
+    const result = await testController.callInteraction('submitEvictionRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Poor behavior score and multiple violations',
+        supportingEvidence: 'Evidence document URL'
+      }
+    })
+    
+    // Verify no errors occurred
+    expect(result.error).toBeUndefined()
+    
+    // Record timestamp after interaction
+    const afterTimestamp = Math.floor(Date.now() / 1000)
+    
+    // Verify EvictionRequest entity was created
+    const evictionRequests = await testSystem.storage.find('EvictionRequest', 
+      undefined,
+      undefined,
+      ['id', 'reason', 'status', 'requestDate', 'supportingEvidence']
+    )
+    
+    expect(evictionRequests.length).toBe(1)
+    const evictionRequest = evictionRequests[0]
+    
+    // Verify _owner properties are set correctly
+    expect(evictionRequest.reason).toBe('Poor behavior score and multiple violations')
+    expect(evictionRequest.status).toBe('pending')  // Default initial status
+    expect(evictionRequest.requestDate).toBeGreaterThanOrEqual(beforeTimestamp)
+    expect(evictionRequest.requestDate).toBeLessThanOrEqual(afterTimestamp)
+    expect(evictionRequest.supportingEvidence).toBe('Evidence document URL')
+    
+    // Import relation instances for correct naming
+    const { EvictionTargetRelation, EvictionRequesterRelation } = await import('../backend')
+    
+    // Verify EvictionTargetRelation was created (targetUser relation)
+    const targetRelations = await testSystem.storage.find(EvictionTargetRelation.name,
+      MatchExp.atom({ key: 'target.id', value: ['=', evictionRequest.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'reason'] }]
+      ]
+    )
+    
+    expect(targetRelations.length).toBe(1)
+    const targetRelation = targetRelations[0]
+    expect(targetRelation.source.id).toBe(targetUser.id)
+    expect(targetRelation.source.name).toBe('Target User')
+    expect(targetRelation.target.id).toBe(evictionRequest.id)
+    expect(targetRelation.target.reason).toBe('Poor behavior score and multiple violations')
+    
+    // Verify EvictionRequesterRelation was created (requester relation)
+    const requesterRelations = await testSystem.storage.find(EvictionRequesterRelation.name,
+      MatchExp.atom({ key: 'target.id', value: ['=', evictionRequest.id] }),
+      undefined,
+      [
+        'id',
+        ['source', { attributeQuery: ['id', 'name'] }],
+        ['target', { attributeQuery: ['id', 'reason'] }]
+      ]
+    )
+    
+    expect(requesterRelations.length).toBe(1)
+    const requesterRelation = requesterRelations[0]
+    expect(requesterRelation.source.id).toBe(requesterUser.id)
+    expect(requesterRelation.source.name).toBe('Requester User')
+    expect(requesterRelation.target.id).toBe(evictionRequest.id)
+    expect(requesterRelation.target.reason).toBe('Poor behavior score and multiple violations')
+    
+    // Test case with optional supportingEvidence not provided
+    const result2 = await testController.callInteraction('submitEvictionRequest', {
+      user: requesterUser,
+      payload: {
+        targetUserId: targetUser.id,
+        reason: 'Another eviction request'
+        // No supportingEvidence provided
+      }
+    })
+    
+    expect(result2.error).toBeUndefined()
+    
+    // Verify second EvictionRequest was created without supportingEvidence
+    const allEvictionRequests = await testSystem.storage.find('EvictionRequest', 
+      undefined,
+      undefined,
+      ['id', 'reason', 'supportingEvidence']
+    )
+    
+    expect(allEvictionRequests.length).toBe(2)
+    const secondRequest = allEvictionRequests.find(r => r.reason === 'Another eviction request')
+    expect(secondRequest).toBeDefined()
+    expect(secondRequest.supportingEvidence).toBeUndefined()  // Optional field not provided
+  })
 }) 

@@ -658,7 +658,7 @@ export const relations = [
 ]
 
 // Export individual relations for testing
-export { BedDormitory, UserViolationRelation, ViolationReporterRelation }
+export { BedDormitory, UserViolationRelation, ViolationReporterRelation, EvictionTargetRelation, EvictionRequesterRelation }
 export const activities = []
 export const interactions = [
   CreateDormitory,
@@ -744,6 +744,27 @@ BehaviorViolation.computation = Transform.create({
         status: 'active',  // Default to active status
         violator: { id: event.payload.userId },  // Create UserViolationRelation via 'violator' property
         reporter: event.user  // Create ViolationReporterRelation via 'reporter' property
+      };
+    }
+    return null;
+  }
+})
+
+// EvictionRequest entity computation - Transform for creation from InteractionEventEntity
+// Also creates EvictionTargetRelation and EvictionRequesterRelation via relation properties
+EvictionRequest.computation = Transform.create({
+  record: InteractionEventEntity,
+  callback: function(event) {
+    // Handle eviction request submission from submitEvictionRequest interaction (I401)
+    if (event.interactionName === 'submitEvictionRequest') {
+      // Return EvictionRequest object with relations
+      return {
+        reason: event.payload.reason,
+        status: 'pending',  // Default initial status
+        requestDate: Math.floor(Date.now() / 1000),  // Current timestamp in seconds
+        supportingEvidence: event.payload.supportingEvidence,
+        targetUser: { id: event.payload.targetUserId },  // Create EvictionTargetRelation via 'targetUser' property
+        requester: event.user  // Create EvictionRequesterRelation via 'requester' property
       };
     }
     return null;
