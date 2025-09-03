@@ -1,3 +1,4 @@
+import { uuidv7 } from 'uuidv7';
 // 基础实例接口
 export interface IInstance {
   uuid: string;
@@ -67,7 +68,7 @@ export abstract class BaseKlass<TInstance extends IInstance, TCreateArgs> {
 
 // 生成 UUID 的辅助函数
 export function generateUUID(options?: { uuid?: string }): string {
-  return options?.uuid || crypto.randomUUID();
+  return options?.uuid || uuidv7();
 }
 
 // 概念相关的类型
