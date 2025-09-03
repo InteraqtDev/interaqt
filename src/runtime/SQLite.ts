@@ -1,8 +1,8 @@
 import SQLite from "better-sqlite3";
 import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import pino from "pino";
 import {InteractionContext} from "./Controller";
+import { dbConsoleLogger } from "./MonoSystem.js";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -30,7 +30,7 @@ export class SQLiteDB implements Database{
     logger: DatabaseLogger
     constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
         this.idSystem = new IDSystem(this)
-        this.logger = this.options?.logger || pino()
+        this.logger = this.options?.logger || dbConsoleLogger
     }
     async open() {
         this.db = new SQLite(this.file, this.options)

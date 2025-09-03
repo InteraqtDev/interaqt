@@ -1,8 +1,8 @@
 import {Database, DatabaseLogger, EntityIdRef} from "./System.js";
 import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mysql2/promise'
 import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import pino from "pino";
 import {InteractionContext} from "./Controller";
+import { dbConsoleLogger } from "./MonoSystem.js";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -30,7 +30,7 @@ export class MysqlDB implements Database{
     db!: Connection
     constructor(public database:string, public options: MysqlDBConfig = {}) {
         this.idSystem = new IDSystem(this)
-        this.logger = this.options?.logger || pino()
+        this.logger = this.options?.logger || dbConsoleLogger
     }
     async open(forceDrop = false) {
         const options = {...this.options}

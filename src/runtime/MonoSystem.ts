@@ -21,7 +21,6 @@ import {
     RawEntityData
 } from '@storage';
 import { SQLiteDB } from "./SQLite.js";
-import pino from "pino";
 import { RecordBoundState } from "./computations/Computation.js";
 
 function JSONStringify(value:any) {
@@ -199,7 +198,6 @@ export class SystemConsoleLogger implements SystemLogger{
         return new SystemConsoleLogger(this.level)
     }
 }
-export const dbPinoLogger = pino()
 export const dbConsoleLogger = new DBConsoleLogger()
 export const systemConsoleLogger = new SystemConsoleLogger()
 
