@@ -37,7 +37,8 @@
   "version": "0.2.0",
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "agent"
   ],
   "author": "sskyy<skyking_H@hotmail.com>",
   "license": "MIT",
