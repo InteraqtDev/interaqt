@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, DICTIONARY_RECORD, Entity, Property, StateMachine, StateNode, StateTransfer, Interaction } from 'interaqt';
+import { Controller, MonoSystem, DICTIONARY_RECORD, Entity, Property, StateMachine, StateNode, StateTransfer, Interaction, Action, Payload, PayloadItem, Relation, NON_EXIST_STATE } from 'interaqt';
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
@@ -185,7 +185,6 @@ describe('StateMachineRunner', () => {
 
     test('state machine with dynamic computeValue', async () => {
         // 创建一个带有动态计算值的状态机
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -369,7 +368,6 @@ describe('StateMachineRunner', () => {
 
     test('state machine with timestamp recording', async () => {
         // 创建一个记录时间戳的简单状态机
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建实体
         const TimeLogger = Entity.create({
@@ -497,7 +495,6 @@ describe('StateMachineRunner', () => {
 
     test('state machine with computeValue using event parameter', async () => {
         // 测试 computeValue 的第二个参数 event - 可以访问触发转换的交互记录
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建消息实体
         const Message = Entity.create({
@@ -672,7 +669,6 @@ describe('StateMachineRunner', () => {
 
     test('delete x:1 relation through state machine', async () => {
         // 创建一个简单的 x:1 关系，通过 StateMachine 删除
-        const { Entity, Property, Relation, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -737,10 +733,7 @@ describe('StateMachineRunner', () => {
             computeValue: () => ({})  // 返回空对象，表示关系存在
         })
 
-        const UnassignedState = StateNode.create({
-            name: 'unassigned',
-            computeValue: () => null  // 返回 null，表示删除关系
-        })
+        const UnassignedState = NON_EXIST_STATE
 
         // 创建状态转换
         const AssignTransfer = StateTransfer.create({
@@ -870,7 +863,6 @@ describe('StateMachineRunner', () => {
 
     test('delete x:n relation through state machine', async () => {
         // 创建一个 x:n 关系（多对多），通过 StateMachine 删除
-        const { Entity, Property, Relation, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -1151,7 +1143,6 @@ describe('StateMachineRunner', () => {
 
     test('create and delete entity through state machine', async () => {
         // 测试通过 StateMachine 创建和删除实体
-        const { Entity, Property, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer, Transform } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -1345,7 +1336,6 @@ describe('StateMachineRunner', () => {
 
     test('create entity with relations through state machine', async () => {
         // 测试通过 StateMachine 创建带有关系的实体
-        const { Entity, Property, Relation, Interaction, Action, Payload, PayloadItem, StateMachine, StateNode, StateTransfer } = await import('@shared')
         
         // 创建用户实体
         const User = Entity.create({
@@ -1542,5 +1532,336 @@ describe('StateMachineRunner', () => {
         // 验证关系也被删除
         const remainingRelations = await controller.system.storage.find('OrderCustomer', undefined, undefined, ['*'])
         expect(remainingRelations.length).toBe(1)
+    })
+
+    test('hard delete entity through HardDeletionProperty and StateMachine', async () => {
+        // 使用 HardDeletionProperty 和 StateMachine 实现实体的硬删除
+        const { HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE } = await import('interaqt')
+
+        // 创建带有 HardDeletionProperty 的 User 实体
+        const UserEntity = Entity.create({
+            name: 'User',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'email',
+                    type: 'string',
+                }),
+                HardDeletionProperty.create()
+            ]
+        })
+
+        // 创建删除用户的交互
+        const DeleteUserInteraction = Interaction.create({
+            name: 'deleteUser',
+            action: Action.create({ name: 'deleteUser' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'targetUser',
+                        isRef: true,
+                        base: UserEntity
+                    })
+                ]
+            })
+        })
+
+        // 创建恢复用户的交互（用于测试从已删除状态恢复）
+        const RestoreUserInteraction = Interaction.create({
+            name: 'restoreUser',
+            action: Action.create({ name: 'restoreUser' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'targetUser',
+                        isRef: true,
+                        base: UserEntity
+                    })
+                ]
+            })
+        })
+
+        // 创建状态转换
+        const DeleteTransfer = StateTransfer.create({
+            trigger: DeleteUserInteraction,
+            current: NON_DELETED_STATE,
+            next: DELETED_STATE,
+            computeTarget: (event: any) => {
+                return { id: event.payload!.targetUser.id }
+            }
+        })
+
+
+        // 创建状态机并绑定到 HardDeletionProperty
+        const DeletionStateMachine = StateMachine.create({
+            states: [NON_DELETED_STATE, DELETED_STATE],
+            transfers: [DeleteTransfer],
+            defaultState: NON_DELETED_STATE
+        })
+
+        // 将状态机绑定到 _isDeleted_ 属性
+        const deletionProperty = UserEntity.properties.find(p => p.name === '_isDeleted_')!
+        deletionProperty.computation = DeletionStateMachine
+
+        // 创建系统和控制器
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system,
+            entities: [UserEntity],
+            relations: [],
+            activities: [],
+            interactions: [DeleteUserInteraction, RestoreUserInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建操作用户
+        const adminUser = await controller.system.storage.create('User', {
+            name: 'admin',
+            email: 'admin@example.com'
+        })
+
+        // 创建要删除的用户
+        const userToDelete1 = await controller.system.storage.create('User', {
+            name: 'user1',
+            email: 'user1@example.com'
+        })
+
+        const userToDelete2 = await controller.system.storage.create('User', {
+            name: 'user2',
+            email: 'user2@example.com'
+        })
+
+        // 验证初始状态：有3个用户
+        const initialUsers = await controller.system.storage.find('User', undefined, undefined, ['*'])
+        expect(initialUsers.length).toBe(3)
+        // 初始状态下 _isDeleted_ 应该是 false 或 0（数据库可能返回 0 表示 false）
+        expect(initialUsers.every(u => u._isDeleted_ === false || u._isDeleted_ === 0 || u._isDeleted_ === undefined)).toBe(true)
+
+        // 删除 user1
+        await controller.callInteraction('deleteUser', {
+            user: adminUser,
+            payload: {
+                targetUser: { id: userToDelete1.id }
+            }
+        })
+
+        // 验证 user1 已被删除（硬删除）
+        const afterDelete1 = await controller.system.storage.find('User', undefined, undefined, ['*'])
+        expect(afterDelete1.length).toBe(2)
+        expect(afterDelete1.find(u => u.id === userToDelete1.id)).toBeUndefined()
+        expect(afterDelete1.find(u => u.id === adminUser.id)).toBeDefined()
+        expect(afterDelete1.find(u => u.id === userToDelete2.id)).toBeDefined()
+
+        // 删除 user2
+        await controller.callInteraction('deleteUser', {
+            user: adminUser,
+            payload: {
+                targetUser: { id: userToDelete2.id }
+            }
+        })
+
+        // 验证只剩下 admin 用户
+        const afterDelete2 = await controller.system.storage.find('User', undefined, undefined, ['*'])
+        expect(afterDelete2.length).toBe(1)
+        expect(afterDelete2[0].id).toBe(adminUser.id)
+        expect(afterDelete2[0].name).toBe('admin')
+    })
+
+    test('hard delete with complex state transitions', async () => {
+        // 测试带有复杂状态转换的硬删除场景
+        const { HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE, BoolExp } = await import('interaqt')
+
+        const hardDeleteProperty = HardDeletionProperty.create()
+
+        // 创建 Article 实体，包含多个状态
+        const ArticleEntity = Entity.create({
+            name: 'Article',
+            properties: [
+                Property.create({
+                    name: 'title',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'status',
+                    type: 'string',
+                }),
+                hardDeleteProperty
+            ]
+        })
+
+        // 定义文章状态
+        const DraftState = StateNode.create({ name: 'draft' })
+        const PublishedState = StateNode.create({ name: 'published' })
+        const ArchivedState = StateNode.create({ name: 'archived' })
+
+        // 创建交互
+        const PublishArticleInteraction = Interaction.create({
+            name: 'publishArticle',
+            action: Action.create({ name: 'publishArticle' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'article',
+                        isRef: true,
+                        base: ArticleEntity
+                    })
+                ]
+            })
+        })
+
+        const ArchiveArticleInteraction = Interaction.create({
+            name: 'archiveArticle',
+            action: Action.create({ name: 'archiveArticle' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'article',
+                        isRef: true,
+                        base: ArticleEntity
+                    })
+                ]
+            })
+        })
+
+        const DeleteArticleInteraction = Interaction.create({
+            name: 'deleteArticle',
+            action: Action.create({ name: 'deleteArticle' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        name: 'article',
+                        isRef: true,
+                        base: ArticleEntity
+                    })
+                ]
+            })
+        })
+
+        // 状态机用于 status 属性
+        const StatusStateMachine = StateMachine.create({
+            states: [DraftState, PublishedState, ArchivedState],
+            transfers: [
+                StateTransfer.create({
+                    trigger: PublishArticleInteraction,
+                    current: DraftState,
+                    next: PublishedState,
+                    computeTarget: (event: any) => ({ id: event.payload!.article.id })
+                }),
+                StateTransfer.create({
+                    trigger: ArchiveArticleInteraction,
+                    current: PublishedState,
+                    next: ArchivedState,
+                    computeTarget: (event: any) => ({ id: event.payload!.article.id })
+                })
+            ],
+            defaultState: DraftState
+        })
+
+        // 删除状态机 - 只有归档的文章才能删除
+        const DeletionStateMachine = StateMachine.create({
+            states: [NON_DELETED_STATE, DELETED_STATE],
+            transfers: [
+                StateTransfer.create({
+                    trigger: DeleteArticleInteraction,
+                    current: NON_DELETED_STATE,
+                    next: DELETED_STATE,
+                    computeTarget: async function(this: Controller, event: any) {
+                        // 只有归档状态的文章才能删除
+                        const article = await this.system.storage.findOne(
+                            'Article',
+                            BoolExp.atom({ key: 'id', value: ['=', event.payload!.article.id] }),
+                            undefined,
+                            ['status']
+                        )
+                        return article?.status === 'archived' ? { id: event.payload!.article.id } : undefined
+                    }
+                })
+            ],
+            defaultState: NON_DELETED_STATE
+        })
+
+        // 绑定状态机
+        const statusProperty = ArticleEntity.properties.find(p => p.name === 'status')!
+        statusProperty.computation = StatusStateMachine
+
+        hardDeleteProperty.computation = DeletionStateMachine
+
+        // 创建系统
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system,
+            entities: [ArticleEntity],
+            relations: [],
+            activities: [],
+            interactions: [PublishArticleInteraction, ArchiveArticleInteraction, DeleteArticleInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建文章
+        const article1 = await controller.system.storage.create('Article', {
+            title: 'Article 1',
+        })
+
+        const article2 = await controller.system.storage.create('Article', {
+            title: 'Article 2',
+        })
+
+        // 验证初始状态
+        const initialArticles = await controller.system.storage.find('Article', undefined, undefined, ['*'])
+        expect(initialArticles.length).toBe(2)
+        expect(initialArticles[0].status).toBe('draft')
+        expect(initialArticles[1].status).toBe('draft')
+
+        // 尝试直接删除 draft 状态的文章（应该失败）
+        await controller.callInteraction('deleteArticle', {
+            user: { id: 'admin' },
+            payload: {
+                article: { id: article1.id }
+            }
+        })
+
+        // 验证文章仍然存在
+        const afterFailedDelete = await controller.system.storage.find('Article', undefined, undefined, ['*'])
+        expect(afterFailedDelete.length).toBe(2)
+
+        // 将 article1 发布并归档
+        await controller.callInteraction('publishArticle', {
+            user: { id: 'admin' },
+            payload: {
+                article: { id: article1.id }
+            }
+        })
+
+        await controller.callInteraction('archiveArticle', {
+            user: { id: 'admin' },
+            payload: {
+                article: { id: article1.id }
+            }
+        })
+
+        // 验证状态
+        const afterArchive = await controller.system.storage.findOne(
+            'Article',
+            BoolExp.atom({ key: 'id', value: ['=', article1.id] }),
+            undefined,
+            ['*']
+        )
+        expect(afterArchive!.status).toBe('archived')
+
+        // 现在可以删除归档的文章
+        await controller.callInteraction('deleteArticle', {
+            user: { id: 'admin' },
+            payload: {
+                article: { id: article1.id }
+            }
+        })
+
+        // 验证文章已被删除
+        const finalArticles = await controller.system.storage.find('Article', undefined, undefined, ['*'])
+        expect(finalArticles.length).toBe(1)
+        expect(finalArticles[0].id).toBe(article2.id)
     })
 });     

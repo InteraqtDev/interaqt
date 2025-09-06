@@ -1,4 +1,4 @@
-import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller } from "interaqt";
+import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller, NON_EXIST_STATE } from "interaqt";
 import { OtherAttr } from "./roles";
 
 export function createData() {
@@ -85,14 +85,10 @@ export function createData() {
         computeValue: () => ({})
     })
 
-    const notReviewerState = StateNode.create({
-        name:'notReviewer',
-        computeValue: () => null
-    })
 
     const sendRequestTransfer = StateTransfer.create({
         trigger: sendInteraction,
-        current: notReviewerState,
+        current: NON_EXIST_STATE,
         next: isReviewerState,
         computeTarget: async function(this: Controller, eventArgs: any) {
             const MatchExp = this.globals.MatchExp
@@ -111,7 +107,7 @@ export function createData() {
     const transferToNotReviewerTransfer = StateTransfer.create({
         trigger: transferReviewersInteraction,
         current: isReviewerState,
-        next: notReviewerState,
+        next: NON_EXIST_STATE,
         computeTarget: async function(this: Controller,eventArgs: any) {
             const MatchExp = this.globals.MatchExp
             const originRelation = await this.system.storage.findOne(reviewerRelation.name!,
@@ -128,7 +124,7 @@ export function createData() {
 
     const transferToReviewerTransfer = StateTransfer.create({
         trigger: transferReviewersInteraction,
-        current: notReviewerState,
+        current: NON_EXIST_STATE,
         next: isReviewerState,
         computeTarget: async function(this: Controller,eventArgs: any) {
             return {
@@ -141,9 +137,9 @@ export function createData() {
 
 
     const reviewerRelationSM = StateMachine.create({
-        states: [notReviewerState, isReviewerState],
+        states: [NON_EXIST_STATE, isReviewerState],
         transfers: [sendRequestTransfer, transferToNotReviewerTransfer,transferToReviewerTransfer],
-        defaultState: notReviewerState
+        defaultState: NON_EXIST_STATE
     })
 
     // 是否是 reviewer

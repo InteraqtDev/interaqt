@@ -1,6 +1,7 @@
 import { DICTIONARY_RECORD, RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
 import {
-    BoolExp, IInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance
+    BoolExp, IInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance,
+    Property
 } from "@shared";
 import './computations/index.js';
 import { InteractionCallResponse, InteractionEventArgs } from "./activity/InteractionCall.js";
@@ -23,6 +24,7 @@ import { CustomHandles } from "./computations/Custom.js";
 import {
     InteractionExecutionError
 } from "./errors/index.js";
+import { assert } from "./util.js";
 
 export const USER_ENTITY = 'User'
 
@@ -68,6 +70,17 @@ export interface ControllerOptions {
     computations?: (new (...args: any[]) => Computation)[]
     ignorePermission?: boolean
     forceThtrowInteractionError?: boolean
+}
+
+export const HARD_DELETION_PROPERTY_NAME = '_isDeleted_'
+
+export const HardDeletionProperty = {
+    create() {
+        return Property.create({
+            name: HARD_DELETION_PROPERTY_NAME,
+            type: 'boolean',
+        })
+    }
 }
 
 export class Controller {
@@ -151,6 +164,20 @@ export class Controller {
 
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
+    
+    async retrieveLastValue(dataContext: DataContext, record?: any) {
+        if (dataContext.type === 'global') {
+            return this.system.storage.get(DICTIONARY_RECORD, dataContext.id! as string)
+        } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
+            return this.system.storage.find(dataContext.id.name!, undefined, undefined, ['*'])
+        } else {
+            const propertyDataContext = dataContext as PropertyDataContext
+            if (record[propertyDataContext.id.name]) return record[propertyDataContext.id.name]
+
+            const item = await this.system.storage.findOne(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
+            return item[propertyDataContext.id.name]
+        }
+    }
     async applyResult(dataContext: DataContext, result: any, record?: any) {
         if (result instanceof ComputationResultSkip) return
 
@@ -180,21 +207,12 @@ export class Controller {
             }
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: result})
+            if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
+                await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))
+            } else {
+                await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: result})
+            }
         }   
-    }
-    async retrieveLastValue(dataContext: DataContext, record?: any) {
-        if (dataContext.type === 'global') {
-            return this.system.storage.get(DICTIONARY_RECORD, dataContext.id! as string)
-        } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
-            return this.system.storage.find(dataContext.id.name!, undefined, undefined, ['*'])
-        } else {
-            const propertyDataContext = dataContext as PropertyDataContext
-            if (record[propertyDataContext.id.name]) return record[propertyDataContext.id.name]
-
-            const item = await this.system.storage.findOne(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
-            return item[propertyDataContext.id.name]
-        }
     }
     async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: any) {
         if (patch instanceof ComputationResultSkip||patch === undefined) return
@@ -216,13 +234,22 @@ export class Controller {
                 }
             } else {
                 const propertyDataContext = dataContext as PropertyDataContext
-                if (patch.type === 'insert') {
-                    await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
-                } else if (patch.type === 'update') {
-                    await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
-                } else if (patch.type === 'delete') {
-                    await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: null})
+
+                // 系统级别的软删除应该 storage 中去做。
+                if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && patch.data) {
+                    assert(patch.type !== 'delete', 'Hard deletion property cannot be deleted')
+                    await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))
+                } else {
+                    if (patch.type === 'insert') {
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
+                    } else if (patch.type === 'update') {
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
+                    } else if (patch.type === 'delete') {
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: null})
+                    }
                 }
+
+                
             }
         }
     }

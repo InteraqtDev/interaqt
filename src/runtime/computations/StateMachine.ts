@@ -1,4 +1,4 @@
-import { Relation, StateMachine, StateMachineInstance, StateNodeInstance } from "@shared";
+import { Relation, StateMachine, StateMachineInstance, StateNode, StateNodeInstance } from "@shared";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { INTERACTION_RECORD } from "../activity/ActivityManager.js";
@@ -60,8 +60,6 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, interactionEvent)) : nextState.name
     }
 }
-
-
 
 
 export class PropertyStateMachineHandle implements EventBasedComputation {
@@ -136,7 +134,20 @@ Or if you want to use state name as value, you should not set ${this.dataContext
     }
 }
 
+export const NON_EXIST_STATE = StateNode.create({
+    name: 'nonExistent',
+    computeValue: () => null
+})
 
+export const NON_DELETED_STATE = StateNode.create({
+    name: 'nonDeleted',
+    computeValue: () => false
+})
+
+export const DELETED_STATE = StateNode.create({
+    name: 'deleted',
+    computeValue: () => true
+})
 
 export class RecordStateMachineHandle implements EventBasedComputation {
     static computationType = StateMachine
@@ -179,8 +190,13 @@ export class RecordStateMachineHandle implements EventBasedComputation {
             const transfers = this.transitionFinder.findTransfers(trigger)
             
             return (await Promise.all(transfers.map(transfer => {
-                const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
-                return transfer.computeTarget!.call(this.controller, event)
+                if (transfer.current === NON_EXIST_STATE && !this.isRelation) {
+                    return {}
+                } else {
+                    assert(!(transfer.current === NON_EXIST_STATE && this.isRelation && transfer.computeTarget===undefined), 'NON_EXIST_STATE transfer must have computeTarget for relation')
+                    const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
+                    return transfer.computeTarget!.call(this.controller, event)
+                }
             }))).flat().filter(Boolean)
         }
     }
@@ -202,7 +218,6 @@ export class RecordStateMachineHandle implements EventBasedComputation {
                     affectedId: [dirtyRecord.id],
                 }
             }else {
-                // await this.state.currentState.set(dirtyRecord, nextState.name)
                 return {
                     type:'update',
                     affectedId: [dirtyRecord.id],
