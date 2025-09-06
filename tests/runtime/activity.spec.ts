@@ -59,7 +59,7 @@ describe("activity state", () => {
         userB = await controller.system.storage.create('User', { roles: ['user']})
     })
 
-    test("call friend request activity with approve response", async () => {
+    test("call friend request activity with approve response - needs fix for Activity integration", async () => {
         // 1. 创建 activity
         // const { activityId, state } = await  createFriendRelationActivityCall.create()
         // expect(activityId).not.toBe(null)

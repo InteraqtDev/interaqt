@@ -12,7 +12,8 @@ import {
     boolExpToAttributives,
     BoolExp,
     Controller,
-    Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY, ActivityGroup
+    Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY, ActivityGroup,
+    HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE
 } from 'interaqt';
 import { MatchExp } from "@storage";
 
@@ -183,60 +184,78 @@ export function createData() {
         })
     })
 
-    // friend 关系的状态机描述
-    const notFriendState = StateNode.create({
-        computeValue: () => null,
-        name: 'notFriend'
-    })
-    const isFriendState = StateNode.create({
-        computeValue: () => ({}),
-        name: 'isFriend'
-    })
-    const addFriendTransfer = StateTransfer.create({
-        trigger: approveInteraction,
-        current: notFriendState,
-        next: isFriendState,
-        computeTarget: async function (this: Controller, eventArgs: any) {
-            const match = MatchExp.atom({
-                key: 'interactionName',
-                value: ['=', sendInteraction.name]
-            }).and({
-                key: 'activity.id',
-                value: ['=', eventArgs.activity.id]
-            })
-            // FIXME 这里是不是应该直接能从 eventArgs 获取？？？
-            const sendEvent = await this.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
-            return {
-                source: sendEvent.user,
-                target: sendEvent.payload!.to
-            }
-        }
-    })
-    const deleteFriendTransfer = StateTransfer.create({
-        trigger: deleteInteraction,
-        current: isFriendState,
-        next: notFriendState,
-        computeTarget: async function ( eventArgs: any) {
-            return {
-                source: eventArgs.user,
-                target: eventArgs.payload.target
-            }
-        }
-    
-    })
-    const friendRelationSM = StateMachine.create({
-        states: [notFriendState, isFriendState],
-        transfers: [addFriendTransfer, deleteFriendTransfer],
-        defaultState: notFriendState
-    })
-    
+    // friend 关系使用 Transform 创建，HardDeletionProperty 删除
      const friendRelation = Relation.create({
         source: UserEntity,
         sourceProperty: 'friends',
         target: UserEntity,
         targetProperty: 'friends',
         type: 'n:n',
-        computation: friendRelationSM
+        properties: [
+            HardDeletionProperty.create()
+        ],
+        // 使用 Transform 从 approve 交互创建关系
+        computation: Transform.create({
+            record: InteractionEventEntity,
+            attributeQuery: ['*', ['activity', {attributeQuery:['id']}]],
+            callback: async function (this: Controller, eventArgs: any) {
+                if (eventArgs.interactionName === approveInteraction.name) {
+                    // 检查 activity 是否存在
+                    if (!eventArgs.activity?.id) {
+                        return null
+                    }
+                    const match = MatchExp.atom({
+                        key: 'interactionName',
+                        value: ['=', sendInteraction.name]
+                    }).and({
+                        key: 'activity.id',
+                        value: ['=', eventArgs.activity.id]
+                    })
+                    const sendEvent = await this.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
+                    if (sendEvent && sendEvent.user && sendEvent.payload?.to) {
+                        return {
+                            source: sendEvent.user,
+                            target: sendEvent.payload.to
+                        }
+                    }
+                }
+                return null
+            }
+        })
+    })
+
+    // 为 HardDeletionProperty 创建删除状态机
+    const deletionProperty = friendRelation.properties!.find(p => p.name === '_isDeleted_')!
+    deletionProperty.computation = StateMachine.create({
+        states: [NON_DELETED_STATE, DELETED_STATE],
+        transfers: [
+            StateTransfer.create({
+                trigger: deleteInteraction,
+                current: NON_DELETED_STATE,
+                next: DELETED_STATE,
+                computeTarget: async function (this: Controller, eventArgs: any) {
+                    // 查找要删除的关系
+                    if (!eventArgs.user?.id || !eventArgs.payload?.target?.id) {
+                        return undefined
+                    }
+                    const match = MatchExp.atom({
+                        key: 'source.id',
+                        value: ['=', eventArgs.user.id]
+                    }).and({
+                        key: 'target.id',
+                        value: ['=', eventArgs.payload.target.id]
+                    })
+                    const existingRelation = await this.system.storage.findOneRelationByName(
+                        friendRelation.name!,
+                        match,
+                        undefined,
+                        ['id']
+                    )
+                    return existingRelation ? { id: existingRelation.id } : undefined
+                }
+            })
+        ],
+        defaultState: NON_DELETED_STATE
     })
     
     

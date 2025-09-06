@@ -1,4 +1,4 @@
-import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller, NON_EXIST_STATE } from "interaqt";
+import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller, HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE } from "interaqt";
 import { OtherAttr } from "./roles";
 
 export function createData() {
@@ -72,7 +72,6 @@ export function createData() {
                 }),
                 PayloadItem.create({
                     name: 'request',
-                    // FIXME 增加定语： 我的、未完成的
                     base: RequestEntity,
                     isRef: true
                 })
@@ -80,81 +79,86 @@ export function createData() {
         })
     })
 
-    const isReviewerState = StateNode.create({
-        name:'isReviewer',
-        computeValue: () => ({})
-    })
-
-
-    const sendRequestTransfer = StateTransfer.create({
-        trigger: sendInteraction,
-        current: NON_EXIST_STATE,
-        next: isReviewerState,
-        computeTarget: async function(this: Controller, eventArgs: any) {
-            const MatchExp = this.globals.MatchExp
-            const request = await this.system.storage.findOne(RequestEntity.name, MatchExp.atom({
-                key: 'interaction.id',
-                value: ['=', eventArgs.id]
-            }), undefined, ['id'])
-            return {
-                source: request,
-                target: eventArgs.payload.to
-            }
-        }
-    })
-    
-    
-    const transferToNotReviewerTransfer = StateTransfer.create({
-        trigger: transferReviewersInteraction,
-        current: isReviewerState,
-        next: NON_EXIST_STATE,
-        computeTarget: async function(this: Controller,eventArgs: any) {
-            const MatchExp = this.globals.MatchExp
-            const originRelation = await this.system.storage.findOne(reviewerRelation.name!,
-                MatchExp.atom({
-                    key:'source.id',
-                    value: ['=', eventArgs.payload.request.id]
-                }),
-                undefined,
-                ['*']
-            )
-            return originRelation
-        }
-    })
-
-    const transferToReviewerTransfer = StateTransfer.create({
-        trigger: transferReviewersInteraction,
-        current: NON_EXIST_STATE,
-        next: isReviewerState,
-        computeTarget: async function(this: Controller,eventArgs: any) {
-            return {
-                source: eventArgs.payload.request,
-                target: eventArgs.payload.reviewer
-            }
-        }
-    })
-
-
-
-    const reviewerRelationSM = StateMachine.create({
-        states: [NON_EXIST_STATE, isReviewerState],
-        transfers: [sendRequestTransfer, transferToNotReviewerTransfer,transferToReviewerTransfer],
-        defaultState: NON_EXIST_STATE
-    })
-
-    // 是否是 reviewer
+    // 是否是 reviewer - 使用 Transform 创建关系
     const reviewerRelation = Relation.create({
         source: RequestEntity,
         sourceProperty: 'to',
         target: UserEntity,
         targetProperty: 'request',
         type: 'n:1',
-        computation:  reviewerRelationSM,
-        properties: [Property.create({
-            name: 'result',
-            type: 'string',
-            collection: false,
-        })]
+        properties: [
+            Property.create({
+                name: 'result',
+                type: 'string',
+                collection: false,
+            }),
+            HardDeletionProperty.create()
+        ],
+        // 使用 Transform 从交互事件创建关系
+        computation: Transform.create({
+            record: InteractionEventEntity,
+            callback: async function(this: Controller, eventArgs: any) {
+                const MatchExp = this.globals.MatchExp
+                
+                // 从 sendRequest 创建初始关系
+                if (eventArgs.interactionName === sendInteraction.name) {
+                    const request = await this.system.storage.findOne(RequestEntity.name, MatchExp.atom({
+                        key: 'interaction.id',
+                        value: ['=', eventArgs.id]
+                    }), undefined, ['id'])
+                    if (request) {
+                        return {
+                            source: request,
+                            target: eventArgs.payload.to
+                        }
+                    }
+                }
+                
+                // 从 transferReviewer 创建新关系
+                if (eventArgs.interactionName === transferReviewersInteraction.name) {
+                    const reviewer = eventArgs.payload.reviewer
+                    // 确保使用正确的对象格式
+                    const targetUser = reviewer.id ? { id: reviewer.id } : reviewer
+                    return {
+                        source: eventArgs.payload.request,
+                        target: targetUser
+                    }
+                }
+                
+                return null
+            }
+        })
+    })
+
+    // 为转移创建删除状态机
+    const deletionProperty = reviewerRelation.properties!.find(p => p.name === '_isDeleted_')!
+    deletionProperty.computation = StateMachine.create({
+        states: [NON_DELETED_STATE, DELETED_STATE],
+        transfers: [
+            StateTransfer.create({
+                trigger: transferReviewersInteraction,
+                current: NON_DELETED_STATE,
+                next: DELETED_STATE,
+                computeTarget: async function(this: Controller, eventArgs: any) {
+                    const MatchExp = this.globals.MatchExp
+                    // 转移时删除旧的关系
+                    const originRelation = await this.system.storage.findOne(
+                        reviewerRelation.name!,
+                        MatchExp.atom({
+                            key:'source.id',
+                            value: ['=', eventArgs.payload.request.id]
+                        }).and({
+                            key: 'target.id',
+                            value: ['!=', eventArgs.payload.reviewer.id]
+                        }),
+                        undefined,
+                        ['id']
+                    )
+                    return originRelation ? { id: originRelation.id } : undefined
+                }
+            })
+        ],
+        defaultState: NON_DELETED_STATE
     })
         
 

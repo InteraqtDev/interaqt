@@ -9,3 +9,9 @@
   2.1. 理解框架用法。
   2.2. 理解 statemachine 测试用例写法。理解如何使用 statemachine 实现 property-level 正常的增删改。
 3. 在 tests/runtime/ 的 statemachine.spec.ts中补充通过HardDeletionProperty 和 statemachine DELETED_STATE/NON_DELETED_STATE  实现 entity 数据 删除的测试用例。注意补充的测试用例应该尽量简短易读。
+
+# 任务二
+将 tests/runtime 下面原本使用 entity/relation level 的 statemachine 全部改成：
+1. 使用 Transform 来创建 entity/relation。
+2. 使用 HardDeletionProperty 和 statemachine DELETED_STATE/NON_DELETED_STATE 实现 entity/relation 数据删除
+3. property 如果需要更新使用自己独立的 statemachine。
