@@ -72,6 +72,11 @@ Constraints expressed on roles, interactions, and data in requirements.
 
 ### Analyze User Input
 
+**🌐 Language Processing:**
+- Translate user input to English if provided in other languages
+- Use English consistently throughout all subsequent analysis and outputs
+- Preserve original meaning and context during translation
+
 User input may contain:
 - Vague or incomplete goals
 - Specific requirements mixed with goals
@@ -168,6 +173,34 @@ git commit -m "feat: Task 1.1 - Complete goal analysis and refinement"
 ### Analysis Methodology
 
 We focus on data-centric requirements. Human software usage delegates unsuitable tasks (storage, computation) to support better decision-making. Since decisions require information, we start with **READ requirements** as the root.
+
+### ⚠️ CRITICAL: Reactive Framework Principles
+
+**DO NOT create "automatic system" requirements.** Our framework is reactive - avoid designing autonomous system behaviors.
+
+**Transform "automatic" requirements into:**
+
+1. **Reactive Data Requirements**: 
+   - ❌ WRONG: "System automatically counts total books"
+   - ✅ CORRECT: "There is a `totalBookCount` data that represents the statistical result of total books"
+
+2. **Interaction Constraint Conditions**:
+   - ❌ WRONG: "System automatically detects uniqueness"  
+   - ✅ CORRECT: "Can only create unique XXX" (as constraint condition)
+
+3. **Data Constraints on Write Operations**:
+   - ❌ WRONG: "System automatically creates uniform record when employee is created"
+   - ✅ CORRECT: "When creating employee, automatically create uniform record" (as data constraint)
+
+**For unavoidable side-effect requirements** (e.g., "automatically send notification"):
+- Design the requirement but explicitly mark as **"Currently Not Supported"**
+- Document: "This requirement involves automatic side-effects which are not supported by the current reactive framework"
+
+**Examples of Proper Transformation:**
+- "Auto-calculate late fees" → "Late fee amount is computed based on overdue days and daily rate"
+- "Auto-send reminders" → "Reminder needed status is computed based on due date" + "Send reminder interaction"
+- "Auto-validate ISBN" → "Can only create books with valid ISBN format" (constraint)
+- "Auto-update inventory" → "Available count is computed based on total copies minus borrowed copies"
 
 ### Step 1: Create Read Requirements from Goals
 
@@ -541,6 +574,7 @@ git commit -m "feat: Task 1.3 - Complete data concept extraction"
 - Interactions fulfill requirements
 - All data in interactions must reference concepts from Task 1.3
 - **CRITICAL**: Inherit all data constraints from requirements
+- **Interaction IDs must be semantic names** (e.g., "BorrowBook", "ViewAvailableBooks") not generic codes (e.g., "I001", "I002")
 
 ### Interaction Specification Format
 
@@ -569,8 +603,7 @@ Create `requirements/interactions-design.json`:
   },
   "interactions": [
     {
-      "id": "I001",
-      "name": "BorrowBook",
+      "id": "BorrowBook",
       "fulfills_requirements": ["R101"],
       "type": "create",
       "specification": {
@@ -611,8 +644,7 @@ Create `requirements/interactions-design.json`:
       ]
     },
     {
-      "id": "I002",
-      "name": "ViewAvailableBooks",
+      "id": "ViewAvailableBooks",
       "fulfills_requirements": ["R001"],
       "type": "read",
       "specification": {
@@ -650,20 +682,20 @@ Create `requirements/interactions-design.json`:
   ],
   "interaction_matrix": {
     "by_requirement": {
-      "R001": ["I002"],
-      "R101": ["I001"],
-      "R102": ["I003"],
-      "R201": ["I004"]
+      "R001": ["ViewAvailableBooks"],
+      "R101": ["BorrowBook"],
+      "R102": ["ReturnBook"],
+      "R201": ["ValidateReaderStatus"]
     },
     "by_role": {
-      "Reader": ["I001", "I002"],
-      "Librarian": ["I003", "I004", "I005"],
-      "Administrator": ["I006", "I007"]
+      "Reader": ["BorrowBook", "ViewAvailableBooks"],
+      "Librarian": ["ReturnBook", "ValidateReaderStatus", "ManageBookInventory"],
+      "Administrator": ["CreateBook", "ManageReaderAccounts"]
     },
     "by_data_entity": {
-      "Book": ["I001", "I002", "I003"],
-      "Reader": ["I001", "I004"],
-      "BorrowRecord": ["I001", "I003", "I005"]
+      "Book": ["BorrowBook", "ViewAvailableBooks", "CreateBook"],
+      "Reader": ["BorrowBook", "ValidateReaderStatus"],
+      "BorrowRecord": ["BorrowBook", "ReturnBook", "ManageBookInventory"]
     }
   },
   "coverage_analysis": {

@@ -279,6 +279,8 @@ This task has its own dedicated sub-agent that handles the progressive implement
 
 **🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
 
+** CRETICA:L use the specialized sub-agent `computation-generation-handler` until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
+
 **✅ END Task 3.1.4.3: Update `docs/STATUS.json`:**
 ```json
 {

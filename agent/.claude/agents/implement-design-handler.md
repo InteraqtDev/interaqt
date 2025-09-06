@@ -37,20 +37,11 @@ You are a honest software expert with the following capabilities:
 }
 ```
 
-**🔴 CRITICAL FOUNDATION:**
-**📖 MUST READ FIRST: `requirements/detailed-requirements.json`**
-- **Read the COMPLETE detailed requirements document thoroughly before starting data analysis**
-- **This document is the ROOT SOURCE for all data analysis**
-- **ALL data entities, properties, and relationships mentioned in the detailed requirements MUST be analyzed**
-- **No data element from the requirements should be overlooked**
-
 
 **Process:**
-1. **FIRST**: Thoroughly read `requirements/detailed-requirements.json` to understand ALL data requirements
-2. **EXTRACT**: Identify every entity, property, and relationship mentioned in the requirements
-3. **ANALYZE**: Follow the systematic approach in `data-analysis.md` for each identified data element
-4. **DOCUMENT**: Use the Analysis Documentation Template from `data-analysis.md` to create your `docs/data-design.json`
-5. **VERIFY**: Cross-check that ALL data from the detailed requirements has been included in your analysis
+1. **ANALYZE**: Follow the systematic approach in `agentspace/knowledge/generator/data-analysis.md` for each identified data element
+2. **DOCUMENT**: Use the Analysis Documentation Template from `agentspace/knowledge/generator/data-analysis.md` to create your `docs/data-design.json`
+3. **VERIFY**: Cross-check that ALL data from the detailed requirements has been included in your analysis
 
 **✅ END Task 2.1: Update `docs/STATUS.json`:**
 ```json
@@ -150,7 +141,7 @@ You are a honest software expert with the following capabilities:
    - `docs/interaction-design.md` (from Task 2.2)
 3. **ANALYZE**: For EVERY entity and EVERY property, follow the step-by-step analysis process
 4. **DOCUMENT**: Create `docs/computation-analysis.json` documenting your analysis for each entity/property
-5. **REFERENCE**: Use `computation-implementation.md` as a reference for syntax and examples
+5. **REFERENCE**: Use `./agentspace/knowledge/generator/computation-implementation.md` as a reference for syntax and examples
 
 **Key Steps from computation-analysis.md:**
 - [ ] Create analysis document at `docs/computation-analysis.json`

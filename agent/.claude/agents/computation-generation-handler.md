@@ -59,6 +59,7 @@ color: blue
        - You should modify the PARENT entity's computation, not the current entity
        - Example: For `_parent:[User]`, modify the `User` entity's computation that creates Posts
        - This typically occurs when a child entity needs to be created by a parent's Transform computation
+       - **📍 Finding the parent entity**: You can find the parent entity name in the current item's `lifecycle.creation.parent` field
        - **How to create child entities**: Use the relation's source/target property name in the parent's Transform return value
        - Example: If `OrderItemRelation` has `sourceProperty: 'items'`, then in Order's Transform:
          ```typescript

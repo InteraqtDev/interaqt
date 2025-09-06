@@ -15,3 +15,8 @@
 1. 使用 Transform 来创建 entity/relation。
 2. 使用 HardDeletionProperty 和 statemachine DELETED_STATE/NON_DELETED_STATE 实现 entity/relation 数据删除
 3. property 如果需要更新使用自己独立的 statemachine。
+
+# 任务三
+更新文档。
+1. 更新 `agent/agentspace/knowledge/generator/api-reference.md`，删除 entity/relation level 的 statemachine 用法。增加使用 HardDeletionProperty 和 statemachine DELETED_STATE/NON_DELETED_STATE 来实现 entity/relation 删除的例子，注意一定要简洁。
+2. 更新 `agent/agentspace/knowledge/generator/computation-analysis.md` 相关的部分，当时 hard-delete 时，entity/relation level computation 应该仍然使用 Transform，同时使用 HardDeletionProperty 和 statemachine DELETED_STATE/NON_DELETED_STATE 来实现 record 的删除。
