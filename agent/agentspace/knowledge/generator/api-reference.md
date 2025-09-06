@@ -178,7 +178,12 @@ const deletionStateMachine = StateMachine.create({
     defaultState: NON_DELETED_STATE,
     transfers: [
         StateTransfer.create({
-            trigger: DeleteUserInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: DeleteUserInteraction.name
+                }
+            },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: function(event) {
@@ -241,7 +246,12 @@ deletionProperty.computation = StateMachine.create({
     defaultState: NON_DELETED_STATE,
     transfers: [
         StateTransfer.create({
-            trigger: DeleteArticleInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: DeleteArticleInteraction.name
+                }
+            },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: function(event) {
@@ -818,7 +828,13 @@ const OrderStateMachine = StateMachine.create({
         StateTransfer.create({
             current: pendingState,
             next: confirmedState,
-            trigger: ConfirmOrderInteraction
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: ConfirmOrderInteraction.name
+                }
+            },
+            computeTarget: (event) => ({ id: event.payload.orderId })
         })
     ],
     defaultState: pendingState
@@ -860,7 +876,12 @@ relationDeletionProperty.computation = StateMachine.create({
     defaultState: NON_DELETED_STATE,
     transfers: [
         StateTransfer.create({
-            trigger: DeleteRelationInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: DeleteRelationInteraction.name
+                }
+            },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: async function(this: Controller, event: any) {
@@ -1713,31 +1734,55 @@ StateNodes with `computeValue` are used in StateMachine to compute property valu
 
 ```typescript
 // Counter that increments on interaction
+const idleState = StateNode.create({ 
+    name: 'idle', 
+    computeValue: (lastValue) => lastValue || 0 
+});
+const incrementingState = StateNode.create({ 
+    name: 'incrementing', 
+    computeValue: (lastValue) => (lastValue || 0) + 1 
+});
+
 const CounterStateMachine = StateMachine.create({
-    states: [
-        StateNode.create({ 
-            name: 'idle', 
-            computeValue: (lastValue) => lastValue || 0 
-        }),
-        StateNode.create({ 
-            name: 'incrementing', 
-            computeValue: (lastValue) => (lastValue || 0) + 1 
+    states: [idleState, incrementingState],
+    transfers: [
+        StateTransfer.create({
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: IncrementInteraction.name
+                }
+            },
+            current: idleState,
+            next: incrementingState,
+            computeTarget: (event) => ({ id: event.payload.counterId })
         })
     ],
-    transfers: [/* ... */],
     defaultState: idleState
 });
 
 // Timestamp tracking
+const pendingState = StateNode.create({ name: 'pending' });
+const processedState = StateNode.create({ 
+    name: 'processed', 
+    computeValue: () => new Date().toISOString() 
+});
+
 const ProcessingStateMachine = StateMachine.create({
-    states: [
-        StateNode.create({ name: 'pending' }),
-        StateNode.create({ 
-            name: 'processed', 
-            computeValue: () => new Date().toISOString() 
+    states: [pendingState, processedState],
+    transfers: [
+        StateTransfer.create({
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: ProcessInteraction.name
+                }
+            },
+            current: pendingState,
+            next: processedState,
+            computeTarget: (event) => ({ id: event.payload.itemId })
         })
     ],
-    transfers: [/* ... */],
     defaultState: pendingState
 });
 
@@ -1764,7 +1809,7 @@ StateTransfer.create(config: StateTransferConfig): StateTransferInstance
 ```
 
 **Parameters**
-- `config.trigger` (Interaction, required): The Interaction instance that triggers this state transfer. Must be a reference to an Interaction created with `Interaction.create()`
+- `config.trigger` (RecordMutationEventPattern, required): A partial pattern to match against RecordMutationEvent. Supports deep partial matching of event properties.
 - `config.current` (StateNode, required): Current state node
 - `config.next` (StateNode, required): Next state node
 - `config.computeTarget` (function, optional): Function to compute which records should undergo this state transition. Returns the target record(s) that should be affected by this state change.
@@ -1785,18 +1830,59 @@ The `computeTarget` function determines which specific records should transition
   - Async: `async function(this: Controller, event: InteractionEvent) => TargetRecord`
 - **Event Parameter**: Contains interaction details including `event.payload` with the interaction's payload data
 
+**Trigger Pattern**
+
+The `trigger` parameter now accepts a RecordMutationEventPattern that allows deep partial matching:
+
+```typescript
+// Match interaction events by name
+trigger: {
+    recordName: InteractionEventEntity.name,  // Use the constant, not hardcoded string
+    record: {
+        interactionName: 'approve'  // Or better: ApproveInteraction.name
+    }
+}
+
+// Match data mutation events
+trigger: {
+    recordName: 'User',
+    type: 'update'  // Match only update events
+}
+
+// Match with complex patterns
+trigger: {
+    recordName: InteractionEventEntity.name,
+    record: {
+        interactionName: 'updateStatus',
+        payload: {
+            status: 'active'  // Only trigger when status is set to 'active'
+        }
+    }
+}
+```
+
 **Examples**
 ```typescript
 // Simple state transfer (no computeTarget needed for global state)
 const approveTransfer = StateTransfer.create({
-    trigger: ApproveInteraction,
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: ApproveInteraction.name
+        }
+    },
     current: pendingState,
     next: approvedState
 });
 
 // Entity state transfer - specify which entity to update
 const incrementTransfer = StateTransfer.create({
-    trigger: IncrementInteraction,
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: IncrementInteraction.name
+        }
+    },
     current: idleState,
     next: incrementingState,
     computeTarget: (event) => {
@@ -1807,7 +1893,12 @@ const incrementTransfer = StateTransfer.create({
 
 // Relation state transfer - create new relation
 const assignReviewerTransfer = StateTransfer.create({
-    trigger: AssignReviewerInteraction,
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: AssignReviewerInteraction.name
+        }
+    },
     current: unassignedState,
     next: assignedState,
     computeTarget: async function(this: Controller, event) {
@@ -1829,43 +1920,41 @@ const assignReviewerTransfer = StateTransfer.create({
     }
 });
 
-// Relation state transfer - simple source/target
-const createFriendshipTransfer = StateTransfer.create({
-    trigger: AddFriendInteraction,
-    current: notFriendsState,
-    next: friendsState,
-    computeTarget: (event) => ({
-        source: event.user,  // The user initiating the friendship
-        target: { id: event.payload.friendId }  // The friend being added
-    })
+// Trigger on specific payload values
+const publishTransfer = StateTransfer.create({
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: UpdateStatusInteraction.name,
+            payload: {
+                newStatus: 'published'  // Only trigger when status changes to 'published'
+            }
+        }
+    },
+    current: draftState,
+    next: publishedState,
+    computeTarget: (event) => ({ id: event.payload.documentId })
 });
 
-// Relation state transfer - existing relation
-const updateRelationTransfer = StateTransfer.create({
-    trigger: UpdateStatusInteraction,
-    current: activeState,
+// Trigger on data mutations (non-interaction events)
+const dataUpdateTransfer = StateTransfer.create({
+    trigger: {
+        recordName: 'Order',
+        type: 'update'  // Only trigger on Order updates
+    },
+    current: processingState,
     next: updatedState,
-    computeTarget: async function(this: Controller, event) {
-        // Find existing relation
-        const relation = await this.system.storage.findOneRelationByName(UserProjectRelation.name,
-            this.globals.MatchExp.atom({
-                key: 'source.id',
-                value: ['=', event.user.id]
-            }).and({
-                key: 'target.id', 
-                value: ['=', event.payload.projectId]
-            }),
-            undefined,
-            ['id']
-        );
-        
-        return relation;  // Return existing relation by id
-    }
+    computeTarget: (event) => ({ id: event.record.id })
 });
 
 // Multiple targets - return array
 const bulkApproveTransfer = StateTransfer.create({
-    trigger: BulkApproveInteraction,
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: BulkApproveInteraction.name
+        }
+    },
     current: pendingState,
     next: approvedState,
     computeTarget: (event) => {

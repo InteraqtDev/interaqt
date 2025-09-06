@@ -16,7 +16,7 @@
 外部资源的基础实体模板：
 
 ```typescript
-import { Entity, Property, StateMachine, StateNode, StateTransfer, Interaction } from 'interaqt'
+import { Entity, Property, StateMachine, StateNode, StateTransfer, Interaction, InteractionEventEntity } from 'interaqt'
 
 // 定义外部资源的通用状态
 const pendingState = StateNode.create({ name: 'pending' })
@@ -81,28 +81,48 @@ const ExternalResource = Entity.create({
           StateTransfer.create({
             current: pendingState,
             next: syncingState,
-            trigger: StartSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: StartSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           }),
           // syncing -> synced
           StateTransfer.create({
             current: syncingState,
             next: syncedState,
-            trigger: CompleteSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: CompleteSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           }),
           // syncing -> failed
           StateTransfer.create({
             current: syncingState,
             next: failedState,
-            trigger: FailSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: FailSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           }),
           // failed -> syncing (retry)
           StateTransfer.create({
             current: failedState,
             next: syncingState,
-            trigger: RetrySync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: RetrySync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           })
         ]
@@ -153,7 +173,12 @@ const ExternalResource = Entity.create({
               name: 'timestamp',
               computeValue: () => new Date().toISOString()
             }),
-            trigger: StartSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: StartSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           })
         ]
@@ -177,7 +202,12 @@ const ExternalResource = Entity.create({
               name: 'timestamp',
               computeValue: () => new Date().toISOString()
             }),
-            trigger: CompleteSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: CompleteSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           })
         ]
@@ -242,19 +272,34 @@ const FileResource = Entity.create({
           StateTransfer.create({
             current: StateNode.create({ name: 'idle' }),
             next: uploadingState,
-            trigger: StartSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: StartSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           }),
           StateTransfer.create({
             current: uploadingState,
             next: uploadingState,
-            trigger: UpdateUploadProgress,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: UpdateUploadProgress.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.fileId })
           }),
           StateTransfer.create({
             current: uploadingState,
             next: StateNode.create({ name: 'complete', computeValue: () => 100 }),
-            trigger: CompleteSync,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: CompleteSync.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.resourceId })
           })
         ]
@@ -343,19 +388,34 @@ const PaymentResource = Entity.create({
           StateTransfer.create({
             current: pendingState,
             next: authorizedState,
-            trigger: AuthorizePayment,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: AuthorizePayment.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           }),
           StateTransfer.create({
             current: authorizedState,
             next: capturedState,
-            trigger: CapturePayment,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: CapturePayment.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           }),
           StateTransfer.create({
             current: capturedState,
             next: refundedState,
-            trigger: RefundPayment,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: RefundPayment.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           })
         ]
@@ -432,7 +492,12 @@ const WebhookEvent = Entity.create({
           StateTransfer.create({
             current: unprocessedState,
             next: processedState,
-            trigger: ProcessWebhook,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: ProcessWebhook.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.eventId })
           })
         ]
@@ -461,7 +526,12 @@ const WebhookEvent = Entity.create({
               name: 'timestamp',
               computeValue: () => new Date().toISOString()
             }),
-            trigger: ProcessWebhook,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: ProcessWebhook.name
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.eventId })
           })
         ]
@@ -629,13 +699,23 @@ const RetryStateMachine = StateMachine.create({
     StateTransfer.create({
       current: failedState,
       next: retryState,
-      trigger: RetrySync,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+          interactionName: RetrySync.name
+        }
+      },
       computeTarget: ({ payload }) => ({ id: payload.resourceId })
     }),
     StateTransfer.create({
       current: retryState,
       next: syncingState,
-      trigger: StartSync,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+          interactionName: StartSync.name
+        }
+      },
       computeTarget: ({ payload }) => ({ id: payload.resourceId })
     })
   ]

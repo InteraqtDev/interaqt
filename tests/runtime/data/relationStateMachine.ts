@@ -136,7 +136,12 @@ export function createData() {
         states: [NON_DELETED_STATE, DELETED_STATE],
         transfers: [
             StateTransfer.create({
-                trigger: transferReviewersInteraction,
+                trigger: {
+                    recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: transferReviewersInteraction.name
+                }
+                },
                 current: NON_DELETED_STATE,
                 next: DELETED_STATE,
                 computeTarget: async function(this: Controller, eventArgs: any) {

@@ -2,15 +2,28 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { StateNodeInstance } from './StateNode.js';
 import { InteractionInstance } from './Interaction.js';
 
+// Partial RecordMutationEvent type for trigger matching
+export type RecordMutationEventPattern = {
+  recordName?: string;
+  type?: 'create' | 'update' | 'delete';
+  keys?: string[];
+  record?: {
+    [key: string]: any;
+  };
+  oldRecord?: {
+    [key: string]: any;
+  };
+};
+
 export interface StateTransferInstance extends IInstance {
-  trigger: InteractionInstance;
+  trigger: RecordMutationEventPattern;
   current: StateNodeInstance;
   next: StateNodeInstance;
   computeTarget?: Function;
 }
 
 export interface StateTransferCreateArgs {
-  trigger: InteractionInstance;
+  trigger: RecordMutationEventPattern;
   current: StateNodeInstance;
   next: StateNodeInstance;
   computeTarget?: Function;
@@ -20,7 +33,7 @@ export class StateTransfer implements StateTransferInstance {
   public uuid: string;
   public _type = 'StateTransfer';
   public _options?: { uuid?: string };
-  public trigger: InteractionInstance;
+  public trigger: RecordMutationEventPattern;
   public current: StateNodeInstance;
   public next: StateNodeInstance;
   public computeTarget?: Function;
@@ -41,7 +54,7 @@ export class StateTransfer implements StateTransferInstance {
   
   static public = {
     trigger: {
-      instanceType: {} as unknown as InteractionInstance,
+      instanceType: {} as unknown as RecordMutationEventPattern,
       collection: false as const,
       required: true as const
     },

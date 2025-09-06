@@ -1,14 +1,33 @@
 import { StateMachineInstance } from "@shared";
 
-function shallowEqual(a: {[key:string]:any}, b: {[key:string]:any}) {
-    if (a===b) return true
+// Deep partial matching function for RecordMutationEvent patterns
+function deepPartialMatch(event: any, pattern: any): boolean {
+    if (pattern === undefined || pattern === null) return true;
+    if (event === pattern) return true;
     
-    for (const key in b) {
-        if (a[key] !== b[key]) {
-            return false
+    // If pattern is not an object, do simple equality check
+    if (typeof pattern !== 'object' || pattern === null) {
+        return event === pattern;
+    }
+    
+    // If event is not an object, it doesn't match the pattern
+    if (typeof event !== 'object' || event === null) {
+        return false;
+    }
+    
+    // Check all properties in the pattern
+    for (const key in pattern) {
+        if (!(key in event)) {
+            return false;
+        }
+        
+        // Recursively check nested objects
+        if (!deepPartialMatch(event[key], pattern[key])) {
+            return false;
         }
     }
-    return true
+    
+    return true;
 }
 
 
@@ -26,11 +45,11 @@ export class TransitionFinder {
         }
     }
 
-    findNextState(currentState: string, trigger: any) {
+    findNextState(currentState: string, event: any) {
         const transitions = this.map[currentState]
         if (transitions) {
             for (const transition of transitions) {
-                if (shallowEqual(transition.trigger, trigger)) {
+                if (deepPartialMatch(event, transition.trigger)) {
                     return transition.next
                 }
             }
@@ -38,7 +57,7 @@ export class TransitionFinder {
         return null
     }
 
-    findTransfers(trigger:any) {
-        return this.data.transfers.filter(transfer => shallowEqual(transfer.trigger, trigger))
+    findTransfers(event: any) {
+        return this.data.transfers.filter(transfer => deepPartialMatch(event, transfer.trigger))
     }
 }

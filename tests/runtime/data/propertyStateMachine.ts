@@ -2,6 +2,7 @@ import {
     Action,
     Entity,
     Interaction,
+    InteractionEventEntity,
     Payload,
     PayloadItem,
     Property,
@@ -113,7 +114,12 @@ export function createData() {
     })
 
     const draftToNormalTransfer = StateTransfer.create({
-        trigger: finalizeInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: finalizeInteraction.name
+            }
+        },
         current: draftState,
         next: normalState,
         computeTarget: (event: any) => {
@@ -122,7 +128,12 @@ export function createData() {
     })
 
     const normalToDraftTransfer = StateTransfer.create({
-        trigger: draftInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: draftInteraction.name
+            }
+        },
         current: normalState,
         next: draftState,
         computeTarget: (event: any) => {
@@ -131,7 +142,12 @@ export function createData() {
     })
 
     const normalToPublishedTransfer = StateTransfer.create({
-        trigger: publishInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: publishInteraction.name
+            }
+        },
         current: normalState,
         next: publishedState,
         computeTarget: (event: any) => {
@@ -140,7 +156,12 @@ export function createData() {
     })
 
     const publishedToNormalTransfer = StateTransfer.create({
-        trigger: withdrawInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: withdrawInteraction.name
+            }
+        },
         current: publishedState,
         next: normalState,
         computeTarget: (event: any) => {

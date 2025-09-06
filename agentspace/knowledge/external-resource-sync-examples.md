@@ -17,7 +17,7 @@
 ```typescript
 import { 
   Entity, Property, Relation, StateMachine, 
-  StateNode, StateTransfer, Interaction, Transform, Count 
+  StateNode, StateTransfer, Interaction, InteractionEventEntity, Transform, Count 
 } from 'interaqt'
 
 // ========== 状态定义 ==========
@@ -64,31 +64,56 @@ const File = Entity.create({
           StateTransfer.create({
             current: pendingState,
             next: uploadingState,
-            trigger: Interaction.create({ name: 'StartUpload' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'StartUpload'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.fileId })
           }),
           StateTransfer.create({
             current: uploadingState,
             next: processingState,
-            trigger: Interaction.create({ name: 'FinishUpload' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'FinishUpload'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.fileId })
           }),
           StateTransfer.create({
             current: processingState,
             next: readyState,
-            trigger: Interaction.create({ name: 'CompleteProcessing' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'CompleteProcessing'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.fileId })
           }),
           StateTransfer.create({
             current: uploadingState,
             next: failedState,
-            trigger: Interaction.create({ name: 'UploadFailed' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'UploadFailed'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.fileId })
           }),
           StateTransfer.create({
             current: failedState,
             next: uploadingState,
-            trigger: Interaction.create({ name: 'RetryUpload' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'RetryUpload'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.fileId })
           })
         ]
@@ -654,31 +679,56 @@ const Payment = Entity.create({
           StateTransfer.create({
             current: paymentPendingState,
             next: paymentProcessingState,
-            trigger: Interaction.create({ name: 'ProcessPayment' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'ProcessPayment'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           }),
           StateTransfer.create({
             current: paymentProcessingState,
             next: paymentAuthorizedState,
-            trigger: Interaction.create({ name: 'AuthorizePayment' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'AuthorizePayment'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           }),
           StateTransfer.create({
             current: paymentAuthorizedState,
             next: paymentCapturedState,
-            trigger: Interaction.create({ name: 'CapturePayment' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'CapturePayment'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           }),
           StateTransfer.create({
             current: paymentCapturedState,
             next: paymentRefundedState,
-            trigger: Interaction.create({ name: 'RefundPayment' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'RefundPayment'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           }),
           StateTransfer.create({
             current: paymentProcessingState,
             next: paymentFailedState,
-            trigger: Interaction.create({ name: 'PaymentFailed' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'PaymentFailed'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.paymentId })
           })
         ]
@@ -972,31 +1022,56 @@ const Email = Entity.create({
           StateTransfer.create({
             current: emailQueuedState,
             next: emailSendingState,
-            trigger: Interaction.create({ name: 'SendEmail' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'SendEmail'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.emailId })
           }),
           StateTransfer.create({
             current: emailSendingState,
             next: emailSentState,
-            trigger: Interaction.create({ name: 'EmailSent' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'EmailSent'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.emailId })
           }),
           StateTransfer.create({
             current: emailSentState,
             next: emailDeliveredState,
-            trigger: Interaction.create({ name: 'EmailDelivered' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'EmailDelivered'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.emailId })
           }),
           StateTransfer.create({
             current: emailSentState,
             next: emailBouncedState,
-            trigger: Interaction.create({ name: 'EmailBounced' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'EmailBounced'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.emailId })
           }),
           StateTransfer.create({
             current: emailSendingState,
             next: emailFailedState,
-            trigger: Interaction.create({ name: 'EmailFailed' }),
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              record: {
+                interactionName: 'EmailFailed'
+              }
+            },
             computeTarget: ({ payload }) => ({ id: payload.emailId })
           })
         ]

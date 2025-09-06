@@ -228,7 +228,12 @@ const rejectedStateNode = StateNode.create({
 })
 
 const pendingToApprovedTransfer = StateTransfer.create({
-    trigger: approveInteraction,
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: approveInteraction.name
+        }
+    },
     current: pendingStateNode,
     next: approvedStateNode,
     computeTarget: async function(eventArgs: any) {
@@ -239,7 +244,12 @@ const pendingToApprovedTransfer = StateTransfer.create({
 })
 
 const pendingToRejectedTransfer = StateTransfer.create({
-    trigger: rejectInteraction,
+    trigger: {
+        recordName: InteractionEventEntity.name,
+        record: {
+            interactionName: rejectInteraction.name
+        }
+    },
     current: pendingStateNode,
     next: rejectedStateNode,
     computeTarget: async function(eventArgs: any) {
@@ -322,7 +332,12 @@ deletionProperty.computation = StateMachine.create({
     states: [NON_DELETED_STATE, DELETED_STATE],
     transfers: [
         StateTransfer.create({
-            trigger: transferReviewersInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: transferReviewersInteraction.name
+                }
+            },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: async function(this: Controller, event: any) {

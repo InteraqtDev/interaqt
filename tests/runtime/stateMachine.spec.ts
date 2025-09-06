@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, DICTIONARY_RECORD, Entity, Property, StateMachine, StateNode, StateTransfer, Interaction, Action, Payload, PayloadItem, Relation, NON_EXIST_STATE } from 'interaqt';
+import { Controller, MonoSystem, DICTIONARY_RECORD, Entity, Property, StateMachine, StateNode, StateTransfer, Interaction, InteractionEventEntity, Action, Payload, PayloadItem, Relation } from 'interaqt';
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
@@ -261,7 +261,12 @@ describe('StateMachineRunner', () => {
 
         // 创建状态转移
         const IdleToIncrementingTransfer = StateTransfer.create({
-            trigger: IncrementInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: IncrementInteraction.name
+                }
+            },
             current: IdleState,
             next: IncrementingState,
             computeTarget: (event: any) => {
@@ -270,7 +275,12 @@ describe('StateMachineRunner', () => {
         })
 
         const IncrementingToIdleTransfer = StateTransfer.create({
-            trigger: ResetInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: ResetInteraction.name
+                }
+            },
             current: IncrementingState,
             next: IdleState,
             computeTarget: (event: any) => {
@@ -293,13 +303,23 @@ describe('StateMachineRunner', () => {
             states: [idleStateForName, incrementingStateForName],
             transfers: [
                 StateTransfer.create({
-                    trigger: IncrementInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: 'increment'
+                        }
+                    },
                     current: idleStateForName,
                     next: incrementingStateForName,
                     computeTarget: (event: any) => ({ id: event.payload!.counter.id })
                 }),
                 StateTransfer.create({
-                    trigger: ResetInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: 'reset'
+                        }
+                    },
                     current: incrementingStateForName,
                     next: idleStateForName,
                     computeTarget: (event: any) => ({ id: event.payload!.counter.id })
@@ -405,7 +425,12 @@ describe('StateMachineRunner', () => {
 
         // 创建状态转移 - 自循环转换
         const LoggingToLoggingTransfer = StateTransfer.create({
-            trigger: LogTimeInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+                record: {
+                    interactionName: LogTimeInteraction.name
+                }
+            },
             current: LoggingState,
             next: LoggingState,
             computeTarget: (event: any) => {
@@ -576,7 +601,12 @@ describe('StateMachineRunner', () => {
             states: [UpdatedState],
             transfers: [
                 StateTransfer.create({
-                    trigger: UpdateMessageInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: UpdateMessageInteraction.name
+                        }
+                    },
                     current: UpdatedState,
                     next: UpdatedState,
                     computeTarget: (event: any) => ({ id: event.payload!.message.id })
@@ -590,7 +620,12 @@ describe('StateMachineRunner', () => {
             states: [CountingState],
             transfers: [
                 StateTransfer.create({
-                    trigger: UpdateMessageInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: UpdateMessageInteraction.name
+                        }
+                    },
                     current: CountingState,
                     next: CountingState,
                     computeTarget: (event: any) => ({ id: event.payload!.message.id })
@@ -760,7 +795,12 @@ describe('StateMachineRunner', () => {
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [
                 StateTransfer.create({
-                    trigger: UnassignDocumentInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: UnassignDocumentInteraction.name
+                        }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: async function(this: Controller, event: any) {
@@ -984,7 +1024,12 @@ describe('StateMachineRunner', () => {
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [
                 StateTransfer.create({
-                    trigger: LeaveProjectInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: LeaveProjectInteraction.name
+                        }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: async function(this: Controller, event: any) {
@@ -1008,7 +1053,12 @@ describe('StateMachineRunner', () => {
                     }
                 }),
                 StateTransfer.create({
-                    trigger: ClearProjectMembersInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: ClearProjectMembersInteraction.name
+                        }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: async function(this: Controller, event: any) {
@@ -1253,13 +1303,23 @@ describe('StateMachineRunner', () => {
             states: [PendingState, ActiveState, CompletedState],
             transfers: [
                 StateTransfer.create({
-                    trigger: UpdateTaskStatusInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: UpdateTaskStatusInteraction.name
+                        }
+                    },
                     current: PendingState,
                     next: ActiveState,
                     computeTarget: (event: any) => event.payload.newStatus === 'active' ? { id: event.payload.task.id } : undefined
                 }),
                 StateTransfer.create({
-                    trigger: UpdateTaskStatusInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: UpdateTaskStatusInteraction.name
+                        }
+                    },
                     current: ActiveState,
                     next: CompletedState,
                     computeTarget: (event: any) => event.payload.newStatus === 'completed' ? { id: event.payload.task.id } : undefined
@@ -1274,7 +1334,12 @@ describe('StateMachineRunner', () => {
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [
                 StateTransfer.create({
-                    trigger: DeleteTaskInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: DeleteTaskInteraction.name
+                        }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: (event: any) => ({ id: event.payload!.task.id })
@@ -1507,7 +1572,12 @@ describe('StateMachineRunner', () => {
             states: [PendingState, CancelledState],
             transfers: [
                 StateTransfer.create({
-                    trigger: CancelOrderInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                    record: {
+                        interactionName: CancelOrderInteraction.name
+                    }
+                    },
                     current: PendingState,
                     next: CancelledState,
                     computeTarget: (event: any) => ({ id: event.payload.order.id })
@@ -1522,7 +1592,12 @@ describe('StateMachineRunner', () => {
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [
                 StateTransfer.create({
-                    trigger: CancelOrderInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                    record: {
+                        interactionName: CancelOrderInteraction.name
+                    }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: (event: any) => ({ id: event.payload!.order.id })
@@ -1537,7 +1612,12 @@ describe('StateMachineRunner', () => {
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [
                 StateTransfer.create({
-                    trigger: CancelOrderInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                    record: {
+                        interactionName: CancelOrderInteraction.name
+                    }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: async function(this: Controller, event: any) {
@@ -1682,7 +1762,12 @@ describe('StateMachineRunner', () => {
 
         // 创建状态转换
         const DeleteTransfer = StateTransfer.create({
-            trigger: DeleteUserInteraction,
+            trigger: {
+                recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: DeleteUserInteraction.name
+            }
+            },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: (event: any) => {
@@ -1841,13 +1926,23 @@ describe('StateMachineRunner', () => {
             states: [DraftState, PublishedState, ArchivedState],
             transfers: [
                 StateTransfer.create({
-                    trigger: PublishArticleInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                    record: {
+                        interactionName: PublishArticleInteraction.name
+                    }
+                    },
                     current: DraftState,
                     next: PublishedState,
                     computeTarget: (event: any) => ({ id: event.payload!.article.id })
                 }),
                 StateTransfer.create({
-                    trigger: ArchiveArticleInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: 'archiveArticle'
+                        }
+                    },
                     current: PublishedState,
                     next: ArchivedState,
                     computeTarget: (event: any) => ({ id: event.payload!.article.id })
@@ -1861,7 +1956,12 @@ describe('StateMachineRunner', () => {
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [
                 StateTransfer.create({
-                    trigger: DeleteArticleInteraction,
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        record: {
+                            interactionName: 'deleteArticle'
+                        }
+                    },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
                     computeTarget: async function(this: Controller, event: any) {

@@ -1,7 +1,9 @@
 import {
     Action,
     Entity,
-    Interaction, Property,
+    Interaction,
+    InteractionEventEntity,
+    Property,
     StateNode,
     StateTransfer,
     StateMachine,
@@ -41,13 +43,23 @@ export function createData() {
     })
 
     const globalEnabledToDisabledTransfer = StateTransfer.create({
-        trigger: disableInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: disableInteraction.name
+            }
+        },
         current: globalEnabledState,
         next: globalDisabledState,
     })
 
     const globalDisabledToEnabledTransfer = StateTransfer.create({
-        trigger: enableInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            record: {
+                interactionName: enableInteraction.name
+            }
+        },
         current: globalDisabledState,
         next: globalEnabledState,
     })

@@ -34,30 +34,16 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     getDefaultValue(event:any) {
         return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
     }
-    mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
-        if (mutationEvent.recordName === INTERACTION_RECORD) {
-            const interactionName = mutationEvent.record!.interactionName!
-            const interaction = this.controller.interactions.find(i => i.name === interactionName)
-            return interaction
-        } else {
-            return {
-                type: 'data',
-                eventType: mutationEvent.type,
-            }
-        }
-    }
     async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
-        assert(mutationEvent.recordName === INTERACTION_RECORD, 'Record StateMachine only supports interaction record')
-
+        // Now we can handle any mutationEvent, not just interaction events
         const currentStateName = await this.state.currentState.get()
-        const trigger = this.mutationEventToTrigger(mutationEvent)
-        const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
+        const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)
         if (!nextState) return ComputationResult.skip()
 
         await this.state.currentState.set(nextState.name)
 
-        const interactionEvent = mutationEvent.record!
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, interactionEvent)) : nextState.name
+        const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record! : mutationEvent
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, event)) : nextState.name
     }
 }
 
@@ -97,40 +83,26 @@ Or if you want to use state name as value, you should not set ${this.dataContext
             return this.defaultState.name
         }
     }
-    mutationEventToTrigger(mutationEvent: RecordMutationEvent) {
-        // FIXME 支持 data mutation
-        if (mutationEvent.recordName === INTERACTION_RECORD) {
-            const interactionName = mutationEvent.record!.interactionName!
-            const interaction = this.controller.interactions.find(i => i.name === interactionName)
-            return interaction
-        }
-    }
     async computeDirtyRecords(mutationEvent: RecordMutationEvent) {
-        // 这里 trigger 要么是 DataEventDep，要么是 Interaqtion。
-        // TODO 未来还会有 Action 之类的？？？
-        const trigger = this.mutationEventToTrigger(mutationEvent)
-        if (trigger) {
-            const transfers = this.transitionFinder.findTransfers(trigger)
-            // CAUTION 不能返回有 null 的节点，所以加上 filter。
-            return (await Promise.all(transfers.map(transfer => {
-                const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
-                return transfer.computeTarget!.call(this.controller, event)
-            }))).flat().filter(Boolean)
-        }
+        // Now directly use mutationEvent for matching
+        const transfers = this.transitionFinder.findTransfers(mutationEvent)
+        // CAUTION 不能返回有 null 的节点，所以加上 filter。
+        return (await Promise.all(transfers.map(transfer => {
+            const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
+            return transfer.computeTarget!.call(this.controller, event)
+        }))).flat().filter(Boolean)
     }
     
     async incrementalCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any) {
-        assert(mutationEvent.recordName === INTERACTION_RECORD, 'Record StateMachine only supports interaction record')
-
+        // Now we can handle any mutationEvent, not just interaction events
         const currentStateName = await this.state.currentState.get(dirtyRecord)
-        const trigger = this.mutationEventToTrigger(mutationEvent)
-        const nextState = this.transitionFinder?.findNextState(currentStateName, trigger)
+        const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)
         if (!nextState) return ComputationResult.skip()
 
         await this.state.currentState.set(dirtyRecord, nextState.name)
 
-        const interactionEvent = mutationEvent.record!
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, interactionEvent)) : nextState.name
+        const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record! : mutationEvent
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, event)) : nextState.name
     }
 }
 

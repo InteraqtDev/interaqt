@@ -208,19 +208,30 @@ const TotalActiveUserAge = Summation.create({
 ### 在 StateMachine 中使用
 
 ```typescript
-const UserStateMachine = StateMachine.create({
-  entity: User,
-  attribute: 'status',
-  states: [activeState, inactiveState],
-  defaultState: inactiveState,
-  transfers: [
-    StateTransfer.create({
-      from: inactiveState,
-      to: activeState,
-      trigger: ActivateUser,
-      // 状态变化会自动更新 filtered entity
-    })
-  ]
+const activeState = StateNode.create({ name: 'active' });
+const inactiveState = StateNode.create({ name: 'inactive' });
+
+const statusProperty = Property.create({
+  name: 'status',
+  type: 'string',
+  computation: StateMachine.create({
+    states: [activeState, inactiveState],
+    defaultState: inactiveState,
+    transfers: [
+      StateTransfer.create({
+        current: inactiveState,
+        next: activeState,
+        trigger: {
+          recordName: InteractionEventEntity.name,
+          record: {
+            interactionName: ActivateUser.name
+          }
+        },
+        computeTarget: (event) => ({ id: event.payload.userId })
+        // 状态变化会自动更新 filtered entity
+      })
+    ]
+  })
 })
 ```
 

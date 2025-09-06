@@ -150,6 +150,9 @@ user.department.manager.role.permissions.includes('admin')
 
 ```typescript
 // 使用 StateMachine 维护跨实体状态
+const techState = StateNode.create({ name: 'tech' });
+const nonTechState = StateNode.create({ name: 'nonTech' });
+
 const UserDepartmentType = Property.create({
   name: 'departmentType',
   type: 'string',
@@ -160,7 +163,12 @@ const UserDepartmentType = Property.create({
       StateTransfer.create({
         current: nonTechState,
         next: techState,
-        trigger: DepartmentUpdated,
+        trigger: {
+          recordName: InteractionEventEntity.name,
+          record: {
+            interactionName: DepartmentUpdated.name
+          }
+        },
         computeTarget: (event) => /* 计算逻辑 */
       })
     ]
