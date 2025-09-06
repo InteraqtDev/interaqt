@@ -153,6 +153,107 @@ const postCount = Property.create({
 })
 ```
 
+### HardDeletionProperty.create()
+
+Create a special property that triggers physical deletion of records when set to true.
+
+**Syntax**
+```typescript
+HardDeletionProperty.create(config?: HardDeletionPropertyConfig): PropertyInstance
+```
+
+**Parameters**
+- `config.name` (string, optional): Property name, defaults to `'_isDeleted_'`
+
+**Usage with StateMachine**
+
+HardDeletionProperty is typically used with StateMachine to manage record deletion:
+
+```typescript
+import { DELETED_STATE, NON_DELETED_STATE } from 'interaqt'
+
+// Define deletion StateMachine for the HardDeletionProperty
+const deletionStateMachine = StateMachine.create({
+    states: [NON_DELETED_STATE, DELETED_STATE],
+    defaultState: NON_DELETED_STATE,
+    transfers: [
+        StateTransfer.create({
+            trigger: DeleteUserInteraction,
+            current: NON_DELETED_STATE,
+            next: DELETED_STATE,
+            computeTarget: function(event) {
+                return { id: event.payload.userId }
+            }
+        })
+    ]
+})
+
+const hardDeletionProperty = HardDeletionProperty.create()
+hardDeletionProperty.computation = deletionStateMachine
+
+// Add HardDeletionProperty to entity
+const User = Entity.create({
+    name: 'User',
+    properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'email', type: 'string' }),
+        // Add HardDeletionProperty with deletion StateMachine
+        hardDeletionProperty
+    ]
+})
+```
+
+**How It Works**
+1. When the property value transitions to `DELETED_STATE` (true), the Controller automatically deletes the record from storage
+2. The deletion is physical - the record is completely removed from the database
+3. This is different from soft deletion where records remain but are marked as deleted
+
+**Example: Entity Creation and Deletion Pattern**
+
+```typescript
+// Use Transform for entity creation
+const Article = Entity.create({
+    name: 'Article',
+    properties: [
+        Property.create({ name: 'title', type: 'string' }),
+        Property.create({ name: 'content', type: 'string' }),
+        HardDeletionProperty.create()
+    ],
+    // Transform creates new articles from interaction events
+    computation: Transform.create({
+        record: InteractionEventEntity,
+        callback: function(event) {
+            if (event.interactionName === 'CreateArticle') {
+                return {
+                    title: event.payload.title,
+                    content: event.payload.content
+                }
+            }
+            return null
+        }
+    })
+})
+
+// Configure deletion for the HardDeletionProperty
+const deletionProperty = HardDeletionProperty.create()
+deletionProperty.computation = StateMachine.create({
+    states: [NON_DELETED_STATE, DELETED_STATE],
+    defaultState: NON_DELETED_STATE,
+    transfers: [
+        StateTransfer.create({
+            trigger: DeleteArticleInteraction,
+            current: NON_DELETED_STATE,
+            next: DELETED_STATE,
+            computeTarget: function(event) {
+                return { id: event.payload.articleId }
+            }
+        })
+    ]
+})
+
+Article.properties.push(deletionProperty)
+```
+
 ### Relation.create()
 
 Create relationship definition between entities or create filtered views of existing relations.
@@ -723,57 +824,7 @@ const OrderStateMachine = StateMachine.create({
     defaultState: pendingState
 });
 
-// Relation State Machine Example
-const relationNotExistsState = StateNode.create({ 
-    name: 'notExists',
-    computeValue: () => null  // Return null means no relation
-});
-
-const relationExistsState = StateNode.create({ 
-    name: 'exists',
-    computeValue: () => ({
-        establishedAt: new Date().toISOString(),
-        status: 'active'
-    })
-});
-
-const RelationStateMachine = StateMachine.create({
-    states: [relationNotExistsState, relationExistsState],
-    transfers: [
-        StateTransfer.create({
-            trigger: CreateRelationInteraction,
-            current: relationNotExistsState,
-            next: relationExistsState,
-            computeTarget: (event) => ({
-                source: event.user,
-                target: event.payload.targetEntity
-            })
-        }),
-        StateTransfer.create({
-            trigger: RemoveRelationInteraction,
-            current: relationExistsState,
-            next: relationNotExistsState,
-            computeTarget: async function(this: Controller, event) {
-                // Find existing relation to remove
-                const relation = await this.system.storage.findOneRelationByName(UserTargetRelation.name,
-                    this.globals.MatchExp.atom({
-                        key: 'source.id',
-                        value: ['=', event.user.id]
-                    }).and({
-                        key: 'target.id',
-                        value: ['=', event.payload.targetId]
-                    }),
-                    undefined,
-                    ['id']
-                );
-                return relation;
-            }
-        })
-    ],
-    defaultState: relationNotExistsState
-});
-
-// Apply to relation definition
+// Relation with HardDeletionProperty for deletion management
 const UserTargetRelation = Relation.create({
     source: User,
     sourceProperty: 'targets',
@@ -781,13 +832,59 @@ const UserTargetRelation = Relation.create({
     targetProperty: 'users',
     type: 'n:n',
     properties: [
-        Property.create({
-            name: 'relationState',
-            type: 'object',
-            computation: RelationStateMachine
+        Property.create({ name: 'createdAt', type: 'string' }),
+        Property.create({ name: 'isActive', type: 'boolean' }),
+    ],
+    // Use Transform to create relations
+    computation: Transform.create({
+        record: InteractionEventEntity,
+        callback: function(event) {
+            if (event.interactionName === 'CreateRelation') {
+                return {
+                    source: event.payload.sourceUser,
+                    target: event.payload.targetEntity,
+                    createdAt: new Date().toISOString(),
+                    isActive: true
+                }
+            }
+            return null
+        }
+    })
+})
+
+const relationDeletionProperty = HardDeletionProperty.create()
+
+// Configure deletion for relation's HardDeletionProperty
+relationDeletionProperty.computation = StateMachine.create({
+    states: [NON_DELETED_STATE, DELETED_STATE],
+    defaultState: NON_DELETED_STATE,
+    transfers: [
+        StateTransfer.create({
+            trigger: DeleteRelationInteraction,
+            current: NON_DELETED_STATE,
+            next: DELETED_STATE,
+            computeTarget: async function(this: Controller, event: any) {
+                const MatchExp = this.globals.MatchExp;
+                const relation = await this.system.storage.findOne(
+                    UserTargetRelation.name,
+                    MatchExp.atom({
+                        key: 'source.id',
+                        value: ['=', event.payload.sourceId]
+                    }).and({
+                        key: 'target.id',
+                        value: ['=', event.payload.targetId]
+                    }),
+                    undefined,
+                    ['id']
+                );
+                return relation ? { id: relation.id } : undefined;
+            }
         })
     ]
 })
+
+UserTargetRelation.properties.push(relationDeletionProperty)
+
 ```
 
 ### RealTime.create()

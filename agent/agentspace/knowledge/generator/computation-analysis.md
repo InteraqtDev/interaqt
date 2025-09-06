@@ -35,11 +35,14 @@ Look at the entity's `lifecycle.creation` and `lifecycle.deletion`:
 |---------------|----------|---------------------|
 | `"created-with-parent"` | Any | `_parent:[lifecycle.creation.parent]` (created by parent's computation) |
 | `"interaction-created"` | `canBeDeleted: false` | `Transform` with `InteractionEventEntity` |
-| `"interaction-created"` | `canBeDeleted: true` with `hard-delete` | `StateMachine` only (handles both create and delete) |
+| `"interaction-created"` | `canBeDeleted: true` with `hard-delete` | `Transform` + `HardDeletionProperty` with `StateMachine` |
 | `"interaction-created"` | `canBeDeleted: true` with `soft-delete` | `Transform` + status property with `StateMachine` |
 | `"derived"` | Any | `Transform` from source entity |
 
-**Critical Rule**: Transform can ONLY create, NEVER delete. If hard deletion is needed, you MUST use StateMachine for the entire entity lifecycle.
+**Critical Rule**: Transform can ONLY create, NEVER delete. For hard deletion:
+- Use `Transform` for entity/relation creation
+- Add `HardDeletionProperty` to the entity/relation
+- Use `StateMachine` on the `HardDeletionProperty` to manage deletion
 
 ### 2. Relation-Level Computations
 
@@ -48,13 +51,13 @@ Check `lifecycle.creation` and `lifecycle.deletion`:
 | Creation Type | Deletion | Computation Decision |
 |---------------|----------|---------------------|
 | `"created-with-entity"` | `canBeDeleted: false` | `_parent:[lifecycle.creation.parent]` (created by parent entity's computation) |
-| `"created-with-entity"` | `canBeDeleted: true` | `_parent:[lifecycle.creation.parent]` + `StateMachine` for deletion |
+| `"created-with-entity"` | `canBeDeleted: true` | `_parent:[lifecycle.creation.parent]` + `HardDeletionProperty` with `StateMachine` for deletion |
 | `"interaction-created"` | `canBeDeleted: false` | `Transform` with `InteractionEventEntity` |
-| `"interaction-created"` | `canBeDeleted: true` | `StateMachine` only (hard delete) |
+| `"interaction-created"` | `canBeDeleted: true` | `Transform` + `HardDeletionProperty` with `StateMachine` |
 | `"derived"` | Any | `Transform` from source conditions |
 | Any | `deletionType: "soft-delete"` | Original computation + status property with `StateMachine` |
 
-**Critical Rule**: Transform can ONLY create, NEVER delete. If deletion is needed, you MUST use StateMachine.
+**Critical Rule**: Transform can ONLY create, NEVER delete. For hard deletion, add `HardDeletionProperty` and use `StateMachine` on it.
 
 ### 3. Property-Level Computations
 
@@ -132,7 +135,7 @@ For each element:
    - If `creation-only` or `derived-with-parent` → use `_owner`
    - If `independent` → apply standard dependency analysis rules
 3. Apply the appropriate rules based on creation type and deletion capability
-4. For entities/relations that can be hard-deleted, use StateMachine instead of Transform
+4. For entities/relations that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
 
 ### Step 3: Generate Output Document
 
@@ -216,14 +219,14 @@ Examples:
 ```
 1. Entity Lifecycle?
    ├─ lifecycle.creation.type: "created-with-parent"? → _parent:[parent]
-   ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (hard)? → StateMachine
+   ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (hard)? → Transform + HardDeletionProperty with StateMachine
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (soft)? → Transform + status StateMachine
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: false? → Transform with InteractionEventEntity
    └─ lifecycle.creation.type: "derived"? → Transform from source entity
    
 2. Relation Lifecycle?
    ├─ lifecycle.creation.type: "created-with-entity"? → _parent:[parent]
-   ├─ Can be deleted? → StateMachine (hard delete) or _parent + StateMachine
+   ├─ Can be deleted? → Transform/parent + HardDeletionProperty with StateMachine
    ├─ Needs audit trail? → Original computation + status StateMachine (soft delete)
    └─ Never deleted? → Transform (if interaction-created) or _parent:[parent]
 
@@ -253,8 +256,8 @@ Examples:
 - [ ] Separate `dependencies` and `interactionDependencies`
 - [ ] Add `InteractionEventEntity` when needed
 - [ ] Verify properties with `controlType: "creation-only"` or `"derived-with-parent"` use `_owner`
-- [ ] Verify no Transform is used for deletable entities (hard-delete)
-- [ ] Verify no Transform is used for deletable relations (hard-delete)
+- [ ] Verify Transform + HardDeletionProperty is used for deletable entities (hard-delete)
+- [ ] Verify Transform + HardDeletionProperty is used for deletable relations (hard-delete)
 - [ ] Generate complete `computation-analysis.json`
 
 ## Common Patterns
@@ -275,30 +278,30 @@ Examples:
 ### Deletion Patterns
 
 #### For Entities:
-- **Hard delete** (no history): StateMachine handles both creation and deletion
-  - Creation: StateMachine creates entity from interaction
-  - Deletion: StateMachine with `computeValue: () => null` removes entity
+- **Hard delete** (no history): Transform + HardDeletionProperty with StateMachine
+  - Creation: Transform creates entity from interaction
+  - Deletion: HardDeletionProperty with StateMachine triggers physical deletion
 - **Soft delete** (audit trail): Transform for creation + status property with StateMachine
   - Creation: Transform creates entity
   - Deletion: StateMachine updates status to "deleted"
 
 #### For Relations:
-- **Hard delete**: StateMachine only (same as entities)
+- **Hard delete**: Transform + HardDeletionProperty with StateMachine
 - **Soft delete**: Original creation computation + status property with StateMachine
-- **Created-with-entity + deletable**: `_parent` for creation + StateMachine for deletion
+- **Created-with-entity + deletable**: `_parent` for creation + HardDeletionProperty with StateMachine for deletion
 
 ## Validation
 
 Before finalizing, verify:
 1. Every entity with `interactionDependencies` has appropriate computation:
-   - If `canBeDeleted: true` with `hard-delete` → Must use StateMachine
+   - If `canBeDeleted: true` with `hard-delete` → Must use Transform + HardDeletionProperty with StateMachine
    - If `canBeDeleted: false` → Can use Transform (unless `created-with-parent`)
 2. Entities/relations with `lifecycle.creation.type: "created-with-parent/entity"` use `_parent:[ParentName]`
 3. Properties with `controlType: "creation-only"` or `"derived-with-parent"` have computation `_owner`
 4. Properties with `controlType: "independent"` are analyzed for appropriate computation
 5. Properties with modifying `interactionDependencies` use StateMachine (if `controlType: "independent"`)
 6. Properties with only `dataDependencies` use data-based computation (if `controlType: "independent"`)
-7. No entities or relations with `canBeDeleted:true` and `hard-delete` use Transform alone
+7. All entities or relations with `canBeDeleted:true` and `hard-delete` use Transform + HardDeletionProperty
 8. All dependencies are properly formatted with specific properties
 9. `InteractionEventEntity` is included when interactions are dependencies
 10. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`

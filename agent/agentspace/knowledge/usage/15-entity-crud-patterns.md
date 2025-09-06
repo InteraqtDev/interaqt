@@ -5,7 +5,9 @@ In interaqt, all data operations follow reactive design principles. This chapter
 ## Core Principles
 
 1. **Creation**: Use Transform to listen to Interaction events to create entities
-2. **Deletion**: Use soft delete pattern, manage deletion state through StateMachine
+2. **Deletion**: 
+   - **Soft Delete (Recommended)**: Manage deletion state through StateMachine on status property
+   - **Hard Delete**: Use HardDeletionProperty + StateMachine for physical deletion
 3. **Update**: Reactively update entity state through StateMachine or Transform
 4. **Reference**: For entities that support deletion, use Filtered Entity to create "non-deleted" views
 5. **Transform Restriction**: Transform can ONLY be used in Entity or Relation computation, NEVER in Property computation
@@ -433,6 +435,68 @@ const Article = Entity.create({
   ]
 });
 ```
+
+## Hard Delete Pattern with HardDeletionProperty
+
+While soft delete is recommended for most cases, sometimes physical deletion is required (e.g., compliance requirements, storage optimization). Use HardDeletionProperty for this:
+
+```javascript
+import { HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE } from 'interaqt';
+
+// Entity with HardDeletionProperty
+const Article = Entity.create({
+  name: 'Article',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'createdAt', type: 'string' }),
+    // Add HardDeletionProperty for physical deletion
+    HardDeletionProperty.create()
+  ],
+  // Use Transform for creation
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: function(event) {
+      if (event.interactionName === 'CreateArticle') {
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          createdAt: new Date().toISOString()
+        };
+      }
+      return null;
+    }
+  })
+});
+
+// Configure deletion StateMachine for HardDeletionProperty
+const deletionProperty = Article.properties.find(p => p.name === '_isDeleted_');
+deletionProperty.computation = StateMachine.create({
+  states: [NON_DELETED_STATE, DELETED_STATE],
+  defaultState: NON_DELETED_STATE,
+  transfers: [
+    StateTransfer.create({
+      trigger: DeleteArticle,
+      current: NON_DELETED_STATE,
+      next: DELETED_STATE,
+      computeTarget: function(event) {
+        return { id: event.payload.articleId };
+      }
+    })
+  ]
+});
+```
+
+### Key Differences: Soft Delete vs Hard Delete
+
+| Aspect | Soft Delete | Hard Delete |
+|--------|------------|-------------|
+| Data Persistence | Record remains in database | Record is physically removed |
+| Recovery | Can be restored | Cannot be restored |
+| Audit Trail | Full history preserved | History lost after deletion |
+| Storage | Uses more storage | Frees storage immediately |
+| Implementation | Status property + StateMachine | HardDeletionProperty + StateMachine |
+| Use Cases | Most business scenarios | Compliance, privacy requirements |
 
 ## Using Filtered Entity to Handle Non-Deleted Entities
 
@@ -1033,7 +1097,7 @@ await controller.callInteraction('DeleteArticle', {
 
 ## Best Practices
 
-1. **Always Use Soft Delete**: In reactive systems, hard deletion breaks data integrity and historical traceability.
+1. **Prefer Soft Delete**: In reactive systems, soft delete preserves data integrity and historical traceability. Only use hard delete when absolutely necessary (compliance, privacy laws).
 
 2. **Reasonable Use of Filtered Entities**: For scenarios that frequently query non-deleted data, creating corresponding Filtered Entities can simplify queries.
 
@@ -1043,7 +1107,11 @@ await controller.callInteraction('DeleteArticle', {
 
 5. **Consider Relation Validity**: When entities support deletion, related relations also need validity management.
 
-6. **Avoid Cascading Physical Deletion**: Even when "deleting" related data is needed, it should be implemented through marking or state management.
+6. **Hard Delete Considerations**:
+   - Use HardDeletionProperty + StateMachine pattern
+   - Ensure no critical audit data is lost
+   - Consider cascading effects on related entities
+   - Document why hard delete is necessary
 
 7. **Never Use Transform in Property Computation**: Transform is designed for collection-to-collection transformation (Entity/Relation creation). For property-level computations, use:
    - **StateMachine**: For state management and interaction-driven updates
