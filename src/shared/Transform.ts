@@ -2,14 +2,25 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
 import type { ComputationRecord, AttributeQueryData } from './types.js';
 
+type EventDep = {
+  recordName: string;
+  type: 'create'|'delete'|'update';
+};
+
 export interface TransformInstance extends IInstance {
-  record: ComputationRecord;
+  record?: ComputationRecord;
+  eventDeps?: {
+    [key: string]: EventDep;
+  };
   attributeQuery?: AttributeQueryData;
   callback: Function;
 }
 
 export interface TransformCreateArgs {
-  record: ComputationRecord;
+  record?: ComputationRecord;
+  eventDeps?: {
+    [key: string]: EventDep;
+  };
   attributeQuery?: AttributeQueryData;
   callback: Function;
 }
@@ -18,7 +29,10 @@ export class Transform implements TransformInstance {
   public uuid: string;
   public _type = 'Transform';
   public _options?: { uuid?: string };
-  public record: ComputationRecord;
+  public record?: ComputationRecord;
+  public eventDeps?: {
+    [key: string]: EventDep;
+  };
   public attributeQuery?: AttributeQueryData;
   public callback: Function;
   
@@ -26,6 +40,7 @@ export class Transform implements TransformInstance {
     this._options = options;
     this.uuid = generateUUID(options);
     this.record = args.record;
+    this.eventDeps = args.eventDeps;
     this.attributeQuery = args.attributeQuery;
     this.callback = args.callback;
   }

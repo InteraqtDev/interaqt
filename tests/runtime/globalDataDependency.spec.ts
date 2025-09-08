@@ -168,7 +168,7 @@ describe('Global data dependency', () => {
     await controller.setup(true);
     
     // 设置初始全局值
-    await system.storage.set(DICTIONARY_RECORD, 'globalMultiplier', 10);
+    await system.storage.dict.set( 'globalMultiplier', 10);
     
     // 创建一个分数记录
     const score1 = await system.storage.create('Score', {name: 'Score 1'});
@@ -178,7 +178,7 @@ describe('Global data dependency', () => {
     expect(scoreRecord.adjustedScore).toBe(20);
     
     // 更新全局值
-    await system.storage.set(DICTIONARY_RECORD, 'globalMultiplier', 15);
+    await system.storage.dict.set('globalMultiplier', 15);
     
     // 检查计算值是否更新（15 * 2 = 30）
     scoreRecord = await system.storage.findOne('Score', BoolExp.atom({key: 'id', value: ['=', score1.id]}), undefined, ['*']);
@@ -192,7 +192,7 @@ describe('Global data dependency', () => {
     expect(score2Record.adjustedScore).toBe(30);
     
     // 再次更新全局值
-    await system.storage.set(DICTIONARY_RECORD, 'globalMultiplier', 20);
+    await system.storage.dict.set('globalMultiplier', 20);
     
     // 检查两个记录的计算值是否都更新
     scoreRecord = await system.storage.findOne('Score', BoolExp.atom({key: 'id', value: ['=', score1.id]}), undefined, ['*']);
@@ -354,8 +354,8 @@ describe('Global data dependency', () => {
     await controller.setup(true);
     
     // 设置初始全局值
-    await system.storage.set(DICTIONARY_RECORD, 'taxRate', 0.1); // 10% 税率
-    await system.storage.set(DICTIONARY_RECORD, 'discount', 0.2); // 20% 折扣
+    await system.storage.dict.set('taxRate', 0.1); // 10% 税率
+    await system.storage.dict.set('discount', 0.2); // 20% 折扣
     
     // 创建产品
     const product = await system.storage.create('Product', {
@@ -368,14 +368,14 @@ describe('Global data dependency', () => {
     expect(productRecord.finalPrice).toBe(88);
     
     // 更新税率
-    await system.storage.set(DICTIONARY_RECORD, 'taxRate', 0.15); // 15% 税率
+    await system.storage.dict.set('taxRate', 0.15); // 15% 税率
     
     // 检查计算值：100 * (1 - 0.2) * (1 + 0.15) = 100 * 0.8 * 1.15 = 92
     productRecord = await system.storage.findOne('Product', BoolExp.atom({key: 'id', value: ['=', product.id]}), undefined, ['*']);
     expect(productRecord.finalPrice).toBe(92);
     
     // 更新折扣
-    await system.storage.set(DICTIONARY_RECORD, 'discount', 0.3); // 30% 折扣
+    await system.storage.dict.set('discount', 0.3); // 30% 折扣
     
     // 检查计算值：100 * (1 - 0.3) * (1 + 0.15) = 100 * 0.7 * 1.15 = 80.5，四舍五入为 81
     productRecord = await system.storage.findOne('Product', BoolExp.atom({key: 'id', value: ['=', product.id]}), undefined, ['*']);

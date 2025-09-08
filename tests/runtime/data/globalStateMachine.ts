@@ -45,6 +45,7 @@ export function createData() {
     const globalEnabledToDisabledTransfer = StateTransfer.create({
         trigger: {
             recordName: InteractionEventEntity.name,
+            type: 'create',
             record: {
                 interactionName: disableInteraction.name
             }
@@ -56,6 +57,7 @@ export function createData() {
     const globalDisabledToEnabledTransfer = StateTransfer.create({
         trigger: {
             recordName: InteractionEventEntity.name,
+            type: 'create',
             record: {
                 interactionName: enableInteraction.name
             }

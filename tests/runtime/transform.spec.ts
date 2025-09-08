@@ -1,10 +1,15 @@
 import { describe, expect, test } from "vitest";
 import {
+  Action,
   BoolExp,
   Controller,
   Entity,
+  Interaction,
+  InteractionEventEntity,
   KlassByName,
   MonoSystem,
+  Payload,
+  PayloadItem,
   Property,
   Relation,
   Transform
@@ -634,5 +639,543 @@ describe('Transform computed handle', () => {
     expect(afterDeleteBestsellers).toHaveLength(1); // Only Premium Collection remains
   });
   
+  // NOTE: The following tests are commented out because the current implementation
+  // of Transform with useMutationEvent only listens to InteractionEventEntity mutations,
+  // not regular entity create/update/delete mutations. These tests expect Transform
+  // to react to direct storage operations, which is not currently supported.
   
-}); 
+  test('should transform from RecordMutationEvent when entity is created', async () => {
+    // Create source entity
+    const userEntity = Entity.create({
+      name: 'User',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'email', type: 'string'}),
+        Property.create({name: 'role', type: 'string', defaultValue: () => 'user'})
+      ]
+    });
+    
+    // Create audit log entity that tracks all user mutations
+    const userAuditEntity = Entity.create({
+      name: 'UserAudit',
+      properties: [
+        Property.create({name: 'action', type: 'string'}),
+        Property.create({name: 'userId', type: 'string'}),
+        Property.create({name: 'timestamp', type: 'string'}),
+        Property.create({name: 'changes', type: 'object'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          User: {
+            recordName: 'User',
+            type: 'create'
+          }
+        },
+        callback: function(mutationEvent: any) {
+          // Only process user entity mutations
+          if (mutationEvent.recordName !== 'User') {
+            return null;
+          }
+          
+          return {
+            action: mutationEvent.type,
+            userId: (mutationEvent.record?.id || mutationEvent.oldRecord?.id).toString(),
+            timestamp: new Date().toISOString(),
+            changes: {
+              old: mutationEvent.oldRecord,
+              new: mutationEvent.record
+            }
+          };
+        }
+      })
+    });
+    
+    const entities = [userEntity, userAuditEntity];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Initial audit log should be empty
+    const initialAudits = await system.storage.find('UserAudit');
+    expect(initialAudits).toEqual([]);
+    
+    // Create a user
+    const user1 = await system.storage.create('User', {
+      name: 'John Doe',
+      email: 'john@example.com',
+      role: 'admin'
+    });
+    
+    // Check audit log entry was created
+    const audits1 = await system.storage.find('UserAudit', undefined, undefined, ['*']);
+    expect(audits1).toHaveLength(1);
+    expect(audits1[0].action).toBe('create');
+    expect(audits1[0].userId).toBe(user1.id.toString());
+    expect(audits1[0].changes.new.name).toBe('John Doe');
+    expect(audits1[0].changes.new.email).toBe('john@example.com');
+    expect(audits1[0].changes.old).toBeUndefined();
+    
+    // Create another user
+    const user2 = await system.storage.create('User', {
+      name: 'Jane Smith',
+      email: 'jane@example.com'
+    });
+    
+    // Check second audit log entry
+    const audits2 = await system.storage.find('UserAudit', undefined, undefined, ['*']);
+    expect(audits2).toHaveLength(2);
+    const audit2 = audits2.find((a: any) => a.userId === user2.id.toString());
+    expect(audit2.action).toBe('create');
+    expect(audit2.changes.new.name).toBe('Jane Smith');
+  });
+  
+  test('should transform from RecordMutationEvent when entity is updated', async () => {
+    // Create entities
+    const postEntity = Entity.create({
+      name: 'Post',
+      properties: [
+        Property.create({name: 'title', type: 'string'}),
+        Property.create({name: 'content', type: 'string'}),
+        Property.create({name: 'status', type: 'string', defaultValue: () => 'draft'})
+      ]
+    });
+    
+    // Create revision entity that tracks post changes
+    const postRevisionEntity = Entity.create({
+      name: 'PostRevision',
+      properties: [
+        Property.create({name: 'postId', type: 'string'}),
+        Property.create({name: 'revisionNumber', type: 'number'}),
+        Property.create({name: 'previousTitle', type: 'string'}),
+        Property.create({name: 'newTitle', type: 'string'}),
+        Property.create({name: 'previousContent', type: 'string'}),
+        Property.create({name: 'newContent', type: 'string'}),
+        Property.create({name: 'changedAt', type: 'string'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          Post: {
+            recordName: 'Post',
+            type: 'update'
+          }
+        },
+        callback: function(mutationEvent: any) {
+          // Only track updates to posts
+          if (mutationEvent.recordName !== 'Post' || mutationEvent.type !== 'update') {
+            return null;
+          }
+          
+          // Track changes when title or content is modified
+          if ((mutationEvent.record?.title && mutationEvent.oldRecord?.title !== mutationEvent.record?.title) ||
+            (mutationEvent.record?.content && mutationEvent.oldRecord?.content !== mutationEvent.record?.content)) {
+            return {
+              postId: mutationEvent.record.id.toString(),
+              revisionNumber: Date.now(), // Simple revision numbering
+              previousTitle: mutationEvent.oldRecord?.title,
+              newTitle: mutationEvent.record?.title,
+              previousContent: mutationEvent.oldRecord?.content,
+              newContent: mutationEvent.record?.content,
+              changedAt: new Date().toISOString()
+            };
+          }
+          
+          return null;
+        }
+      })
+    });
+    
+    const entities = [postEntity, postRevisionEntity];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create a post
+    const post = await system.storage.create('Post', {
+      title: 'Original Title',
+      content: 'Original content',
+      status: 'draft'
+    });
+    
+    // No revisions yet (only tracks updates)
+    const revisions1 = await system.storage.find('PostRevision');
+    expect(revisions1).toEqual([]);
+    
+    // Update the post title
+    await system.storage.update('Post',
+      BoolExp.atom({key: 'id', value: ['=', post.id]}),
+      {title: 'Updated Title'}
+    );
+    
+    // Check revision was created
+    const revisions2 = await system.storage.find('PostRevision', undefined, undefined, ['*']);
+    expect(revisions2).toHaveLength(1);
+    expect(revisions2[0].postId).toBe(post.id.toString());
+    expect(revisions2[0].previousTitle).toBe('Original Title');
+    expect(revisions2[0].newTitle).toBe('Updated Title');
+    expect(revisions2[0].previousContent).toBe('Original content');
+    expect(revisions2[0].newContent).toBeUndefined;
+    
+    // Update both title and content
+    await system.storage.update('Post',
+      BoolExp.atom({key: 'id', value: ['=', post.id]}),
+      {title: 'Final Title', content: 'Updated content'}
+    );
+    
+    // Check second revision
+    const revisions3 = await system.storage.find('PostRevision', undefined, undefined, ['*']);
+    expect(revisions3).toHaveLength(2);
+    const latestRevision = revisions3[1];
+    expect(latestRevision.previousTitle).toBe('Updated Title');
+    expect(latestRevision.newTitle).toBe('Final Title');
+    expect(latestRevision.previousContent).toBe('Original content');
+    expect(latestRevision.newContent).toBe('Updated content');
+    
+    // Update only status (should not create revision)
+    await system.storage.update('Post',
+      BoolExp.atom({key: 'id', value: ['=', post.id]}),
+      {status: 'published'}
+    );
+    
+    // Still only 2 revisions
+    const revisions4 = await system.storage.find('PostRevision');
+    expect(revisions4).toHaveLength(2);
+  });
+  
+  test('should transform from RecordMutationEvent when entity is deleted', async () => {
+    // Create entities
+    const documentEntity = Entity.create({
+      name: 'Document',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'content', type: 'string'}),
+        Property.create({name: 'owner', type: 'string'})
+      ]
+    });
+    
+    // Create trash entity for soft deletes
+    const trashEntity = Entity.create({
+      name: 'Trash',
+      properties: [
+        Property.create({name: 'originalType', type: 'string'}),
+        Property.create({name: 'originalId', type: 'string'}),
+        Property.create({name: 'originalData', type: 'object'}),
+        Property.create({name: 'deletedAt', type: 'string'}),
+        Property.create({name: 'deletedBy', type: 'string'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          Document: {
+            recordName: 'Document',
+            type: 'delete'
+          }
+        },
+        callback: function(mutationEvent: any) {
+          // Only track deletions
+          if (mutationEvent.type !== 'delete') {
+            return null;
+          }
+          
+          return {
+            originalType: mutationEvent.recordName,
+            originalId: (mutationEvent.oldRecord?.id || mutationEvent.record?.id).toString(),
+            originalData: mutationEvent.oldRecord || mutationEvent.record,
+            deletedAt: new Date().toISOString(),
+            deletedBy: 'system' // In real app, this would come from context
+          };
+        }
+      })
+    });
+    
+    const entities = [documentEntity, trashEntity];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create documents
+    const doc1 = await system.storage.create('Document', {
+      name: 'Important Report',
+      content: 'Quarterly results...',
+      owner: 'john@example.com'
+    });
+    
+    const doc2 = await system.storage.create('Document', {
+      name: 'Meeting Notes',
+      content: 'Discussion points...',
+      owner: 'jane@example.com'
+    });
+    
+    // No trash items yet
+    const trash1 = await system.storage.find('Trash');
+    expect(trash1).toEqual([]);
+    
+    // Delete first document
+    await system.storage.delete('Document',
+      BoolExp.atom({key: 'id', value: ['=', doc1.id]})
+    );
+    
+    // Check trash entry was created
+    const trash2 = await system.storage.find('Trash', undefined, undefined, ['*']);
+    expect(trash2).toHaveLength(1);
+    expect(trash2[0].originalType).toBe('Document');
+    expect(trash2[0].originalId).toBe(doc1.id.toString());
+    expect(trash2[0].originalData.name).toBe('Important Report');
+    expect(trash2[0].originalData.content).toBe('Quarterly results...');
+    expect(trash2[0].deletedBy).toBe('system');
+    
+    // Delete second document
+    await system.storage.delete('Document',
+      BoolExp.atom({key: 'id', value: ['=', doc2.id]})
+    );
+    
+    // Check both documents are in trash
+    const trash3 = await system.storage.find('Trash', undefined, undefined, ['*']);
+    expect(trash3).toHaveLength(2);
+    const doc2Trash = trash3.find((t: any) => t.originalId === doc2.id.toString());
+    expect(doc2Trash.originalData.name).toBe('Meeting Notes');
+  });
+  
+  test('should transform from interaction events using useMutationEvent', async () => {
+    // Create entities
+    const userEntity = Entity.create({
+      name: 'User',
+      properties: [
+        Property.create({name: 'name', type: 'string'}),
+        Property.create({name: 'email', type: 'string'})
+      ]
+    });
+    
+    // Create audit entity that tracks interactions
+    const interactionAuditEntity = Entity.create({
+      name: 'InteractionAudit',
+      properties: [
+        Property.create({name: 'interactionName', type: 'string'}),
+        Property.create({name: 'userId', type: 'string'}),
+        Property.create({name: 'payload', type: 'object'}),
+        Property.create({name: 'timestamp', type: 'string'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          InteractionEvent: {
+            recordName: InteractionEventEntity.name,
+            type: 'create'
+          }
+        },
+        callback: function(mutationEvent: any) {
+          // This will receive InteractionEventEntity mutations
+          // The mutation event structure for InteractionEventEntity is:
+          // record: { name, user, payload, result, ... }
+          const interactionData = mutationEvent.record;
+          if (!interactionData || mutationEvent.recordName !== InteractionEventEntity.name) return null;
+          
+          return {
+            interactionName: interactionData.interactionName,
+            userId: (interactionData.user?.id || 'anonymous').toString(),
+            payload: interactionData.payload,
+            timestamp: new Date().toISOString()
+          };
+        }
+      })
+    });
+    
+    // Create a simple interaction that just logs without creating entities
+    const testInteraction = Interaction.create({
+      name: 'testAction',
+      action: Action.create({name: 'testAction'}),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({
+            name: 'message'
+          })
+        ]
+      })
+    });
+    
+    const entities = [userEntity, interactionAuditEntity];
+    const interactions = [testInteraction];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: interactions
+    });
+    await controller.setup(true);
+    
+    // Initial audit should be empty
+    const initialAudits = await system.storage.find('InteractionAudit');
+    expect(initialAudits).toEqual([]);
+    
+    // Call interaction
+    await controller.callInteraction('testAction', {
+      user: { id: 'test-user-123' },
+      payload: {
+        message: 'Hello from test'
+      }
+    });
+    
+    // Check audit was created
+    const audits = await system.storage.find('InteractionAudit', undefined, undefined, ['*']);
+    expect(audits).toHaveLength(1);
+    expect(audits[0].interactionName).toBe('testAction');
+    expect(audits[0].userId).toBe('test-user-123');
+    expect(audits[0].payload.message).toBe('Hello from test');
+    expect(audits[0].timestamp).toBeDefined();
+  });
+
+  test('should handle multiple transforms from same mutation event', async () => {
+    // Create order entity
+    const orderEntity = Entity.create({
+      name: 'Order',
+      properties: [
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'customerEmail', type: 'string'}),
+        Property.create({name: 'totalAmount', type: 'number'}),
+        Property.create({name: 'status', type: 'string', defaultValue: () => 'pending'})
+      ]
+    });
+    
+    // Create notification entity
+    const notificationEntity = Entity.create({
+      name: 'Notification',
+      properties: [
+        Property.create({name: 'type', type: 'string'}),
+        Property.create({name: 'recipient', type: 'string'}),
+        Property.create({name: 'message', type: 'string'}),
+        Property.create({name: 'orderId', type: 'string'}),
+        Property.create({name: 'createdAt', type: 'string'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          OrderCreate: {
+            recordName: 'Order',
+            type: 'create'
+          },
+          OrderUpdate: {
+            recordName: 'Order',
+            type: 'update'
+          }
+        },  
+        callback: function(mutationEvent: any) {
+          if (mutationEvent.recordName !== orderEntity.name) {
+            return null;
+          }
+          
+          const notifications = [];
+          
+          // New order notification
+          if (mutationEvent.type === 'create') {
+            notifications.push({
+              type: 'order_placed',
+              recipient: mutationEvent.record.customerEmail,
+              message: `Your order ${mutationEvent.record.orderNumber} has been placed`,
+              orderId: mutationEvent.record.id.toString(),
+              createdAt: new Date().toISOString()
+            });
+            
+            // Also notify warehouse
+            notifications.push({
+              type: 'new_order',
+              recipient: 'warehouse@company.com',
+              message: `New order ${mutationEvent.record.orderNumber} received`,
+              orderId: mutationEvent.record.id,
+              createdAt: new Date().toISOString()
+            });
+          }
+          
+          // Status change notification
+          if (mutationEvent.type === 'update' && 
+              mutationEvent.oldRecord?.status !== mutationEvent.record?.status) {
+            notifications.push({
+              type: 'status_change',
+              recipient: mutationEvent.record.customerEmail,
+              message: `Order ${mutationEvent.record.orderNumber} status changed to ${mutationEvent.record.status}`,
+              orderId: mutationEvent.record.id.toString(),
+              createdAt: new Date().toISOString()
+            });
+          }
+          
+          return notifications;
+        }
+      })
+    });
+    
+    const entities = [orderEntity, notificationEntity];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create an order
+    const order = await system.storage.create('Order', {
+      orderNumber: 'ORD-001',
+      customerEmail: 'customer@example.com',
+      totalAmount: 100
+    });
+    
+    // Check notifications were created
+    const notifications1 = await system.storage.find('Notification', undefined, undefined, ['*']);
+    expect(notifications1).toHaveLength(2);
+    
+    const customerNotif = notifications1.find((n: any) => n.type === 'order_placed');
+    expect(customerNotif.recipient).toBe('customer@example.com');
+    expect(customerNotif.message).toContain('ORD-001');
+    expect(customerNotif.orderId).toBe(order.id.toString());
+    
+    const warehouseNotif = notifications1.find((n: any) => n.type === 'new_order');
+    expect(warehouseNotif.recipient).toBe('warehouse@company.com');
+    
+    // Update order status
+    await system.storage.update('Order',
+      BoolExp.atom({key: 'id', value: ['=', order.id]}),
+      {status: 'shipped'}
+    );
+    
+    // Check status change notification
+    const notifications2 = await system.storage.find('Notification', undefined, undefined, ['*']);
+    expect(notifications2).toHaveLength(3);
+    
+    const statusNotif = notifications2.find((n: any) => n.type === 'status_change');
+    expect(statusNotif.message).toContain('status changed to shipped');
+  });
+  
+  
+});

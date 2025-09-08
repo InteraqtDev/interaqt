@@ -40,14 +40,14 @@ describe('Every computed handle', () => {
 
 
     // 获取 dictionary 的值
-    const everyRequestHandled0 = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
+    const everyRequestHandled0 = await system.storage.dict.get('everyRequestHandled')
     expect(everyRequestHandled0).toBeFalsy()
     // 创建两个 request
     const request1 = await system.storage.create('Request', {handled: false})
     const request2 = await system.storage.create('Request', {handled: false})
 
     // 获取 dictionary 的值
-    const everyRequestHandled = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
+    const everyRequestHandled = await system.storage.dict.get('everyRequestHandled')
     expect(everyRequestHandled).toBeFalsy()
 
     // 更新 request 的 handled 属性
@@ -63,14 +63,14 @@ describe('Every computed handle', () => {
     await system.storage.update('Request', idMatch2, {handled: true})
 
     // 获取 dictionary 的值
-    const everyRequestHandled2 = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
+    const everyRequestHandled2 = await system.storage.dict.get('everyRequestHandled')
     expect(everyRequestHandled2).toBeTruthy()
 
     // 再次更新 request 的 handled 属性
     await system.storage.update('Request', idMatch1, {handled: false})
 
     // 获取 dictionary 的值
-    const everyRequestHandled3 = await system.storage.get(DICTIONARY_RECORD,'everyRequestHandled')
+    const everyRequestHandled3 = await system.storage.dict.get('everyRequestHandled')
     expect(everyRequestHandled3).toBeFalsy()
   });
 
@@ -665,24 +665,24 @@ describe('Every computed handle', () => {
     await controller.setup(true)
 
     // set ageLimit to 19
-    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 19)
+    await system.storage.dict.set('ageLimit', 19)
 
     const user1 = await system.storage.create('User', {name: 'user1', age: 18})
     const user2 = await system.storage.create('User', {name: 'user2', age: 20})
 
-    const isEveryUserAgeGreaterThanAgeLimit = await system.storage.get(DICTIONARY_RECORD, 'isEveryUserAgeGreaterThanAgeLimit')
+    const isEveryUserAgeGreaterThanAgeLimit = await system.storage.dict.get('isEveryUserAgeGreaterThanAgeLimit')
     expect(isEveryUserAgeGreaterThanAgeLimit).toBeFalsy()
 
     // 把 user1 的 age 改为 20
     await system.storage.update('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}), {age: 20})
 
-    const isEveryUserAgeGreaterThanAgeLimit2 = await system.storage.get(DICTIONARY_RECORD, 'isEveryUserAgeGreaterThanAgeLimit')
+    const isEveryUserAgeGreaterThanAgeLimit2 = await system.storage.dict.get('isEveryUserAgeGreaterThanAgeLimit')
     expect(isEveryUserAgeGreaterThanAgeLimit2).toBeTruthy()
 
     // 把 ageLimit 改为 21
-    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 21)
+    await system.storage.dict.set('ageLimit', 21)
 
-    const isEveryUserAgeGreaterThanAgeLimit3 = await system.storage.get(DICTIONARY_RECORD, 'isEveryUserAgeGreaterThanAgeLimit')
+    const isEveryUserAgeGreaterThanAgeLimit3 = await system.storage.dict.get('isEveryUserAgeGreaterThanAgeLimit')
     expect(isEveryUserAgeGreaterThanAgeLimit3).toBeFalsy()
   })
 
@@ -1290,9 +1290,9 @@ describe('Every computed handle', () => {
     await controller.setup(true);
 
     // Initially with no orders, every should return true (vacuous truth)
-    let allDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOrdersDelivered');
-    let allPaid = await system.storage.get(DICTIONARY_RECORD, 'allOrdersPaid');
-    let allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    let allDelivered = await system.storage.dict.get('allOrdersDelivered');
+    let allPaid = await system.storage.dict.get('allOrdersPaid');
+    let allOnlineDelivered = await system.storage.dict.get('allOnlineOrdersDelivered');
     
     expect(allDelivered).toBe(true);
     expect(allPaid).toBe(true);
@@ -1328,9 +1328,9 @@ describe('Every computed handle', () => {
     });
 
     // Check the conditions
-    allDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOrdersDelivered');
-    allPaid = await system.storage.get(DICTIONARY_RECORD, 'allOrdersPaid');
-    allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    allDelivered = await system.storage.dict.get('allOrdersDelivered');
+    allPaid = await system.storage.dict.get('allOrdersPaid');
+    allOnlineDelivered = await system.storage.dict.get('allOnlineOrdersDelivered');
     
     expect(allDelivered).toBe(false); // ON002 is not delivered
     expect(allPaid).toBe(true); // All orders are paid
@@ -1349,8 +1349,8 @@ describe('Every computed handle', () => {
     );
 
     // Now all should be delivered
-    allDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOrdersDelivered');
-    allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    allDelivered = await system.storage.dict.get('allOrdersDelivered');
+    allOnlineDelivered = await system.storage.dict.get('allOnlineOrdersDelivered');
     
     expect(allDelivered).toBe(true);
     expect(allOnlineDelivered).toBe(true);
@@ -1363,11 +1363,11 @@ describe('Every computed handle', () => {
     });
 
     // Check that not all orders are paid now
-    allPaid = await system.storage.get(DICTIONARY_RECORD, 'allOrdersPaid');
+    allPaid = await system.storage.dict.get('allOrdersPaid');
     expect(allPaid).toBe(false);
     
     // Test that the online-only check still works
-    allOnlineDelivered = await system.storage.get(DICTIONARY_RECORD, 'allOnlineOrdersDelivered');
+    allOnlineDelivered = await system.storage.dict.get('allOnlineOrdersDelivered');
     expect(allOnlineDelivered).toBe(true); // All online orders are still delivered
   });
 

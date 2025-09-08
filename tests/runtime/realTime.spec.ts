@@ -51,7 +51,7 @@ describe('RealTime computed handle', () => {
     await system.storage.create('Config', {factor: 1000});
     
     // Get computed value
-    const computedValue = await system.storage.get(DICTIONARY_RECORD, 'currentTimestamp');
+    const computedValue = await system.storage.dict.get('currentTimestamp');
     expect(typeof computedValue).toBe('number');
     expect(computedValue).toBeGreaterThan(1000000); // Should be a large timestamp divided by 1000
     
@@ -72,8 +72,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for global computation
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(typeof nextRecomputeTime).toBe('number');
@@ -130,7 +130,7 @@ describe('RealTime computed handle', () => {
     await system.storage.create('Config', {thresholdOffset: 5000}); // 5 seconds in future
     
     // Get value - should be false since we're still before the threshold
-    const isExpired = await system.storage.get(DICTIONARY_RECORD, 'isTimeExpired');
+    const isExpired = await system.storage.dict.get('isTimeExpired');
     expect(isExpired).toBeFalsy();
     
     // Verify RealTime state management for Inequality type
@@ -150,8 +150,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for global computation with Inequality
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(typeof nextRecomputeTime).toBe('number');
@@ -207,7 +207,7 @@ describe('RealTime computed handle', () => {
     await system.storage.create('Config', {timeUnit: 60000}); // Check for exact minutes
     
     // Get value
-    const isExactMinute = await system.storage.get(DICTIONARY_RECORD, 'isExactMinute');
+    const isExactMinute = await system.storage.dict.get('isExactMinute');
     expect(typeof isExactMinute).toBe('boolean');
     
     // Verify RealTime state management for Equation type
@@ -227,8 +227,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for global computation with Equation
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(lastRecomputeTime).toBeGreaterThan(0);
@@ -369,7 +369,7 @@ describe('RealTime computed handle', () => {
     // Create a config record to trigger the computation
     await system.storage.create('Config', {coefficient: 0.001});
     
-    const complexValue = await system.storage.get(DICTIONARY_RECORD, 'complexTimeValue');
+    const complexValue = await system.storage.dict.get('complexTimeValue');
     expect(typeof complexValue).toBe('number');
     expect(complexValue).toBeGreaterThan(0);
     
@@ -390,8 +390,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for complex Expression computation
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(typeof nextRecomputeTime).toBe('number');
@@ -450,7 +450,7 @@ describe('RealTime computed handle', () => {
     await system.storage.create('Config', {multiplier: 2});
     
     // Get scaled timestamp  
-    const scaledValue = await system.storage.get(DICTIONARY_RECORD, 'scaledTimestamp');
+    const scaledValue = await system.storage.dict.get('scaledTimestamp');
     expect(typeof scaledValue).toBe('number');
     expect(scaledValue).toBeGreaterThan(Date.now()); // Should be larger due to multiplier
     
@@ -471,8 +471,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for dataDeps Expression computation
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(typeof nextRecomputeTime).toBe('number');
@@ -536,7 +536,7 @@ describe('RealTime computed handle', () => {
     // Create a config record to trigger the computation
     await system.storage.create('Config', {businessHourStart: 9}); // 9 AM start
     
-    const isBusinessHours = await system.storage.get(DICTIONARY_RECORD, 'isBusinessHours');
+    const isBusinessHours = await system.storage.dict.get('isBusinessHours');
     expect(typeof isBusinessHours).toBe('boolean');
     
     // Verify RealTime state management for business logic computation
@@ -556,8 +556,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for business logic Inequality computation
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(lastRecomputeTime).toBeGreaterThan(0);
@@ -730,7 +730,7 @@ describe('RealTime computed handle', () => {
     await system.storage.create('Config', {divisor: 1000});
     
     // Verify initial computation result
-    const counterValue = await system.storage.get(DICTIONARY_RECORD, 'timeBasedCounter');
+    const counterValue = await system.storage.dict.get('timeBasedCounter');
     expect(typeof counterValue).toBe('number');
     expect(counterValue).toBeGreaterThan(0);
     
@@ -743,8 +743,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for time-based counter Expression computation
-    const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
     expect(typeof lastRecomputeTime).toBe('number');
     expect(typeof nextRecomputeTime).toBe('number');

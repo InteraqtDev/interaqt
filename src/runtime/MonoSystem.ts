@@ -7,9 +7,11 @@ import {
     Storage,
     System,
     SYSTEM_RECORD,
+    DICTIONARY_RECORD,
     SystemEntity,
     SystemLogger,
-    SystemLogType
+    SystemLogType,
+    DictionaryEntity
 } from "./System.js";
 import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@shared";
 import {
@@ -35,7 +37,27 @@ function JSONParse(value: string) {
 class MonoStorage implements Storage{
     public map!: DBSetup["map"]
     public queryHandle?: EntityQueryHandle
+    public dict: { get: (key: string) => Promise<any>, set: (key: string, value: any) => Promise<void> }
+    
     constructor(public db: Database) {
+        // Initialize dict property with get/set methods
+        this.dict = {
+            get: async (key: string) => {
+                const match = MatchExp.atom({key: 'key', value: ['=', key]})
+                const value = (await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value']))?.value
+                return value?.raw
+            },
+            set: async (key: string, value: any) => {
+                const match = MatchExp.atom({key: 'key', value: ['=', key]})
+                const origin = await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value'])
+                if (origin) {
+                    // FIXME 现在的数据库json返回值对字符串、数组没有区分。所以只好再包装一层。
+                    return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [DICTIONARY_RECORD, MatchExp.atom({key: 'id', value: ['=', origin.id]}), {key, value: {raw:value}}], [])
+                } else {
+                    return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [DICTIONARY_RECORD, { key, value: {raw:value}}], [])
+                }
+            }
+        }
     }
     public callbacks: Set<RecordMutationCallback> = new Set()
     beginTransaction(name='') {
@@ -256,7 +278,7 @@ export class MonoSystem implements System {
         
         // Pass the prepared entities to storage.setup
         return this.storage.setup(
-            [...entities, SystemEntity], 
+            [...entities, DictionaryEntity, SystemEntity], 
             relations,
             install
         )

@@ -230,10 +230,17 @@ export function createData() {
         states: [NON_DELETED_STATE, DELETED_STATE],
         transfers: [
             StateTransfer.create({
-                trigger: deleteInteraction,
+                trigger: {
+                    recordName: InteractionEventEntity.name,
+                    type: 'create',
+                    record: {
+                        interactionName: deleteInteraction.name
+                    }
+                },
                 current: NON_DELETED_STATE,
                 next: DELETED_STATE,
-                computeTarget: async function (this: Controller, eventArgs: any) {
+                computeTarget: async function (this: Controller, mutationEvent: any) {
+                    const eventArgs = mutationEvent.record
                     // 查找要删除的关系
                     if (!eventArgs.user?.id || !eventArgs.payload?.target?.id) {
                         return undefined
@@ -283,10 +290,17 @@ export function createData() {
     })
     
     const pendingToApprovedTransfer = StateTransfer.create({
-        trigger: approveInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            type: 'create',
+            record: {
+                interactionName: approveInteraction.name
+            }
+        },
         current: resultPendingState,
         next: resultApprovedState,
-        computeTarget: async function (this: Controller, eventArgs: any) {
+        computeTarget: async function (this: Controller, mutationEvent: any) {
+            const eventArgs = mutationEvent.record
             const request= await this.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
                 value: ['=', eventArgs.activity.id]
@@ -295,10 +309,17 @@ export function createData() {
         }
     })
     const pendingToRejectedTransfer = StateTransfer.create({
-        trigger: rejectInteraction,
+        trigger: {
+            recordName: InteractionEventEntity.name,
+            type: 'create',
+            record: {
+                interactionName: rejectInteraction.name
+            }
+        },
         current: resultPendingState,
         next: resultRejectedState,
-        computeTarget: async function (this: Controller, eventArgs: any) {
+        computeTarget: async function (this: Controller, mutationEvent: any) {
+            const eventArgs = mutationEvent.record
             return this.system.storage.findOne('Request', MatchExp.atom({
                 key: 'activityId',
                 value: ['=', eventArgs.activity.id]

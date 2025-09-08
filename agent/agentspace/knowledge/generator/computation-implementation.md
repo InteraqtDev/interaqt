@@ -94,8 +94,14 @@ When using `InteractionEventEntity` as the Transform input source, understand th
      name: 'Style'
    });
    Style.computation = Transform.create({
-     record: InteractionEventEntity,
-     callback: function(event) {
+     eventDeps: {
+       StyleInteraction: {
+         recordName: InteractionEventEntity.name,
+         type: 'create'
+       }
+     },
+     callback: function(mutationEvent) {
+       const event = mutationEvent.record;
        if (event.interactionName === 'UpdateStyle') {
          // This will CREATE a new Style, not update existing!
          return { id: event.payload.id, ... }  // WRONG!
@@ -115,7 +121,7 @@ When using `InteractionEventEntity` as the Transform input source, understand th
          trigger: UpdateStyleInteraction,
          current: updatedState,
          next: updatedState,
-         computeTarget: (event) => ({ id: event.payload.id })
+         computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
        })
      ]
    });
@@ -133,7 +139,7 @@ When using `InteractionEventEntity` as the Transform input source, understand th
          trigger: DeleteStyleInteraction,
          current: activeState,
          next: deletedState,
-         computeTarget: (event) => ({ id: event.payload.id })
+         computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
        })
      ]
    });
@@ -179,8 +185,14 @@ export const Style = Entity.create({
 });
 // Transform in Entity's computation property
 Style.computation = Transform.create({
-  record: InteractionEventEntity,
-  callback: function(event) {
+  eventDeps: {
+    StyleInteraction: {
+      recordName: InteractionEventEntity.name,
+      type: 'create'
+    }
+  },
+  callback: function(mutationEvent) {
+    const event = mutationEvent.record;
     if (event.interactionName === 'CreateStyle') {
       return {
         label: event.payload.label,
@@ -238,8 +250,14 @@ export const OrderItemRelation = Relation.create({
 
 
 Order.computation = Transform.create({
-  record: InteractionEventEntity,
-  callback: function(event) {
+  eventDeps: {
+    OrderInteraction: {
+      recordName: InteractionEventEntity.name,
+      type: 'create'
+    }
+  },
+  callback: function(mutationEvent) {
+    const event = mutationEvent.record;
     if (event.interactionName === 'CreateOrder') {
       return {
         orderNumber: event.payload.orderNumber,
@@ -374,13 +392,13 @@ statusProperty.computation = StateMachine.create({
       current: draftState,
       next: activeState,
       trigger: PublishStyle,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     }),
     StateTransfer.create({
       current: activeState,
       next: offlineState,
       trigger: DeleteStyle,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
 });
@@ -404,7 +422,7 @@ const UpdateStyle = Interaction.create({
 // Define state node with computeValue
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Math.floor(Date.now()/1000)  // Returns timestamp in seconds when state is entered
+  computeValue: (lastValue, mutationEvent) => Math.floor(Date.now()/1000)  // Returns timestamp in seconds when state is entered
 });
 
 const updatedAtProperty = Property.create({
@@ -420,7 +438,7 @@ updatedAtProperty.computation = StateMachine.create({
       current: updatedState,
       next: updatedState,  // Self-loop to same state
       trigger: UpdateStyle,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
 });
@@ -428,7 +446,7 @@ updatedAtProperty.computation = StateMachine.create({
 
 #### StateMachine with Event Context in computeValue
 
-The `computeValue` function can access the interaction event as a second parameter, allowing you to use interaction context (user, payload) in value computation:
+The `computeValue` function can access the mutation event as a second parameter, allowing you to use interaction context (user, payload) from `mutationEvent.record` in value computation:
 
 ```typescript
 // Track who made changes and what was changed
@@ -448,21 +466,21 @@ const UpdateArticle = Interaction.create({
 // State node that captures user and payload information
 const modifiedState = StateNode.create({
   name: 'modified',
-  // computeValue receives (lastValue, event) parameters
-  computeValue: (lastValue, event) => {
+  // computeValue receives (lastValue, mutationEvent) parameters
+  computeValue: (lastValue, mutationEvent) => {
     // Access user who triggered the update
-    const modifier = event?.user?.name || event?.user?.id || 'anonymous';
+    const modifier = mutationEvent?.record?.user?.name || mutationEvent?.record?.user?.id || 'anonymous';
     
     // Access payload to see what was changed
     const changes = [];
-    if (event?.payload?.title) changes.push('title');
-    if (event?.payload?.content) changes.push('content');
+    if (mutationEvent?.record?.payload?.title) changes.push('title');
+    if (mutationEvent?.record?.payload?.content) changes.push('content');
     
     return {
       modifiedAt: Math.floor(Date.now()/1000),
       modifiedBy: modifier,
       changedFields: changes,
-      updateReason: event?.payload?.updateReason || 'No reason provided',
+      updateReason: mutationEvent?.record?.payload?.updateReason || 'No reason provided',
       // Preserve previous modification history
       previousModifications: lastValue?.previousModifications || []
     };
@@ -483,7 +501,7 @@ modificationInfoProperty.computation = StateMachine.create({
       current: modifiedState,
       next: modifiedState,
       trigger: UpdateArticle,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
 });
@@ -502,25 +520,25 @@ const ApproveRequest = Interaction.create({
 
 const approvedState = StateNode.create({
   name: 'approved',
-  computeValue: (lastValue, event) => {
+  computeValue: (lastValue, mutationEvent) => {
     // Capture complete approval context from event
     return {
       status: 'approved',
       approvedAt: Math.floor(Date.now()/1000),
       approvedBy: {
-        id: event?.user?.id,
-        name: event?.user?.name,
-        role: event?.user?.role
+        id: mutationEvent?.record?.user?.id,
+        name: mutationEvent?.record?.user?.name,
+        role: mutationEvent?.record?.user?.role
       },
-      approvalComments: event?.payload?.comments,
+      approvalComments: mutationEvent?.record?.payload?.comments,
       // Keep approval history
       approvalHistory: [
         ...(lastValue?.approvalHistory || []),
         {
           action: 'approved',
           timestamp: Math.floor(Date.now()/1000),
-          user: event?.user?.name || 'unknown',
-          comments: event?.payload?.comments
+          user: mutationEvent?.record?.user?.name || 'unknown',
+          comments: mutationEvent?.record?.payload?.comments
         }
       ]
     };
@@ -528,11 +546,11 @@ const approvedState = StateNode.create({
 });
 ```
 
-**Key Points about Event Parameter:**
-- The `event` parameter is optional and may be `undefined` during initial state setup
-- Contains the full interaction context: `user`, `payload`, `interactionName`, etc.
+**Key Points about MutationEvent Parameter:**
+- The `mutationEvent` parameter is optional and may be `undefined` during initial state setup
+- Access the interaction context through `mutationEvent.record`: `user`, `payload`, `interactionName`, etc.
 - Useful for audit trails, tracking who made changes, and capturing interaction-specific data
-- Always use optional chaining (`?.`) when accessing event properties as it may be undefined
+- Always use optional chaining (`?.`) when accessing mutationEvent properties as it may be undefined
 
 
 ### 3. Custom - Complete User Control (USE WITH CAUTION!)
@@ -747,8 +765,14 @@ export const Style = Entity.create({
   ]
 });
 Style.computation = Transform.create({
-  record: InteractionEventEntity,
-  callback: (event) => {
+  eventDeps: {
+    StyleInteraction: {
+      recordName: InteractionEventEntity.name,
+      type: 'create'
+    }
+  },
+  callback: (mutationEvent) => {
+    const event = mutationEvent.record;
     if (event.interactionName === 'CreateStyle') {
       return {
         label: event.payload.label,
@@ -780,7 +804,7 @@ export const UpdateStyle = Interaction.create({
 // Property with update tracking
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Math.floor(Date.now()/1000)
+  computeValue: (lastValue, mutationEvent) => Math.floor(Date.now()/1000)
 });
 
 const updatedAtProperty = Property.create({
@@ -795,7 +819,7 @@ updatedAtProperty.computation = StateMachine.create({
       current: updatedState,
       next: updatedState,
       trigger: UpdateStyle,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
 });
@@ -831,7 +855,7 @@ statusProperty.computation = StateMachine.create({
       current: activeState,
       next: offlineState,
       trigger: DeleteStyle,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
 });
@@ -888,7 +912,7 @@ Property.create({
 // ✅ CORRECT: Updated at - updates on changes (in seconds)
 const updatedState = StateNode.create({
   name: 'updated',
-  computeValue: () => Math.floor(Date.now()/1000)  // Always convert to seconds!
+  computeValue: (lastValue, mutationEvent) => Math.floor(Date.now()/1000)  // Always convert to seconds!
 });
 
 const updatedAtProperty = Property.create({
@@ -903,7 +927,7 @@ updatedAtProperty.computation = StateMachine.create({
       current: updatedState,
       next: updatedState,
       trigger: UpdateInteraction,
-      computeTarget: (event) => ({ id: event.payload.id })
+      computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
 });

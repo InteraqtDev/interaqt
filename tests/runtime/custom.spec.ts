@@ -81,7 +81,7 @@ describe('Custom computation', () => {
     await controller.setup(true);
     
     // Initial value should be 0
-    let totalValue = await system.storage.get(DICTIONARY_RECORD, 'totalProductValue');
+    let totalValue = await system.storage.dict.get('totalProductValue');
     expect(totalValue).toBe(0);
     
     // Create product
@@ -91,7 +91,7 @@ describe('Custom computation', () => {
     });
     
     // Check total value
-    totalValue = await system.storage.get(DICTIONARY_RECORD, 'totalProductValue');
+    totalValue = await system.storage.dict.get('totalProductValue');
     expect(totalValue).toBe(100);
     
     // Create another product
@@ -101,7 +101,7 @@ describe('Custom computation', () => {
     });
     
     // Check total value
-    totalValue = await system.storage.get(DICTIONARY_RECORD, 'totalProductValue');
+    totalValue = await system.storage.dict.get('totalProductValue');
     expect(totalValue).toBe(150);
     
     console.log('Final compute executed count:', computeExecuted);
@@ -189,7 +189,7 @@ describe('Custom computation', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // 检查 total
-    const total1 = await system.storage.get(DICTIONARY_RECORD, 'counterTotal');
+    const total1 = await system.storage.dict.get('counterTotal');
     console.log('After first create:', total1);
     expect(total1).toBe(10); // 5 * 2
     
@@ -205,7 +205,7 @@ describe('Custom computation', () => {
     // 等待计算完成
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    const total2 = await system.storage.get(DICTIONARY_RECORD, 'counterTotal');
+    const total2 = await system.storage.dict.get('counterTotal');
     console.log('After update:', total2);
     
     expect(total2).toBe(20); // 10 * 2
@@ -287,29 +287,29 @@ describe('Custom computation', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // 触发第一次计算，增加 2
-    await system.storage.set(DICTIONARY_RECORD, 'stateTrigger', 2);
+    await system.storage.dict.set('stateTrigger', 2);
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // 验证状态被更新
-    let managerState = await system.storage.get(DICTIONARY_RECORD, 'stateManager');
+    let managerState = await system.storage.dict.get('stateManager');
     console.log('After first trigger:', managerState);
     expect(managerState.value).toBe(2);
     expect(managerState.triggerValue).toBe(2);
     
-    let savedState = await system.storage.get(DICTIONARY_RECORD, '_stateManager_bound_myState');
+    let savedState = await system.storage.dict.get('_stateManager_bound_myState');
     console.log('Saved state after first trigger:', savedState);
     expect(savedState).toEqual({ count: 2 });
     
     // 触发第二次计算，再增加 3
-    await system.storage.set(DICTIONARY_RECORD, 'stateTrigger', 3);
+    await system.storage.dict.set('stateTrigger', 3);
     
     // 验证状态被累加更新
-    managerState = await system.storage.get(DICTIONARY_RECORD, 'stateManager');
+    managerState = await system.storage.dict.get('stateManager');
     console.log('After second trigger:', managerState);
     expect(managerState.value).toBe(5); // 2 + 3 = 5
     expect(managerState.triggerValue).toBe(3);
     
-    savedState = await system.storage.get(DICTIONARY_RECORD, '_stateManager_bound_myState');
+    savedState = await system.storage.dict.get('_stateManager_bound_myState');
     console.log('Saved state after second trigger:', savedState);
     expect(savedState).toEqual({ count: 5 });
   });
@@ -408,13 +408,13 @@ describe('Custom computation', () => {
     await controller.setup(true);
     
     // 设置 settings 值
-    await system.storage.set(DICTIONARY_RECORD, 'settings', { prefix: 'Custom' });
+    await system.storage.dict.set('settings', { prefix: 'Custom' });
     
     // 等待计算完成
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // 获取计算结果
-    const result = await system.storage.get(DICTIONARY_RECORD, 'GlobalSettings');
+    const result = await system.storage.dict.get('GlobalSettings');
     console.log('GlobalSettings result:', result);
     
     expect(result).toEqual({ 
@@ -519,7 +519,7 @@ describe('Custom computation', () => {
     // 等待计算完成
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    const counts = await system.storage.get(DICTIONARY_RECORD, 'postAuthorCounts');
+    const counts = await system.storage.dict.get('postAuthorCounts');
     console.log('Final author counts:', counts);
     
     expect(counts[post.id]).toEqual({
@@ -698,11 +698,11 @@ describe('Custom computation', () => {
     await controller.setup(true);
 
     // Initial statistics should be empty
-    let stats = await system.storage.get(DICTIONARY_RECORD, 'eventStatistics');
+    let stats = await system.storage.dict.get('eventStatistics');
     expect(stats.total).toBe(0);
     expect(stats.byType.local).toBe(0);
 
-    let popular = await system.storage.get(DICTIONARY_RECORD, 'popularEvents');
+    let popular = await system.storage.dict.get('popularEvents');
     expect(popular).toEqual([]);
 
     // Create events through different input entities
@@ -727,7 +727,7 @@ describe('Custom computation', () => {
     });
 
     // Check statistics
-    stats = await system.storage.get(DICTIONARY_RECORD, 'eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics');
     expect(stats.total).toBe(3);
     expect(stats.byType.local).toBe(1);
     expect(stats.byType.virtual).toBe(1);
@@ -738,7 +738,7 @@ describe('Custom computation', () => {
     expect(stats.hybridOnlineAttendees).toBe(200);
 
     // Check popular events
-    popular = await system.storage.get(DICTIONARY_RECORD, 'popularEvents');
+    popular = await system.storage.dict.get('popularEvents');
     
     // popular might not be an array initially, check if it exists first
     if (popular && Array.isArray(popular)) {
@@ -757,7 +757,7 @@ describe('Custom computation', () => {
     );
 
     // Check updated statistics
-    stats = await system.storage.get(DICTIONARY_RECORD, 'eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics');
     expect(stats.byStatus.scheduled).toBe(2);
     expect(stats.byStatus.completed).toBe(1);
 
@@ -770,14 +770,14 @@ describe('Custom computation', () => {
     });
 
     // Check updated statistics
-    stats = await system.storage.get(DICTIONARY_RECORD, 'eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics');
     expect(stats.total).toBe(4);
     expect(stats.byType.local).toBe(2);
     expect(stats.totalAttendees).toBe(760);
     expect(stats.avgAttendees).toBe(190);
 
     // Check popular events now includes the festival
-    popular = await system.storage.get(DICTIONARY_RECORD, 'popularEvents');
+    popular = await system.storage.dict.get('popularEvents');
     expect(popular.length).toBe(3);
     expect(popular[0].title).toBe('Music Festival');
 
@@ -787,7 +787,7 @@ describe('Custom computation', () => {
     );
 
     // Final statistics check
-    stats = await system.storage.get(DICTIONARY_RECORD, 'eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics');
     expect(stats.total).toBe(3);
     expect(stats.byType.hybrid).toBe(0);
     expect(stats.hybridOnlineAttendees).toBe(0);

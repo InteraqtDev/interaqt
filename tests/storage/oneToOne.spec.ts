@@ -513,8 +513,8 @@ describe('one to one', () => {
         expect(relationDeleteEvent?.record).toHaveProperty('target')
         
         // Verify the IDs are correct
-        expect(relationDeleteEvent?.record.source).toHaveProperty('id', userA.profile.id)
-        expect(relationDeleteEvent?.record.target).toHaveProperty('id', userA.id)
+        expect(relationDeleteEvent?.record!.source).toHaveProperty('id', userA.profile.id)
+        expect(relationDeleteEvent?.record!.target).toHaveProperty('id', userA.id)
     })
 
     test('update one to one relation: delete event should have both source and target', async () => {
@@ -547,8 +547,8 @@ describe('one to one', () => {
         // Both source and target should be present in the delete event
         expect(deleteEvent?.record).toHaveProperty('source')
         expect(deleteEvent?.record).toHaveProperty('target')
-        expect(deleteEvent?.record.source).toHaveProperty('id')
-        expect(deleteEvent?.record.target).toHaveProperty('id')
+        expect(deleteEvent?.record!.source).toHaveProperty('id')
+        expect(deleteEvent?.record!.target).toHaveProperty('id')
     })
 })
 

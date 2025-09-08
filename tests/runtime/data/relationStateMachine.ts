@@ -138,14 +138,16 @@ export function createData() {
             StateTransfer.create({
                 trigger: {
                     recordName: InteractionEventEntity.name,
-                record: {
-                    interactionName: transferReviewersInteraction.name
-                }
+                    type: 'create',
+                    record: {
+                        interactionName: transferReviewersInteraction.name
+                    }
                 },
                 current: NON_DELETED_STATE,
                 next: DELETED_STATE,
-                computeTarget: async function(this: Controller, eventArgs: any) {
+                computeTarget: async function(this: Controller, mutationEvent: any) {
                     const MatchExp = this.globals.MatchExp
+                    const eventArgs = mutationEvent.record
                     // 转移时删除旧的关系
                     const originRelation = await this.system.storage.findOne(
                         reviewerRelation.name!,

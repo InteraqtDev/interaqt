@@ -39,12 +39,24 @@ describe("Computation System - createClass functionality", () => {
       });
 
       const transfer = StateTransfer.create({
-        trigger: completeInteraction,
+        trigger: {
+          recordName: completeInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: completeInteraction.name
+          }
+        },
         current: fromNode,
         next: toNode
       });
 
-      expect(transfer.trigger).toBe(completeInteraction);
+      expect(transfer.trigger).toMatchObject({
+        recordName: completeInteraction.name,
+        type: 'create',
+        record: {
+          interactionName: completeInteraction.name
+        }
+      });
       expect(transfer.current).toBe(fromNode);
       expect(transfer.next).toBe(toNode);
       expect(transfer._type).toBe("StateTransfer");
@@ -67,13 +79,25 @@ describe("Computation System - createClass functionality", () => {
       });
 
       const startTransfer = StateTransfer.create({
-        trigger: startInteraction,
+        trigger: {
+          recordName: startInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: startInteraction.name
+          }
+        },
         current: pendingNode,
         next: activeNode
       });
 
       const completeTransfer = StateTransfer.create({
-        trigger: completeInteraction,
+        trigger: {
+          recordName: completeInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: completeInteraction.name
+          }
+        },
         current: activeNode,
         next: doneNode
       });

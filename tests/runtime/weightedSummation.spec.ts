@@ -61,7 +61,7 @@ describe('WeightedSummation computed handle', () => {
     await controller.setup(true);
     
     // 初始值应为 0
-    const initialTotalValue = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
+    const initialTotalValue = await system.storage.dict.get('totalValue');
     expect(initialTotalValue).toBe(0);
     
     // 创建几个产品
@@ -69,7 +69,7 @@ describe('WeightedSummation computed handle', () => {
     const product2 = await system.storage.create('Product', {price: 20, quantity: 3});
     
     // 检查总值应为 (10*2) + (20*3) = 20 + 60 = 80
-    const totalValue1 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
+    const totalValue1 = await system.storage.dict.get('totalValue');
     expect(totalValue1).toBe(80);
     
     // 更新产品数量
@@ -80,7 +80,7 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.update('Product', idMatch1, {quantity: 5});
     
     // 检查更新后的总值应为 (10*5) + (20*3) = 50 + 60 = 110
-    const totalValue2 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
+    const totalValue2 = await system.storage.dict.get('totalValue');
     expect(totalValue2).toBe(110);
     
     // 删除一个产品
@@ -91,7 +91,7 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.delete('Product', idMatch2);
     
     // 检查删除后的总值应为 10*5 = 50
-    const totalValue3 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
+    const totalValue3 = await system.storage.dict.get('totalValue');
     expect(totalValue3).toBe(50);
   });
   
@@ -235,14 +235,14 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.create('Product', {price: 0, quantity: 5});
     
     // 总值应为 0*5 = 0
-    const totalValue1 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
+    const totalValue1 = await system.storage.dict.get('totalValue');
     expect(totalValue1).toBe(0);
     
     // 创建数量为0的产品
     await system.storage.create('Product', {price: 20, quantity: 0});
     
     // 总值仍为 0*5 + 20*0 = 0
-    const totalValue2 = await system.storage.get(DICTIONARY_RECORD, 'totalValue');
+    const totalValue2 = await system.storage.dict.get('totalValue');
     expect(totalValue2).toBe(0);
   });
   
@@ -294,7 +294,7 @@ describe('WeightedSummation computed handle', () => {
     await system.storage.create('Account', {amount: 50, factor: -1});  // 负债务
     
     // 净余额应为 (100*1) + (50*-1) = 100 - 50 = 50
-    const netBalance = await system.storage.get(DICTIONARY_RECORD, 'netBalance');
+    const netBalance = await system.storage.dict.get('netBalance');
     expect(netBalance).toBe(50);
   });
 
@@ -393,10 +393,10 @@ describe('WeightedSummation computed handle', () => {
     await controller.setup(true);
 
     // Initial values should be 0
-    const initialRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    const initialRevenue = await system.storage.dict.get('totalRevenue');
     expect(initialRevenue).toBe(0);
 
-    const initialTax = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    const initialTax = await system.storage.dict.get('totalTaxRevenue');
     expect(initialTax).toBe(0);
 
     // Create sales through different input entities
@@ -407,11 +407,11 @@ describe('WeightedSummation computed handle', () => {
     });
 
     // Revenue: 10 * 100 = 1000
-    const revenue1 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    const revenue1 = await system.storage.dict.get('totalRevenue');
     expect(revenue1).toBe(1000);
 
     // Tax: 1000 * 0.08 = 80
-    const tax1 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    const tax1 = await system.storage.dict.get('totalTaxRevenue');
     expect(tax1).toBe(80);
 
     // Add international sale
@@ -423,11 +423,11 @@ describe('WeightedSummation computed handle', () => {
     });
 
     // Revenue: 1000 + (5 * 200) = 2000
-    const revenue2 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    const revenue2 = await system.storage.dict.get('totalRevenue');
     expect(revenue2).toBe(2000);
 
     // Tax: 80 + (1000 * 0) = 80 (international has 0 tax)
-    const tax2 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    const tax2 = await system.storage.dict.get('totalTaxRevenue');
     expect(tax2).toBe(80);
 
     // Add online sale
@@ -439,11 +439,11 @@ describe('WeightedSummation computed handle', () => {
     });
 
     // Revenue: 2000 + (20 * 50) = 3000
-    const revenue3 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    const revenue3 = await system.storage.dict.get('totalRevenue');
     expect(revenue3).toBe(3000);
 
     // Tax: 80 + (1000 * 0.05) = 130
-    const tax3 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    const tax3 = await system.storage.dict.get('totalTaxRevenue');
     expect(tax3).toBe(130);
 
     // Update a sale quantity
@@ -453,11 +453,11 @@ describe('WeightedSummation computed handle', () => {
     );
 
     // Revenue: (15 * 100) + (5 * 200) + (20 * 50) = 3500
-    const revenue4 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    const revenue4 = await system.storage.dict.get('totalRevenue');
     expect(revenue4).toBe(3500);
 
     // Tax: (1500 * 0.08) + (1000 * 0) + (1000 * 0.05) = 120 + 0 + 50 = 170
-    const tax4 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    const tax4 = await system.storage.dict.get('totalTaxRevenue');
     expect(tax4).toBe(170);
 
     // Delete an online sale
@@ -466,11 +466,11 @@ describe('WeightedSummation computed handle', () => {
     );
 
     // Revenue: (15 * 100) + (5 * 200) = 2500
-    const revenue5 = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    const revenue5 = await system.storage.dict.get('totalRevenue');
     expect(revenue5).toBe(2500);
 
     // Tax: (1500 * 0.08) + (1000 * 0) = 120
-    const tax5 = await system.storage.get(DICTIONARY_RECORD, 'totalTaxRevenue');
+    const tax5 = await system.storage.dict.get('totalTaxRevenue');
     expect(tax5).toBe(120);
   });
 

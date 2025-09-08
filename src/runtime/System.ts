@@ -16,6 +16,12 @@ export type Storage = {
     commitTransaction: (transactionName?:string) => Promise<any>
     rollbackTransaction: (transactionName?:string) => Promise<any>
 
+    // Dictionary 专用 API
+    dict: {
+        get: (key: string) => Promise<any>
+        set: (key: string, value: any) => Promise<void>
+    }
+
     // kv 存储
     get: (itemName: string, id: string, initialValue?: any) => Promise<any>
     set: (itemName: string, id: string, value: any, events?: RecordMutationEvent[]) => Promise<any>,
@@ -119,6 +125,22 @@ export const SystemEntity = Entity.create({
         Property.create({
             name: 'value',
             type: 'string',
+            collection: false,
+        })
+    ]
+})
+
+export const DictionaryEntity = Entity.create({
+    name: DICTIONARY_RECORD,
+    properties: [
+        Property.create({
+            name: 'key',
+            type: 'string',
+            collection: false,
+        }),
+        Property.create({
+            name: 'value',
+            type: 'json',
             collection: false,
         })
     ]

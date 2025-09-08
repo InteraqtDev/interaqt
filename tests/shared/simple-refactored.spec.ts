@@ -165,12 +165,24 @@ describe("Simple Objects Refactored - compatibility test", () => {
       });
       
       const transfer = StateTransfer.create({
-        trigger: startInteraction,
+        trigger: {
+          recordName: startInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: startInteraction.name
+          }
+        },
         current: idle,
         next: active
       });
       
-      expect(transfer.trigger).toBe(startInteraction);
+      expect(transfer.trigger).toMatchObject({
+        recordName: startInteraction.name,
+        type: 'create',
+        record: {
+          interactionName: startInteraction.name
+        }
+      });
       expect(transfer.current).toBe(idle);
       expect(transfer.next).toBe(active);
       expect(transfer._type).toBe("StateTransfer");
@@ -187,7 +199,13 @@ describe("Simple Objects Refactored - compatibility test", () => {
       });
       
       const transfer = StateTransfer.create({
-        trigger: startInteraction,
+        trigger: {
+          recordName: startInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: startInteraction.name
+          }
+        },
         current: idle,
         next: active,
         computeTarget: () => "computed"
@@ -210,7 +228,13 @@ describe("Simple Objects Refactored - compatibility test", () => {
       });
       
       const transfer = StateTransfer.create({
-        trigger: startInteraction,
+        trigger: {
+          recordName: startInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: startInteraction.name
+          }
+        },
         current: idle,
         next: active
       });
@@ -262,7 +286,13 @@ describe("Simple Objects Refactored - compatibility test", () => {
       });
       
       const t1 = StateTransfer.create({ 
-        trigger: testInteraction, 
+        trigger: {
+          recordName: testInteraction.name,
+          type: 'create',
+          record: {
+            interactionName: testInteraction.name
+          }
+        },
         current: n1, 
         next: n2 
       });

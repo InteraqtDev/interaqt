@@ -54,7 +54,7 @@ describe('Average computed handle', () => {
     await controller.setup(true);
     
     // Initially, the average should be 0 (no records)
-    let avgScore = await system.storage.get(DICTIONARY_RECORD, 'averageScore');
+    let avgScore = await system.storage.dict.get('averageScore');
     expect(avgScore).toBe(0);
     
     // Add some students
@@ -74,7 +74,7 @@ describe('Average computed handle', () => {
     });
     
     // Check the average
-    avgScore = await system.storage.get(DICTIONARY_RECORD, 'averageScore');
+    avgScore = await system.storage.dict.get('averageScore');
     expect(avgScore).toBe(90); // (85 + 90 + 95) / 3
     
     // Update a student's score
@@ -83,13 +83,13 @@ describe('Average computed handle', () => {
       score: 80
     });
     
-    avgScore = await system.storage.get(DICTIONARY_RECORD, 'averageScore');
+    avgScore = await system.storage.dict.get('averageScore');
     expect(avgScore).toBeCloseTo(86.67, 2); // (85 + 80 + 95) / 3
     
     // Delete a student
     await system.storage.delete('Student', BoolExp.atom({key: 'id', value: ['=', students[0].id]}));
     
-    avgScore = await system.storage.get(DICTIONARY_RECORD, 'averageScore');
+    avgScore = await system.storage.dict.get('averageScore');
     expect(avgScore).toBe(90); // (85 + 95) / 2
   });
   
@@ -139,7 +139,7 @@ describe('Average computed handle', () => {
     await system.storage.create('Data', { value: null });
     await system.storage.create('Data', { value: undefined });
     
-    const average = await system.storage.get(DICTIONARY_RECORD, 'dataAverage');
+    const average = await system.storage.dict.get('dataAverage');
     expect(average).toBeCloseTo(4.28, .1); // Only valid values (10 + 20) / 7 = 4.285714285714286
   });
 
@@ -179,7 +179,7 @@ describe('Average computed handle', () => {
     await controller.setup(true);
     
     // Initially empty, average should be 0
-    const avg = await system.storage.get(DICTIONARY_RECORD, 'averagePrice');
+    const avg = await system.storage.dict.get('averagePrice');
     expect(avg).toBe(0);
   });
   
@@ -258,9 +258,7 @@ describe('Average computed handle', () => {
     })
     
     // Check that only engineering salaries are averaged
-    const avgSalary = await system.storage.get(
-      DICTIONARY_RECORD,
-      'averageEngineerSalary'
+    const avgSalary = await system.storage.dict.get('averageEngineerSalary'
     )
     
     expect(avgSalary).toBe(90000) // (80000 + 90000 + 100000) / 3
@@ -436,22 +434,22 @@ describe('Average computed handle', () => {
     const m2 = await system.storage.create('Measurement', { value: 200, isValid: true });
     const m3 = await system.storage.create('Measurement', { value: null, isValid: false });
     
-    let avg = await system.storage.get(DICTIONARY_RECORD, 'averageMeasurement');
+    let avg = await system.storage.dict.get('averageMeasurement');
     expect(avg).toBe(100); // (100 + 200) / 3, null is considered as 0
     
     // Update null to valid value
     await system.storage.update('Measurement', BoolExp.atom({key: 'id', value: ['=', m3.id]}), { value: 300 });
-    avg = await system.storage.get(DICTIONARY_RECORD, 'averageMeasurement');
+    avg = await system.storage.dict.get('averageMeasurement');
     expect(avg).toBe(200); // (100 + 200 + 300) / 3
     
     // Update valid value to null
     await system.storage.update('Measurement', BoolExp.atom({key: 'id', value: ['=', m2.id]}), { value: null });
-    avg = await system.storage.get(DICTIONARY_RECORD, 'averageMeasurement');
+    avg = await system.storage.dict.get('averageMeasurement');
     expect(avg).closeTo(133,1); // (100 + 300) / 3
     
     // Update valid value to another valid value
     await system.storage.update('Measurement', BoolExp.atom({key: 'id', value: ['=', m1.id]}), { value: 150 });
-    avg = await system.storage.get(DICTIONARY_RECORD, 'averageMeasurement');
+    avg = await system.storage.dict.get('averageMeasurement');
     expect(avg).toBe(150); // (150 + 300) / 3
   });
 
@@ -970,7 +968,7 @@ describe('Average computed handle', () => {
     await controller.setup(true);
 
     // Initial averages should be 0 (no data)
-    let overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    let overallAvg = await system.storage.dict.get('overallAverageRating');
     
     expect(overallAvg).toBe(0);
 
@@ -1018,7 +1016,7 @@ describe('Average computed handle', () => {
     });
 
     // Check the averages
-    overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    overallAvg = await system.storage.dict.get('overallAverageRating');
     
     // Overall: (4.5 + 3.5 + 4.0 + 5.0 + 4.5 + 3.0 + 4.0) / 7 = 28.5 / 7 ≈ 4.07
     expect(overallAvg).toBeCloseTo(4.07, 2);
@@ -1036,7 +1034,7 @@ describe('Average computed handle', () => {
     );
 
     // Check updated averages
-    overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    overallAvg = await system.storage.dict.get('overallAverageRating');
     
     // Overall increased by (4.5 - 3.5) / 7 ≈ 0.14, so ~4.21
     expect(overallAvg).toBeCloseTo(4.21, 2);
@@ -1053,7 +1051,7 @@ describe('Average computed handle', () => {
     );
 
     // Check final averages
-    overallAvg = await system.storage.get(DICTIONARY_RECORD, 'overallAverageRating');
+    overallAvg = await system.storage.dict.get('overallAverageRating');
     
     // Now only 6 reviews: (4.5 + 4.5 + 4.0 + 5.0 + 4.5 + 4.0) / 6 = 26.5 / 6 ≈ 4.42
     expect(overallAvg).toBeCloseTo(4.42, 2);

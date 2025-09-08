@@ -116,56 +116,60 @@ export function createData() {
     const draftToNormalTransfer = StateTransfer.create({
         trigger: {
             recordName: InteractionEventEntity.name,
+            type: 'create',
             record: {
                 interactionName: finalizeInteraction.name
             }
         },
         current: draftState,
         next: normalState,
-        computeTarget: (event: any) => {
-            return {id: event.payload!.content.id}
+        computeTarget: (mutationEvent: any) => {
+            return {id: mutationEvent.record.payload!.content.id}
         }
     })
 
     const normalToDraftTransfer = StateTransfer.create({
         trigger: {
             recordName: InteractionEventEntity.name,
+            type: 'create',
             record: {
                 interactionName: draftInteraction.name
             }
         },
         current: normalState,
         next: draftState,
-        computeTarget: (event: any) => {
-            return {id: event.payload!.content.id}
+        computeTarget: (mutationEvent: any) => {
+            return {id: mutationEvent.record.payload!.content.id}
         }
     })
 
     const normalToPublishedTransfer = StateTransfer.create({
         trigger: {
             recordName: InteractionEventEntity.name,
+            type: 'create',
             record: {
                 interactionName: publishInteraction.name
             }
         },
         current: normalState,
         next: publishedState,
-        computeTarget: (event: any) => {
-            return {id: event.payload!.content.id}
+        computeTarget: (mutationEvent: any) => {
+            return {id: mutationEvent.record.payload!.content.id}
         }
     })
 
     const publishedToNormalTransfer = StateTransfer.create({
         trigger: {
             recordName: InteractionEventEntity.name,
+            type: 'create',
             record: {
                 interactionName: withdrawInteraction.name
             }
         },
         current: publishedState,
         next: normalState,
-        computeTarget: (event: any) => {
-            return {id: event.payload!.content.id}
+        computeTarget: (mutationEvent: any) => {
+            return {id: mutationEvent.record.payload!.content.id}
         }
     })
 

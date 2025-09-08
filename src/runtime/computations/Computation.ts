@@ -110,11 +110,11 @@ export class GlobalBoundState<T> {
 
     }
     async set(value: any):Promise<T> {
-        await this.controller.system.storage.set(DICTIONARY_RECORD, this.key, value)
+        await this.controller.system.storage.dict.set(this.key, value)
         return value
     }
     async get():Promise<T> {
-        return await this.controller.system.storage.get(DICTIONARY_RECORD, this.key)
+        return await this.controller.system.storage.dict.get(this.key)
     }
 }
 
@@ -170,22 +170,15 @@ export interface DataBasedComputation {
 }
 
 
-export type InteractionEventDep = {
-    type: 'interaction',
-    interaction: InteractionInstance
+export type EventDep = {
+    recordName:string,
+    type: 'create'|'delete'|'update',
 }
-
-export type DataEventDep = {
-    type: 'data',
-    eventType?: 'create'|'delete'|'update',
-    dataDep: DataDep
-}
-
-export type EventDep = InteractionEventDep|DataEventDep
 
 export interface EventBasedComputation {
     dataContext: DataContext
     args: any
+    useMutationEvent: boolean
     state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>

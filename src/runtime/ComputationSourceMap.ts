@@ -1,9 +1,10 @@
 import { AttributeQueryData, RecordQueryData } from "../storage/index.js";
-import { DataDep, Computation, DataBasedComputation, RecordsDataDep } from "./computations/Computation.js";
+import { DataDep, Computation, DataBasedComputation, RecordsDataDep, EventBasedComputation, EventDep } from "./computations/Computation.js";
 import { PropertyDataContext } from "./computations/Computation.js";
 import { Controller } from "./Controller.js";
 import { InteractionEventEntity  } from "./activity/ActivityManager.js";
-import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
+import { DICTIONARY_RECORD, RecordMutationEvent } from "./System.js";
+import { Scheduler } from "./Scheduler.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
@@ -43,10 +44,18 @@ export type EntityUpdateEventsSourceMap = {
     isRelation?: boolean
 }
 
-export type EntityEventSourceMap = EntityCreateEventsSourceMap | EntityDeleteEventsSourceMap | EntityUpdateEventsSourceMap
+export type DataBasedEntityEventsSourceMap = EntityCreateEventsSourceMap 
+    | EntityDeleteEventsSourceMap 
+    | EntityUpdateEventsSourceMap
+
+export type EventBasedEntityEventsSourceMap = EventDep & {
+    computation: Computation,
+}
+
+export type EntityEventSourceMap = DataBasedEntityEventsSourceMap | EventBasedEntityEventsSourceMap
 
 export type EtityMutationEvent = RecordMutationEvent & {
-    dataDep: DataDep,
+    dataDep?: DataDep,
     attributes?: string[],
     relatedAttribute?: string[],
     relatedMutationEvent?: RecordMutationEvent,
@@ -65,7 +74,7 @@ export class ComputationSourceMapManager {
     private sourceMaps: EntityEventSourceMap[] = []
     private sourceMapTree: DataSourceMapTree = {}
 
-    constructor(public controller: Controller) {
+    constructor(public controller: Controller, public scheduler: Scheduler) {
         
     }
 
@@ -78,7 +87,7 @@ export class ComputationSourceMapManager {
 
         for(const computation of computations) {
             // 1. 根据 data deps 计算出 mutation events
-            if( this.isDataBasedComputation(computation)) {
+            if( this.scheduler.isDataBasedComputation(computation)) {
                 ERMutationEventSources.push(
                     ...Object.entries(computation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
                 )
@@ -92,25 +101,26 @@ export class ComputationSourceMapManager {
                     ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
                 }
             } else {
-                // TODO 是不是可以和 DataBasedComputation 统一处理？因为监听的 Interaction 也是一种 entity。
-                // 2. EventBasedComputation 等同于监听 
-                // - Interaction 的 create 事件
-                // - TODO Activity 的 create 事件？确定需要吗？
-                const recordDataDep: RecordsDataDep = {
-                    type: 'records',
-                    source: InteractionEventEntity,
-                    attributeQuery: ['*']
+                // const recordDataDep: RecordsDataDep = {
+                //     type: 'records',
+                //     source: InteractionEventEntity,
+                //     attributeQuery: ['*']
+                // }
+                // ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('record', recordDataDep, computation, 'create'))
+                const {eventDeps} = computation as EventBasedComputation
+                for(const eventDep of Object.values(eventDeps!)) {
+                    ERMutationEventSources.push({
+                        type: eventDep.type,
+                        recordName: eventDep.recordName,
+                        computation
+                    } as EventBasedEntityEventsSourceMap)
                 }
-                ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('record', recordDataDep, computation, 'create'))
             }
         }
 
 
         this.sourceMaps = [...ERMutationEventSources]
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
-    }
-    isDataBasedComputation(computation: Computation): computation is DataBasedComputation {
-        return (computation as DataBasedComputation).compute !== undefined
     }
     /**
      * 添加新的 SourceMap
@@ -140,21 +150,19 @@ export class ComputationSourceMapManager {
     }
 
     /**
-     * 检查 update 类型的 SourceMap 是否需要触发计算
+     * 检查 update 类型的更新对 DataBasedComputation 是否需要触发计算
      * @param source EntityEventSourceMap
      * @param mutationEvent RecordMutationEvent
      * @returns 是否需要触发计算
      */
     shouldTriggerUpdateComputation(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent): boolean {
-        if (source.type !== 'update') {
+        if (source.type !== 'update' || !('dataDep' in source)) {
             return true
         }
-        
         // 特殊处理 Global 类型的数据依赖
-        if (source.dataDep.type === 'global' && mutationEvent.recordName === SYSTEM_RECORD) {
+        if (source.dataDep.type === 'global' && mutationEvent.recordName === DICTIONARY_RECORD) {
             // 检查是否是 state 类型的记录，并且 key 匹配
-            return mutationEvent.record?.concept === DICTIONARY_RECORD && 
-                   mutationEvent.record?.key === source.dataDep.source.name
+            return mutationEvent.record?.key === source.dataDep.source.name
         } else {
             // 如果是更新，检查是否是依赖的属性有变化。
             const propAttrs = source.attributes!.filter(attr => attr !== 'id')
@@ -163,6 +171,7 @@ export class ComputationSourceMapManager {
                 (mutationEvent.record![attr] === mutationEvent.oldRecord![attr])
             )
         }
+        
     }
 
     convertDataDepToERMutationEventsSourceMap(dataDepName:string, dataDep: DataDep, computation: Computation, eventType?: 'create'|'delete'|'update', isInitial: boolean = false): EntityEventSourceMap[] {
@@ -213,8 +222,8 @@ export class ComputationSourceMapManager {
                 ERMutationEventsSource.push({
                     dataDep: dataDep,
                     type: 'update',
-                    recordName: SYSTEM_RECORD,
-                    sourceRecordName: SYSTEM_RECORD,
+                    recordName: DICTIONARY_RECORD,
+                    sourceRecordName: DICTIONARY_RECORD,
                     attributes: ['value'],
                     computation
                 })
@@ -225,8 +234,8 @@ export class ComputationSourceMapManager {
                 ERMutationEventsSource.push({
                     dataDep: dataDep,
                     type: 'create',
-                    recordName: SYSTEM_RECORD,
-                    sourceRecordName: SYSTEM_RECORD,
+                    recordName: DICTIONARY_RECORD,
+                    sourceRecordName: DICTIONARY_RECORD,
                     computation
                 })
             }
@@ -323,34 +332,6 @@ export class ComputationSourceMapManager {
         return ERMutationEventsSource
 
         
-    }
-
-    /**
-     * 获取所有 SourceMap
-     * @returns 所有的 EntityEventSourceMap 数组
-     */
-    getAllSourceMaps(): EntityEventSourceMap[] {
-        return [...this.sourceMaps]
-    }
-
-    /**
-     * 根据 recordName 获取相关的 SourceMap
-     * @param recordName 记录名称
-     * @returns 相关的 EntityEventSourceMap 数组
-     */
-    getSourceMapsByRecordName(recordName: string): EntityEventSourceMap[] {
-        return this.sourceMaps.filter(sourceMap => 
-            sourceMap.recordName === recordName || sourceMap.sourceRecordName === recordName
-        )
-    }
-
-
-    /**
-     * 清空所有 SourceMap 数据
-     */
-    clear(): void {
-        this.sourceMaps = []
-        this.sourceMapTree = {}
     }
 
     /**

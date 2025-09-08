@@ -222,16 +222,31 @@ const Article = Entity.create({
     properties: [
         Property.create({ name: 'title', type: 'string' }),
         Property.create({ name: 'content', type: 'string' }),
+        Property.create({ name: 'slug', type: 'string' }),
         HardDeletionProperty.create()
     ],
     // Transform creates new articles from interaction events
     computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
+        eventDeps: {
+            ArticleInteraction: {
+                recordName: InteractionEventEntity.name,
+                type: 'create'
+            }
+        },
+        callback: async function(this: Controller, mutationEvent) {
+            const event = mutationEvent.record;
             if (event.interactionName === 'CreateArticle') {
+                // Use Controller to generate article slug
+                const existingCount = await this.system.storage.find('Article',
+                    undefined,
+                    undefined,
+                    ['id']
+                );
+                
                 return {
                     title: event.payload.title,
-                    content: event.payload.content
+                    content: event.payload.content,
+                    slug: `article-${existingCount.length + 1}`
                 }
             }
             return null
@@ -765,10 +780,211 @@ Transform.create(config: TransformConfig): TransformInstance
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to transform from (source collection)
-- `config.callback` (function, required): Transformation function that converts source data to target data
-- `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
+Transform supports two modes of operation:
 
+1. **Entity/Relation Transform Mode**:
+   - `config.record` (Entity|Relation, required): Entity or relation to transform from (source collection)
+   - `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
+   - `config.callback` (function, required): Transformation function that converts source data to target data
+     - **Context**: `this` is bound to the Controller instance, providing access to system APIs via `this.system.storage`, `this.globals`, etc.
+     - **Signature**: `function(this: Controller, record: any): any | any[]`
+
+2. **Event-Driven Transform Mode** (Recommended for interaction-based transformations):
+   - `config.eventDeps` (EventDeps, required): Event dependencies that trigger the transformation
+   - `config.callback` (function, required): Transformation function that processes mutation events
+     - **Context**: `this` is bound to the Controller instance, providing access to system APIs via `this.system.storage`, `this.globals`, etc.
+     - **Signature**: `function(this: Controller, mutationEvent: MutationEvent): any | any[]`
+
+**Event Dependencies (eventDeps)**
+
+The `eventDeps` parameter allows Transform to react to specific mutation events (create, update, delete) on entities. This is the recommended approach for transforming data based on interactions or system events.
+
+```typescript
+interface EventDep {
+  recordName: string;  // Entity name to listen to
+  type: 'create' | 'update' | 'delete';  // Event type
+}
+
+// Example eventDeps structure
+eventDeps: {
+  UserCreate: {
+    recordName: 'User',
+    type: 'create'
+  },
+  UserUpdate: {
+    recordName: 'User', 
+    type: 'update'
+  }
+}
+```
+
+**Examples**
+
+1. **Entity-to-Entity Transform** (for deriving new entities from existing ones):
+```typescript
+// Create discounted products from regular products
+const DiscountedProduct = Entity.create({
+  name: 'DiscountedProduct',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'originalPrice', type: 'number' }),
+    Property.create({ name: 'discountedPrice', type: 'number' })
+  ],
+  computation: Transform.create({
+    record: Product,
+    attributeQuery: ['name', 'price'],
+    callback: async function(this: Controller, product) {
+      // Access system configuration via Controller
+      const discountRate = await this.system.storage.get('config', 'globalDiscountRate', 0.1);
+      
+      return {
+        name: product.name,
+        originalPrice: product.price,
+        discountedPrice: product.price * (1 - discountRate)
+      };
+    }
+  })
+})
+```
+
+2. **Event-Driven Transform** (recommended for interaction-based transformations):
+```typescript
+// Create audit logs from user mutations
+const UserAudit = Entity.create({
+  name: 'UserAudit',
+  properties: [
+    Property.create({ name: 'action', type: 'string' }),
+    Property.create({ name: 'userId', type: 'string' }),
+    Property.create({ name: 'timestamp', type: 'string' }),
+    Property.create({ name: 'changes', type: 'object' })
+  ],
+  computation: Transform.create({
+    eventDeps: {
+      UserCreate: {
+        recordName: 'User',
+        type: 'create'
+      },
+      UserUpdate: {
+        recordName: 'User',
+        type: 'update'
+      },
+      UserDelete: {
+        recordName: 'User',
+        type: 'delete'
+      }
+    },
+    callback: function(this: Controller, mutationEvent) {
+      // Access Controller APIs via 'this'
+      console.log('Audit log created by:', this.name); // Controller name
+      
+      return {
+        action: mutationEvent.type,
+        userId: (mutationEvent.record?.id || mutationEvent.oldRecord?.id),
+        timestamp: new Date().toISOString(),
+        changes: {
+          old: mutationEvent.oldRecord,
+          new: mutationEvent.record
+        }
+      }
+    }
+  })
+})
+```
+
+3. **Transform from Interaction Events**:
+```typescript
+// Create articles from interactions
+const Article = Entity.create({
+  name: 'Article',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'content', type: 'string' }),
+    Property.create({ name: 'authorId', type: 'string' }),
+    Property.create({ name: 'authorName', type: 'string' })
+  ],
+  computation: Transform.create({
+    eventDeps: {
+      ArticleInteraction: {
+        recordName: InteractionEventEntity.name,
+        type: 'create'
+      }
+    },
+    callback: async function(this: Controller, mutationEvent) {
+      const event = mutationEvent.record;
+      if (event.interactionName === 'CreateArticle') {
+        // Use Controller to fetch additional user data
+        const author = await this.system.storage.findOne('User', 
+          this.globals.MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+          undefined,
+          ['id', 'name']
+        );
+        
+        return {
+          title: event.payload.title,
+          content: event.payload.content,
+          authorId: event.user.id,
+          authorName: author?.name || 'Unknown'
+        }
+      }
+      return null;
+    }
+  })
+})
+```
+
+4. **One-to-Many Transform**:
+```typescript
+// Create multiple notifications from one order
+const Notification = Entity.create({
+  name: 'Notification',
+  properties: [
+    Property.create({ name: 'type', type: 'string' }),
+    Property.create({ name: 'recipient', type: 'string' }),
+    Property.create({ name: 'message', type: 'string' })
+  ],
+  computation: Transform.create({
+    eventDeps: {
+      OrderCreate: {
+        recordName: 'Order',
+        type: 'create'
+      }
+    },
+    callback: async function(this: Controller, mutationEvent) {
+      const order = mutationEvent.record;
+      
+      // Use Controller to fetch warehouse email from configuration
+      const warehouseEmail = await this.system.storage.get('config', 'warehouseEmail', 'warehouse@company.com');
+      
+      // Use Controller to check if customer wants notifications
+      const customer = await this.system.storage.findOne('User',
+        this.globals.MatchExp.atom({ key: 'email', value: ['=', order.customerEmail] }),
+        undefined,
+        ['id', 'notificationPreferences']
+      );
+      
+      const notifications = [];
+      
+      // Only send customer notification if they opted in
+      if (customer?.notificationPreferences?.orderUpdates !== false) {
+        notifications.push({
+          type: 'order_confirmation',
+          recipient: order.customerEmail,
+          message: `Order ${order.orderNumber} confirmed`
+        });
+      }
+      
+      // Always notify warehouse
+      notifications.push({
+        type: 'warehouse_notification',
+        recipient: warehouseEmail,
+        message: `New order ${order.orderNumber} to process`
+      });
+      
+      return notifications;
+    }
+  })
+})
+```
 
 **Key Points**
 
@@ -777,7 +993,23 @@ Transform.create(config: TransformConfig): TransformInstance
    - Array of objects: Creates multiple target records from one source
    - `null`/`undefined`: Creates no records (useful for filtering)
 
-2. **Automatic Updates**: When source records are updated or deleted, the transformed records are automatically updated or removed
+2. **Automatic Updates**: 
+   - For entity/relation transforms: When source records are updated or deleted, the transformed records are automatically updated or removed
+   - For event-driven transforms: New records are created in response to mutation events
+
+3. **Choosing Between Modes**:
+   - Use `record` mode when deriving entities from other entities (e.g., creating views or projections)
+   - Use `eventDeps` mode when creating entities in response to system events or interactions
+
+4. **MutationEvent Structure** (for eventDeps callbacks):
+   ```typescript
+   {
+     type: 'create' | 'update' | 'delete',
+     recordName: string,
+     record?: any,      // New/current record (for create/update)
+     oldRecord?: any    // Previous record (for update/delete)
+   }
+   ```
 
 ### StateMachine.create()
 
@@ -806,7 +1038,7 @@ const MyStateMachine = StateMachine.create({
     transfers: [...],
     defaultState: StateNode.create({
         name: 'pending',
-        computeValue: (lastValue) => {
+        computeValue: (lastValue, mutationEvent) => {
             // Explicitly handle initial value
             return lastValue || 'initial_state_value';
         }
@@ -834,7 +1066,7 @@ const OrderStateMachine = StateMachine.create({
                     interactionName: ConfirmOrderInteraction.name
                 }
             },
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.orderId })
         })
     ],
     defaultState: pendingState
@@ -853,9 +1085,27 @@ const UserTargetRelation = Relation.create({
     ],
     // Use Transform to create relations
     computation: Transform.create({
-        record: InteractionEventEntity,
-        callback: function(event) {
+        eventDeps: {
+            RelationInteraction: {
+                recordName: InteractionEventEntity.name,
+                type: 'create'
+            }
+        },
+        callback: async function(this: Controller, mutationEvent) {
+            const event = mutationEvent.record;
             if (event.interactionName === 'CreateRelation') {
+                // Use Controller to validate the relation
+                const sourceExists = await this.system.storage.findOne('User',
+                    MatchExp.atom({ key: 'id', value: ['=', event.payload.sourceUser.id] }),
+                    undefined,
+                    ['id']
+                );
+                
+                if (!sourceExists) {
+                    console.log('Source user not found, skipping relation creation');
+                    return null;
+                }
+                
                 return {
                     source: event.payload.sourceUser,
                     target: event.payload.targetEntity,
@@ -884,16 +1134,16 @@ relationDeletionProperty.computation = StateMachine.create({
             },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
-            computeTarget: async function(this: Controller, event: any) {
+            computeTarget: async function(this: Controller, mutationEvent: any) {
                 const MatchExp = this.globals.MatchExp;
                 const relation = await this.system.storage.findOne(
                     UserTargetRelation.name,
                     MatchExp.atom({
                         key: 'source.id',
-                        value: ['=', event.payload.sourceId]
+                        value: ['=', mutationEvent.record.payload.sourceId]
                     }).and({
                         key: 'target.id',
-                        value: ['=', event.payload.targetId]
+                        value: ['=', mutationEvent.record.payload.targetId]
                     }),
                     undefined,
                     ['id']
@@ -1073,8 +1323,8 @@ const nextRecomputeTimeKey = controller.scheduler.getBoundStateName(
 );
 
 // Read state values
-const lastRecomputeTime = await system.storage.get(DICTIONARY_RECORD, lastRecomputeTimeKey);
-const nextRecomputeTime = await system.storage.get(DICTIONARY_RECORD, nextRecomputeTimeKey);
+const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
 ```
 
 ### Custom.create()
@@ -1537,10 +1787,13 @@ const activeUsers = Dictionary.create({
     computation: Transform.create({
         record: User,
         attributeQuery: ['id', 'lastLoginTime'],
-        callback: (users) => {
-            const oneHourAgo = Date.now() - 3600000;
+        callback: async function(this: Controller, users) {
+            // Use Controller to get activity threshold from config
+            const activityThreshold = await this.system.storage.get('config', 'userActivityThreshold', 3600000); // Default 1 hour
+            const cutoffTime = Date.now() - activityThreshold;
+            
             return users
-                .filter(u => u.lastLoginTime > oneHourAgo)
+                .filter(u => u.lastLoginTime > cutoffTime)
                 .map(u => u.id);
         }
     })
@@ -1607,13 +1860,13 @@ const pendingState = StateNode.create({ name: 'pending' });
 // Store timestamp when entering state
 const processedState = StateNode.create({
     name: 'processed',
-    computeValue: () => new Date().toISOString()
+    computeValue: (lastValue, mutationEvent) => new Date().toISOString()
 });
 
 // Store complex object
 const activeState = StateNode.create({
     name: 'active',
-    computeValue: () => ({
+    computeValue: (lastValue, mutationEvent) => ({
         activatedAt: Math.floor(Date.now()/1000),  // In seconds
         status: 'active',
         metadata: { source: 'manual' }
@@ -1623,7 +1876,7 @@ const activeState = StateNode.create({
 // Increment value based on previous state
 const incrementingState = StateNode.create({
     name: 'incrementing',
-    computeValue: (lastValue) => {
+    computeValue: (lastValue, mutationEvent) => {
         const baseValue = typeof lastValue === 'number' ? lastValue : 0;
         return baseValue + 1;
     }
@@ -1632,7 +1885,7 @@ const incrementingState = StateNode.create({
 // Preserve previous value
 const idleState = StateNode.create({
     name: 'idle',
-    computeValue: (lastValue) => {
+    computeValue: (lastValue, mutationEvent) => {
         return typeof lastValue === 'number' ? lastValue : 0;
     }
 });
@@ -1640,7 +1893,7 @@ const idleState = StateNode.create({
 // Return null to delete (for entity/relation state machines)
 const deletedState = StateNode.create({
     name: 'deleted',
-    computeValue: () => null
+    computeValue: (lastValue, mutationEvent) => null
 });
 
 // Async computeValue - fetch data from database
@@ -1665,7 +1918,7 @@ const enrichedState = StateNode.create({
 // Async computeValue - external API call
 const verifiedState = StateNode.create({
     name: 'verified',
-    computeValue: async (lastValue) => {
+    computeValue: async (lastValue, mutationEvent) => {
         // Simulate external verification
         const verificationResult = await someExternalAPI.verify(lastValue.data);
         
@@ -1681,9 +1934,9 @@ const verifiedState = StateNode.create({
 // Using event parameter - access user information
 const approvedState = StateNode.create({
     name: 'approved',
-    computeValue: (lastValue, event) => {
+    computeValue: (lastValue, mutationEvent) => {
         // Access user who triggered the approval
-        const approver = event?.user?.name || 'system';
+        const approver = mutationEvent?.record?.user?.name || 'system';
         return {
             status: 'approved',
             approvedAt: Math.floor(Date.now()/1000),  // In seconds
@@ -1695,14 +1948,14 @@ const approvedState = StateNode.create({
 // Using event parameter - access payload data
 const updatedState = StateNode.create({
     name: 'updated',
-    computeValue: (lastValue, event) => {
+    computeValue: (lastValue, mutationEvent) => {
         // Merge payload data with existing value
-        if (event?.payload) {
+        if (mutationEvent?.record?.payload) {
             return {
                 ...lastValue,
-                ...event.payload.updates,
+                ...mutationEvent.record.payload.updates,
                 lastModifiedAt: Math.floor(Date.now()/1000),  // In seconds
-                lastModifiedBy: event.user?.id
+                lastModifiedBy: mutationEvent.record.user?.id
             };
         }
         return lastValue;
@@ -1712,15 +1965,15 @@ const updatedState = StateNode.create({
 // Using event parameter - conditional logic based on interaction
 const reviewedState = StateNode.create({
     name: 'reviewed',
-    computeValue: (lastValue, event) => {
+    computeValue: (lastValue, mutationEvent) => {
         // Different behavior based on which interaction triggered the transition
-        if (event?.interactionName === 'approve') {
+        if (mutationEvent?.record?.interactionName === 'approve') {
             return { status: 'approved', reviewedAt: Math.floor(Date.now()/1000) };  // In seconds
-        } else if (event?.interactionName === 'reject') {
+        } else if (mutationEvent?.record?.interactionName === 'reject') {
             return { 
                 status: 'rejected', 
                 reviewedAt: Math.floor(Date.now()/1000),  // In seconds
-                reason: event.payload?.reason || 'No reason provided'
+                reason: mutationEvent.record.payload?.reason || 'No reason provided'
             };
         }
         return { status: 'pending_review' };
@@ -1736,11 +1989,11 @@ StateNodes with `computeValue` are used in StateMachine to compute property valu
 // Counter that increments on interaction
 const idleState = StateNode.create({ 
     name: 'idle', 
-    computeValue: (lastValue) => lastValue || 0 
+    computeValue: (lastValue, mutationEvent) => lastValue || 0 
 });
 const incrementingState = StateNode.create({ 
     name: 'incrementing', 
-    computeValue: (lastValue) => (lastValue || 0) + 1 
+    computeValue: (lastValue, mutationEvent) => (lastValue || 0) + 1 
 });
 
 const CounterStateMachine = StateMachine.create({
@@ -1755,7 +2008,7 @@ const CounterStateMachine = StateMachine.create({
             },
             current: idleState,
             next: incrementingState,
-            computeTarget: (event) => ({ id: event.payload.counterId })
+            computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.counterId })
         })
     ],
     defaultState: idleState
@@ -1765,7 +2018,7 @@ const CounterStateMachine = StateMachine.create({
 const pendingState = StateNode.create({ name: 'pending' });
 const processedState = StateNode.create({ 
     name: 'processed', 
-    computeValue: () => new Date().toISOString() 
+    computeValue: (lastValue, mutationEvent) => new Date().toISOString() 
 });
 
 const ProcessingStateMachine = StateMachine.create({
@@ -1780,7 +2033,7 @@ const ProcessingStateMachine = StateMachine.create({
             },
             current: pendingState,
             next: processedState,
-            computeTarget: (event) => ({ id: event.payload.itemId })
+            computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.itemId })
         })
     ],
     defaultState: pendingState
@@ -1885,9 +2138,9 @@ const incrementTransfer = StateTransfer.create({
     },
     current: idleState,
     next: incrementingState,
-    computeTarget: (event) => {
+    computeTarget: (mutationEvent) => {
         // Return the counter entity that should transition states
-        return { id: event.payload.counter.id };
+        return { id: mutationEvent.record.payload.counter.id };
     }
 });
 
@@ -1901,12 +2154,12 @@ const assignReviewerTransfer = StateTransfer.create({
     },
     current: unassignedState,
     next: assignedState,
-    computeTarget: async function(this: Controller, event) {
+    computeTarget: async function(this: Controller, mutationEvent) {
         // Find the request entity
         const request = await this.system.storage.findOne('Request', 
             this.globals.MatchExp.atom({
                 key: 'id',
-                value: ['=', event.payload.requestId]
+                value: ['=', mutationEvent.record.payload.requestId]
             }),
             undefined,
             ['id']
@@ -1915,7 +2168,7 @@ const assignReviewerTransfer = StateTransfer.create({
         // Return source and target to create/update relation
         return {
             source: request,  // Can be {id: '...'} or full entity
-            target: event.payload.reviewer  // From payload
+            target: mutationEvent.record.payload.reviewer  // From payload
         };
     }
 });
@@ -1933,7 +2186,7 @@ const publishTransfer = StateTransfer.create({
     },
     current: draftState,
     next: publishedState,
-    computeTarget: (event) => ({ id: event.payload.documentId })
+    computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.documentId })
 });
 
 // Trigger on data mutations (non-interaction events)
@@ -1944,7 +2197,7 @@ const dataUpdateTransfer = StateTransfer.create({
     },
     current: processingState,
     next: updatedState,
-    computeTarget: (event) => ({ id: event.record.id })
+    computeTarget: (mutationEvent) => ({ id: mutationEvent.record.id })
 });
 
 // Multiple targets - return array
@@ -1957,9 +2210,9 @@ const bulkApproveTransfer = StateTransfer.create({
     },
     current: pendingState,
     next: approvedState,
-    computeTarget: (event) => {
+    computeTarget: (mutationEvent) => {
         // Return multiple entities to transition
-        return event.payload.items.map(item => ({ id: item.id }));
+        return mutationEvent.record.payload.items.map(item => ({ id: item.id }));
     }
 });
 ```
@@ -2179,15 +2432,26 @@ const UserPostRelation = Relation.create({
   source: User,
   target: Post,
   computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: (event) => {
+    eventDeps: {
+      PostInteraction: {
+        recordName: InteractionEventEntity.name,
+        type: 'create'
+      }
+    },
+    callback: async function(this: Controller, mutationEvent) {
+      const event = mutationEvent.record;
       if (event.interactionName === 'CreatePost') {
+        // Use Controller to validate and enhance data
+        const now = Math.floor(Date.now() / 1000);
+        
         // This is where the actual creation logic is
         return {
           source: event.user.id,
           target: {
             title: event.payload.title,
-            content: event.payload.content
+            content: event.payload.content,
+            createdAt: now,
+            updatedAt: now
           }
         };
       }
@@ -2624,6 +2888,50 @@ interface System {
 
 Storage layer interface providing data persistence functionality.
 
+**Interface Definition**
+```typescript
+interface Storage {
+    // Entity mapping
+    map: any
+    
+    // Transaction operations
+    beginTransaction: (transactionName?: string) => Promise<any>
+    commitTransaction: (transactionName?: string) => Promise<any>
+    rollbackTransaction: (transactionName?: string) => Promise<any>
+    
+    // Dictionary-specific API
+    dict: {
+        get: (key: string) => Promise<any>
+        set: (key: string, value: any) => Promise<void>
+    }
+    
+    // General KV storage
+    get: (itemName: string, id: string, initialValue?: any) => Promise<any>
+    set: (itemName: string, id: string, value: any, events?: RecordMutationEvent[]) => Promise<any>
+    
+    // Entity/Relation operations
+    setup: (entities: EntityInstance[], relations: RelationInstance[], createTables?: boolean) => any
+    findOne: (entityName: string, ...args: any[]) => Promise<any>
+    find: (entityName: string, ...args: any[]) => Promise<any[]>
+    create: (entityName: string, data: any, events?: RecordMutationEvent[]) => Promise<any>
+    update: (entityName: string, ...args: any[]) => Promise<any>
+    delete: (entityName: string, data: any, events?: RecordMutationEvent[]) => Promise<any>
+    
+    // Relation-specific operations
+    findOneRelationByName: (relationName: string, ...args: any[]) => Promise<any>
+    findRelationByName: (relationName: string, ...args: any[]) => Promise<any>
+    updateRelationByName: (relationName: string, matchExpressionData: any, rawData: any, events?: RecordMutationEvent[]) => Promise<any>
+    removeRelationByName: (relationName: string, matchExpressionData: any, events?: RecordMutationEvent[]) => Promise<any>
+    addRelationByNameById: (relationName: string, sourceEntityId: string, targetEntityId: string, rawData?: any, events?: RecordMutationEvent[]) => Promise<any>
+    
+    // Utility methods
+    getRelationName: (entityName: string, attributeName: string) => string
+    getEntityName: (entityName: string, attributeName: string) => string
+    listen: (callback: RecordMutationCallback) => void
+    destroy: () => void
+}
+```
+
 **Main Methods**
 
 #### Transaction Operations
@@ -3027,10 +3335,43 @@ await storage.removeRelationByName('UserPostRelation',  // Don't hardcode!
 )
 ```
 
+#### Dictionary Operations
+
+**dict.get(key: string)**
+Get value from Dictionary storage.
+
+```typescript
+// Get dictionary value
+const userCount = await storage.dict.get('userCount')
+
+// Returns undefined if key doesn't exist
+const config = await storage.dict.get('systemConfig')
+if (config === undefined) {
+  // Handle missing value
+}
+```
+
+**dict.set(key: string, value: any)**
+Set value in Dictionary storage.
+
+```typescript
+// Set dictionary value
+await storage.dict.set('userCount', 100)
+
+// Store complex objects
+await storage.dict.set('systemConfig', {
+  maxUsers: 1000,
+  maintenanceMode: false,
+  features: ['chat', 'notifications']
+})
+```
+
+**Note**: The Dictionary API is specifically designed for storing global state values that are defined as Dictionary instances in the system. It provides a cleaner, more focused API compared to the general KV storage operations.
+
 #### KV Storage Operations
 
 **get(itemName: string, id: string, initialValue?: any)**
-Get value from key-value storage.
+Get value from general key-value storage.
 
 ```typescript
 // Get value with default
@@ -3038,7 +3379,7 @@ const maxUsers = await storage.get('config', 'maxUsers', 100)
 ```
 
 **set(itemName: string, id: string, value: any, events?: RecordMutationEvent[])**
-Set value in key-value storage.
+Set value in general key-value storage.
 
 ```typescript
 // Set configuration value
@@ -3051,6 +3392,8 @@ await storage.set('cache', 'userPreferences', {
   notifications: true
 })
 ```
+
+**Note**: The general KV storage operations (`get`/`set`) are for arbitrary key-value pairs. For Dictionary entities specifically, prefer using the `dict` API.
 
 #### Utility Methods
 

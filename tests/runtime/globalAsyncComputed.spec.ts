@@ -10,7 +10,6 @@ import {
   DataBasedComputation,
   ComputationResult,
   Dictionary,
-  DICTIONARY_RECORD
 } from "interaqt";
 
 // GlobalWeatherComputed as a standard ES6 class
@@ -318,7 +317,7 @@ describe('Global async computed', () => {
     await controller.scheduler.handleAsyncReturn(statsComputation, {id: task1.id});
     
     // 检查全局统计状态
-    let productStats = await system.storage.get(DICTIONARY_RECORD, 'productStats');
+    let productStats = await system.storage.dict.get('productStats');
     expect(productStats).toMatchObject({
       totalCount: 1,
       totalPrice: 100,
@@ -348,7 +347,7 @@ describe('Global async computed', () => {
     await controller.scheduler.handleAsyncReturn(statsComputation, {id: task2.id});
     
     // 检查更新后的全局统计状态
-    productStats = await system.storage.get(DICTIONARY_RECORD, 'productStats');
+    productStats = await system.storage.dict.get('productStats');
     expect(productStats).toMatchObject({
       totalCount: 2,
       totalPrice: 300,

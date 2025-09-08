@@ -230,15 +230,16 @@ const rejectedStateNode = StateNode.create({
 const pendingToApprovedTransfer = StateTransfer.create({
     trigger: {
         recordName: InteractionEventEntity.name,
+        type: 'create',
         record: {
             interactionName: approveInteraction.name
         }
     },
     current: pendingStateNode,
     next: approvedStateNode,
-    computeTarget: async function(eventArgs: any) {
+    computeTarget: async function(mutationEvent: any) {
         return {
-            id: eventArgs.payload.request.id,
+            id: mutationEvent.record.payload.request.id,
         }
     }
 })
@@ -246,15 +247,16 @@ const pendingToApprovedTransfer = StateTransfer.create({
 const pendingToRejectedTransfer = StateTransfer.create({
     trigger: {
         recordName: InteractionEventEntity.name,
+        type: 'create',
         record: {
             interactionName: rejectInteraction.name
         }
     },
     current: pendingStateNode,
     next: rejectedStateNode,
-    computeTarget: async function(eventArgs: any) {
+    computeTarget: async function(mutationEvent: any) {
         return {
-            id: eventArgs.payload.request.id,
+            id: mutationEvent.record.payload.request.id,
         }
     }
 })
@@ -334,20 +336,21 @@ deletionProperty.computation = StateMachine.create({
         StateTransfer.create({
             trigger: {
                 recordName: InteractionEventEntity.name,
+                type: 'create',
                 record: {
                     interactionName: transferReviewersInteraction.name
                 }
             },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
-            computeTarget: async function(this: Controller, event: any) {
+            computeTarget: async function(this: Controller, mutationEvent: any) {
                 const MatchExp = this.globals.MatchExp
                 // 转移时删除旧的关系  
                 const existingRelation = await this.system.storage.findOne(
                     reviewerRelation.name!,
                     MatchExp.atom({
                         key: 'source.id',
-                        value: ['=', event.payload.request.id]
+                        value: ['=', mutationEvent.record.payload.request.id]
                     }),
                     undefined,
                     ['id']

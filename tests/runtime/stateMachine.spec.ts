@@ -110,19 +110,21 @@ describe('StateMachineRunner', () => {
             name: 'user1',
         })
         
-        const globalState = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
+        const globalState = await controller.system.storage.dict.get('globalState')
         expect(globalState).toBe('enabled')
 
         await controller.callInteraction(disableInteraction.name, {
             user: user1,
         })
-        const globalState2 = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
+
+        const dictss = await controller.system.storage.find(DICTIONARY_RECORD, undefined, undefined, ['*'])
+        const globalState2 = await controller.system.storage.dict.get('globalState')
         expect(globalState2).toBe('disabled')
 
         await controller.callInteraction(enableInteraction.name, {
             user: user1,
         })
-        const globalState3 = await controller.system.storage.get(DICTIONARY_RECORD, 'globalState')
+        const globalState3 = await controller.system.storage.dict.get('globalState')
         expect(globalState3).toBe('enabled')
     })
 
@@ -245,7 +247,7 @@ describe('StateMachineRunner', () => {
         const IncrementingState = StateNode.create({
             name: 'incrementing',
             // 动态计算：返回一个增量后的值
-            computeValue: ((lastValue: any) => {
+            computeValue: ((lastValue: any, mutationEvent: any) => {
                 const baseValue = typeof lastValue === 'number' ? lastValue : 0
                 return baseValue + 1
             }) as any
@@ -254,7 +256,7 @@ describe('StateMachineRunner', () => {
         const IdleState = StateNode.create({
             name: 'idle',
             // idle 状态不改变值
-            computeValue: ((lastValue: any) => {
+            computeValue: ((lastValue: any, mutationEvent: any) => {
                 return typeof lastValue === 'number' ? lastValue : 0
             }) as any
         })
@@ -263,28 +265,30 @@ describe('StateMachineRunner', () => {
         const IdleToIncrementingTransfer = StateTransfer.create({
             trigger: {
                 recordName: InteractionEventEntity.name,
+                type: 'create',
                 record: {
                     interactionName: IncrementInteraction.name
                 }
             },
             current: IdleState,
             next: IncrementingState,
-            computeTarget: (event: any) => {
-                return { id: event.payload!.counter.id }
+            computeTarget: (mutationEvent: any) => {
+                return { id: mutationEvent.record.payload!.counter.id }
             }
         })
 
         const IncrementingToIdleTransfer = StateTransfer.create({
             trigger: {
                 recordName: InteractionEventEntity.name,
+                type: 'create',
                 record: {
                     interactionName: ResetInteraction.name
                 }
             },
             current: IncrementingState,
             next: IdleState,
-            computeTarget: (event: any) => {
-                return { id: event.payload!.counter.id }
+            computeTarget: (mutationEvent: any) => {
+                return { id: mutationEvent.record.payload!.counter.id }
             }
         })
 
@@ -305,24 +309,26 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: 'increment'
                         }
                     },
                     current: idleStateForName,
                     next: incrementingStateForName,
-                    computeTarget: (event: any) => ({ id: event.payload!.counter.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.counter.id })
                 }),
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: 'reset'
                         }
                     },
                     current: incrementingStateForName,
                     next: idleStateForName,
-                    computeTarget: (event: any) => ({ id: event.payload!.counter.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.counter.id })
                 })
             ],
             defaultState: idleStateForName
@@ -418,7 +424,7 @@ describe('StateMachineRunner', () => {
         // 创建状态节点 - 每次触发时记录当前时间戳
         const LoggingState = StateNode.create({
             name: 'logging',
-            computeValue: (() => {
+            computeValue: ((lastValue: any, mutationEvent: any) => {
                 return Date.now()
             }) as any
         })
@@ -427,14 +433,15 @@ describe('StateMachineRunner', () => {
         const LoggingToLoggingTransfer = StateTransfer.create({
             trigger: {
                 recordName: InteractionEventEntity.name,
+                type: 'create',
                 record: {
                     interactionName: LogTimeInteraction.name
                 }
             },
             current: LoggingState,
             next: LoggingState,
-            computeTarget: (event: any) => {
-                return { id: event.payload!.logger.id }
+            computeTarget: (mutationEvent: any) => {
+                return { id: mutationEvent.record.payload!.logger.id }
             }
         })
 
@@ -572,11 +579,11 @@ describe('StateMachineRunner', () => {
         // 创建状态节点 - 使用 event 参数获取用户信息
         const UpdatedState = StateNode.create({
             name: 'updated',
-            // computeValue 接收两个参数：lastValue 和 event
-            computeValue: ((lastValue: any, event: any) => {
-                // 从 event 中获取用户名
-                if (event && event.user && event.user.name) {
-                    return event.user.name
+            // computeValue 接收两个参数：lastValue 和 mutationEvent
+            computeValue: ((lastValue: any, mutationEvent: any) => {
+                // 从 mutationEvent.record 中获取用户名
+                if (mutationEvent && mutationEvent.record && mutationEvent.record.user && mutationEvent.record.user.name) {
+                    return mutationEvent.record.user.name
                 }
                 return 'unknown'
             }) as any
@@ -585,13 +592,13 @@ describe('StateMachineRunner', () => {
         // 创建计数状态节点 - 使用 event 参数访问 payload
         const CountingState = StateNode.create({
             name: 'counting',
-            computeValue: ((lastValue: any, event: any) => {
+            computeValue: ((lastValue: any, mutationEvent: any) => {
                 const currentCount = typeof lastValue === 'number' ? lastValue : 0
-                // 从 event.payload 中获取新内容的长度作为增量
-                if (event && event.payload && event.payload.newContent) {
-                    return currentCount + event.payload.newContent.length
+                // 从 mutationEvent.record.payload 中获取新内容的长度作为增量
+                if (mutationEvent && mutationEvent.record && mutationEvent.record.payload && mutationEvent.record.payload.newContent) {
+                    return currentCount + mutationEvent.record.payload.newContent.length
                 }
-                // 没有 event 时（初始化时）返回当前值
+                // 没有 mutationEvent 时（初始化时）返回当前值
                 return currentCount
             })
         })
@@ -603,13 +610,14 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: UpdateMessageInteraction.name
                         }
                     },
                     current: UpdatedState,
                     next: UpdatedState,
-                    computeTarget: (event: any) => ({ id: event.payload!.message.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.message.id })
                 })
             ],
             defaultState: UpdatedState
@@ -622,13 +630,14 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: UpdateMessageInteraction.name
                         }
                     },
                     current: CountingState,
                     next: CountingState,
-                    computeTarget: (event: any) => ({ id: event.payload!.message.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.message.id })
                 })
             ],
             defaultState: CountingState
@@ -797,19 +806,20 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: UnassignDocumentInteraction.name
                         }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: async function(this: Controller, event: any) {
+                    computeTarget: async function(this: Controller, mutationEvent: any) {
                         // 查找要删除的关系
                         const existingRelation = await this.system.storage.findOne(
                             'DocumentOwner',
                             BoolExp.atom({
                                 key: 'source.id',
-                                value: ['=', event.payload!.document.id]
+                                value: ['=', mutationEvent.record.payload!.document.id]
                             }),
                             undefined,
                             ['id']
@@ -1015,7 +1025,7 @@ describe('StateMachineRunner', () => {
         const roleProperty = ProjectMembershipRelation.properties!.find(p => p.name === 'role')!
         const RoleActiveState = StateNode.create({ 
             name: 'active',
-            computeValue: (lastValue: any, event: any) => event.payload?.newRole || lastValue
+            computeValue: (lastValue: any, mutationEvent: any) => mutationEvent.record.payload?.newRole || lastValue
         })
         
         // 为 HardDeletionProperty 创建删除状态机
@@ -1026,24 +1036,25 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: LeaveProjectInteraction.name
                         }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: async function(this: Controller, event: any) {
+                    computeTarget: async function(this: Controller, mutationEvent: any) {
                         // 查找特定用户和项目的关系
                         const existingRelation = await this.system.storage.findOne(
                             'ProjectMembership',
                             BoolExp.and(
                                 BoolExp.atom({
                                     key: 'source.id',
-                                    value: ['=', event.payload!.user.id]
+                                    value: ['=', mutationEvent.record.payload!.user.id]
                                 }),
                                 BoolExp.atom({
                                     key: 'target.id',
-                                    value: ['=', event.payload!.project.id]
+                                    value: ['=', mutationEvent.record.payload!.project.id]
                                 })
                             ),
                             undefined,
@@ -1055,19 +1066,20 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: ClearProjectMembersInteraction.name
                         }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: async function(this: Controller, event: any) {
+                    computeTarget: async function(this: Controller, mutationEvent: any) {
                         // 查找项目的所有成员关系
                         const projectRelations = await this.system.storage.find(
                             'ProjectMembership',
                             BoolExp.atom({
                                 key: 'target.id',
-                                value: ['=', event.payload!.project.id]
+                                value: ['=', mutationEvent.record.payload!.project.id]
                             }),
                             undefined,
                             ['id']
@@ -1288,15 +1300,15 @@ describe('StateMachineRunner', () => {
         const statusProperty = Task.properties.find(p => p.name === 'status')!
         const PendingState = StateNode.create({ 
             name: 'pending',
-            computeValue: () => 'pending'  // 设置默认值
+            computeValue: (lastValue: any, mutationEvent: any) => 'pending'  // 设置默认值
         })
         const ActiveState = StateNode.create({ 
             name: 'active',
-            computeValue: () => 'active'
+            computeValue: (lastValue: any, mutationEvent: any) => 'active'
         })
         const CompletedState = StateNode.create({ 
             name: 'completed',
-            computeValue: () => 'completed'
+            computeValue: (lastValue: any, mutationEvent: any) => 'completed'
         })
         
         statusProperty.computation = StateMachine.create({
@@ -1305,24 +1317,30 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: UpdateTaskStatusInteraction.name
                         }
                     },
                     current: PendingState,
                     next: ActiveState,
-                    computeTarget: (event: any) => event.payload.newStatus === 'active' ? { id: event.payload.task.id } : undefined
+                    computeTarget: (mutationEvent: any) => {
+                        return mutationEvent.record.payload.newStatus === 'active' ? { id: mutationEvent.record.payload.task.id } : undefined
+                    }
                 }),
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: UpdateTaskStatusInteraction.name
                         }
                     },
                     current: ActiveState,
                     next: CompletedState,
-                    computeTarget: (event: any) => event.payload.newStatus === 'completed' ? { id: event.payload.task.id } : undefined
+                    computeTarget: (mutationEvent: any) => {
+                        return mutationEvent.record.payload.newStatus === 'completed' ? { id: mutationEvent.record.payload.task.id } : undefined
+                    }
                 })
             ],
             defaultState: PendingState
@@ -1336,13 +1354,14 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: DeleteTaskInteraction.name
                         }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: (event: any) => ({ id: event.payload!.task.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.task.id })
                 })
             ],
             defaultState: NON_DELETED_STATE
@@ -1561,11 +1580,11 @@ describe('StateMachineRunner', () => {
         const statusProperty = Order.properties.find(p => p.name === 'status')!
         const PendingState = StateNode.create({ 
             name: 'pending',
-            computeValue: () => 'pending'  // 设置默认值
+            computeValue: (lastValue: any, mutationEvent: any) => 'pending'  // 设置默认值
         })
         const CancelledState = StateNode.create({ 
             name: 'cancelled',
-            computeValue: () => 'cancelled'
+            computeValue: (lastValue: any, mutationEvent: any) => 'cancelled'
         })
         
         statusProperty.computation = StateMachine.create({
@@ -1574,13 +1593,14 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
-                    record: {
-                        interactionName: CancelOrderInteraction.name
-                    }
+                        type: 'create',
+                        record: {
+                            interactionName: CancelOrderInteraction.name
+                        }
                     },
                     current: PendingState,
                     next: CancelledState,
-                    computeTarget: (event: any) => ({ id: event.payload.order.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload.order.id })
                 })
             ],
             defaultState: PendingState
@@ -1594,13 +1614,14 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
-                    record: {
-                        interactionName: CancelOrderInteraction.name
-                    }
+                        type: 'create',
+                        record: {
+                            interactionName: CancelOrderInteraction.name
+                        }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: (event: any) => ({ id: event.payload!.order.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.order.id })
                 })
             ],
             defaultState: NON_DELETED_STATE
@@ -1614,19 +1635,20 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
-                    record: {
-                        interactionName: CancelOrderInteraction.name
-                    }
+                        type: 'create',
+                        record: {
+                            interactionName: CancelOrderInteraction.name
+                        }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: async function(this: Controller, event: any) {
+                    computeTarget: async function(this: Controller, mutationEvent: any) {
                         // 找到订单相关的关系
                         const relation = await this.system.storage.findOne(
                             'OrderCustomer',
                             BoolExp.atom({
                                 key: 'source.id',
-                                value: ['=', event.payload!.order.id]
+                                value: ['=', mutationEvent.record.payload!.order.id]
                             }),
                             undefined,
                             ['id']
@@ -1764,14 +1786,15 @@ describe('StateMachineRunner', () => {
         const DeleteTransfer = StateTransfer.create({
             trigger: {
                 recordName: InteractionEventEntity.name,
-            record: {
-                interactionName: DeleteUserInteraction.name
-            }
+                type: 'create',
+                record: {
+                    interactionName: DeleteUserInteraction.name
+                }
             },
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
-            computeTarget: (event: any) => {
-                return { id: event.payload!.targetUser.id }
+            computeTarget: (mutationEvent: any) => {
+                return { id: mutationEvent.record.payload!.targetUser.id }
             }
         })
 
@@ -1928,24 +1951,26 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
-                    record: {
-                        interactionName: PublishArticleInteraction.name
-                    }
+                        type: 'create',
+                        record: {
+                            interactionName: PublishArticleInteraction.name
+                        }
                     },
                     current: DraftState,
                     next: PublishedState,
-                    computeTarget: (event: any) => ({ id: event.payload!.article.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.article.id })
                 }),
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: 'archiveArticle'
                         }
                     },
                     current: PublishedState,
                     next: ArchivedState,
-                    computeTarget: (event: any) => ({ id: event.payload!.article.id })
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.article.id })
                 })
             ],
             defaultState: DraftState
@@ -1958,21 +1983,22 @@ describe('StateMachineRunner', () => {
                 StateTransfer.create({
                     trigger: {
                         recordName: InteractionEventEntity.name,
+                        type: 'create',
                         record: {
                             interactionName: 'deleteArticle'
                         }
                     },
                     current: NON_DELETED_STATE,
                     next: DELETED_STATE,
-                    computeTarget: async function(this: Controller, event: any) {
+                    computeTarget: async function(this: Controller, mutationEvent: any) {
                         // 只有归档状态的文章才能删除
                         const article = await this.system.storage.findOne(
                             'Article',
-                            BoolExp.atom({ key: 'id', value: ['=', event.payload!.article.id] }),
+                            BoolExp.atom({ key: 'id', value: ['=', mutationEvent.record.payload!.article.id] }),
                             undefined,
                             ['status']
                         )
-                        return article?.status === 'archived' ? { id: event.payload!.article.id } : undefined
+                        return article?.status === 'archived' ? { id: mutationEvent.record.payload!.article.id } : undefined
                     }
                 })
             ],

@@ -4,8 +4,8 @@ import { InteractionInstance } from './Interaction.js';
 
 // Partial RecordMutationEvent type for trigger matching
 export type RecordMutationEventPattern = {
-  recordName?: string;
-  type?: 'create' | 'update' | 'delete';
+  recordName: string;
+  type: 'create' | 'update' | 'delete';
   keys?: string[];
   record?: {
     [key: string]: any;

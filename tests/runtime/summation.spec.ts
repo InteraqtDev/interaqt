@@ -55,7 +55,7 @@ describe('Sum computed handle', () => {
     await controller.setup(true);
     
     // Initially, the sum should be 0
-    let totalAmount = await system.storage.get(DICTIONARY_RECORD, 'totalAmount');
+    let totalAmount = await system.storage.dict.get('totalAmount');
     expect(totalAmount).toBe(0);
     
     // Add some transactions
@@ -75,7 +75,7 @@ describe('Sum computed handle', () => {
     });
     
     // Check the sum
-    totalAmount = await system.storage.get(DICTIONARY_RECORD, 'totalAmount');
+    totalAmount = await system.storage.dict.get('totalAmount');
     expect(totalAmount).toBe(350);
     
     // Update a transaction
@@ -84,13 +84,13 @@ describe('Sum computed handle', () => {
       amount: 75
     });
     
-    totalAmount = await system.storage.get(DICTIONARY_RECORD, 'totalAmount');
+    totalAmount = await system.storage.dict.get('totalAmount');
     expect(totalAmount).toBe(375);
     
     // Delete a transaction
     await system.storage.delete('Transaction', BoolExp.atom({key: 'id', value: ['=', transactions[0].id]}));
     
-    totalAmount = await system.storage.get(DICTIONARY_RECORD, 'totalAmount');
+    totalAmount = await system.storage.dict.get('totalAmount');
     expect(totalAmount).toBe(300);
   });
   
@@ -138,7 +138,7 @@ describe('Sum computed handle', () => {
     await system.storage.create('Score', { value: Infinity });
     await system.storage.create('Score', { value: -Infinity });
     
-    const totalScore = await system.storage.get(DICTIONARY_RECORD, 'totalScore');
+    const totalScore = await system.storage.dict.get('totalScore');
     expect(totalScore).toBe(30); // Only valid scores are summed
   });
 
@@ -178,7 +178,7 @@ describe('Sum computed handle', () => {
     await controller.setup(true);
     
     // Initially empty, sum should be 0
-    const sum = await system.storage.get(DICTIONARY_RECORD, 'sumOfItems');
+    const sum = await system.storage.dict.get('sumOfItems');
     expect(sum).toBe(0);
   });
   
@@ -225,7 +225,7 @@ describe('Sum computed handle', () => {
     await system.storage.create('Data', { value: null, category: 'D' }); // null value
     await system.storage.create('Data', { value: undefined, category: 'E' }); // undefined value
     
-    const sum = await system.storage.get(DICTIONARY_RECORD, 'dataSum');
+    const sum = await system.storage.dict.get('dataSum');
     expect(sum).toBe(30); // Only valid numeric values are summed
   });
 
@@ -270,22 +270,22 @@ describe('Sum computed handle', () => {
     const acc2 = await system.storage.create('Account', { balance: 2000, accountType: 'savings' });
     const acc3 = await system.storage.create('Account', { balance: 500, accountType: 'credit' });
     
-    let totalBalance = await system.storage.get(DICTIONARY_RECORD, 'totalBalance');
+    let totalBalance = await system.storage.dict.get('totalBalance');
     expect(totalBalance).toBe(3500);
     
     // Update balance
     await system.storage.update('Account', BoolExp.atom({key: 'id', value: ['=', acc1.id]}), { balance: 1500 });
-    totalBalance = await system.storage.get(DICTIONARY_RECORD, 'totalBalance');
+    totalBalance = await system.storage.dict.get('totalBalance');
     expect(totalBalance).toBe(4000);
     
     // Update non-balance field (should not trigger recomputation)
     await system.storage.update('Account', BoolExp.atom({key: 'id', value: ['=', acc2.id]}), { accountType: 'investment' });
-    totalBalance = await system.storage.get(DICTIONARY_RECORD, 'totalBalance');
+    totalBalance = await system.storage.dict.get('totalBalance');
     expect(totalBalance).toBe(4000);
     
     // Delete an account
     await system.storage.delete('Account', BoolExp.atom({key: 'id', value: ['=', acc3.id]}));
-    totalBalance = await system.storage.get(DICTIONARY_RECORD, 'totalBalance');
+    totalBalance = await system.storage.dict.get('totalBalance');
     expect(totalBalance).toBe(3500);
   });
 
@@ -359,9 +359,7 @@ describe('Sum computed handle', () => {
     })
     
     // Check that only completed orders are summed
-    const total = await system.storage.get(
-      DICTIONARY_RECORD,
-      'completedOrdersTotal'
+    const total = await system.storage.dict.get('completedOrdersTotal'
     )
     
     expect(total).toBe(500) // 200 + 300 (only completed orders)
@@ -1120,7 +1118,7 @@ describe('Sum computed handle', () => {
     await controller.setup(true);
 
     // Initial sums should be 0
-    let totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    let totalRevenue = await system.storage.dict.get('totalRevenue');
     
     expect(totalRevenue).toBe(0);
 
@@ -1165,7 +1163,7 @@ describe('Sum computed handle', () => {
     });
 
     // Check the sums
-    totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    totalRevenue = await system.storage.dict.get('totalRevenue');
     
     expect(totalRevenue).toBe(4200); // 1500 + 50 + 2000 + 500 + 100 + 50
 
@@ -1182,7 +1180,7 @@ describe('Sum computed handle', () => {
     );
 
     // Check updated sums
-    totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    totalRevenue = await system.storage.dict.get('totalRevenue');
     
     expect(totalRevenue).toBe(4500); // Increased by 300
 
@@ -1198,7 +1196,7 @@ describe('Sum computed handle', () => {
     );
 
     // Check final sums
-    totalRevenue = await system.storage.get(DICTIONARY_RECORD, 'totalRevenue');
+    totalRevenue = await system.storage.dict.get('totalRevenue');
     
     expect(totalRevenue).toBe(4000); // Decreased by 500
   });

@@ -53,7 +53,7 @@ describe('Count computed handle', () => {
     await controller.setup(true);
     
     // Initial count should be 0
-    const initialCount = await system.storage.get(DICTIONARY_RECORD, 'productCount');
+    const initialCount = await system.storage.dict.get('productCount');
     expect(initialCount).toBe(0);
     
     // Create products
@@ -61,14 +61,14 @@ describe('Count computed handle', () => {
     await system.storage.create('Product', {name: 'Product 2', price: 20});
     
     // Count should be 2
-    const count1 = await system.storage.get(DICTIONARY_RECORD, 'productCount');
+    const count1 = await system.storage.dict.get('productCount');
     expect(count1).toBe(2);
     
     // Create another product
     await system.storage.create('Product', {name: 'Product 3', price: 30});
     
     // Count should be 3
-    const count2 = await system.storage.get(DICTIONARY_RECORD, 'productCount');
+    const count2 = await system.storage.dict.get('productCount');
     expect(count2).toBe(3);
     
     // Delete a product
@@ -80,7 +80,7 @@ describe('Count computed handle', () => {
     await system.storage.delete('Product', idMatch);
     
     // Count should be 2
-    const count3 = await system.storage.get(DICTIONARY_RECORD, 'productCount');
+    const count3 = await system.storage.dict.get('productCount');
     expect(count3).toBe(2);
   });
   
@@ -513,7 +513,7 @@ describe('Count computed handle', () => {
     await controller.setup(true);
     
     // Initial count should be 0
-    const initialCount = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    const initialCount = await system.storage.dict.get('completedOrderCount');
     expect(initialCount).toBe(0);
     
     // Create orders with different statuses
@@ -522,14 +522,14 @@ describe('Count computed handle', () => {
     await system.storage.create('Order', {customerName: 'Customer 3', status: 'processing', amount: 150});
     
     // Only 1 completed order should be counted
-    const count1 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    const count1 = await system.storage.dict.get('completedOrderCount');
     expect(count1).toBe(1);
     
     // Create another completed order
     await system.storage.create('Order', {customerName: 'Customer 4', status: 'completed', amount: 300});
     
     // Should count 2 completed orders
-    const count2 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    const count2 = await system.storage.dict.get('completedOrderCount');
     expect(count2).toBe(2);
     
     // Update an order status to completed
@@ -539,7 +539,7 @@ describe('Count computed handle', () => {
     }
     
     // Should count 3 completed orders now
-    const count3 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    const count3 = await system.storage.dict.get('completedOrderCount');
     expect(count3).toBe(3);
     
     // Update a completed order to cancelled
@@ -547,7 +547,7 @@ describe('Count computed handle', () => {
     await system.storage.update('Order', BoolExp.atom({key: 'id', value: ['=', completedOrders[0].id]}), {status: 'cancelled'});
     
     // Should count 2 completed orders
-    const count4 = await system.storage.get(DICTIONARY_RECORD, 'completedOrderCount');
+    const count4 = await system.storage.dict.get('completedOrderCount');
     expect(count4).toBe(2);
   });
 
@@ -727,7 +727,7 @@ describe('Count computed handle', () => {
     expect(customer1.vipPurchaseCount).toBe(2);
     
     // Update VIP minimum amount
-    await system.storage.set(DICTIONARY_RECORD, 'vipMinAmount', 600);
+    await system.storage.dict.set('vipMinAmount', 600);
     
     
     // Should count 3 VIP purchases now (>= 600)
@@ -795,7 +795,7 @@ describe('Count computed handle', () => {
     });
     
     // Should count 2 active items
-    const count1 = await system.storage.get(DICTIONARY_RECORD, 'activeItemCount');
+    const count1 = await system.storage.dict.get('activeItemCount');
     expect(count1).toBe(2);
     
     // Update item status
@@ -803,7 +803,7 @@ describe('Count computed handle', () => {
     await system.storage.update('Item', BoolExp.atom({key: 'id', value: ['=', items[0].id]}), {status: 'active'});
     
     // Should count 3 active items
-    const count2 = await system.storage.get(DICTIONARY_RECORD, 'activeItemCount');
+    const count2 = await system.storage.dict.get('activeItemCount');
     expect(count2).toBe(3);
   });
 
@@ -1388,7 +1388,7 @@ describe('Count computed handle', () => {
     await controller.setup(true);
 
     // Initial counts should be 0
-    const initialTotalCount = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    const initialTotalCount = await system.storage.dict.get('totalContactCount');
     expect(initialTotalCount).toBe(0);
 
     // Create records through input entities
@@ -1412,7 +1412,7 @@ describe('Count computed handle', () => {
     });
 
     // Total count should be 3 (1 customer + 1 vendor + 1 employee)
-    const totalCount1 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    const totalCount1 = await system.storage.dict.get('totalContactCount');
     expect(totalCount1).toBe(3);
 
     // Add more customers
@@ -1427,7 +1427,7 @@ describe('Count computed handle', () => {
     });
 
     // Total count should be 5
-    const totalCount2 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    const totalCount2 = await system.storage.dict.get('totalContactCount');
     expect(totalCount2).toBe(5);
 
     // Delete a customer
@@ -1436,7 +1436,7 @@ describe('Count computed handle', () => {
     );
 
     // Total count should be 4
-    const totalCount3 = await system.storage.get(DICTIONARY_RECORD, 'totalContactCount');
+    const totalCount3 = await system.storage.dict.get('totalContactCount');
     expect(totalCount3).toBe(4);
   });
 

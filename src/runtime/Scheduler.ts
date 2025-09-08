@@ -1,6 +1,6 @@
 import { MatchExp } from "@storage";
 import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
-import { type EtityMutationEvent } from "./ComputationSourceMap.js";
+import { DataBasedEntityEventsSourceMap, EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
 import { DataContext, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computations/Computation.js";
 import { assert } from "./util.js";
@@ -36,7 +36,7 @@ export class Scheduler {
         dict: PropertyInstance[],
         computationHandles: Array<{ new(...args: any[]): Computation }>
     ) {
-        this.sourceMapManager = new ComputationSourceMapManager(this.controller)
+        this.sourceMapManager = new ComputationSourceMapManager(this.controller, this)
         this.buildComputationHandleMap(computationHandles)
         const computationInputs: {dataContext: DataContext, args: IInstance}[] = []
         entities.forEach(entity => {
@@ -46,8 +46,8 @@ export class Scheduler {
 
             // property 的
             entity.properties?.forEach(property => {
-                            if (property.computation) {
-                computationInputs.push({dataContext: {type: 'property',host: entity,id: property},args: property.computation})
+                if(property.computation) {
+                    computationInputs.push({dataContext: {type: 'property',host: entity,id: property},args: property.computation})
                 }
             })
         })
@@ -293,7 +293,7 @@ export class Scheduler {
                 for(const state of Object.values(computationHandle.state)) {
                     if (state instanceof GlobalBoundState) {
                         state.controller = this.controller
-                        await this.controller.system.storage.set(DICTIONARY_RECORD, state.key , state.defaultValue ?? null)
+                        await this.controller.system.storage.dict.set(state.key , state.defaultValue ?? null)
                     } 
                 }
             }
@@ -321,7 +321,7 @@ export class Scheduler {
 
         // TODO 未来也许要监听 MutationEvent，让开发者能观测系统的变化。
     }
-    async computeDirtyDataDepRecords(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {
+    async computeDirtyDataDepRecords(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {
         // 1. 就是自身的变化
         if(!source.targetPath?.length) {
             return [mutationEvent.oldRecord ?? mutationEvent.record]
@@ -372,18 +372,18 @@ export class Scheduler {
 
         return dirtyDataDepRecords
     }
-    computeOldRecord(newRecord: any, sourceMap: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
+    computeOldRecord(newRecord: any, sourceMap: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         // FIXME 理论上我们现在不需要 computeOldRecord 了。
         if(!sourceMap.targetPath?.length) {
             return mutationEvent.oldRecord
         }
         return {...newRecord}
     }
-    async computeDataBasedDirtyRecordsAndEvents(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
+    async computeDataBasedDirtyRecordsAndEvents(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
         // 特殊处理 Global 类型的数据依赖
-        if (source.dataDep.type === 'global' && mutationEvent.recordName === SYSTEM_RECORD) {
+        if (source.dataDep.type === 'global' && mutationEvent.recordName === DICTIONARY_RECORD) {
             // 对于 Global 类型，需要找到所有依赖这个 global 值的记录
             // 如果是 property 级别的 dataContext，需要找到所有实体记录，就是记录都受影响了
             if (source.computation.dataContext.type === 'property') {
@@ -425,24 +425,19 @@ export class Scheduler {
         }
         return dirtyRecordsAndEvents
     }
-    async computeEventBasedDirtyRecordsAndEvents(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
+    async computeEventBasedDirtyRecordsAndEvents(source: EventBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         const eventBasedComputation = source.computation as EventBasedComputation
         if (eventBasedComputation.computeDirtyRecords) {
             let dirtyRecords = (await eventBasedComputation.computeDirtyRecords!(mutationEvent)) || []
             dirtyRecords = Array.isArray(dirtyRecords) ? dirtyRecords : [dirtyRecords]
-            return dirtyRecords.filter(Boolean).map(record => [record, {
-                dataDep: source.dataDep,
-                ...mutationEvent
-            }]) as [any, EtityMutationEvent][]
+            return dirtyRecords.filter(Boolean).map(record => [record, mutationEvent]) as [any, EtityMutationEvent][]
         } else {
-            return [[null, {
-                dataDep: source.dataDep,
-                ...mutationEvent
-            }]] as [any, EtityMutationEvent][]
+            return [[null, mutationEvent]] as [any, EtityMutationEvent][]
         }
     }
-    isDataBasedComputation(computation: Computation) {
-        return (computation as DataBasedComputation).compute !== undefined
+    isDataBasedComputation(computation: Computation): computation is DataBasedComputation {
+        // return (computation as DataBasedComputation).compute !== undefined
+        return !(computation as EventBasedComputation).eventDeps
     }
     async runDirtyRecordsComputation(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent) {
         try {
@@ -453,7 +448,7 @@ export class Scheduler {
                 
                 try {
                     if (this.isDataBasedComputation(source.computation)) {
-                        dirtyRecordsAndEvents = await this.computeDataBasedDirtyRecordsAndEvents(source, mutationEvent)
+                        dirtyRecordsAndEvents = await this.computeDataBasedDirtyRecordsAndEvents(source as DataBasedEntityEventsSourceMap, mutationEvent)
                     } else {
                         dirtyRecordsAndEvents = await this.computeEventBasedDirtyRecordsAndEvents(source, mutationEvent)
                     }
@@ -760,7 +755,7 @@ export class Scheduler {
                             }
                             return this.controller.system.storage.findOne((computation.dataContext as PropertyDataContext).host.name!, MatchExp.atom({key: 'id', value: ['=', record.id]}), {}, dataDep.attributeQuery)
                         } else if (dataDep.type === 'global') {
-                            return await this.controller.system.storage.get(DICTIONARY_RECORD, dataDep.source.name!)
+                            return await this.controller.system.storage.dict.get(dataDep.source.name!)
                         } else {
                             const error = new ComputationDataDepError(`Unknown data dependency type: ${(dataDep as any).type}`, {
                                 depName: dataDepName,
@@ -807,7 +802,7 @@ export class Scheduler {
     async setupGlobalDict() {
         const globalDict = this.controller.dict.filter(dict => dict.defaultValue !== undefined)
         for (const dict of globalDict) {
-            await this.controller.system.storage.set(DICTIONARY_RECORD, dict.name, dict.defaultValue!())
+            await this.controller.system.storage.dict.set(dict.name, dict.defaultValue!())
         }
     }
     

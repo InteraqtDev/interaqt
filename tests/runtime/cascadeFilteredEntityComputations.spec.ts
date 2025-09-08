@@ -10,11 +10,7 @@ import {
   Every,
   Any,
   WeightedSummation,
-  Dictionary,
-  Relation,
-  MatchExp,
-  DICTIONARY_RECORD,
-  PGLiteDB
+  Dictionary, MatchExp, PGLiteDB
 } from 'interaqt';
 
 describe('Cascade Filtered Entity Computations', () => {
@@ -167,11 +163,11 @@ describe('Cascade Filtered Entity Computations', () => {
       await controller.setup(true);
 
       // Initially all counts should be 0
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalUserCount')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'activeUserCount')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'techActiveUserCount')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'seniorTechActiveUserCount')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'youngActiveUserCount')).toBe(0);
+      expect(await system.storage.dict.get('totalUserCount')).toBe(0);
+      expect(await system.storage.dict.get('activeUserCount')).toBe(0);
+      expect(await system.storage.dict.get('techActiveUserCount')).toBe(0);
+      expect(await system.storage.dict.get('seniorTechActiveUserCount')).toBe(0);
+      expect(await system.storage.dict.get('youngActiveUserCount')).toBe(0);
 
       // Create test users
       await system.storage.create('User', {
@@ -230,11 +226,11 @@ describe('Cascade Filtered Entity Computations', () => {
       });
 
       // Verify counts
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalUserCount')).toBe(5);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'activeUserCount')).toBe(4); // Exclude David
-      expect(await system.storage.get(DICTIONARY_RECORD, 'techActiveUserCount')).toBe(3); // Alice, Bob, Eve
-      expect(await system.storage.get(DICTIONARY_RECORD, 'seniorTechActiveUserCount')).toBe(1); // Only Bob
-      expect(await system.storage.get(DICTIONARY_RECORD, 'youngActiveUserCount')).toBe(3); // Alice, Charlie, Eve
+      expect(await system.storage.dict.get('totalUserCount')).toBe(5);
+      expect(await system.storage.dict.get('activeUserCount')).toBe(4); // Exclude David
+      expect(await system.storage.dict.get('techActiveUserCount')).toBe(3); // Alice, Bob, Eve
+      expect(await system.storage.dict.get('seniorTechActiveUserCount')).toBe(1); // Only Bob
+      expect(await system.storage.dict.get('youngActiveUserCount')).toBe(3); // Alice, Charlie, Eve
     });
   });
 
@@ -312,11 +308,11 @@ describe('Cascade Filtered Entity Computations', () => {
       await controller.setup(true);
 
       // Initially all averages should be 0
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgUserSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgActiveUserSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgTechActiveUserSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgYoungActiveUserAge')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgSeniorTechActiveUserScore')).toBe(0);
+      expect(await system.storage.dict.get('avgUserSalary')).toBe(0);
+      expect(await system.storage.dict.get('avgActiveUserSalary')).toBe(0);
+      expect(await system.storage.dict.get('avgTechActiveUserSalary')).toBe(0);
+      expect(await system.storage.dict.get('avgYoungActiveUserAge')).toBe(0);
+      expect(await system.storage.dict.get('avgSeniorTechActiveUserScore')).toBe(0);
 
       // Create test users
       await system.storage.create('User', {
@@ -375,11 +371,11 @@ describe('Cascade Filtered Entity Computations', () => {
       });
 
       // Verify averages
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgUserSalary')).toBe(65000); // (50000+80000+60000+90000+45000)/5
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgActiveUserSalary')).toBe(58750); // (50000+80000+60000+45000)/4
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgTechActiveUserSalary')).toBe(58333.333333333336); // (50000+80000+45000)/3
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgYoungActiveUserAge')).toBe(25); // (25+28+22)/3
-      expect(await system.storage.get(DICTIONARY_RECORD, 'avgSeniorTechActiveUserScore')).toBe(95); // Only Bob
+      expect(await system.storage.dict.get('avgUserSalary')).toBe(65000); // (50000+80000+60000+90000+45000)/5
+      expect(await system.storage.dict.get('avgActiveUserSalary')).toBe(58750); // (50000+80000+60000+45000)/4
+      expect(await system.storage.dict.get('avgTechActiveUserSalary')).toBe(58333.333333333336); // (50000+80000+45000)/3
+      expect(await system.storage.dict.get('avgYoungActiveUserAge')).toBe(25); // (25+28+22)/3
+      expect(await system.storage.dict.get('avgSeniorTechActiveUserScore')).toBe(95); // Only Bob
     });
   });
 
@@ -457,11 +453,11 @@ describe('Cascade Filtered Entity Computations', () => {
       await controller.setup(true);
 
       // Initially all sums should be 0
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalUserSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalActiveUserSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalTechActiveUserSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalSeniorTechActiveUserScore')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalYoungActiveUserAge')).toBe(0);
+      expect(await system.storage.dict.get('totalUserSalary')).toBe(0);
+      expect(await system.storage.dict.get('totalActiveUserSalary')).toBe(0);
+      expect(await system.storage.dict.get('totalTechActiveUserSalary')).toBe(0);
+      expect(await system.storage.dict.get('totalSeniorTechActiveUserScore')).toBe(0);
+      expect(await system.storage.dict.get('totalYoungActiveUserAge')).toBe(0);
 
       // Create test users
       await system.storage.create('User', {
@@ -520,11 +516,11 @@ describe('Cascade Filtered Entity Computations', () => {
       });
 
       // Verify sums
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalUserSalary')).toBe(325000); // 50000+80000+60000+90000+45000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalActiveUserSalary')).toBe(235000); // 50000+80000+60000+45000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalTechActiveUserSalary')).toBe(175000); // 50000+80000+45000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalSeniorTechActiveUserScore')).toBe(95); // Only Bob's score
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalYoungActiveUserAge')).toBe(75); // 25+28+22
+      expect(await system.storage.dict.get('totalUserSalary')).toBe(325000); // 50000+80000+60000+90000+45000
+      expect(await system.storage.dict.get('totalActiveUserSalary')).toBe(235000); // 50000+80000+60000+45000
+      expect(await system.storage.dict.get('totalTechActiveUserSalary')).toBe(175000); // 50000+80000+45000
+      expect(await system.storage.dict.get('totalSeniorTechActiveUserScore')).toBe(95); // Only Bob's score
+      expect(await system.storage.dict.get('totalYoungActiveUserAge')).toBe(75); // 25+28+22
     });
   });
 
@@ -612,11 +608,11 @@ describe('Cascade Filtered Entity Computations', () => {
       await controller.setup(true);
 
       // Initially all should be false (notEmpty: true means false when empty)
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allUsersHighSalary')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allActiveUsersInTech')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allTechActiveUsersHighScore')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allSeniorTechActiveUsersHighSalary')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allYoungActiveUsersUnder30')).toBe(false);
+      expect(await system.storage.dict.get('allUsersHighSalary')).toBe(false);
+      expect(await system.storage.dict.get('allActiveUsersInTech')).toBe(false);
+      expect(await system.storage.dict.get('allTechActiveUsersHighScore')).toBe(false);
+      expect(await system.storage.dict.get('allSeniorTechActiveUsersHighSalary')).toBe(false);
+      expect(await system.storage.dict.get('allYoungActiveUsersUnder30')).toBe(false);
 
       // Create test users
       await system.storage.create('User', {
@@ -675,11 +671,11 @@ describe('Cascade Filtered Entity Computations', () => {
       });
 
       // Verify every results
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allUsersHighSalary')).toBe(true); // All users have salary > 40000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allActiveUsersInTech')).toBe(false); // Charlie is in Sales
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allTechActiveUsersHighScore')).toBe(true); // Alice: 85, Bob: 95, Eve: 80, all > 75
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allSeniorTechActiveUsersHighSalary')).toBe(true); // Only Bob with 80000 > 70000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'allYoungActiveUsersUnder30')).toBe(true); // Alice: 25, Charlie: 28, Eve: 22, all < 30
+      expect(await system.storage.dict.get('allUsersHighSalary')).toBe(true); // All users have salary > 40000
+      expect(await system.storage.dict.get('allActiveUsersInTech')).toBe(false); // Charlie is in Sales
+      expect(await system.storage.dict.get('allTechActiveUsersHighScore')).toBe(true); // Alice: 85, Bob: 95, Eve: 80, all > 75
+      expect(await system.storage.dict.get('allSeniorTechActiveUsersHighSalary')).toBe(true); // Only Bob with 80000 > 70000
+      expect(await system.storage.dict.get('allYoungActiveUsersUnder30')).toBe(true); // Alice: 25, Charlie: 28, Eve: 22, all < 30
     });
   });
 
@@ -762,11 +758,11 @@ describe('Cascade Filtered Entity Computations', () => {
       await controller.setup(true);
 
       // Initially all should be false (empty entities)
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyUserHighSalary')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyActiveUserInHR')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyTechActiveUserLowScore')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anySeniorTechActiveUserLowSalary')).toBe(false);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyYoungActiveUserAge25')).toBe(false);
+      expect(await system.storage.dict.get('anyUserHighSalary')).toBe(false);
+      expect(await system.storage.dict.get('anyActiveUserInHR')).toBe(false);
+      expect(await system.storage.dict.get('anyTechActiveUserLowScore')).toBe(false);
+      expect(await system.storage.dict.get('anySeniorTechActiveUserLowSalary')).toBe(false);
+      expect(await system.storage.dict.get('anyYoungActiveUserAge25')).toBe(false);
 
       // Create test users
       await system.storage.create('User', {
@@ -825,11 +821,11 @@ describe('Cascade Filtered Entity Computations', () => {
       });
 
       // Verify any results
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyUserHighSalary')).toBe(true); // David has 90000 > 85000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyActiveUserInHR')).toBe(false); // No active users in HR
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyTechActiveUserLowScore')).toBe(true); // Eve has score 80 < 85
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anySeniorTechActiveUserLowSalary')).toBe(true); // Bob has 80000 < 100000
-      expect(await system.storage.get(DICTIONARY_RECORD, 'anyYoungActiveUserAge25')).toBe(true); // Alice is exactly 25
+      expect(await system.storage.dict.get('anyUserHighSalary')).toBe(true); // David has 90000 > 85000
+      expect(await system.storage.dict.get('anyActiveUserInHR')).toBe(false); // No active users in HR
+      expect(await system.storage.dict.get('anyTechActiveUserLowScore')).toBe(true); // Eve has score 80 < 85
+      expect(await system.storage.dict.get('anySeniorTechActiveUserLowSalary')).toBe(true); // Bob has 80000 < 100000
+      expect(await system.storage.dict.get('anyYoungActiveUserAge25')).toBe(true); // Alice is exactly 25
     });
   });
 
@@ -927,11 +923,11 @@ describe('Cascade Filtered Entity Computations', () => {
       await controller.setup(true);
 
       // Initially all weighted sums should be 0
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalUserWeightedScore')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalActiveUserWeightedScore')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalTechActiveUserWeightedSalary')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalSeniorTechActiveUserWeightedScore')).toBe(0);
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalYoungActiveUserWeightedAge')).toBe(0);
+      expect(await system.storage.dict.get('totalUserWeightedScore')).toBe(0);
+      expect(await system.storage.dict.get('totalActiveUserWeightedScore')).toBe(0);
+      expect(await system.storage.dict.get('totalTechActiveUserWeightedSalary')).toBe(0);
+      expect(await system.storage.dict.get('totalSeniorTechActiveUserWeightedScore')).toBe(0);
+      expect(await system.storage.dict.get('totalYoungActiveUserWeightedAge')).toBe(0);
 
       // Create test users
       await system.storage.create('User', {
@@ -992,19 +988,19 @@ describe('Cascade Filtered Entity Computations', () => {
       // Verify weighted sums
       // WeightedSummation computes sum(value * weight), not (score * weight)
       // Total user weighted score: 85*0.8 + 95*1.0 + 90*0.9 + 88*0.95 + 80*0.7 = 68 + 95 + 81 + 83.6 + 56 = 383.6
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalUserWeightedScore')).toBeCloseTo(383.6, 5);
+      expect(await system.storage.dict.get('totalUserWeightedScore')).toBeCloseTo(383.6, 5);
       
       // Active user weighted score: 85*0.8 + 95*1.0 + 90*0.9 + 80*0.7 = 68 + 95 + 81 + 56 = 300
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalActiveUserWeightedScore')).toBe(300);
+      expect(await system.storage.dict.get('totalActiveUserWeightedScore')).toBe(300);
       
       // Tech active user weighted salary: 50000*0.8 + 80000*1.0 + 45000*0.7 = 40000 + 80000 + 31500 = 151500
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalTechActiveUserWeightedSalary')).toBe(151500);
+      expect(await system.storage.dict.get('totalTechActiveUserWeightedSalary')).toBe(151500);
       
       // Senior tech active user weighted score: 95*1.0 = 95
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalSeniorTechActiveUserWeightedScore')).toBe(95);
+      expect(await system.storage.dict.get('totalSeniorTechActiveUserWeightedScore')).toBe(95);
       
       // Young active user weighted age: 25*0.8 + 28*0.9 + 22*0.7 = 20 + 25.2 + 15.4 = 60.6
-      expect(await system.storage.get(DICTIONARY_RECORD, 'totalYoungActiveUserWeightedAge')).toBeCloseTo(60.6, 5);
+      expect(await system.storage.dict.get('totalYoungActiveUserWeightedAge')).toBeCloseTo(60.6, 5);
     });
   });
 }); 

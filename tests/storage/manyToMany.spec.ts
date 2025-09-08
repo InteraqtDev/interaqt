@@ -671,12 +671,12 @@ describe('many to many', () => {
         const event = relationDeleteEvents[0]
         expect(event.record).toHaveProperty('source')
         expect(event.record).toHaveProperty('target')
-        expect(event.record.source).toHaveProperty('id')
-        expect(event.record.target).toHaveProperty('id')
+        expect(event.record!.source).toHaveProperty('id')
+        expect(event.record!.target).toHaveProperty('id')
         
         // Verify that user1 is involved in each relation
-        const isUser1Source = event.record.source.id === user1.id
-        const isUser1Target = event.record.target.id === user1.id
+        const isUser1Source = event.record!.source.id === user1.id
+        const isUser1Target = event.record!.target.id === user1.id
         expect(isUser1Source || isUser1Target).toBe(true)
     })
 })

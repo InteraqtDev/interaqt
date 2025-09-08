@@ -20,10 +20,19 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: GlobalBoundState<any>}
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
+    useMutationEvent: boolean = true
     defaultState: StateNodeInstance
     constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.defaultState = this.args.defaultState
+        // 从所有 transfer 中构建 eventDeps
+        for(const transfer of this.args.transfers) {
+            const eventDepName = `${transfer.trigger.recordName}_${transfer.trigger.type}`
+            this.eventDeps[eventDepName] = {
+                recordName: transfer.trigger.recordName,
+                type: transfer.trigger.type
+            }
+        }
     }
     createState() {
         return {
@@ -42,8 +51,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
 
         await this.state.currentState.set(nextState.name)
 
-        const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record! : mutationEvent
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, event)) : nextState.name
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, mutationEvent)) : nextState.name
     }
 }
 
@@ -57,10 +65,20 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     eventDeps: {[key: string]: EventDep} = {}
     defaultState: StateNodeInstance
     dataContext: PropertyDataContext
+    useMutationEvent: boolean = true
     constructor(public controller: Controller, public args: StateMachineInstance, dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.defaultState = this.args.defaultState
         this.dataContext = dataContext as PropertyDataContext
+        // 从所有 transfer 中构建 eventDeps
+        for(const transfer of this.args.transfers) {
+            const eventDepName = `${transfer.trigger.recordName}_${transfer.trigger.type}`
+            this.eventDeps[eventDepName] = {
+                recordName: transfer.trigger.recordName,
+                type: transfer.trigger.type
+            }
+        }
+        return
     }
     createState() {
         return {
@@ -88,8 +106,7 @@ Or if you want to use state name as value, you should not set ${this.dataContext
         const transfers = this.transitionFinder.findTransfers(mutationEvent)
         // CAUTION 不能返回有 null 的节点，所以加上 filter。
         return (await Promise.all(transfers.map(transfer => {
-            const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record : mutationEvent
-            return transfer.computeTarget!.call(this.controller, event)
+            return transfer.computeTarget!.call(this.controller, mutationEvent)
         }))).flat().filter(Boolean)
     }
     
@@ -100,9 +117,7 @@ Or if you want to use state name as value, you should not set ${this.dataContext
         if (!nextState) return ComputationResult.skip()
 
         await this.state.currentState.set(dirtyRecord, nextState.name)
-
-        const event = mutationEvent.recordName === INTERACTION_RECORD ? mutationEvent.record! : mutationEvent
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, event)) : nextState.name
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, mutationEvent)) : nextState.name
     }
 }
 

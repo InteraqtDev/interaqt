@@ -35,7 +35,7 @@ describe('Any computed handle', () => {
     })
     await controller.setup(true)
     // 获取 dictionary 的值
-    const anyRequestHandled0 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
+    const anyRequestHandled0 = await system.storage.dict.get('anyRequestHandled')
     expect(anyRequestHandled0).toBeFalsy()
     
     // 创建两个 request
@@ -43,7 +43,7 @@ describe('Any computed handle', () => {
     const request2 = await system.storage.create('Request', {handled: false})
 
     // 获取 dictionary 的值
-    const anyRequestHandled = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
+    const anyRequestHandled = await system.storage.dict.get('anyRequestHandled')
     expect(anyRequestHandled).toBeFalsy()
 
     // 更新 request 的 handled 属性
@@ -54,14 +54,14 @@ describe('Any computed handle', () => {
     await system.storage.update('Request', idMatch1, {handled: true})
 
     // 获取 dictionary 的值
-    const anyRequestHandled2 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
+    const anyRequestHandled2 = await system.storage.dict.get('anyRequestHandled')
     expect(anyRequestHandled2).toBeTruthy()   
 
     // 更新 request 的 handled 属性
     await system.storage.update('Request', idMatch1, {handled: false})
 
     // 获取 dictionary 的值
-    const anyRequestHandled3 = await system.storage.get(DICTIONARY_RECORD,'anyRequestHandled')
+    const anyRequestHandled3 = await system.storage.dict.get('anyRequestHandled')
     expect(anyRequestHandled3).toBeFalsy()
   });
 
@@ -419,36 +419,36 @@ describe('Any computed handle', () => {
     await controller.setup(true)
 
     // set ageLimit to 19   
-    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 19)
+    await system.storage.dict.set('ageLimit', 19)
 
     const user1 = await system.storage.create('User', {name: 'user1', age: 18})
     const user2 = await system.storage.create('User', {name: 'user2', age: 20})
 
-    const isAnyUserAgeGreaterThanAgeLimit = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit = await system.storage.dict.get('isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit).toBeTruthy()
 
     // set ageLimit to 21
-    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 21)
+    await system.storage.dict.set('ageLimit', 21)
 
-    const isAnyUserAgeGreaterThanAgeLimit2 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit2 = await system.storage.dict.get('isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit2).toBeFalsy()
 
     // set ageLimit to 19
-    await system.storage.set(DICTIONARY_RECORD, 'ageLimit', 19)
+    await system.storage.dict.set('ageLimit', 19)
 
-    const isAnyUserAgeGreaterThanAgeLimit3 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit3 = await system.storage.dict.get('isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit3).toBeTruthy()
 
     // delete user1 
     await system.storage.delete('User', BoolExp.atom({key: 'id', value: ['=', user1.id]}))
 
-    const isAnyUserAgeGreaterThanAgeLimit4 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit4 = await system.storage.dict.get('isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit4).toBeTruthy()
     
     // delete user2
     await system.storage.delete('User', BoolExp.atom({key: 'id', value: ['=', user2.id]}))
 
-    const isAnyUserAgeGreaterThanAgeLimit5 = await system.storage.get(DICTIONARY_RECORD, 'isAnyUserAgeGreaterThanAgeLimit')
+    const isAnyUserAgeGreaterThanAgeLimit5 = await system.storage.dict.get('isAnyUserAgeGreaterThanAgeLimit')
     expect(isAnyUserAgeGreaterThanAgeLimit5).toBeFalsy()
 
   })
@@ -741,10 +741,10 @@ describe('Any computed handle', () => {
     await controller.setup(true);
 
     // Initial checks - should be false as no tickets exist
-    const initialHasUrgent = await system.storage.get(DICTIONARY_RECORD, 'hasUrgentTicket');
+    const initialHasUrgent = await system.storage.dict.get('hasUrgentTicket');
     expect(initialHasUrgent).toBeFalsy();
 
-    const initialHasPhone = await system.storage.get(DICTIONARY_RECORD, 'hasPhoneTicket');
+    const initialHasPhone = await system.storage.dict.get('hasPhoneTicket');
     expect(initialHasPhone).toBeFalsy();
 
     // Create non-urgent tickets
@@ -760,7 +760,7 @@ describe('Any computed handle', () => {
     });
 
     // Should still be false - no urgent tickets
-    const hasUrgent1 = await system.storage.get(DICTIONARY_RECORD, 'hasUrgentTicket');
+    const hasUrgent1 = await system.storage.dict.get('hasUrgentTicket');
     expect(hasUrgent1).toBeFalsy();
 
     // Create a phone ticket (default priority is 'high', not 'critical')
@@ -771,11 +771,11 @@ describe('Any computed handle', () => {
     });
 
     // Should now have phone ticket
-    const hasPhone1 = await system.storage.get(DICTIONARY_RECORD, 'hasPhoneTicket');
+    const hasPhone1 = await system.storage.dict.get('hasPhoneTicket');
     expect(hasPhone1).toBeTruthy();
 
     // Still no critical tickets
-    const hasUrgent2 = await system.storage.get(DICTIONARY_RECORD, 'hasUrgentTicket');
+    const hasUrgent2 = await system.storage.dict.get('hasUrgentTicket');
     expect(hasUrgent2).toBeFalsy();
 
     // Update phone ticket to critical priority
@@ -785,7 +785,7 @@ describe('Any computed handle', () => {
     );
 
     // Should now have urgent ticket (open && critical)
-    const hasUrgent3 = await system.storage.get(DICTIONARY_RECORD, 'hasUrgentTicket');
+    const hasUrgent3 = await system.storage.dict.get('hasUrgentTicket');
     expect(hasUrgent3).toBeTruthy();
 
     // Close the critical ticket
@@ -795,7 +795,7 @@ describe('Any computed handle', () => {
     );
 
     // Should no longer have urgent ticket (closed tickets are not urgent)
-    const hasUrgent4 = await system.storage.get(DICTIONARY_RECORD, 'hasUrgentTicket');
+    const hasUrgent4 = await system.storage.dict.get('hasUrgentTicket');
     expect(hasUrgent4).toBeFalsy();
 
     // Create a critical online ticket
@@ -807,7 +807,7 @@ describe('Any computed handle', () => {
     });
 
     // Should now have urgent ticket again
-    const hasUrgent5 = await system.storage.get(DICTIONARY_RECORD, 'hasUrgentTicket');
+    const hasUrgent5 = await system.storage.dict.get('hasUrgentTicket');
     expect(hasUrgent5).toBeTruthy();
   });
 
