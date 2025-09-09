@@ -134,7 +134,7 @@ For each element:
 2. For properties, check controlType first:
    - If `creation-only` or `derived-with-parent` → use `_owner`
    - If `independent` → apply standard dependency analysis rules
-3. Apply the appropriate rules based on creation type and deletion capability
+3. Apply the appropriate rules based on creation type
 4. For entities/relations that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
 
 ### Step 3: Generate Output Document
@@ -149,7 +149,7 @@ Create `docs/computation-analysis.json` with this structure:
       "entityAnalysis": {
         "purpose": "<from data-design.json>",
         "lifecycle": "<directly copy from lifecycle field in data-design.json>",
-        "computationDecision": "<Transform/StateMachine/_parent:[ParentName]/None based on rules>",
+        "computationDecision": "<Transform/_parent:[ParentName]/None based on rules>",
         "reasoning": "<automated based on lifecycle and deletion capability>",
         "calculationMethod": "<from computationMethod>"
       },
@@ -175,7 +175,7 @@ Create `docs/computation-analysis.json` with this structure:
       "relationAnalysis": {
         "purpose": "<from data-design.json>",
         "lifecycle": "<directly copy from lifecycle field in data-design.json>",
-        "computationDecision": "<Transform/_parent:[ParentName]/StateMachine based on rules>",
+        "computationDecision": "<Transform/_parent:[ParentName] based on rules>",
         "reasoning": "<automated based on lifecycle>",
         "calculationMethod": "<from computationMethod>"
       }
@@ -223,11 +223,12 @@ Examples:
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (soft)? → Transform + status StateMachine
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: false? → Transform with InteractionEventEntity
    └─ lifecycle.creation.type: "derived"? → Transform from source entity
+   └─ lifecycle.creation.type: "mutation-derived"? → Transform from record mutation event
    
 2. Relation Lifecycle?
    ├─ lifecycle.creation.type: "created-with-entity"? → _parent:[parent]
    ├─ Can be deleted? → Transform/parent + HardDeletionProperty with StateMachine
-   ├─ Needs audit trail? → Original computation + status StateMachine (soft delete)
+   ├─ Needs audit trail? → Transform + status StateMachine (soft delete)
    └─ Never deleted? → Transform (if interaction-created) or _parent:[parent]
 
 3. Property Value?
@@ -243,22 +244,6 @@ Examples:
 4. Dictionary Aggregation?
    └─ Check computationMethod → Map to Count/Summation/Custom
 ```
-
-## Implementation Checklist
-
-- [ ] Parse `data-design.json` completely
-- [ ] Apply mapping rules for every entity (check deletion capability)
-- [ ] Check `controlType` for every property first
-- [ ] Apply mapping rules for properties based on `controlType`
-- [ ] Apply mapping rules for every relation
-- [ ] Apply mapping rules for every dictionary
-- [ ] Format all dependencies correctly
-- [ ] Separate `dependencies` and `interactionDependencies`
-- [ ] Add `InteractionEventEntity` when needed
-- [ ] Verify properties with `controlType: "creation-only"` or `"derived-with-parent"` use `_owner`
-- [ ] Verify Transform + HardDeletionProperty is used for deletable entities (hard-delete)
-- [ ] Verify Transform + HardDeletionProperty is used for deletable relations (hard-delete)
-- [ ] Generate complete `computation-analysis.json`
 
 ## Common Patterns
 
@@ -305,3 +290,20 @@ Before finalizing, verify:
 8. All dependencies are properly formatted with specific properties
 9. `InteractionEventEntity` is included when interactions are dependencies
 10. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`
+
+
+## Implementation Checklist
+
+- [ ] Parse `data-design.json` completely
+- [ ] Apply mapping rules for every entity (check deletion capability)
+- [ ] Check `controlType` for every property first
+- [ ] Apply mapping rules for properties based on `controlType`
+- [ ] Apply mapping rules for every relation
+- [ ] Apply mapping rules for every dictionary
+- [ ] Format all dependencies correctly
+- [ ] Separate `dependencies` and `interactionDependencies`
+- [ ] Add `InteractionEventEntity` when needed
+- [ ] Verify properties with `controlType: "creation-only"` or `"derived-with-parent"` use `_owner`
+- [ ] Verify Transform + HardDeletionProperty is used for deletable entities (hard-delete)
+- [ ] Verify Transform + HardDeletionProperty is used for deletable relations (hard-delete)
+- [ ] Generate complete `computation-analysis.json`

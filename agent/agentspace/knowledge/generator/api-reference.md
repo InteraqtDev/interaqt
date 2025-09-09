@@ -163,14 +163,14 @@ HardDeletionProperty.create(config?: HardDeletionPropertyConfig): PropertyInstan
 ```
 
 **Parameters**
-- `config.name` (string, optional): Property name, defaults to `'_isDeleted_'`
+- `config.name` (string, optional): Property name, defaults to `HARD_DELETION_PROPERTY_NAME`
 
 **Usage with StateMachine**
 
 HardDeletionProperty is typically used with StateMachine to manage record deletion:
 
 ```typescript
-import { DELETED_STATE, NON_DELETED_STATE } from 'interaqt'
+import { DELETED_STATE, NON_DELETED_STATE, HARD_DELETION_PROPERTY_NAME } from 'interaqt'
 
 // Define deletion StateMachine for the HardDeletionProperty
 const deletionStateMachine = StateMachine.create({
@@ -212,6 +212,11 @@ const User = Entity.create({
 1. When the property value transitions to `DELETED_STATE` (true), the Controller automatically deletes the record from storage
 2. The deletion is physical - the record is completely removed from the database
 3. This is different from soft deletion where records remain but are marked as deleted
+
+**Note**: When you need to find the HardDeletionProperty after entity creation, use:
+```typescript
+const hardDeletionProp = entity.properties.find(p => p.name === HARD_DELETION_PROPERTY_NAME)
+```
 
 **Example: Entity Creation and Deletion Pattern**
 

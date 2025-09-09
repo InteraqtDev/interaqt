@@ -81,6 +81,12 @@ Analyze the creation pattern:
 - **derived**: Entity is filtered/computed from other entities
   - No interactions directly create it
   - Views in data-concepts.json are typically derived
+  
+- **mutation-derived**: Entity is created from record mutation events
+  - Not directly in any interaction's `data.creates`
+  - Created by reactive computations (e.g., Transform) responding to other entities' creation/update/deletion
+  - Check for descriptions mentioning "when X is created/updated/deleted, create Y"
+  - Often used for audit logs, history tracking, or event-driven workflows
 
 **Example Analysis**:
 ```json
@@ -92,6 +98,12 @@ Analyze the creation pattern:
   "Automatically create individual bed entities for each bed"
 ]
 // Result: Dormitory is interaction-created, Bed is created-with-parent (parent: Dormitory)
+
+// For mutation-derived entity (not in any interaction's creates):
+// In data-concepts.json: "UserActivityLog: Records all user actions"
+// In interactions: No interaction directly creates UserActivityLog
+// In descriptions: "Activity logs are automatically created when users perform actions"
+// Result: UserActivityLog is mutation-derived
 ```
 
 #### 2.2 Determine Deletion Pattern
@@ -164,6 +176,10 @@ Similar to entities, analyze how relations are created:
 - **interaction-created**: Relation created independently
 - **created-with-entity**: Created when source/target entity is created
 - **derived**: Computed from data conditions
+- **mutation-derived**: Created from record mutation events
+  - Not directly in any interaction's `data.creates`
+  - Created by reactive computations responding to entity/relation changes
+  - Common for maintaining referential integrity or creating audit trails
 
 **Example**:
 ```json
@@ -174,6 +190,11 @@ Similar to entities, analyze how relations are created:
 // If it appeared with entity creation:
 // "CreatePost": "data": { "creates": ["Post", "PostAuthorRelation"] }
 // Result: PostAuthorRelation is created-with-entity (Post)
+
+// For mutation-derived relation:
+// UserFollowRelation not in any interaction's creates
+// Description: "Automatically created when user likes multiple posts by same author"
+// Result: UserFollowRelation is mutation-derived
 ```
 
 ### Step 5: Transform Dictionaries to Analysis Format
@@ -310,7 +331,7 @@ Transform the analyzed data into the standard output format:
       "computationMethod": "[Creation pattern description]",
       "lifecycle": {
         "creation": {
-          "type": "[interaction-created | derived | created-with-parent]",
+          "type": "[interaction-created | derived | created-with-parent | mutation-derived]",
           "parent": "[Parent entity name if created-with-parent]",
           "creationInteractions": "[List from Step 2.1]"
         },
@@ -345,7 +366,7 @@ Transform the analyzed data into the standard output format:
       "computationMethod": "[From Step 4.2]",
       "lifecycle": {
         "creation": {
-          "type": "[From Step 4.2]",
+          "type": "[interaction-created | created-with-entity | derived | mutation-derived]",
           "parent": "[If created-with-entity]",
           "creationInteractions": "[From Step 4.2]"
         },

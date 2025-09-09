@@ -178,7 +178,7 @@ We focus on data-centric requirements. Human software usage delegates unsuitable
 
 **DO NOT create "automatic system" requirements.** Our framework is reactive - avoid designing autonomous system behaviors.
 
-**Transform "automatic" requirements into:**
+**Transform "non-data-reactive" requirements into:**
 
 1. **Reactive Data Requirements**: 
    - ❌ WRONG: "System automatically counts total books"
@@ -192,6 +192,10 @@ We focus on data-centric requirements. Human software usage delegates unsuitable
    - ❌ WRONG: "System automatically creates uniform record when employee is created"
    - ✅ CORRECT: "When creating employee, automatically create uniform record" (as data constraint)
 
+4. **Data Replacement Operations**:
+   - ❌ WRONG: "Replace old data with new data"
+   - ✅ CORRECT: "Create new data + Delete old data" (as two separate operations)
+
 **For unavoidable side-effect requirements** (e.g., "automatically send notification"):
 - Design the requirement but explicitly mark as **"Currently Not Supported"**
 - Document: "This requirement involves automatic side-effects which are not supported by the current reactive framework"
@@ -201,6 +205,7 @@ We focus on data-centric requirements. Human software usage delegates unsuitable
 - "Auto-send reminders" → "Reminder needed status is computed based on due date" + "Send reminder interaction"
 - "Auto-validate ISBN" → "Can only create books with valid ISBN format" (constraint)
 - "Auto-update inventory" → "Available count is computed based on total copies minus borrowed copies"
+- "Replace employee profile" → "Create new employee profile" + "Delete old employee profile" (two interactions)
 
 ### Step 1: Create Read Requirements from Goals
 
@@ -288,6 +293,20 @@ Create `requirements/requirements-analysis.json`:
         },
         "business_constraints": ["[Business rule 1]"],
         "data_constraints": ["[Data constraint 1]"]
+      },
+      {
+        "id": "R103",
+        "type": "delete",
+        "title": "[Requirement name]",
+        "parent": "R001",
+        "role": "[Role]",
+        "data": {
+          "type": "entity|relation",
+          "description": "[Data to delete]"
+        },
+        "deletion_type": "hard",
+        "deletion_rules": ["[Rule 1: e.g., Cannot delete if has active references]", "[Rule 2]"],
+        "business_constraints": ["[Business rule 1]"]
       }
     ],
     "from_R101": [
@@ -366,6 +385,11 @@ For each entity property:
 - **Type**: string|number|boolean|date|others
 - **Computation Method**: For aggregated or computed values
 - **Data Dependencies**: For computed values, list dependencies
+
+**Hard Deletion Property**:
+- If delete requirements in Task 1.2 specify `"deletion_type": "hard"`
+- Add **HardDeletionProperty** to the entity/relation
+- Document deletion rules from requirements as property metadata
 
 ### Step 3: Relation Identification and Analysis
 
@@ -459,9 +483,17 @@ Create `requirements/data-concepts.json`:
             "description": "Total copies minus borrowed copies",
             "dependencies": ["BookCopy", "BorrowRecord"]
           }
+        },
+        {
+          "name": "_hardDeletion",
+          "type": "HardDeletionProperty",
+          "required": false,
+          "computed": false,
+          "deletion_rules": ["Cannot delete if has active borrow records", "Only administrators can delete"],
+          "source_requirement": "R103"
         }
       ],
-      "referenced_in": ["R001", "R101", "R201"],
+      "referenced_in": ["R001", "R101", "R103", "R201"],
       "note": "No authorId or publisherId - use BookAuthorRelation and BookPublisherRelation instead"
     },
     {
@@ -514,9 +546,17 @@ Create `requirements/data-concepts.json`:
           "name": "dueDate",
           "type": "date",
           "required": true
+        },
+        {
+          "name": "_hardDeletion",
+          "type": "HardDeletionProperty",
+          "required": false,
+          "computed": false,
+          "deletion_rules": ["Auto-delete when book is returned"],
+          "source_requirement": "R103"
         }
       ],
-      "lifecycle": "Created on borrow, updated on return",
+      "lifecycle": "Created on borrow, updated on return, deleted on return or book deletion",
       "referenced_in": ["R102", "R103"]
     },
     {

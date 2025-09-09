@@ -80,9 +80,7 @@ color: blue
    - **🔴 SPECIAL CASE 2: `_owner` notation**
      - If the computation decision is `_owner`, this means:
        - The property's value is fully controlled by its owner entity/relation's computation
-       - You should modify the OWNER entity/relation's creation or derivation logic, not add a separate property computation
-       - For `controlType: "creation-only"`: Add the property assignment logic in the entity/relation's creation Transform or StateMachine
-       - For `controlType: "derived-with-parent"`: The property is part of the parent's derivation computation
+       - You should modify the OWNER entity/relation's creation or derivation logic, not add a separate property computation. Add the property assignment logic in the entity/relation's creation Transform
        - Example: For a `createdAt` property with `_owner`, add timestamp assignment in the entity's Transform that creates it
    - Add computation code using assignment pattern at end of file:
      ```typescript
