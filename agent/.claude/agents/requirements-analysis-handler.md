@@ -624,10 +624,56 @@ git commit -m "feat: Task 1.3 - Complete data concept extraction"
     "role": "Actor role",
     "action": "Action name",
     "payload": "Input data (optional)",
-    "data": "Data from current requirement (optional)",
+    "data": {
+        "creates": [
+            {
+                "target": "EntityOrRelationName",
+                "description": "Detailed description of how to create using what data",
+                "dependencies": ["Entity.property", "OtherEntity", "Relation.property"]
+            }
+        ],
+        "updates": [
+            {
+                "target": "EntityOrRelationName.propertyName",
+                "description": "Detailed description of how to update using what data",
+                "dependencies": ["Entity.property", "OtherEntity", "Relation.property"]
+            }
+        ],
+        "deletes": [
+            {
+                "target": "EntityOrRelationName",
+                "description": "Detailed description of how to delete and conditions",
+                "dependencies": ["Entity.property", "OtherEntity", "Relation.property"]
+            }
+        ],
+        "reads": ["Entity.property", "OtherEntity", "View"] // Only for read-type interactions
+    },
     "dataConstraints": "Inherited data constraints from fulfilled requirement"
 }
 ```
+
+### Data Field Specification Details
+
+The `data` field describes all data operations performed by the interaction:
+
+**For Write Operations (creates/updates/deletes):**
+- Each operation must specify:
+  - `target`: The entity/relation name (for creates/deletes) or entity/relation.property (for updates)
+  - `description`: Detailed explanation of how the operation is performed, including what data is used
+  - `dependencies`: Array of other entities/relations/properties that must be read to perform this operation
+- Dependencies should use dot notation for specific properties (e.g., `Book.availableCount`, `Reader.status`)
+- Dependencies include all data that needs to be read or validated during the operation
+
+**For Read Operations:**
+- `reads`: Array of entities/relations/properties that the user wants to retrieve through this interaction
+- Use dot notation for specific properties (e.g., `Book.title`, `Reader.name`)
+- Include views and aggregated values as needed
+- This represents the data the user expects to receive, not dependencies for internal operations
+
+**Important Notes:**
+- Write operations should NOT include a `reads` field - use `dependencies` within each operation instead
+- Read operations should ONLY have a `reads` field - no creates/updates/deletes
+- All referenced entities/relations must exist in the data concepts from Task 1.3
 
 ### Output: interactions-design.json
 
@@ -667,9 +713,20 @@ Create `requirements/interactions-design.json`:
           }
         },
         "data": {
-          "creates": ["BorrowRecord"],
-          "updates": ["Book.availableCount"],
-          "reads": ["Reader", "Book", "SystemConfig.maxBorrowLimit"]
+          "creates": [
+            {
+              "target": "BorrowRecord",
+              "description": "Create new borrow record using readerId, bookId, current timestamp as borrowDate, and calculated dueDate based on loan period from SystemConfig",
+              "dependencies": ["Reader", "Book", "SystemConfig.loanPeriod"]
+            }
+          ],
+          "updates": [
+            {
+              "target": "Book.availableCount",
+              "description": "Decrease available count by 1 after validating current count is greater than 0",
+              "dependencies": ["Book.availableCount"]
+            }
+          ]
         },
         "dataConstraints": [
           "Automatically decrease Book.availableCount by 1",
@@ -710,12 +767,62 @@ Create `requirements/interactions-design.json`:
           }
         },
         "data": {
-          "reads": ["Book", "Book.availableCount"],
-          "returns": "BookListView"
+          "reads": ["Book.title", "Book.author", "Book.availableCount", "Book.category"]
         },
         "dataConstraints": [
           "Only show books with availableCount > 0",
           "Exclude books marked as 'restricted' for regular readers"
+        ]
+      }
+    },
+    {
+      "id": "ReturnBook",
+      "fulfills_requirements": ["R102"],
+      "type": "update",
+      "specification": {
+        "role": "Librarian",
+        "action": "return",
+        "conditions": [
+          "BorrowRecord exists for the given readerId and bookId",
+          "BorrowRecord.returnDate is null"
+        ],
+        "payload": {
+          "readerId": {
+            "type": "string",
+            "description": "ID of the reader returning the book",
+            "required": true
+          },
+          "bookId": {
+            "type": "string",
+            "description": "ID of the book being returned",
+            "required": true
+          }
+        },
+        "data": {
+          "updates": [
+            {
+              "target": "BorrowRecord.returnDate",
+              "description": "Set return date to current timestamp for the specific borrow record matching readerId and bookId",
+              "dependencies": ["BorrowRecord.readerId", "BorrowRecord.bookId", "BorrowRecord.returnDate"]
+            },
+            {
+              "target": "Book.availableCount",
+              "description": "Increase available count by 1 after confirming the book return",
+              "dependencies": ["Book.availableCount", "BorrowRecord"]
+            }
+          ],
+          "deletes": [
+            {
+              "target": "BorrowRecord",
+              "description": "Delete the borrow record after successful return if hard deletion is enabled",
+              "dependencies": ["BorrowRecord.returnDate", "SystemConfig.enableHardDeletion"]
+            }
+          ]
+        },
+        "dataConstraints": [
+          "Only update return date if it's currently null",
+          "Increase Book.availableCount only after confirming valid return",
+          "Delete BorrowRecord only if system configuration allows hard deletion"
         ]
       }
     }

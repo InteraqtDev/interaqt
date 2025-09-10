@@ -152,7 +152,7 @@ git commit -m "feat: Task 3.1.2 - Complete entity and relation implementation"
 - Clear next step
 
 
-- [ ] Generate all interactions based on `docs/interaction-design.md`. **DO NOT define any conditions yet** - we will add permissions and business rules later in Task 3.2. No `condition` parameter in Interaction.create()
+- [ ] Generate all interactions based on `requirements/interaction-designs.json`. **DO NOT define any conditions yet** - we will add permissions and business rules later in Task 3.2. No `condition` parameter in Interaction.create()
 - [ ] Start with simple payload-only interactions (no conditions initially)
 - [ ] Ensure all payloads match the documented fields
 - [ ] **Type Check**: Run `npm run check` to ensure TypeScript compilation passes
@@ -380,7 +380,7 @@ git commit -m "feat: Task 3.2.0 - Create permission test file"
 **📋 Create the Permission and Business Rules Implementation Plan:**
 
 - [ ] Create `docs/business-rules-and-permission-control-implementation-plan.json` based on:
-  - `docs/interaction-design.md` (Stage 2 requirements)
+  - `requirements/interactions-design.json` 
   - `requirements/interaction-matrix.md` (permission requirements)
   - `requirements/test-cases.md` (business rule scenarios)
 
@@ -511,7 +511,7 @@ git commit -m "feat: Task 3.2.2 - Complete progressive permission and business r
 }
 ```
 
-- [ ] All permissions from `docs/interaction-design.md` are implemented
+- [ ] All permissions from `requirements/interactions-design.json` are implemented
 - [ ] All business rules from requirements are implemented
 - [ ] Each rule has comprehensive test coverage (success and failure cases)
 - [ ] All type checks pass (`npm run check`)

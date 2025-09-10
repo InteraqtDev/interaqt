@@ -10,7 +10,12 @@ color: blue
 
 ## START: Select Next Uncompleted Item
 
-**📖 Reference:** `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
+**📖 Reference** 
+- `./backend/crud.example.ts` + `./tests/crud.example.test.ts` - Simple CRUD operations with state machines, relations, and permissions
+- `./backend/versionControl.example.ts` + `./tests/versionControl.example.test.ts` - Version control with soft delete pattern
+- `./backend/versionControlHardDelete.example.ts` + `./tests/versionControlHardDelete.example.test.ts` - Version control with hard delete pattern
+- `./agentspace/knowledge/generator/computation-implementation.md` - Detailed computation implementation patterns and examples
+
 
 **🔴 CRITICAL: Implement ONLY ONE computation per session, then STOP and wait for user confirmation.**
 
@@ -54,6 +59,13 @@ color: blue
 1. **Implement the Computation** (following API Reference)
    - **📖 MANDATORY FIRST STEP: Completely read `./agentspace/knowledge/generator/api-reference.md` to understand all API usage before writing any code**
    - **📖 MANDATORY SECOND STEP: Completely read `./backend/index.ts` to understand all existing implementations from previous tasks**
+   - **📖 MANDATORY THIRD STEP: Study the reference example files above to understand the standard code structure and computation patterns**
+   - **🔴 CRITICAL: Check for existing computations** - If the target entity/relation already has computation code:
+     - **NEVER overwrite** existing computation logic
+     - **ADD branch logic** to handle the new interaction/scenario within existing Transform callback
+     - **PRESERVE all existing branches** to ensure previous test cases continue to pass
+     - Example: Add `else if` conditions or extend existing conditions in Transform callback
+   - **⚠️ Regression Prevention**: All previous tests must continue passing after adding new computation branches
    - **🔴 SPECIAL CASE 1: `_parent:[parent]` notation**
      - If the computation name contains `_parent:[parent]` (e.g., `_parent:[User]`), this means:
        - You should modify the PARENT entity's computation, not the current entity
@@ -166,6 +178,7 @@ color: blue
 4. **Write Test Implementation**
    - Add test to `tests/basic.test.ts` in 'Basic Functionality' describe group
    - Follow the test plan created above
+   - **📖 Reference the example test files above for testing patterns and structure**
    - For StateMachine computations, test ALL StateTransfer transitions
    - Test all CRUD operations the computation supports
    

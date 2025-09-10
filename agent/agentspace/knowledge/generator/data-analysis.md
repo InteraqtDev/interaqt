@@ -63,8 +63,12 @@ For **EACH entity** in data-concepts.json:
 Analyze `requirements/interactions-design.json` to identify how entities are created:
 
 **Step A: Find Creation Interactions**
-1. Search all interactions where the entity appears in `data.creates`
-2. List these as `creationInteractions` (use interaction **names**, not IDs)
+1. Search all interactions where the entity appears in `interactions.specification.data.creates`
+2. For each creation interaction, capture:
+   - Interaction name (not ID)
+   - Description from the creates entry
+   - Dependencies from the creates entry
+3. Store as `creationInteractions` with detailed information for each interaction
 
 **Step B: Determine Creation Type**
 Analyze the creation pattern:
@@ -92,12 +96,22 @@ Analyze the creation pattern:
 ```json
 // In interaction "CreateDormitory":
 "data": {
-  "creates": ["Dormitory", "Bed"]
-},
-"dataConstraints": [
-  "Automatically create individual bed entities for each bed"
-]
-// Result: Dormitory is interaction-created, Bed is created-with-parent (parent: Dormitory)
+  "creates": [
+    {
+      "target": "Dormitory",
+      "description": "Create new dormitory with basic info",
+      "dependencies": ["DormitoryValidation"]
+    },
+    {
+      "target": "Bed", 
+      "description": "Automatically create individual bed entities for each bed",
+      "dependencies": ["Dormitory"]
+    }
+  ]
+}
+// Result: 
+// Dormitory is interaction-created with creation details
+// Bed is created-with-parent (parent: Dormitory) with creation details
 
 // For mutation-derived entity (not in any interaction's creates):
 // In data-concepts.json: "UserActivityLog: Records all user actions"
@@ -109,8 +123,12 @@ Analyze the creation pattern:
 #### 2.2 Determine Deletion Pattern
 
 Search interactions for deletion operations:
-1. Find interactions where entity appears in `data.deletes` (record interaction **names**, not IDs)
-2. Determine deletion type:
+1. Find interactions where entity appears in `data.deletes`
+2. For each deletion interaction, capture:
+   - Interaction name (not ID)
+   - Description from the deletes entry
+   - Dependencies from the deletes entry
+3. Determine deletion type:
    - **hard-delete**: Entity removed from storage
    - **soft-delete**: Entity marked as deleted (status change)
    - **auto-delete**: Deleted when parent/dependency is deleted
@@ -169,8 +187,11 @@ Similar to entities, analyze how relations are created:
 
 **Find Creation Interactions**:
 1. Search for relation name in `data.creates`
-2. Analyze creation context
-3. Record interaction **names**, not IDs
+2. For each creation interaction, capture:
+   - Interaction name (not ID)
+   - Description from the creates entry
+   - Dependencies from the creates entry
+3. Analyze creation context
 
 **Determine Creation Type**:
 - **interaction-created**: Relation created independently
@@ -184,12 +205,23 @@ Similar to entities, analyze how relations are created:
 **Example**:
 ```json
 // UserBedAssignment appears in:
-// "AssignUserToBed": "data": { "creates": ["UserBedAssignment"] }
-// Result: interaction-created
+// "AssignUserToBed": "data": { 
+//   "creates": [{
+//     "target": "UserBedAssignment",
+//     "description": "Create assignment between user and bed",
+//     "dependencies": ["User", "Bed", "AvailabilityCheck"]
+//   }]
+// }
+// Result: interaction-created with detailed creation info
 
 // If it appeared with entity creation:
-// "CreatePost": "data": { "creates": ["Post", "PostAuthorRelation"] }
-// Result: PostAuthorRelation is created-with-entity (Post)
+// "CreatePost": "data": { 
+//   "creates": [
+//     {"target": "Post", "description": "Create new post", "dependencies": ["User"]},
+//     {"target": "PostAuthorRelation", "description": "Link post to author", "dependencies": ["Post", "User"]}
+//   ]
+// }
+// Result: PostAuthorRelation is created-with-entity (Post) with creation details
 
 // For mutation-derived relation:
 // UserFollowRelation not in any interaction's creates
@@ -333,12 +365,24 @@ Transform the analyzed data into the standard output format:
         "creation": {
           "type": "[interaction-created | derived | created-with-parent | mutation-derived]",
           "parent": "[Parent entity name if created-with-parent]",
-          "creationInteractions": "[List from Step 2.1]"
+          "creationInteractions": [
+            {
+              "name": "[Interaction name]",
+              "description": "[Description from creates entry]",
+              "dependencies": "[Dependencies from creates entry]"
+            }
+          ]
         },
         "deletion": {
           "canBeDeleted": "[true/false based on Step 2.2]",
           "deletionType": "[soft-delete | hard-delete | auto-delete]",
-          "deletionInteractions": "[List from Step 2.2]"
+          "deletionInteractions": [
+            {
+              "name": "[Interaction name]",
+              "description": "[Description from deletes entry]",
+              "dependencies": "[Dependencies from deletes entry]"
+            }
+          ]
         }
       },
       "properties": {
@@ -368,12 +412,24 @@ Transform the analyzed data into the standard output format:
         "creation": {
           "type": "[interaction-created | created-with-entity | derived | mutation-derived]",
           "parent": "[If created-with-entity]",
-          "creationInteractions": "[From Step 4.2]"
+          "creationInteractions": [
+            {
+              "name": "[Interaction name]",
+              "description": "[Description from creates entry]",
+              "dependencies": "[Dependencies from creates entry]"
+            }
+          ]
         },
         "deletion": {
           "canBeDeleted": "[Based on analysis]",
           "deletionType": "[Type identified]",
-          "deletionInteractions": "[List of interactions]"
+          "deletionInteractions": [
+            {
+              "name": "[Interaction name]",
+              "description": "[Description from deletes entry]",
+              "dependencies": "[Dependencies from deletes entry]"
+            }
+          ]
         }
       },
       "properties": {
@@ -465,6 +521,31 @@ Entities filtered from base entities:
       "type": "derived",
       "parent": null,
       "creationInteractions": []
+    }
+  }
+}
+```
+
+### 5. Multiple Creation Interactions
+Entity created by different interactions with different logic:
+```json
+"Style": {
+  "lifecycle": {
+    "creation": {
+      "type": "interaction-created",
+      "parent": null,
+      "creationInteractions": [
+        {
+          "name": "CreateStyle",
+          "description": "Create new Style entity with provided data, automatically setting status to 'draft', generating slug if not provided, and setting timestamps",
+          "dependencies": ["SlugUniquenessCheck"]
+        },
+        {
+          "name": "RestoreToVersion", 
+          "description": "Recreate Style entities from version snapshot data",
+          "dependencies": ["StyleVersion.snapshotData"]
+        }
+      ]
     }
   }
 }
