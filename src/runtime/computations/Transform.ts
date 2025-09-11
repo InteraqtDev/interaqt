@@ -17,13 +17,16 @@ export class RecordsTransformHandle implements DataBasedComputation {
     eventDeps?: {[key: string]: EventDep}
     constructor(public controller: Controller, public args: TransformInstance, public dataContext: DataContext) {
         assert(!(this.args.record && this.args.eventDeps), 'Transform must have either record or eventDep')
+        assert(!(this.args.dataDeps && this.args.eventDeps), 'Transform must have either dataDeps or eventDeps')
         this.transformCallback = this.args.callback.bind(this.controller)
         
         if (this.args.eventDeps) {
             this.eventDeps = this.args.eventDeps
         } else {
+            assert(this.args.dataDeps?._source === undefined, 'dataDep name `_source` is reserved for Transform')
             this.dataDeps = {
-                main: {
+                ...(this.args.dataDeps || {}),
+                _source: {
                     type: 'records',
                     source: this.args.record as EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
                     attributeQuery: this.args.attributeQuery || ['*']
@@ -43,7 +46,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         return []
     }
 
-    async compute({main: records}: {main: any[]}): Promise<any[]> {
+    async compute({_source: records}: {_source: any[]}): Promise<any[]> {
         assert(!this.eventDeps, 'Transform compute should not be called with eventDeps')
 
         const result: ComputationResultPatch[]  = []
@@ -96,7 +99,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         const results: ComputationResultPatch[] = []
         if (mutationEvent.type === 'create') {
             const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
-            const souceDataDep = this.dataDeps.main as RecordsDataDep
+            const souceDataDep = this.dataDeps._source as RecordsDataDep
             const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name!, matchSourceRecord, undefined, souceDataDep.attributeQuery)
             const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
             const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
@@ -128,7 +131,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
             let transformedRecords: any[] = []
             if (mutationEvent.type === 'update') {
                 const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', sourceRecordId]})
-                const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps.main as RecordsDataDep).source.name!, matchSourceRecord, undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery)
+                const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps._source as RecordsDataDep).source.name!, matchSourceRecord, undefined, (this.dataDeps._source as RecordsDataDep).attributeQuery)
                 const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
                 transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             }
