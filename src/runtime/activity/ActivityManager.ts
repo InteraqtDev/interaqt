@@ -334,8 +334,8 @@ export class ActivityManager {
             refs: activity.refs,
         }))
     }
-    async saveEvent(event: InteractionEvent, mutationEvents: RecordMutationEvent[] = []): Promise<unknown> {
-        return this.controller.system.storage.create(INTERACTION_RECORD, event, mutationEvents)
+    async saveEvent(event: InteractionEvent): Promise<unknown> {
+        return this.controller.system.storage.create(INTERACTION_RECORD, event)
     }
     async getEvent(query?: MatchExpressionData ) {
         return (await this.controller.system.storage.find(INTERACTION_RECORD, query, undefined, ['*'])).map(event => ({

@@ -4,7 +4,11 @@ import path from 'path'
 export default defineConfig({
     test: {
         setupFiles: './scripts/vitest.setup.js',
-        include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts']
+        include: [
+            'tests/**/*.test.ts', 
+            'tests/**/*.spec.ts', 
+            // 'examples/**/*.test.ts'
+        ]
     },
     plugins: [
         tsconfigPaths({

@@ -1037,14 +1037,33 @@ describe('Transform computed handle', () => {
     expect(initialAudits).toEqual([]);
     
     // Call interaction
-    await controller.callInteraction('testAction', {
+    const result = await controller.callInteraction('testAction', {
       user: { id: 'test-user-123' },
       payload: {
         message: 'Hello from test'
       }
     });
     
-    // Check audit was created
+    // Check the result has effects
+    expect(result.effects).toBeDefined();
+    expect(Array.isArray(result.effects)).toBe(true);
+    
+    // Should include InteractionEventEntity creation
+    const interactionEventCreation = result.effects?.find(
+      (e: any) => e.recordName === InteractionEventEntity.name && e.type === 'create'
+    );
+    expect(interactionEventCreation).toBeDefined();
+    
+    // Most importantly: Should include InteractionAudit creation from Transform
+    const auditCreation = result.effects?.find(
+      (e: any) => e.recordName === 'InteractionAudit' && e.type === 'create'
+    );
+    expect(auditCreation).toBeDefined();
+    expect(auditCreation?.record!.interactionName).toBe('testAction');
+    expect(auditCreation?.record!.userId).toBe('test-user-123');
+    expect(auditCreation?.record!.payload.message).toBe('Hello from test');
+    
+    // Also verify via storage that audit was created
     const audits = await system.storage.find('InteractionAudit', undefined, undefined, ['*']);
     expect(audits).toHaveLength(1);
     expect(audits[0].interactionName).toBe('testAction');

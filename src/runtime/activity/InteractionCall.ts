@@ -441,9 +441,9 @@ export class InteractionCall {
     isGetInteraction() {
         return this.interaction.action === GetAction
     }
-    async saveEvent(interactionEvent: InteractionEvent, effects: any[]) {
+    async saveEvent(interactionEvent: InteractionEvent) {
         // 为 payload 里面的新数据保存起来
-        return await this.controller.activityManager.saveEvent(interactionEvent, effects)
+        return await this.controller.activityManager.saveEvent(interactionEvent)
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
         let data: any
@@ -481,7 +481,6 @@ export class InteractionCall {
     async call(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse> {
         const response: InteractionCallResponse = {
             sideEffects: {},
-            effects: []
         }
 
         response.error  = await this.check(interactionEventArgs, activityId, checkUserRef, context)
@@ -499,7 +498,7 @@ export class InteractionCall {
                 }
             }
 
-            await this.saveEvent(event, response.effects!)
+            await this.saveEvent(event)
             response.event = event
             // effect
             await this.runEffects(interactionEventArgs, activityId, response)

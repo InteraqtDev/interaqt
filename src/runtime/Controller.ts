@@ -25,6 +25,7 @@ import {
     InteractionExecutionError
 } from "./errors/index.js";
 import { assert } from "./util.js";
+import { asyncEffectsContext } from "./asyncEffectsContext.js";
 
 export const USER_ENTITY = 'User'
 
@@ -257,8 +258,15 @@ export class Controller {
 
     async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs) {
         try {
-            // 内部 error 已经 catch 住了，如果 option 中没有声明 returnInteractionError，则直接 throw 出去。
-            const result = await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+            // Run the interaction call within the effects context
+            const effectsContext = { effects: [] as RecordMutationEvent[] }
+            const result = await asyncEffectsContext.run(effectsContext, async () => {
+                // 内部 error 已经 catch 住了，如果 option 中没有声明 returnInteractionError，则直接 throw 出去。
+                return await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+            })
+            
+            result.effects = effectsContext.effects
+            
             if (result.error && this.forceThtrowInteractionError) {
                 throw result.error
             } else {
@@ -277,7 +285,25 @@ export class Controller {
     }
     async callActivityInteraction(activityName:string, interactionName:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
         try {
-            const result = await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+            // Run the interaction call within the effects context
+            const effectsContext = { effects: [] as RecordMutationEvent[] }
+            const result = await asyncEffectsContext.run(effectsContext, async () => {
+                return await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+            })
+            
+            // Merge effects from context into result
+            if (result.effects && effectsContext.effects.length > 0) {
+                // Add any effects collected during computation execution
+                const computationEffects = effectsContext.effects.filter(e => 
+                    !result.effects!.some(re => 
+                        re.type === e.type && 
+                        re.recordName === e.recordName && 
+                        re.record?.id === e.record?.id
+                    )
+                )
+                result.effects.push(...computationEffects)
+            }
+            
             if (result.error && this.forceThtrowInteractionError) {
                 throw result.error
             } else {

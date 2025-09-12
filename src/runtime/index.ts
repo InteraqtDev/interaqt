@@ -9,6 +9,7 @@ export * from './activity/ActivityManager.js'
 // computation related
 export * from './Scheduler.js'
 export * from './asyncInteractionContext.js'
+export * from './asyncEffectsContext.js'
 export * from './computations/index.js'
 export * from './computations/MathResolver.js'
 // error related

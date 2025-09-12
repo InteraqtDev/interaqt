@@ -13,6 +13,7 @@ import {
     SystemLogType,
     DictionaryEntity
 } from "./System.js";
+import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@shared";
 import {
     DBSetup,
@@ -114,14 +115,25 @@ class MonoStorage implements Storage{
         return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData], events)
     }
     async callWithEvents<T extends any[]>(method: (...arg: [...T, RecordMutationEvent[]]) => any, args: T, events: RecordMutationEvent[] = []) {
-        const result = await method(...args, events)
+        const methodEvents:RecordMutationEvent[] = []
+        const result = await method(...args, methodEvents)
         // FIXME 还没有实现异步机制
         // nextJob(() => {
         //     this.dispatch(events)
         // })
         // CAUTION 特别注意这里会空充 events
-        const  newEvents = await this.dispatch(events)
-        events.push(...newEvents)
+        const  newEvents = await this.dispatch(methodEvents)
+        events.push(...methodEvents, ...newEvents)
+        
+        // Also add to async context if available
+        const contextEffects = getCurrentEffects()
+        if (contextEffects && methodEvents.length > 0) {
+            addToCurrentEffects(methodEvents)
+        }
+        if (contextEffects && newEvents.length > 0) {
+            addToCurrentEffects(newEvents)
+        }
+        
         return result
     }
     findRelationByName(...arg:Parameters<EntityQueryHandle["findRelationByName"]>) {
