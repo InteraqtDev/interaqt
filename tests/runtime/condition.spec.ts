@@ -66,6 +66,7 @@ describe('condition checks', () => {
                 items: [
                     PayloadItem.create({
                         name: 'post',
+                        type: 'Entity',
                         base: Post
                     })
                 ]

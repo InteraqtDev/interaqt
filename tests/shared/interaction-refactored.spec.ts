@@ -32,6 +32,7 @@ describe("Interaction System Refactored - compatibility test", () => {
       const entity = Entity.create({ name: "User" });
       const item = PayloadItem.create({
         name: "user",
+        type: 'Entity',
         base: entity,
         isRef: true,
         required: true
@@ -47,8 +48,8 @@ describe("Interaction System Refactored - compatibility test", () => {
 
   describe("Payload", () => {
     test("should create payload with items", () => {
-      const item1 = PayloadItem.create({ name: "title" });
-      const item2 = PayloadItem.create({ name: "content" });
+      const item1 = PayloadItem.create({ name: "title", type: 'string' });
+      const item2 = PayloadItem.create({ name: "content", type: 'string' });
       
       const payload = Payload.create({
         items: [item1, item2]
@@ -110,7 +111,7 @@ describe("Interaction System Refactored - compatibility test", () => {
         content: () => true
       });
       const payload = Payload.create({
-        items: [PayloadItem.create({ name: "data" })]
+        items: [PayloadItem.create({ name: "data", type: 'string' })]
       });
       const sideEffect = SideEffect.create({
         name: "log",

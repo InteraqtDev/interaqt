@@ -24,6 +24,7 @@ describe("Interaction System - createClass functionality", () => {
     test("should create payload item", () => {
       const item = PayloadItem.create({
         name: "username",
+        type: 'string',
         required: true
       });
 
@@ -35,11 +36,13 @@ describe("Interaction System - createClass functionality", () => {
     test("should create payload with items", () => {
       const usernameItem = PayloadItem.create({
         name: "username",
+        type: 'string',
         required: true
       });
 
       const emailItem = PayloadItem.create({
         name: "email",
+        type: 'string',
         required: true
       });
 
@@ -388,8 +391,8 @@ describe("Interaction System - createClass functionality", () => {
       const action = Action.create({ name: "submitOrder" });
       
       const payloadItems = [
-        PayloadItem.create({ name: "orderId", required: true }),
-        PayloadItem.create({ name: "items", required: true })
+        PayloadItem.create({ name: "orderId", type: 'string', required: true }),
+        PayloadItem.create({ name: "items", type: 'string', required: true })
       ];
       
       const payload = Payload.create({ items: payloadItems });

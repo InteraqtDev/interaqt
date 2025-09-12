@@ -76,10 +76,12 @@ describe('Controller ignorePermission parameter', () => {
                 items: [
                     PayloadItem.create({
                         name: 'title',
+                        type: 'string',
                         required: true
                     }),
                     PayloadItem.create({
                         name: 'content',
+                        type: 'string',
                         required: true
                     })
                 ]

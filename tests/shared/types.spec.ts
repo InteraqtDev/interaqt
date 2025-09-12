@@ -57,6 +57,7 @@ describe("refactored types", () => {
             items: [
                 PayloadItem.create({
                     name: 'data',
+                    type: 'string',
                     isRef: false,
                     base: Entity.create({ name: 'TestEntity' })
                 })

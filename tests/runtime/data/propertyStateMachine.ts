@@ -49,6 +49,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'content',
+                    type: 'Entity',
                     isRef:true,
                     base: postEntity
                 })
@@ -63,6 +64,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'content',
+                    type: 'Entity',
                     isRef:true,
                     base: postEntity
                 })
@@ -79,6 +81,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'content',
+                    type: 'Entity',
                     isRef:true,
                     base: postEntity
                 })
@@ -93,6 +96,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'content',
+                    type: 'Entity',
                     isRef:true,
                     base: postEntity
                 })

@@ -343,40 +343,6 @@ export class InteractionCall {
                     await this.system.storage.find(payloadDef.base!.name!, itemMatch, undefined, ['*']) :
                     await this.system.storage.findOne(payloadDef.base!.name!, itemMatch, undefined, ['*'])
             }
-
-            // TODO deprecate
-            if (payloadDef.attributives) {
-                const attributives =  Attributives.is(payloadDef.attributives) ?
-                    new BoolExp<AttributiveInstance>(payloadDef.attributives.content as BoolExpressionRawData<AttributiveInstance>) :
-                    BoolExp.atom<AttributiveInstance>(payloadDef.attributives as AttributiveInstance)
-
-                // 作为整体是否合法应该放到 condition 里面做
-                if (payloadDef.isCollection) {
-                    const result = await everyWithErrorAsync(fullPayloadItem as unknown[], (item => {
-                        const handleAttribute = this.createHandleAttributive(
-                            Attributive,
-                            interactionEvent,
-                            item
-                        )
-
-                        return this.checkAttributives(attributives, handleAttribute)
-                    }))
-
-                    if (result !== true) {
-                        throw ConditionError.attributiveCheckFailed(payloadDef.name!, 'not every item match attribute', fullPayloadItem, result)
-                    }
-                } else {
-                    const handleAttribute = this.createHandleAttributive(
-                        Attributive,
-                        interactionEvent,
-                        fullPayloadItem
-                    )
-                    const result = await this.checkAttributives(attributives, handleAttribute)
-                    if (result !== true ) {
-                        throw ConditionError.attributiveCheckFailed(payloadDef.name!, 'not match attributive', fullPayloadItem, result)
-                    }
-                }
-            }
         }
     }
 

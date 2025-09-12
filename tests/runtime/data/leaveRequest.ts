@@ -17,7 +17,8 @@ import {
     StateNode,
     StateTransfer, Transform,
     USER_ENTITY,
-    HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE
+    HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE,
+    Condition
 } from 'interaqt';
 import { OtherAttr } from "./roles";
 
@@ -34,16 +35,23 @@ const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
  const sendInteraction = Interaction.create({
     name: 'sendRequest',
     action: Action.create({name: 'sendRequest'}),
+    conditions: Condition.create({
+        name: 'otherUser',
+        content: function(this: Controller, event: any) {
+            return event.payload.to.id !== event.user.id
+        }
+    }),
     payload: Payload.create({
         items: [
             PayloadItem.create({
                 name: 'to',
-                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                type: 'Entity',
                 base: UserEntity,
                 isRef: true,
             }),
             PayloadItem.create({
                 name: 'reason',
+                type: 'string'
             })
         ]
     })
@@ -136,12 +144,18 @@ const MyAttr = Attributive.create({
  const approveInteraction = Interaction.create({
     name: 'approve',
     action: Action.create({name: 'approve'}),
+    conditions: Condition.create({
+        name: 'request',
+        content: function(this: Controller, event: any) {
+            return event.payload.request.to.id === event.user.id
+        }
+    }),
     payload: Payload.create({
         items: [
             PayloadItem.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
-                attributives: boolExpToAttributives(BoolExp.atom(MyAttr)),
+                type: 'Entity',
                 base: RequestEntity,
                 isRef: true
             })
@@ -159,6 +173,7 @@ const rejectInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
+                type: 'Entity',
                 base: RequestEntity,
                 isRef: true
             })
@@ -175,7 +190,7 @@ const rejectInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'reviewers',
-                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                type: 'Entity',
                 isCollection: true,
                 base: UserEntity,
                 isRef:true,
@@ -183,6 +198,7 @@ const rejectInteraction = Interaction.create({
             PayloadItem.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
+                type: 'Entity',
                 base: RequestEntity,
                 isRef: true
             })
@@ -199,13 +215,14 @@ const rejectInteraction = Interaction.create({
         items: [
             PayloadItem.create({
                 name: 'reviewer',
-                attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                type: 'Entity',
                 base: UserEntity,
                 isRef: true
             }),
             PayloadItem.create({
                 name: 'request',
                 // FIXME 增加定语： 我的、未完成的
+                type: 'Entity',
                 base: RequestEntity,
                 isRef: true
             })

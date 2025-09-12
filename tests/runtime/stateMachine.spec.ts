@@ -221,6 +221,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'counter',
                         isRef: true,
                         base: Counter
@@ -235,6 +236,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'counter',
                         isRef: true,
                         base: Counter
@@ -413,6 +415,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'logger',
                         isRef: true,
                         base: TimeLogger
@@ -565,11 +568,13 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'message',
                         isRef: true,
                         base: Message
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'newContent'
                     })
                 ]
@@ -744,11 +749,13 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'document',
                         isRef: true,
                         base: Document
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'owner',
                         isRef: true,
                         base: User
@@ -764,6 +771,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'document',
                         isRef: true,
                         base: Document
@@ -939,16 +947,19 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'user',
                         isRef: true,
                         base: User
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'project',
                         isRef: true,
                         base: Project
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'role',
                     })
                 ]
@@ -962,11 +973,13 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'user',
                         isRef: true,
                         base: User
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'project',
                         isRef: true,
                         base: Project
@@ -982,6 +995,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'project',
                         isRef: true,
                         base: Project
@@ -1254,9 +1268,11 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'title',
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'description',
                     })
                 ]
@@ -1270,6 +1286,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'task',
                         isRef: true,
                         base: Task
@@ -1285,11 +1302,13 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'task',
                         isRef: true,
                         base: Task
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'newStatus',
                     })
                 ]
@@ -1509,14 +1528,17 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'customer',
                         isRef: true,
                         base: User
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'orderNumber',
                     }),
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'totalAmount',
                     })
                 ]
@@ -1530,6 +1552,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'order',
                         isRef: true,
                         base: Order
@@ -1759,6 +1782,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'targetUser',
                         isRef: true,
                         base: UserEntity
@@ -1774,6 +1798,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'targetUser',
                         isRef: true,
                         base: UserEntity
@@ -1908,6 +1933,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'article',
                         isRef: true,
                         base: ArticleEntity
@@ -1922,6 +1948,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'article',
                         isRef: true,
                         base: ArticleEntity
@@ -1936,6 +1963,7 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
+                        type: 'Entity',
                         name: 'article',
                         isRef: true,
                         base: ArticleEntity

@@ -111,7 +111,8 @@ describe("Support Classes Refactored", () => {
   describe("PayloadItem", () => {
     test("should create payload item instance", () => {
       const item = PayloadItem.create({
-        name: "username"
+        name: "username",
+        type: 'string'
       });
 
       expect(item.name).toBe("username");
@@ -125,6 +126,7 @@ describe("Support Classes Refactored", () => {
     test("should create payload item with all options", () => {
       const item = PayloadItem.create({
         name: "user",
+        type: 'Entity',
         base: userEntity,
         isRef: true,
         required: true,
@@ -141,6 +143,7 @@ describe("Support Classes Refactored", () => {
     test("should stringify and parse payload item", () => {
       const original = PayloadItem.create({
         name: "email",
+        type: 'string',
         required: true
       });
       
@@ -155,6 +158,7 @@ describe("Support Classes Refactored", () => {
     test("should clone payload item", () => {
       const original = PayloadItem.create({
         name: "tags",
+        type: 'Entity',
         isCollection: true,
         base: userEntity
       });
@@ -178,8 +182,8 @@ describe("Support Classes Refactored", () => {
     });
 
     test("should create payload with items", () => {
-      const usernameItem = PayloadItem.create({ name: "username", required: true });
-      const emailItem = PayloadItem.create({ name: "email", required: true });
+      const usernameItem = PayloadItem.create({ name: "username", type: 'string', required: true });
+      const emailItem = PayloadItem.create({ name: "email", type: 'string', required: true });
       
       const payload = Payload.create({
         items: [usernameItem, emailItem]
@@ -191,7 +195,7 @@ describe("Support Classes Refactored", () => {
     });
 
     test("should stringify and parse payload", () => {
-      const item = PayloadItem.create({ name: "testItem" });
+      const item = PayloadItem.create({ name: "testItem", type: 'string' });
       const original = Payload.create({
         items: [item]
       });
@@ -204,8 +208,8 @@ describe("Support Classes Refactored", () => {
     });
 
     test("should clone payload", () => {
-      const item1 = PayloadItem.create({ name: "item1" });
-      const item2 = PayloadItem.create({ name: "item2" });
+      const item1 = PayloadItem.create({ name: "item1", type: 'string' });
+      const item2 = PayloadItem.create({ name: "item2", type: 'string' });
       const original = Payload.create({
         items: [item1, item2]
       });
@@ -237,8 +241,8 @@ describe("Support Classes Refactored", () => {
       const c1 = Condition.create({ content: () => true });
       const c2 = Condition.create({ content: () => false });
       const s1 = SideEffect.create({ name: "test", handle: () => {} });
-      const pi1 = PayloadItem.create({ name: "item1" });
-      const pi2 = PayloadItem.create({ name: "item2" });
+      const pi1 = PayloadItem.create({ name: "item1", type: 'string' });
+      const pi2 = PayloadItem.create({ name: "item2", type: 'string' });
       const p1 = Payload.create({ items: [pi1, pi2] });
 
       expect(Condition.instances).toHaveLength(2);

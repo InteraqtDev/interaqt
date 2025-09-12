@@ -4,7 +4,7 @@ import { EntityInstance } from './Entity.js';
 
 export interface PayloadItemInstance extends IInstance {
   name: string;
-  attributives?: AttributivesInstance | AttributiveInstance;
+  type: string;
   base?: EntityInstance;
   isRef?: boolean;
   required?: boolean;
@@ -14,7 +14,7 @@ export interface PayloadItemInstance extends IInstance {
 
 export interface PayloadItemCreateArgs {
   name: string;
-  attributives?: AttributivesInstance | AttributiveInstance;
+  type: string;
   base?: EntityInstance;
   isRef?: boolean;
   required?: boolean;
@@ -27,19 +27,18 @@ export class PayloadItem implements PayloadItemInstance {
   public _type = 'PayloadItem';
   public _options?: { uuid?: string };
   public name: string;
-  public attributives?: AttributivesInstance | AttributiveInstance;
   public base?: EntityInstance;
   public isRef: boolean;
   public required: boolean;
   public isCollection: boolean;
   public itemRef?: AttributiveInstance | EntityInstance;
-  
+  public type: string;
   constructor(args: PayloadItemCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
     this.name = args.name;
-    this.attributives = args.attributives;
     this.base = args.base;
+    this.type = args.type;
     this.isRef = args.isRef ?? false;
     this.required = args.required ?? false;
     this.isCollection = args.isCollection ?? false;
@@ -56,9 +55,9 @@ export class PayloadItem implements PayloadItemInstance {
       type: 'string' as const,
       required: true as const
     },
-    attributives: {
-      type: ['Attributives', 'Attributive'] as const,
-      collection: false as const
+    type: {
+      type: 'string' as const,
+      required: true as const
     },
     base: {
       type: 'Entity' as const,
@@ -107,7 +106,7 @@ export class PayloadItem implements PayloadItemInstance {
       isCollection: instance.isCollection,
       required: instance.required,
       isRef: instance.isRef,
-      attributives: instance.attributives
+      type: instance.type,
     };
     
     const data: SerializedData<PayloadItemCreateArgs> = {
@@ -121,9 +120,9 @@ export class PayloadItem implements PayloadItemInstance {
   
   static clone(instance: PayloadItemInstance, deep: boolean): PayloadItemInstance {
     const args: PayloadItemCreateArgs = {
-      name: instance.name
+      name: instance.name,
+      type: instance.type,
     };
-    if (instance.attributives !== undefined) args.attributives = instance.attributives;
     if (instance.base !== undefined) args.base = instance.base;
     if (instance.isRef !== false) args.isRef = instance.isRef;
     if (instance.required !== false) args.required = instance.required;

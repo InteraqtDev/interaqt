@@ -1011,7 +1011,8 @@ describe('Transform computed handle', () => {
       payload: Payload.create({
         items: [
           PayloadItem.create({
-            name: 'message'
+            name: 'message',
+            type: 'string'
           })
         ]
       })

@@ -46,7 +46,7 @@ describe('Version Control Example with Hard Delete', () => {
       action: Action.create({ name: 'createStyle' }),
       payload: Payload.create({
         items: [
-          PayloadItem.create({ name: 'content', required: true })
+          PayloadItem.create({ name: 'content', type: 'string', required: true })
         ]
       })
     });
@@ -57,7 +57,7 @@ describe('Version Control Example with Hard Delete', () => {
       action: Action.create({ name: 'publishStyle' }),
       payload: Payload.create({
         items: [
-          PayloadItem.create({ name: 'styleId', required: true })
+          PayloadItem.create({ name: 'styleId', type: 'string', required: true })
         ]
       })
     });
@@ -68,7 +68,7 @@ describe('Version Control Example with Hard Delete', () => {
       action: Action.create({ name: 'rollbackVersion' }),
       payload: Payload.create({
         items: [
-          PayloadItem.create({ name: 'version', required: true })
+          PayloadItem.create({ name: 'version', type: 'number', required: true })
         ]
       })
     });
@@ -78,7 +78,7 @@ describe('Version Control Example with Hard Delete', () => {
       action: Action.create({ name: 'offlineStyle' }),
       payload: Payload.create({
         items: [
-          PayloadItem.create({ name: 'styleId', required: true })
+          PayloadItem.create({ name: 'styleId', type: 'string', required: true })
         ]
       })
     });

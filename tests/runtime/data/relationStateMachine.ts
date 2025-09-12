@@ -16,12 +16,13 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'to',
-                    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                    type: 'Entity',
                     base: UserEntity,
                     isRef: true,
                 }),
                 PayloadItem.create({
                     name: 'title',
+                    type: 'string'
                 })
             ]
         })
@@ -66,12 +67,13 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'reviewer',
-                    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                    type: 'Entity',
                     base: UserEntity,
                     isRef: true
                 }),
                 PayloadItem.create({
                     name: 'request',
+                    type: 'Entity',
                     base: RequestEntity,
                     isRef: true
                 })

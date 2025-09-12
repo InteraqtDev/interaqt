@@ -67,13 +67,14 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'to',
-                    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
+                    type: 'Entity',
                     isRef:true,
                     base: UserEntity,
                     itemRef: userRefB
                 }),
                 PayloadItem.create({
                     name: 'message',
+                    type: 'Entity',
                     base: messageEntity,
                 })
             ]
@@ -112,6 +113,7 @@ export function createData() {
             items: [
                 PayloadItem.create({
                     name: 'reason',
+                    type: 'Entity',
                     base: messageEntity,
                 })
             ]
@@ -176,7 +178,7 @@ export function createData() {
                     //     content: BoolAtomData.create({data: MyFriend})
                     // }),
                     // 支持上面这种形式，也支持单独一个 Attributive 写法
-                    attributives: MyFriend,
+                    type: 'Entity',
                     base: UserEntity,
                     isRef: true,
                 }),
