@@ -249,19 +249,28 @@ export class BoolExp<T> {
   
   public static and<U>(...atomValues:U[]) {
     const atomValueWithoutUndefined = atomValues.filter(v => !!v)
+    if (atomValueWithoutUndefined.length === 0) {
+      return undefined
+    }
     const [first, ...rest] = atomValueWithoutUndefined
-    return rest.reduce((acc, cur) => acc.and(cur), BoolExp.atom(first))
+    return rest.reduce((acc, cur) => acc.and(cur), first instanceof BoolExp ? first : BoolExp.atom(first))
   }
   
   public static or<U>(...atomValues:U[]) {
     const atomValueWithoutUndefined = atomValues.filter(v => !!v)
+    if (atomValueWithoutUndefined.length === 0) {
+      return undefined
+    }
     const [first, ...rest] = atomValueWithoutUndefined
-    return rest.reduce((acc, cur) => acc.or(cur), BoolExp.atom(first))
+    return rest.reduce((acc, cur) => acc.or(cur), first instanceof BoolExp ? first : BoolExp.atom(first))
   }
   
   constructor(public raw: ExpressionData<T>) {
     if (!raw) {
       throw new Error('BoolExp raw data cannot be undefined')
+    }
+    if (raw.type !== 'atom' && raw.type !== 'expression') {
+      throw new Error(`invalid bool expression type: ${JSON.stringify(raw)}`)
     }
   }
   
@@ -291,6 +300,9 @@ export class BoolExp<T> {
   }
   
   static fromValue<T>(value: ExpressionData<T>) {
+    if (value instanceof BoolExp) {
+      return value
+    }
     return new BoolExp<T>(value)
   }
 

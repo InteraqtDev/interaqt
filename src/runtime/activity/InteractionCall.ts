@@ -418,33 +418,16 @@ export class InteractionCall {
             const queryItems = Object.fromEntries(
                 this.interaction.query?.items?.map(item => [(item as any).name, (item as any).value as any]) || []
             )
-            const fixedModifier = queryItems.modifier
-            const allowedAttributeQuery = queryItems.attributeQuery
-            let fixedMatch = queryItems.match
-            
-            // If fixedMatch is a BoolExp instance, keep it as is for now
-            let fixedMatchBoolExp: BoolExp<MatchAtom> | undefined
-            if (fixedMatch && typeof fixedMatch === 'object' && 'raw' in fixedMatch) {
-                fixedMatchBoolExp = fixedMatch as BoolExp<MatchAtom>
-            } else if (fixedMatch) {
-                // It's raw data, convert to BoolExp
-                fixedMatchBoolExp = BoolExp.fromValue(fixedMatch)
-            }
+
+            const {match: fixedMatch, modifier: fixedModifier, attributeQuery: allowedAttributeQuery} = queryItems
             
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？这里涉及到复合 attrubuteQuery 的深度检测问题。
             const attributeQuery = interactionEvent.query?.attributeQuery || []
             
-            // Combine fixed match with user-provided match using AND logic
-            let combinedMatch = interactionEvent.query?.match
-            if (fixedMatchBoolExp && combinedMatch) {
-                // Both fixed and user match exist, combine them with AND
-                combinedMatch = fixedMatchBoolExp.and(combinedMatch)
-            } else if (fixedMatchBoolExp) {
-                // Only fixed match exists
-                combinedMatch = fixedMatchBoolExp
-            }
-            // If only user match exists, it's already in combinedMatch
+            const matchValue = typeof fixedMatch === 'function' ? await fixedMatch.call(this.controller, interactionEvent) : fixedMatch
+            const fixedMatchBoolExp: BoolExp<MatchAtom> | undefined = matchValue instanceof BoolExp ? matchValue : matchValue ? BoolExp.atom(matchValue) : undefined
+            const combinedMatch = BoolExp.and(fixedMatchBoolExp, interactionEvent.query?.match)
 
             data = await this.system.storage.find(recordName, combinedMatch, modifier, attributeQuery)
         } else {

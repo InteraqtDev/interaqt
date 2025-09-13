@@ -1046,6 +1046,351 @@ describe('Get Data Interaction', () => {
         })
     })
 
+    describe('Data retrieval with dynamic match conditions', () => {
+        test('should support function-based match that returns MatchExp', async () => {
+            const Task = Entity.create({
+                name: 'Task',
+                properties: [
+                    Property.create({ name: 'title', type: 'string' }),
+                    Property.create({ name: 'priority', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' })
+                ]
+            })
+
+            // Create interaction with dynamic match function
+            const GetTasksByPriority = Interaction.create({
+                name: 'getTasksByPriority',
+                action: GetAction,
+                data: Task,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: function(this: Controller, event: any) {
+                                // Dynamic match based on current state
+                                const priorityFilter = event.user?.preferredPriority || 'high'
+                                return MatchExp.atom({ key: 'priority', value: ['=', priorityFilter] })
+                            }
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Task],
+                interactions: [GetTasksByPriority]
+            })
+            await controller.setup(true)
+
+            // Create test tasks
+            await system.storage.create('Task', { title: 'Task 1', priority: 'low', status: 'open' })
+            await system.storage.create('Task', { title: 'Task 2', priority: 'high', status: 'open' })
+            await system.storage.create('Task', { title: 'Task 3', priority: 'medium', status: 'open' })
+            await system.storage.create('Task', { title: 'Task 4', priority: 'high', status: 'closed' })
+
+            // Test 1: User prefers high priority
+            const highPriorityResult = await controller.callInteraction('getTasksByPriority', {
+                user: { id: 'user-1', preferredPriority: 'high' },
+                query: {
+                    attributeQuery: ['id', 'title', 'priority', 'status']
+                }
+            })
+
+            expect(highPriorityResult.error).toBeUndefined()
+            const highPriorityData = highPriorityResult.data as any[]
+            expect(highPriorityData).toHaveLength(2)
+            expect(highPriorityData.every((t: any) => t.priority === 'high')).toBe(true)
+
+            // Test 2: User prefers low priority
+            const lowPriorityResult = await controller.callInteraction('getTasksByPriority', {
+                user: { id: 'user-2', preferredPriority: 'low' },
+                query: {
+                    attributeQuery: ['id', 'title', 'priority', 'status']
+                }
+            })
+
+            expect(lowPriorityResult.error).toBeUndefined()
+            const lowPriorityData = lowPriorityResult.data as any[]
+            expect(lowPriorityData).toHaveLength(1)
+            expect(lowPriorityData[0].priority).toBe('low')
+        })
+
+        test('should support async function-based match', async () => {
+            const Product = Entity.create({
+                name: 'Product',
+                properties: [
+                    Property.create({ name: 'name', type: 'string' }),
+                    Property.create({ name: 'category', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' })
+                ]
+            })
+
+            // Mock Dictionary-like storage
+            const categoryFilter = { current: 'electronics' }
+
+            const GetFilteredProducts = Interaction.create({
+                name: 'getFilteredProducts',
+                action: GetAction,
+                data: Product,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: async function(this: Controller, event: any) {
+                                // Simulate async operation (e.g., fetching from Dictionary)
+                                await new Promise(resolve => setTimeout(resolve, 10))
+                                return MatchExp.atom({ 
+                                    key: 'category', 
+                                    value: ['=', categoryFilter.current] 
+                                })
+                            }
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Product],
+                interactions: [GetFilteredProducts]
+            })
+            await controller.setup(true)
+
+            // Create test products
+            await system.storage.create('Product', { name: 'Laptop', category: 'electronics', status: 'active' })
+            await system.storage.create('Product', { name: 'Phone', category: 'electronics', status: 'active' })
+            await system.storage.create('Product', { name: 'Desk', category: 'furniture', status: 'active' })
+            await system.storage.create('Product', { name: 'Chair', category: 'furniture', status: 'active' })
+
+            // Test 1: Filter is set to electronics
+            const electronicsResult = await controller.callInteraction('getFilteredProducts', {
+                user: { id: 'user-1' },
+                query: {
+                    attributeQuery: ['id', 'name', 'category']
+                }
+            })
+
+            expect(electronicsResult.error).toBeUndefined()
+            const electronicsData = electronicsResult.data as any[]
+            expect(electronicsData).toHaveLength(2)
+            expect(electronicsData.every((p: any) => p.category === 'electronics')).toBe(true)
+
+            // Test 2: Change filter to furniture
+            categoryFilter.current = 'furniture'
+            const furnitureResult = await controller.callInteraction('getFilteredProducts', {
+                user: { id: 'user-2' },
+                query: {
+                    attributeQuery: ['id', 'name', 'category']
+                }
+            })
+
+            expect(furnitureResult.error).toBeUndefined()
+            const furnitureData = furnitureResult.data as any[]
+            expect(furnitureData).toHaveLength(2)
+            expect(furnitureData.every((p: any) => p.category === 'furniture')).toBe(true)
+        })
+
+        test('should combine dynamic match with user-provided match', async () => {
+            const Order = Entity.create({
+                name: 'Order',
+                properties: [
+                    Property.create({ name: 'orderNumber', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' }),
+                    Property.create({ name: 'priority', type: 'string' }),
+                    Property.create({ name: 'amount', type: 'number' })
+                ]
+            })
+
+            // Dynamic match for priority based on amount threshold
+            const GetHighValueOrders = Interaction.create({
+                name: 'getHighValueOrders',
+                action: GetAction,
+                data: Order,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: function(this: Controller, event: any) {
+                                // High value threshold changes based on context
+                                const threshold = event.user?.isVip ? 500 : 1000
+                                return MatchExp.atom({ 
+                                    key: 'amount', 
+                                    value: ['>=', threshold] 
+                                })
+                            }
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Order],
+                interactions: [GetHighValueOrders]
+            })
+            await controller.setup(true)
+
+            // Create test orders
+            await system.storage.create('Order', { orderNumber: 'ORD001', status: 'pending', priority: 'normal', amount: 300 })
+            await system.storage.create('Order', { orderNumber: 'ORD002', status: 'pending', priority: 'urgent', amount: 600 })
+            await system.storage.create('Order', { orderNumber: 'ORD003', status: 'delivered', priority: 'normal', amount: 1200 })
+            await system.storage.create('Order', { orderNumber: 'ORD004', status: 'pending', priority: 'urgent', amount: 1500 })
+
+            // Test 1: VIP user (threshold = 500) + filter for pending status
+            const vipResult = await controller.callInteraction('getHighValueOrders', {
+                user: { id: 'vip-user', isVip: true },
+                query: {
+                    match: MatchExp.atom({ key: 'status', value: ['=', 'pending'] }),
+                    attributeQuery: ['id', 'orderNumber', 'status', 'amount']
+                }
+            })
+
+            expect(vipResult.error).toBeUndefined()
+            const vipData = vipResult.data as any[]
+            expect(vipData).toHaveLength(2) // ORD002 and ORD004
+            expect(vipData.every((o: any) => o.amount >= 500 && o.status === 'pending')).toBe(true)
+
+            // Test 2: Regular user (threshold = 1000) + filter for urgent priority
+            const regularResult = await controller.callInteraction('getHighValueOrders', {
+                user: { id: 'regular-user', isVip: false },
+                query: {
+                    match: MatchExp.atom({ key: 'priority', value: ['=', 'urgent'] }),
+                    attributeQuery: ['id', 'orderNumber', 'priority', 'amount']
+                }
+            })
+
+            expect(regularResult.error).toBeUndefined()
+            const regularData = regularResult.data as any[]
+            expect(regularData).toHaveLength(1) // Only ORD004
+            expect(regularData[0].amount).toBe(1500)
+            expect(regularData[0].priority).toBe('urgent')
+        })
+
+        test('should handle function returning raw match data', async () => {
+            const Document = Entity.create({
+                name: 'Document',
+                properties: [
+                    Property.create({ name: 'title', type: 'string' }),
+                    Property.create({ name: 'type', type: 'string' }),
+                    Property.create({ name: 'department', type: 'string' })
+                ]
+            })
+
+            const GetDepartmentDocuments = Interaction.create({
+                name: 'getDepartmentDocuments',
+                action: GetAction,
+                data: Document,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: function(this: Controller, event: any) {
+                                // Return raw match data instead of MatchExp
+                                return {
+                                    key: 'department',
+                                    value: ['=', event.user?.department || 'general']
+                                }
+                            }
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Document],
+                interactions: [GetDepartmentDocuments]
+            })
+            await controller.setup(true)
+
+            // Create test documents
+            await system.storage.create('Document', { title: 'HR Policy', type: 'policy', department: 'hr' })
+            await system.storage.create('Document', { title: 'IT Guidelines', type: 'guide', department: 'it' })
+            await system.storage.create('Document', { title: 'General Info', type: 'info', department: 'general' })
+
+            // Test: User from HR department
+            const result = await controller.callInteraction('getDepartmentDocuments', {
+                user: { id: 'hr-user', department: 'hr' },
+                query: {
+                    attributeQuery: ['id', 'title', 'department']
+                }
+            })
+
+            expect(result.error).toBeUndefined()
+            const data = result.data as any[]
+            expect(data).toHaveLength(1)
+            expect(data[0].department).toBe('hr')
+        })
+
+        test('should handle function returning null/undefined', async () => {
+            const Item = Entity.create({
+                name: 'Item',
+                properties: [
+                    Property.create({ name: 'name', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' })
+                ]
+            })
+
+            const GetConditionalItems = Interaction.create({
+                name: 'getConditionalItems',
+                action: GetAction,
+                data: Item,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: function(this: Controller, event: any) {
+                                // Return null if no filter should be applied
+                                if (event.user?.applyFilter === false) {
+                                    return null
+                                }
+                                return MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+                            }
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Item],
+                interactions: [GetConditionalItems]
+            })
+            await controller.setup(true)
+
+            // Create test items
+            await system.storage.create('Item', { name: 'Item 1', status: 'active' })
+            await system.storage.create('Item', { name: 'Item 2', status: 'inactive' })
+            await system.storage.create('Item', { name: 'Item 3', status: 'active' })
+
+            // Test 1: With filter applied
+            const withFilterResult = await controller.callInteraction('getConditionalItems', {
+                user: { id: 'user-1', applyFilter: true },
+                query: {
+                    attributeQuery: ['id', 'name', 'status']
+                }
+            })
+
+            expect(withFilterResult.error).toBeUndefined()
+            const withFilterData = withFilterResult.data as any[]
+            expect(withFilterData).toHaveLength(2)
+            expect(withFilterData.every((i: any) => i.status === 'active')).toBe(true)
+
+            // Test 2: Without filter (function returns null)
+            const withoutFilterResult = await controller.callInteraction('getConditionalItems', {
+                user: { id: 'user-2', applyFilter: false },
+                query: {
+                    attributeQuery: ['id', 'name', 'status']
+                }
+            })
+
+            expect(withoutFilterResult.error).toBeUndefined()
+            const withoutFilterData = withoutFilterResult.data as any[]
+            expect(withoutFilterData).toHaveLength(3) // All items
+        })
+    })
+
     describe('Data retrieval with Condition-based permissions', () => {
         test('should allow data retrieval when condition passes', async () => {
             const Document = Entity.create({
