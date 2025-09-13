@@ -4,7 +4,6 @@ import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "@runtime";
 import {PlaceholderGen} from "./RecordQueryAgent.js";
-import { AttributeInfo } from "./AttributeInfo.js";
 
 export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
@@ -399,5 +398,35 @@ export class MatchExp {
         
         const transformedData = this.data ? transformData(this.data) : undefined;
         return new MatchExp(targetEntityName, this.map, transformedData, this.contextRootEntity, this.fromRelation);
+    }
+
+    /**
+     * 将 MatchExp 实例序列化为 JSON 格式
+     * @returns JSON 可序列化的对象
+     */
+    toJSON(): any {
+        return {
+            entityName: this.entityName,
+            data: this.data ? this.data.raw : undefined,
+            contextRootEntity: this.contextRootEntity,
+            fromRelation: this.fromRelation
+        };
+    }
+
+    /**
+     * 从 JSON 对象创建 MatchExp 实例
+     * @param json JSON 对象
+     * @param map EntityToTableMap 实例
+     * @returns MatchExp 实例
+     */
+    static fromJSON(json: any, map: EntityToTableMap): MatchExp {
+        const data = json.data ? BoolExp.fromValue<MatchAtom>(json.data) : undefined;
+        return new MatchExp(
+            json.entityName,
+            map,
+            data,
+            json.contextRootEntity,
+            json.fromRelation
+        );
     }
 }

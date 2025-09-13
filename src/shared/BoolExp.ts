@@ -293,6 +293,13 @@ export class BoolExp<T> {
   static fromValue<T>(value: ExpressionData<T>) {
     return new BoolExp<T>(value)
   }
+
+  toJSON() {
+    return this.raw
+  }
+  static fromJSON<T>(json: ExpressionData<T>) {
+    return new BoolExp<T>(json)
+  }
   
   isExpression() {
     return this.raw.type === 'expression'

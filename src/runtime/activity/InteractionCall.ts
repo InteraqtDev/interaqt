@@ -415,15 +415,12 @@ export class InteractionCall {
         let data: any
         if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
             const recordName = (this.interaction.data as EntityInstance).name!
-            const {modifier: fixedModifier, attributeQuery: fixedAttributeQuery} = Object.fromEntries(
+            const {modifier: fixedModifier, attributeQuery: allowedAttributeQuery} = Object.fromEntries(
                 this.interaction.query?.items?.map(item => [(item as any).name, (item as any).value as any]) || [])
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
-            // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？
+            // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？这里涉及到复合 attrubuteQuery 的深度检测问题。
             const attributeQuery = interactionEvent.query?.attributeQuery || []
             data = await this.system.storage.find(recordName, interactionEvent.query?.match, modifier, attributeQuery)
-        // } else if (Computation.is(this.interaction.data)){
-        //     const { content: computation } = this.interaction.data as KlassInstance<typeof Computation>
-        //     data= await computation.call(this.controller, match, interactionEvent.query, interactionEvent )
         } else {
             assert(false,`unknown data type ${this.interaction.data}`)
         }
