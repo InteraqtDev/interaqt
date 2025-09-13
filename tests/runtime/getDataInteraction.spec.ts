@@ -754,6 +754,298 @@ describe('Get Data Interaction', () => {
         })
     })
 
+    describe('Data retrieval with fixed match parameters', () => {
+        test('should apply fixed match parameter from interaction definition', async () => {
+            const Product = Entity.create({
+                name: 'Product',
+                properties: [
+                    Property.create({ name: 'name', type: 'string' }),
+                    Property.create({ name: 'category', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' }),
+                    Property.create({ name: 'price', type: 'number' })
+                ]
+            })
+
+            // Create interaction with fixed match for status = 'active'
+            const GetActiveProducts = Interaction.create({
+                name: 'getActiveProducts',
+                action: GetAction,
+                data: Product,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Product],
+                interactions: [GetActiveProducts]
+            })
+            await controller.setup(true)
+
+            // Create test products with different statuses
+            await system.storage.create('Product', { name: 'Product 1', category: 'electronics', status: 'active', price: 100 })
+            await system.storage.create('Product', { name: 'Product 2', category: 'electronics', status: 'inactive', price: 200 })
+            await system.storage.create('Product', { name: 'Product 3', category: 'furniture', status: 'active', price: 300 })
+            await system.storage.create('Product', { name: 'Product 4', category: 'furniture', status: 'deleted', price: 400 })
+
+            // Call without user match - should only get active products
+            const result = await controller.callInteraction('getActiveProducts', {
+                user: { id: 'test-user' },
+                query: {
+                    attributeQuery: ['id', 'name', 'category', 'status', 'price']
+                }
+            })
+
+            expect(result.error).toBeUndefined()
+            const data = result.data as any[]
+            expect(data).toHaveLength(2)
+            expect(data.every((p: any) => p.status === 'active')).toBe(true)
+        })
+
+        test('should combine fixed match with user-provided match using AND logic', async () => {
+            const Product = Entity.create({
+                name: 'Product',
+                properties: [
+                    Property.create({ name: 'name', type: 'string' }),
+                    Property.create({ name: 'category', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' }),
+                    Property.create({ name: 'price', type: 'number' })
+                ]
+            })
+
+            // Create interaction with fixed match for status = 'active'
+            const GetActiveProducts = Interaction.create({
+                name: 'getActiveProducts',
+                action: GetAction,
+                data: Product,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Product],
+                interactions: [GetActiveProducts]
+            })
+            await controller.setup(true)
+
+            // Create test products
+            await system.storage.create('Product', { name: 'Active Electronics 1', category: 'electronics', status: 'active', price: 100 })
+            await system.storage.create('Product', { name: 'Inactive Electronics', category: 'electronics', status: 'inactive', price: 200 })
+            await system.storage.create('Product', { name: 'Active Furniture', category: 'furniture', status: 'active', price: 300 })
+            await system.storage.create('Product', { name: 'Active Electronics 2', category: 'electronics', status: 'active', price: 150 })
+
+            // Call with user match for category = 'electronics'
+            // Should only get products that are BOTH active AND electronics
+            const result = await controller.callInteraction('getActiveProducts', {
+                user: { id: 'test-user' },
+                query: {
+                    match: MatchExp.atom({ key: 'category', value: ['=', 'electronics'] }),
+                    attributeQuery: ['id', 'name', 'category', 'status', 'price']
+                }
+            })
+
+            expect(result.error).toBeUndefined()
+            const data = result.data as any[]
+            expect(data).toHaveLength(2)
+            expect(data.every((p: any) => p.status === 'active' && p.category === 'electronics')).toBe(true)
+        })
+
+        test('should support fixed match with modifier and attributeQuery', async () => {
+            const Article = Entity.create({
+                name: 'Article',
+                properties: [
+                    Property.create({ name: 'title', type: 'string' }),
+                    Property.create({ name: 'author', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' }),
+                    Property.create({ name: 'publishedAt', type: 'string' }),
+                    Property.create({ name: 'views', type: 'number', defaultValue: () => 0 })
+                ]
+            })
+
+            // Create interaction with fixed match, modifier, and attributeQuery
+            const GetPublishedArticles = Interaction.create({
+                name: 'getPublishedArticles',
+                action: GetAction,
+                data: Article,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: MatchExp.atom({ key: 'status', value: ['=', 'published'] })
+                        }),
+                        QueryItem.create({
+                            name: 'modifier',
+                            value: { limit: 5, orderBy: { views: 'desc' } } as any
+                        }),
+                        QueryItem.create({
+                            name: 'attributeQuery',
+                            value: ['id', 'title', 'author', 'views'] as any
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Article],
+                interactions: [GetPublishedArticles]
+            })
+            await controller.setup(true)
+
+            // Create test articles
+            await system.storage.create('Article', { 
+                title: 'Article 1', 
+                author: 'Alice', 
+                status: 'published', 
+                publishedAt: '2024-01-01',
+                views: 1000 
+            })
+            await system.storage.create('Article', { 
+                title: 'Article 2', 
+                author: 'Bob', 
+                status: 'draft', 
+                publishedAt: null,
+                views: 0 
+            })
+            await system.storage.create('Article', { 
+                title: 'Article 3', 
+                author: 'Charlie', 
+                status: 'published', 
+                publishedAt: '2024-01-02',
+                views: 500 
+            })
+            await system.storage.create('Article', { 
+                title: 'Article 4', 
+                author: 'David', 
+                status: 'published', 
+                publishedAt: '2024-01-03',
+                views: 2000 
+            })
+            await system.storage.create('Article', { 
+                title: 'Article 5', 
+                author: 'Eve', 
+                status: 'published', 
+                publishedAt: '2024-01-04',
+                views: 750 
+            })
+            await system.storage.create('Article', { 
+                title: 'Article 6', 
+                author: 'Frank', 
+                status: 'published', 
+                publishedAt: '2024-01-05',
+                views: 300 
+            })
+
+            // Call with additional user filters
+            const result = await controller.callInteraction('getPublishedArticles', {
+                user: { id: 'test-user' },
+                query: {
+                    match: MatchExp.atom({ key: 'views', value: ['>=', 500] }),
+                    attributeQuery: ['id', 'title', 'author', 'views', 'status']
+                }
+            })
+
+            expect(result.error).toBeUndefined()
+            const data = result.data as any[]
+            // Should be limited to 5 by fixed modifier
+            expect(data.length).toBeLessThanOrEqual(5)
+            // All should be published (from fixed match) AND have views >= 500 (from user match)
+            expect(data.every((a: any) => a.status === 'published' && a.views >= 500)).toBe(true)
+            // Should be ordered by views desc (from fixed modifier)
+            if (data.length > 1) {
+                for (let i = 1; i < data.length; i++) {
+                    expect(data[i-1].views).toBeGreaterThanOrEqual(data[i].views)
+                }
+            }
+        })
+
+        test('should work with complex fixed match expressions', async () => {
+            const Task = Entity.create({
+                name: 'Task',
+                properties: [
+                    Property.create({ name: 'title', type: 'string' }),
+                    Property.create({ name: 'priority', type: 'string' }),
+                    Property.create({ name: 'status', type: 'string' }),
+                    Property.create({ name: 'assignee', type: 'string' })
+                ]
+            })
+
+            // Create interaction with complex fixed match (status = 'open' AND priority IN ['high', 'critical'])
+            const GetUrgentTasks = Interaction.create({
+                name: 'getUrgentTasks',
+                action: GetAction,
+                data: Task,
+                query: Query.create({
+                    items: [
+                        QueryItem.create({
+                            name: 'match',
+                            value: MatchExp.atom({ key: 'status', value: ['=', 'open'] })
+                                .and(MatchExp.atom({ key: 'priority', value: ['in', ['high', 'critical']] }))
+                        })
+                    ]
+                })
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Task],
+                interactions: [GetUrgentTasks]
+            })
+            await controller.setup(true)
+
+            // Create test tasks
+            await system.storage.create('Task', { title: 'Task 1', priority: 'high', status: 'open', assignee: 'Alice' })
+            await system.storage.create('Task', { title: 'Task 2', priority: 'low', status: 'open', assignee: 'Bob' })
+            await system.storage.create('Task', { title: 'Task 3', priority: 'critical', status: 'closed', assignee: 'Charlie' })
+            await system.storage.create('Task', { title: 'Task 4', priority: 'critical', status: 'open', assignee: 'David' })
+            await system.storage.create('Task', { title: 'Task 5', priority: 'medium', status: 'open', assignee: 'Eve' })
+
+            // Call without additional filters
+            const result1 = await controller.callInteraction('getUrgentTasks', {
+                user: { id: 'test-user' },
+                query: {
+                    attributeQuery: ['id', 'title', 'priority', 'status', 'assignee']
+                }
+            })
+
+            expect(result1.error).toBeUndefined()
+            const data1 = result1.data as any[]
+            expect(data1).toHaveLength(2) // Task 1 and Task 4
+            expect(data1.every((t: any) => 
+                t.status === 'open' && ['high', 'critical'].includes(t.priority)
+            )).toBe(true)
+
+            // Call with additional assignee filter
+            const result2 = await controller.callInteraction('getUrgentTasks', {
+                user: { id: 'test-user' },
+                query: {
+                    match: MatchExp.atom({ key: 'assignee', value: ['=', 'David'] }),
+                    attributeQuery: ['id', 'title', 'priority', 'status', 'assignee']
+                }
+            })
+
+            expect(result2.error).toBeUndefined()
+            const data2 = result2.data as any[]
+            expect(data2).toHaveLength(1) // Only Task 4
+            expect(data2[0].assignee).toBe('David')
+            expect(data2[0].priority).toBe('critical')
+            expect(data2[0].status).toBe('open')
+        })
+    })
+
     describe('Data retrieval with Condition-based permissions', () => {
         test('should allow data retrieval when condition passes', async () => {
             const Document = Entity.create({
