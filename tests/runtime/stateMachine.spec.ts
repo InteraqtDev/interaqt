@@ -1472,6 +1472,318 @@ describe('StateMachineRunner', () => {
         expect(tasks.length).toBe(0)
     })
 
+    test('create entity with custom initial state through Transform and createStateData', async () => {
+        // 测试使用 Transform 创建实体时，通过 createStateData 设置初始状态（而非 defaultState）
+        const { Transform, BoolExp } = await import('interaqt')
+        
+        // 创建任务实体，包含状态属性
+        const Task = Entity.create({
+            name: 'Task',
+            properties: [
+                Property.create({
+                    name: 'title',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'priority',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'status',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 创建项目实体，用于触发任务创建
+        const Project = Entity.create({
+            name: 'Project',
+            properties: [
+                Property.create({
+                    name: 'name',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'type',
+                    type: 'string',
+                })
+            ]
+        })
+
+        // 定义任务状态
+        const TodoState = StateNode.create({ 
+            name: 'todo',
+            // 添加 computeValue 以保存初始值
+            computeValue: (lastValue: any) => lastValue || 'todo'
+        })
+        const InProgressState = StateNode.create({ name: 'in_progress' })
+        const DoneState = StateNode.create({ name: 'done' })
+        const UrgentState = StateNode.create({ 
+            name: 'urgent',
+            // 添加 computeValue 以保存初始值
+            computeValue: (lastValue: any) => lastValue || 'urgent'
+        })
+
+        // 创建交互
+        const StartTaskInteraction = Interaction.create({
+            name: 'startTask',
+            action: Action.create({ name: 'startTask' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        type: 'Entity',
+                        name: 'task',
+                        isRef: true,
+                        base: Task
+                    })
+                ]
+            })
+        })
+
+        const CompleteTaskInteraction = Interaction.create({
+            name: 'completeTask',
+            action: Action.create({ name: 'completeTask' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        type: 'Entity',
+                        name: 'task',
+                        isRef: true,
+                        base: Task
+                    })
+                ]
+            })
+        })
+        
+        const EscalateTaskInteraction = Interaction.create({
+            name: 'escalateTask',
+            action: Action.create({ name: 'escalateTask' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        type: 'Entity',
+                        name: 'task',
+                        isRef: true,
+                        base: Task
+                    })
+                ]
+            })
+        })
+
+        // 为 status 属性创建状态机
+        const statusProperty = Task.properties.find(p => p.name === 'status')!
+        const statusStateMachine = StateMachine.create({
+            states: [TodoState, InProgressState, DoneState, UrgentState],
+            transfers: [
+                // todo 状态只能通过 startTask 转换到 in_progress
+                StateTransfer.create({
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        type: 'create',
+                        record: {
+                            interactionName: StartTaskInteraction.name
+                        }
+                    },
+                    current: TodoState,
+                    next: InProgressState,
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.task.id })
+                }),
+                // urgent 状态只能通过 escalateTask 转换到 in_progress（不同的交互）
+                StateTransfer.create({
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        type: 'create',
+                        record: {
+                            interactionName: EscalateTaskInteraction.name
+                        }
+                    },
+                    current: UrgentState,
+                    next: InProgressState,
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.task.id })
+                }),
+                // in_progress 可以通过 completeTask 转换到 done
+                StateTransfer.create({
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        type: 'create',
+                        record: {
+                            interactionName: CompleteTaskInteraction.name
+                        }
+                    },
+                    current: InProgressState,
+                    next: DoneState,
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.task.id })
+                })
+            ],
+            defaultState: TodoState
+        })
+        statusProperty.computation = statusStateMachine
+
+        // 使用 Transform 从项目创建任务，并根据项目类型设置不同的初始状态
+        Task.computation = Transform.create({
+            record: Project,
+            attributeQuery: ['name', 'type'],
+            callback: async function(this: Controller, project: any) {
+                // 根据项目类型决定任务的初始状态
+                const initialState = project.type === 'urgent' ? UrgentState : TodoState
+                
+                // 创建任务数据
+                const taskData = {
+                    title: `Task for ${project.name}`,
+                    priority: project.type === 'urgent' ? 'high' : 'normal',
+                    // 设置初始状态值
+                    status: initialState.name
+                }
+                
+                // 使用 createStateData 创建状态数据
+                // 直接设置状态机的状态数据
+                // 对于 property-level StateMachine，key 格式为: _${entityName}_${propertyName}_bound_${stateName}
+
+                const stateData = await this.scheduler.createStateData(statusProperty, initialState)
+                
+                // 返回任务数据和状态数据
+                const result = {
+                    ...taskData,
+                    ...stateData
+                }
+                return result
+            }
+        })
+
+        // 设置测试环境
+        const system = new MonoSystem()
+        const controller = new Controller({
+            system,
+            entities: [Project, Task],
+            relations: [],
+            activities: [],
+            interactions: [StartTaskInteraction, CompleteTaskInteraction, EscalateTaskInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建普通项目 - 应该创建 todo 状态的任务
+        const normalProject = await controller.system.storage.create('Project', {
+            name: 'Normal Project',
+            type: 'normal'
+        })
+
+        // 验证创建了 todo 状态的任务
+        let tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(1)
+        expect(tasks[0].title).toBe('Task for Normal Project')
+        expect(tasks[0].priority).toBe('normal')
+        expect(tasks[0].status).toBe('todo') // 默认状态
+
+        // 创建紧急项目 - 应该创建 urgent 状态的任务
+        const urgentProject = await controller.system.storage.create('Project', {
+            name: 'Urgent Project',
+            type: 'urgent'
+        })
+
+        // 验证创建了 urgent 状态的任务
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(2)
+        const urgentTask = tasks.find(t => t.title === 'Task for Urgent Project')
+        expect(urgentTask).toBeDefined()
+        expect(urgentTask.priority).toBe('high')
+        
+        // 检查状态数据是否正确设置
+        const stateKey = '_Task_status_bound_currentState'
+        const urgentTaskWithState = await controller.system.storage.findOne('Task', BoolExp.atom({key: 'id', value: ['=', urgentTask.id]}), undefined, ['*', stateKey])
+        expect(urgentTaskWithState[stateKey]).toBe('urgent')
+        expect(urgentTask.status).toBe('urgent') // 自定义的初始状态，不是 defaultState
+
+        // 测试状态机的后续转换是否正常工作
+        // urgent 状态的任务需要使用 escalateTask 才能转换（而不是 startTask）
+        // 先尝试错误的交互 - startTask 不应该对 urgent 状态的任务生效
+        await controller.callInteraction('startTask', {
+            user: { id: 'test-user' },
+            payload: {
+                task: { id: urgentTask.id }
+            }
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        let currentUrgentTask = tasks.find(t => t.id === urgentTask.id)
+        expect(currentUrgentTask.status).toBe('urgent') // 应该仍然是 urgent，因为 startTask 不适用于 urgent 状态
+
+        // 使用正确的交互 - escalateTask
+        await controller.callInteraction('escalateTask', {
+            user: { id: 'test-user' },
+            payload: {
+                task: { id: urgentTask.id }
+            }
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        currentUrgentTask = tasks.find(t => t.id === urgentTask.id)
+        expect(currentUrgentTask.status).toBe('in_progress') // 现在应该转换成功
+
+        // todo 状态的任务使用 startTask 可以转换
+        const todoTask = tasks.find(t => t.title === 'Task for Normal Project')
+        await controller.callInteraction('startTask', {
+            user: { id: 'test-user' },
+            payload: {
+                task: { id: todoTask.id }
+            }
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        const startedTodoTask = tasks.find(t => t.id === todoTask.id)
+        expect(startedTodoTask.status).toBe('in_progress')
+        
+        // 测试 todo 状态的任务不能使用 escalateTask
+        const anotherTodoTask = tasks.find(t => t.title === 'Task for Another Urgent' && t.status === 'urgent')
+        if (anotherTodoTask) {
+            // 重置为 todo 状态进行测试
+            await controller.system.storage.update('Task', BoolExp.atom({key: 'id', value: ['=', anotherTodoTask.id]}), {status: 'todo'})
+            
+            await controller.callInteraction('escalateTask', {
+                user: { id: 'test-user' },
+                payload: {
+                    task: { id: anotherTodoTask.id }
+                }
+            })
+            
+            const updatedTask = await controller.system.storage.findOne('Task', BoolExp.atom({key: 'id', value: ['=', anotherTodoTask.id]}), undefined, ['status'])
+            expect(updatedTask.status).toBe('todo') // 应该仍然是 todo，因为 escalateTask 不适用于 todo 状态
+        }
+
+        // 完成任务 - 两种路径转换到 in_progress 的任务都可以被完成
+        await controller.callInteraction('completeTask', {
+            user: { id: 'test-user' },
+            payload: {
+                task: { id: currentUrgentTask.id }
+            }
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        const completedUrgentTask = tasks.find(t => t.id === urgentTask.id)
+        expect(completedUrgentTask.status).toBe('done')
+        
+        await controller.callInteraction('completeTask', {
+            user: { id: 'test-user' },
+            payload: {
+                task: { id: todoTask.id }
+            }
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        const completedTodoTask = tasks.find(t => t.id === todoTask.id)
+        expect(completedTodoTask.status).toBe('done')
+
+        // 创建另一个项目，测试动态任务创建
+        const anotherUrgentProject = await controller.system.storage.create('Project', {
+            name: 'Another Urgent',
+            type: 'urgent'
+        })
+
+        tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
+        expect(tasks.length).toBe(3)
+        const anotherUrgentTask = tasks.find(t => t.title === 'Task for Another Urgent')
+        expect(anotherUrgentTask.status).toBe('urgent') // 验证新任务也有正确的初始状态
+    })
+
     test('create entity with relations through state machine', async () => {
         // 使用 Transform 创建实体和关系，使用 HardDeletionProperty 删除
         const { HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE, Transform, BoolExp, InteractionEventEntity } = await import('interaqt')

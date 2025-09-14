@@ -166,6 +166,7 @@ export interface DataBasedComputation {
     useLastValue?: boolean
     // 异步计算，就会声明这个函数
     asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
+    createStateData?: (...args: any[]) => Promise<{[key: string]: any}>
 }
 
 
@@ -187,6 +188,7 @@ export interface EventBasedComputation {
     getDefaultValue?: (...args: any[]) => any
     computeDirtyRecords?: (...args: any[]) => Promise<any[]|undefined>
     asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
+    createStateData?: (...args: any[]) => Promise<{[key: string]: any}>
 }
 
 export type Computation = DataBasedComputation|EventBasedComputation

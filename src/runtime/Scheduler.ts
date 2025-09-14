@@ -25,7 +25,7 @@ export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
 type ComputationContextType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Scheduler {
-    computationsHandles = new Set<Computation>()
+    computationsHandles = new Map<IInstance, Computation>()
     private sourceMapManager: ComputationSourceMapManager
     private computationHandleMap: Map<any, { [key in ComputationContextType]?: { new(...args: any[]): Computation } }> = new Map()
     
@@ -82,8 +82,6 @@ export class Scheduler {
             })
         })
 
-        
-
 
         for(const computationInput of computationInputs) {
             const dataContext = computationInput.dataContext
@@ -93,9 +91,7 @@ export class Scheduler {
             const ComputationCtor = contextMap![dataContext.type] as ComputationClass
             assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.displayName || args.constructor.name} with context type ${dataContext.type}`)
             const computationHandle = new ComputationCtor(this.controller, args, dataContext)
-            this.computationsHandles.add(computationHandle)
-            // dataContext.id.computation!.handle = computationHandle
-            
+            this.computationsHandles.set(dataContext.id, computationHandle)
 
             // 为每一个 async computation 建立自己所需要的 task 任务表。应该每一个 asyncComputation 都有一张独立的表。global state 总共一张。
             if(this.isAsyncComputation(computationHandle)) {
@@ -236,7 +232,7 @@ export class Scheduler {
     }
     createStates() {
         const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}[] = []
-        for(const computation of this.computationsHandles) {
+        for(const computation of this.computationsHandles.values()) {
             if (computation.createState) {
                 const state = computation.createState()
                 states.push({dataContext: computation.dataContext, state})
@@ -265,8 +261,14 @@ export class Scheduler {
         return states
     }
 
+    async createStateData(instance: IInstance, ...args: any[]) {
+        const computationHandle = this.computationsHandles.get(instance)
+        assert(!!computationHandle, `cannot find computation handle`)
+        return computationHandle!.createStateData?.(...args) ?? {}
+    }
+
     async setupDefaultValues() {
-        for(const computation of this.computationsHandles) {
+        for(const computation of this.computationsHandles.values()) {
             // CAUTION 非 property 的 computation 的 defaultValue 直接 applyResult 即可。
             
             if(computation.getDefaultValue) {
@@ -296,8 +298,8 @@ export class Scheduler {
             }
         }
     }
-    async setupStateDefaultValues() {
-        for(const computation of this.computationsHandles) {
+    async setupGlobalBoundStateDefaultValues() {
+        for(const computation of this.computationsHandles.values()) {
             const computationHandle = computation as Computation
             // 1. 创建计算所需要的 state
             if (computationHandle.state) {
@@ -313,7 +315,7 @@ export class Scheduler {
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
     async setupMutationListeners() {
-        this.sourceMapManager.initialize(this.computationsHandles)
+        this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
         this.controller.system.storage.listen(async (mutationEvents) => {
@@ -832,7 +834,7 @@ export class Scheduler {
 
             // entity/relation/dict 中的 computation 内部的 state 的 default value.
             try {
-                await this.setupStateDefaultValues()
+                await this.setupGlobalBoundStateDefaultValues()
             } catch (e) {
                 const error = new SchedulerError('Failed to setup computation state default values', {
                     schedulingPhase: 'state-default-values-setup',
