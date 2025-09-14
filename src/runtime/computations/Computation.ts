@@ -10,7 +10,7 @@ import { DICTIONARY_RECORD } from "../System";
 // Types from ComputationHandle.ts
 export type GlobalDataContext = {
     type: 'global',
-    id: string
+    id: DictionaryInstance
 }
 
 export type EntityDataContext = {

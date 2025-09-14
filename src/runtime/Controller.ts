@@ -168,7 +168,7 @@ export class Controller {
     
     async retrieveLastValue(dataContext: DataContext, record?: any) {
         if (dataContext.type === 'global') {
-            return this.system.storage.dict.get(dataContext.id! as string)
+            return this.system.storage.dict.get(dataContext.id.name)
         } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
             return this.system.storage.find(dataContext.id.name!, undefined, undefined, ['*'])
         } else {
@@ -183,7 +183,7 @@ export class Controller {
         if (result instanceof ComputationResultSkip) return
 
         if (dataContext.type === 'global') {
-            return this.system.storage.dict.set(dataContext.id! as string, result)
+            return this.system.storage.dict.set(dataContext.id.name, result)
         } else if (dataContext.type === 'entity') {
             if (result === undefined || result === null) return
             // Entity 级别的计算结果完全替换实体表中的所有记录
@@ -221,7 +221,7 @@ export class Controller {
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {
                 if (dataContext.type === 'global') {
-                    return this.system.storage.dict.set(dataContext.id! as string, patch)
+                    return this.system.storage.dict.set(dataContext.id.name, patch)
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
                 if (patch.type === 'insert') {  

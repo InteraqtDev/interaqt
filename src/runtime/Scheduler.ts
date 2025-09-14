@@ -1,5 +1,5 @@
 import { MatchExp } from "@storage";
-import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance } from "@shared";
+import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance, DictionaryInstance } from "@shared";
 import { DataBasedEntityEventsSourceMap, EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
 import { DataContext, PropertyDataContext, EntityDataContext, RelationDataContext } from "./computations/Computation.js";
@@ -33,7 +33,7 @@ export class Scheduler {
         public controller: Controller, 
         entities: EntityInstance[], 
         relations: RelationInstance[], 
-        dict: PropertyInstance[],
+        dict: DictionaryInstance[],
         computationHandles: Array<{ new(...args: any[]): Computation }>
     ) {
         this.sourceMapManager = new ComputationSourceMapManager(this.controller, this)
@@ -44,7 +44,7 @@ export class Scheduler {
         // 因为目前没有设计 before/after 等机制，所以以最常见的需求来排列。
         dict.forEach(dictItem => {
             if (dictItem.computation) {
-                computationInputs.push({dataContext: {type: 'global',id: dictItem.name},args: dictItem.computation})
+                computationInputs.push({dataContext: {type: 'global',id: dictItem},args: dictItem.computation})
             }
         })
 
@@ -228,7 +228,7 @@ export class Scheduler {
 
         const stateDataContextKey = dataContext.type === 'property' ? 
             `${dataContext.host.name}_${dataContext.id.name}` : 
-            (dataContext.type === 'entity' || dataContext.type === 'relation') ? dataContext.id.name : dataContext.id
+            dataContext.id.name
 
         return `_${stateDataContextKey}_bound_${stateName}`
     }
@@ -253,7 +253,7 @@ export class Scheduler {
                             } else if (computation.dataContext.type === 'relation') {
                                 stateItem.record = (computation.dataContext as RelationDataContext)!.id.name!
                             } else {
-                                throw new Error(`global data context ${computation.dataContext.id} must specify record name for RecordBoundState`)
+                                throw new Error(`global data context ${(computation.dataContext as any).id.name} must specify record name for RecordBoundState`)
                             }
                         }
                     }
@@ -507,10 +507,10 @@ export class Scheduler {
             const propertyContext = computation.dataContext as PropertyDataContext
             return `${ASYNC_TASK_RECORD}_${propertyContext.host.name}_${propertyContext.id.name}`
         } else if (computation.dataContext.type === 'global') {
-            return `${ASYNC_TASK_RECORD}_${computation.dataContext.id}`
+            return `${ASYNC_TASK_RECORD}_${computation.dataContext.id.name}`
         } else {
             // entity 或其他类型
-            return `${ASYNC_TASK_RECORD}_${computation.dataContext.type}_${(computation.dataContext as any).id?.name || computation.dataContext.id}`
+            return `${ASYNC_TASK_RECORD}_${computation.dataContext.type}_${(computation.dataContext as any).id?.name}`
         }
     }
     async createAsyncTask(computation: Computation, args: any, record?: any, result?: any) {

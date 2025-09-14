@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "vitest";
-import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD } from 'interaqt';
+import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD, GlobalDataContext } from 'interaqt';
 import { Expression } from 'interaqt';
 
 describe('RealTime computed handle', () => {
@@ -58,7 +58,7 @@ describe('RealTime computed handle', () => {
     // Verify RealTime state management
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'currentTimestamp'
+                   (computation.dataContext as GlobalDataContext).id.name === 'currentTimestamp'
     );
     expect(realTimeComputation).toBeDefined();
     expect(realTimeComputation?.state).toBeDefined();
@@ -136,7 +136,7 @@ describe('RealTime computed handle', () => {
     // Verify RealTime state management for Inequality type
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'isTimeExpired'
+                   (computation.dataContext as GlobalDataContext).id.name === 'isTimeExpired'
     );
     expect(realTimeComputation).toBeDefined();
     expect(realTimeComputation?.state).toBeDefined();
@@ -213,7 +213,7 @@ describe('RealTime computed handle', () => {
     // Verify RealTime state management for Equation type
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'isExactMinute'
+                   (computation.dataContext as GlobalDataContext).id.name === 'isExactMinute'
     );
     expect(realTimeComputation).toBeDefined();
     expect(realTimeComputation?.state).toBeDefined();
@@ -376,7 +376,7 @@ describe('RealTime computed handle', () => {
     // Verify RealTime state management for complex mathematical expressions
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'complexTimeValue'
+                   (computation.dataContext as GlobalDataContext).id.name === 'complexTimeValue'
     );
     expect(realTimeComputation).toBeDefined();
     expect(realTimeComputation?.state).toBeDefined();
@@ -457,7 +457,7 @@ describe('RealTime computed handle', () => {
     // Verify RealTime state management for dataDeps computation
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'scaledTimestamp'
+                   (computation.dataContext as GlobalDataContext).id.name === 'scaledTimestamp'
     );
     expect(realTimeComputation).toBeDefined();
     expect(realTimeComputation?.state).toBeDefined();
@@ -542,7 +542,7 @@ describe('RealTime computed handle', () => {
     // Verify RealTime state management for business logic computation
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'isBusinessHours'
+                   (computation.dataContext as GlobalDataContext).id.name === 'isBusinessHours'
     );
     expect(realTimeComputation).toBeDefined();
     expect(realTimeComputation?.state).toBeDefined();
@@ -718,7 +718,7 @@ describe('RealTime computed handle', () => {
     // Get the computation instance to verify state is being managed
     const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
       computation => computation.dataContext.type === 'global' && 
-                   computation.dataContext.id === 'timeBasedCounter'
+                   (computation.dataContext as GlobalDataContext).id.name === 'timeBasedCounter'
     );
     
     expect(realTimeComputation).toBeDefined();

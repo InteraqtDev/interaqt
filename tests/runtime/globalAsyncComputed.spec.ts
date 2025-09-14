@@ -285,7 +285,7 @@ describe('Global async computed', () => {
     
     // 获取统计计算的异步任务
     const statsComputation = Array.from(controller.scheduler.computations.values()).find(
-      computation => computation.dataContext.type === 'global' && computation.dataContext.id === 'productStats'
+      computation => computation.dataContext.type === 'global' && (computation.dataContext as GlobalDataContext).id.name === 'productStats'
     )! as DataBasedComputation;
     
     const statsTaskRecordName = controller.scheduler.getAsyncTaskRecordKey(statsComputation);
