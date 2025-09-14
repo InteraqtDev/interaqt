@@ -289,13 +289,13 @@ export class InteractionCall {
         
         for(let payloadDef of payloadDefs) {
 
-            const payloadItem = interactionEvent.payload![payloadDef.name!]
-            if (payloadDef.required && !payloadItem) {
+
+            if (payloadDef.required && !(payloadDef.name in interactionEvent.payload!)) {
                 throw ConditionError.payloadValidationFailed(payloadDef.name!, 'missing', interactionEvent.payload)
             }
 
+            const payloadItem = interactionEvent.payload![payloadDef.name!]
             if (!payloadItem) return
-
 
             if (payloadDef.isCollection && !Array.isArray(payloadItem)) {
                 throw ConditionError.payloadValidationFailed(payloadDef.name!, 'data is not array', payloadItem)

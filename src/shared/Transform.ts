@@ -6,6 +6,8 @@ import { DataDep } from './Computation.js';
 type EventDep = {
   recordName: string;
   type: 'create'|'delete'|'update';
+  record?:any
+  oldRecord?:any
 };
 
 export interface TransformInstance extends IInstance {
