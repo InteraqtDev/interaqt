@@ -119,6 +119,12 @@ Or if you want to use state name as value, you should not set ${this.dataContext
         await this.state.currentState.set(dirtyRecord, nextState.name)
         return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, mutationEvent)) : nextState.name
     }
+    // 给外部用的，因为可能在 Transform 里面设置初始值。
+    createRecordState(state: StateNodeInstance) {
+        return {
+            [this.state.currentState.key]: state.name
+        }
+    }
 }
 
 export const NON_EXIST_STATE = StateNode.create({

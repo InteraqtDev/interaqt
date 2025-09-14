@@ -50,7 +50,7 @@ export interface IInstance {
 /**
  * Union type of all computation instances
  */
-export type ComputationInstance = 
+export type ComputationInstance = (
   | CountInstance 
   | SummationInstance 
   | AverageInstance 
@@ -60,7 +60,7 @@ export type ComputationInstance =
   | TransformInstance 
   | StateMachineInstance 
   | RealTimeInstance
-  | CustomInstance;
+  | CustomInstance) & { handle?: any };
 
 /**
  * Record type that can be used in computations

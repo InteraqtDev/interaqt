@@ -21,7 +21,8 @@ import {
   HardDeletionProperty,
   DELETED_STATE,
   NON_DELETED_STATE,
-  HARD_DELETION_PROPERTY_NAME
+  HARD_DELETION_PROPERTY_NAME,
+  PropertyStateMachineHandle
 } from 'interaqt';
 
 describe('Version Control Example with Hard Delete', () => {
@@ -100,12 +101,6 @@ describe('Version Control Example with Hard Delete', () => {
       defaultState: draftState,
       transfers: [
         StateTransfer.create({ 
-          trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: PublishStyle.name } }, 
-          current: draftState, 
-          next: publishedState,
-          computeTarget: (mutationEvent: RecordMutationEvent) => ({ id: mutationEvent.record!.payload.styleId })
-        }),
-        StateTransfer.create({ 
           trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: OfflineStyle.name } }, 
           current: publishedState, 
           next: offlineState,
@@ -135,6 +130,7 @@ describe('Version Control Example with Hard Delete', () => {
           return {
             version: newVersion,
             publishedAt: timestamp,
+            publishedStyleId: event.payload.styleId,
             type: 'publish'
           };
         } else if (event.interactionName === 'RollbackVersion') {
@@ -222,12 +218,15 @@ describe('Version Control Example with Hard Delete', () => {
               ['*']
             );
 
-            return currentStyles.map(style => ({
-              ...style,
-              id: undefined,
-              version: versionInfo.version,
-              createdAt: versionInfo.publishedAt,
-            }));
+            return currentStyles.map(style => {
+              return {
+                ...style,
+                id: undefined,
+                version: versionInfo.version,
+                createdAt: versionInfo.publishedAt,
+                status: style.id === versionInfo.publishedStyleId ? 'published' : style.status
+              }
+            });
           } else if (versionInfo.type === 'rollback') {
             // Copy styles from rollback target version
             const targetStyles = await this.system.storage.find('VersionedStyle',
@@ -329,7 +328,7 @@ describe('Version Control Example with Hard Delete', () => {
     expect(styles[0].version).toBe(0);
 
     // 2. Publish one style
-    const styleToPublish = styles[0];
+    const styleToPublish = styles.find(s => s.content === 'Style 1 content')!;
     const publishResult = await controller.callInteraction('PublishStyle', {
       user,
       payload: { styleId: styleToPublish.id }
@@ -360,6 +359,10 @@ describe('Version Control Example with Hard Delete', () => {
     expect(version0Styles).toHaveLength(2); // Original version still exists
     expect(version1Styles).toHaveLength(2); // New version created
     
+    const styleBeforePublished = version0Styles.find(s => s.content === 'Style 1 content');
+    expect(styleBeforePublished).toBeDefined();
+    expect(styleBeforePublished.status).toBe('draft');
+
     // Check the published style in new version
     const publishedStyle = version1Styles.find(s => s.content === 'Style 1 content');
     const otherStyle = version1Styles.find(s => s.content === 'Style 2 content');
@@ -448,5 +451,7 @@ describe('Version Control Example with Hard Delete', () => {
     
     console.log(`Version 0: ${version0Count}, Version 1: ${version1Count}, Version 3: ${version3Count}`);
     expect(finalStyles.length).toBe(version0Count + version1Count + version3Count);
+
+    
   });
 });

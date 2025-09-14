@@ -96,12 +96,6 @@ describe('Version Control Example', () => {
       defaultState: draftState,
       transfers: [
         StateTransfer.create({ 
-          trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: PublishStyle.name } }, 
-          current: draftState, 
-          next: publishedState,
-          computeTarget: (mutationEvent: RecordMutationEvent) => ({ id: mutationEvent.record!.payload.styleId })
-        }),
-        StateTransfer.create({ 
           trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: OfflineStyle.name } }, 
           current: publishedState, 
           next: offlineState,
@@ -131,7 +125,8 @@ describe('Version Control Example', () => {
           return {
             version: newVersion,
             publishedAt: timestamp,
-            type: 'publish'
+            type: 'publish',
+            publishedStyleId: event.payload.styleId
           };
         } else if (event.interactionName === 'RollbackVersion') {
           return {
@@ -225,6 +220,7 @@ describe('Version Control Example', () => {
               id: undefined,
               version: versionInfo.version,
               createdAt: versionInfo.publishedAt,
+              status: versionInfo.publishedStyleId === style.id ? 'published' : 'draft'
             }));
           } else if (versionInfo.type === 'rollback') {
             // Copy styles from rollback target version

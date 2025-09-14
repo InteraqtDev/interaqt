@@ -39,12 +39,32 @@ export class Scheduler {
         this.sourceMapManager = new ComputationSourceMapManager(this.controller, this)
         this.buildComputationHandleMap(computationHandles)
         const computationInputs: {dataContext: DataContext, args: IInstance}[] = []
+        
+        // 这里收集 computation 的顺序有意义。
+        // 因为目前没有设计 before/after 等机制，所以以最常见的需求来排列。
+        dict.forEach(dictItem => {
+            if (dictItem.computation) {
+                computationInputs.push({dataContext: {type: 'global',id: dictItem.name},args: dictItem.computation})
+            }
+        })
+
+        // 把 entity/relation 的 computation 拆到最后，是因为有可能删除了，property 的变化就不需要了。
         entities.forEach(entity => {
             if (entity.computation) {
                 computationInputs.push({dataContext: {type: 'entity',id: entity},args: entity.computation})
             }
+        })
 
-            // property 的
+        // relation 
+        relations.forEach(relation => {
+            const relationWithComputation = relation as RelationInstance & { computation?: unknown; properties?: PropertyInstance[] };
+            if(relationWithComputation.computation) {
+                computationInputs.push({dataContext: {type: 'relation',id: relation},args: relationWithComputation.computation})
+            }
+        })
+
+        // entity 的 property
+        entities.forEach(entity => {
             entity.properties?.forEach(property => {
                 if(property.computation) {
                     computationInputs.push({dataContext: {type: 'property',host: entity,id: property},args: property.computation})
@@ -52,27 +72,17 @@ export class Scheduler {
             })
         })
 
-        // relation 的
+        // relation 的 property
         relations.forEach(relation => {
             const relationWithComputation = relation as RelationInstance & { computation?: unknown; properties?: PropertyInstance[] };
-            if(relationWithComputation.computation) {
-                computationInputs.push({dataContext: {type: 'relation',id: relation},args: relationWithComputation.computation})
-            }
-
-            if (relationWithComputation.properties) {
-                relationWithComputation.properties.forEach((property: PropertyInstance) => {
-                    if (property.computation) {
-                        computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computation})
-                    }
-                })
-            }
+            relationWithComputation.properties?.forEach((property: PropertyInstance) => {
+                if (property.computation) {
+                    computationInputs.push({dataContext: {type: 'property',host: relation,id: property},args: property.computation})
+                }
+            })
         })
 
-        dict.forEach(dictItem => {
-            if (dictItem.computation) {
-                computationInputs.push({dataContext: {type: 'global',id: dictItem.name},args: dictItem.computation})
-            }
-        })
+        
 
 
         for(const computationInput of computationInputs) {
@@ -84,7 +94,6 @@ export class Scheduler {
             assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.displayName || args.constructor.name} with context type ${dataContext.type}`)
             const computation = new ComputationCtor(this.controller, args, dataContext)
             this.computations.add(computation)
-
 
             // 为每一个 async computation 建立自己所需要的 task 任务表。应该每一个 asyncComputation 都有一张独立的表。global state 总共一张。
             if(this.isAsyncComputation(computation)) {
