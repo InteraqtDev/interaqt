@@ -56,7 +56,7 @@ describe('RealTime computed handle', () => {
     expect(computedValue).toBeGreaterThan(1000000); // Should be a large timestamp divided by 1000
     
     // Verify RealTime state management
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'currentTimestamp'
     );
@@ -134,7 +134,7 @@ describe('RealTime computed handle', () => {
     expect(isExpired).toBeFalsy();
     
     // Verify RealTime state management for Inequality type
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'isTimeExpired'
     );
@@ -211,7 +211,7 @@ describe('RealTime computed handle', () => {
     expect(typeof isExactMinute).toBe('boolean');
     
     // Verify RealTime state management for Equation type
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'isExactMinute'
     );
@@ -293,7 +293,7 @@ describe('RealTime computed handle', () => {
     expect(userWithTime.currentTimeSeconds).toBeGreaterThan(1000000); // Should be a large timestamp in seconds
     
     // Verify RealTime state management for property-level computation
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'property' && 
                    computation.dataContext.host.name === 'User' &&
                    computation.dataContext.id.name === 'currentTimeSeconds'
@@ -374,7 +374,7 @@ describe('RealTime computed handle', () => {
     expect(complexValue).toBeGreaterThan(0);
     
     // Verify RealTime state management for complex mathematical expressions
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'complexTimeValue'
     );
@@ -455,7 +455,7 @@ describe('RealTime computed handle', () => {
     expect(scaledValue).toBeGreaterThan(Date.now()); // Should be larger due to multiplier
     
     // Verify RealTime state management for dataDeps computation
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'scaledTimestamp'
     );
@@ -540,7 +540,7 @@ describe('RealTime computed handle', () => {
     expect(typeof isBusinessHours).toBe('boolean');
     
     // Verify RealTime state management for business logic computation
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'isBusinessHours'
     );
@@ -641,7 +641,7 @@ describe('RealTime computed handle', () => {
     expect(oldUserData.isRecentlyActive).toBeFalsy();
     
     // Verify RealTime state management for user-specific computation
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'property' && 
                    computation.dataContext.host.name === 'User' &&
                    computation.dataContext.id.name === 'isRecentlyActive'
@@ -716,7 +716,7 @@ describe('RealTime computed handle', () => {
     await controller.setup(true);
     
     // Get the computation instance to verify state is being managed
-    const realTimeComputation = Array.from(controller.scheduler.computations.values()).find(
+    const realTimeComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'global' && 
                    (computation.dataContext as GlobalDataContext).id.name === 'timeBasedCounter'
     );

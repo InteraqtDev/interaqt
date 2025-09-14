@@ -25,7 +25,7 @@ export const ASYNC_TASK_RECORD = '_ASYNC_TASK_'
 type ComputationContextType = 'global' | 'entity' | 'relation' | 'property'
 
 export class Scheduler {
-    computations = new Set<Computation>()
+    computationsHandles = new Set<Computation>()
     private sourceMapManager: ComputationSourceMapManager
     private computationHandleMap: Map<any, { [key in ComputationContextType]?: { new(...args: any[]): Computation } }> = new Map()
     
@@ -92,14 +92,16 @@ export class Scheduler {
             assert(!!contextMap, `cannot find Computation handle map for ${args.constructor.displayName || args.constructor.name}`)
             const ComputationCtor = contextMap![dataContext.type] as ComputationClass
             assert(!!ComputationCtor, `cannot find Computation handle for ${args.constructor.displayName || args.constructor.name} with context type ${dataContext.type}`)
-            const computation = new ComputationCtor(this.controller, args, dataContext)
-            this.computations.add(computation)
+            const computationHandle = new ComputationCtor(this.controller, args, dataContext)
+            this.computationsHandles.add(computationHandle)
+            // dataContext.id.computation!.handle = computationHandle
+            
 
             // 为每一个 async computation 建立自己所需要的 task 任务表。应该每一个 asyncComputation 都有一张独立的表。global state 总共一张。
-            if(this.isAsyncComputation(computation)) {
-                if (computation.dataContext.type === 'property') {
+            if(this.isAsyncComputation(computationHandle)) {
+                if (computationHandle.dataContext.type === 'property') {
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computation),
+                        name: this.getAsyncTaskRecordKey(computationHandle),
                         properties: [
                         Property.create({
                             name: 'status',
@@ -115,19 +117,19 @@ export class Scheduler {
                         })
                     ]})
                     const AsyncTaskRelation = Relation.create({
-                        name: `${AsyncTaskEntity.name}_${computation.dataContext.host.name}_${computation.dataContext.id.name}`,
+                        name: `${AsyncTaskEntity.name}_${computationHandle.dataContext.host.name}_${computationHandle.dataContext.id.name}`,
                         source: AsyncTaskEntity,
-                        target: computation.dataContext.host,
+                        target: computationHandle.dataContext.host,
                         sourceProperty: 'record',
-                        targetProperty: `_${computation.dataContext.id.name}_task`,
+                        targetProperty: `_${computationHandle.dataContext.id.name}_task`,
                         type: '1:1'
                     })
                     entities.push(AsyncTaskEntity)
                     relations.push(AsyncTaskRelation)
-                } else if (computation.dataContext.type === 'global') {
+                } else if (computationHandle.dataContext.type === 'global') {
                     // Global 类型的异步任务表
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computation),
+                        name: this.getAsyncTaskRecordKey(computationHandle),
                         properties: [
                             Property.create({
                                 name: 'status',
@@ -148,11 +150,11 @@ export class Scheduler {
                         ]
                     })
                     entities.push(AsyncTaskEntity)
-                } else if (computation.dataContext.type === 'entity') {
+                } else if (computationHandle.dataContext.type === 'entity') {
                     // Entity 类型的异步任务表
-                    const entityContext = computation.dataContext as EntityDataContext
+                    const entityContext = computationHandle.dataContext as EntityDataContext
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computation),
+                        name: this.getAsyncTaskRecordKey(computationHandle),
                         properties: [
                             Property.create({
                                 name: 'status',
@@ -173,11 +175,11 @@ export class Scheduler {
                         ]
                     })
                     entities.push(AsyncTaskEntity)
-                } else if (computation.dataContext.type === 'relation') {
+                } else if (computationHandle.dataContext.type === 'relation') {
                     // Relation 类型的异步任务表
-                    const relationContext = computation.dataContext as RelationDataContext
+                    const relationContext = computationHandle.dataContext as RelationDataContext
                     const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computation),
+                        name: this.getAsyncTaskRecordKey(computationHandle),
                         properties: [
                             Property.create({
                                 name: 'status',
@@ -234,7 +236,7 @@ export class Scheduler {
     }
     createStates() {
         const states: {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}[] = []
-        for(const computation of this.computations) {
+        for(const computation of this.computationsHandles) {
             if (computation.createState) {
                 const state = computation.createState()
                 states.push({dataContext: computation.dataContext, state})
@@ -264,7 +266,7 @@ export class Scheduler {
     }
 
     async setupDefaultValues() {
-        for(const computation of this.computations) {
+        for(const computation of this.computationsHandles) {
             // CAUTION 非 property 的 computation 的 defaultValue 直接 applyResult 即可。
             
             if(computation.getDefaultValue) {
@@ -295,7 +297,7 @@ export class Scheduler {
         }
     }
     async setupStateDefaultValues() {
-        for(const computation of this.computations) {
+        for(const computation of this.computationsHandles) {
             const computationHandle = computation as Computation
             // 1. 创建计算所需要的 state
             if (computationHandle.state) {
@@ -311,7 +313,7 @@ export class Scheduler {
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
     async setupMutationListeners() {
-        this.sourceMapManager.initialize(this.computations)
+        this.sourceMapManager.initialize(this.computationsHandles)
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
         this.controller.system.storage.listen(async (mutationEvents) => {

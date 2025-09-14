@@ -129,7 +129,7 @@ describe('async computed', () => {
             computations: TestCrawlerHandles
         })
         await controller.setup(true)
-        const crawlerComputation = Array.from(controller.scheduler.computations.values()).find(
+        const crawlerComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
             computation => computation.dataContext.type === 'property' && computation.dataContext.host === URLEntity && computation.dataContext.id.name === 'content'
         )! as DataBasedComputation
         const crawlerTaskRecordName = controller.scheduler.getAsyncTaskRecordKey(crawlerComputation)

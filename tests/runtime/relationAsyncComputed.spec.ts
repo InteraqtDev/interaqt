@@ -194,12 +194,12 @@ describe('Relation async computed', () => {
     await controller.setup(true);
     
     // 获取关系计算实例
-    console.log('All computations:', Array.from(controller.scheduler.computations).map(c => ({
+    console.log('All computations:', Array.from(controller.scheduler.computationsHandles).map(c => ({
       type: c.dataContext.type,
       id: c.dataContext.type === 'relation' ? (c.dataContext as RelationDataContext).id.name : c.dataContext.id
     })));
     
-    const relationComputation = Array.from(controller.scheduler.computations).find(
+    const relationComputation = Array.from(controller.scheduler.computationsHandles).find(
       computation => computation.dataContext.type === 'relation' && 
                     (computation.dataContext as RelationDataContext).id.name === 'UserItem'
     ) as DataBasedComputation;

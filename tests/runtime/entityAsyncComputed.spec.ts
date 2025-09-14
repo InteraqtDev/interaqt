@@ -173,7 +173,7 @@ describe('Entity async computed', () => {
     await controller.setup(true);
     
     // 获取实体计算实例
-    const recommendationComputation = Array.from(controller.scheduler.computations.values()).find(
+    const recommendationComputation = Array.from(controller.scheduler.computationsHandles.values()).find(
       computation => computation.dataContext.type === 'entity' && 
                     (computation.dataContext as EntityDataContext).id.name === 'Recommendation'
     )! as DataBasedComputation;
