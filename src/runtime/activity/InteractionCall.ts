@@ -295,7 +295,7 @@ export class InteractionCall {
             }
 
             const payloadItem = interactionEvent.payload![payloadDef.name!]
-            if (!payloadItem) return
+            if (payloadItem===undefined) return
 
             if (payloadDef.isCollection && !Array.isArray(payloadItem)) {
                 throw ConditionError.payloadValidationFailed(payloadDef.name!, 'data is not array', payloadItem)
