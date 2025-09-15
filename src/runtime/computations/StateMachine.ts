@@ -32,6 +32,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
                 recordName: transfer.trigger.recordName,
                 type: transfer.trigger.type
             }
+            // this.eventDeps[eventDepName] = transfer.trigger
         }
     }
     createState() {

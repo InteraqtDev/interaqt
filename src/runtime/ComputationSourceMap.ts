@@ -127,6 +127,8 @@ export class ComputationSourceMapManager {
                     sortedERMutationEventSources[eventDep.phase||PHASE_NORMAL].push({
                         type: eventDep.type,
                         recordName: eventDep.recordName,
+                        record: eventDep.record,
+                        oldRecord: eventDep.oldRecord,
                         computation
                     } as EventBasedEntityEventsSourceMap)
 
@@ -194,6 +196,81 @@ export class ComputationSourceMapManager {
             )
         }
         
+    }
+
+    /**
+     * 检查 EventBasedComputation 的 eventDep 是否匹配当前的 mutation event
+     * @param source EventBasedEntityEventsSourceMap  
+     * @param mutationEvent RecordMutationEvent
+     * @returns 是否匹配
+     */
+    shouldTriggerEventBasedComputation(source: EventBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent): boolean {
+        // 对于 EventBasedComputation，检查 eventDep 中的 record 和 oldRecord 字段是否匹配
+        const eventDep = source as EventDep & { computation: Computation }
+        
+        
+        // 如果 eventDep 中定义了 record 字段，需要深度匹配
+        if (eventDep.record !== undefined) {
+            // 对于 update 操作，mutationEvent.record 可能只包含更新的字段
+            // 所以我们需要将 oldRecord 和 record 合并来获得完整的当前状态
+            let actualRecord = mutationEvent.record;
+            if (mutationEvent.type === 'update' && mutationEvent.oldRecord) {
+                // 合并 oldRecord 和 record 来获得完整的当前记录
+                actualRecord = { ...mutationEvent.oldRecord, ...mutationEvent.record };
+            }
+            
+            if (!this.deepMatch(actualRecord, eventDep.record)) {
+                return false
+            }
+        }
+        
+        // 如果 eventDep 中定义了 oldRecord 字段，需要深度匹配
+        if (eventDep.oldRecord !== undefined) {
+            if (!this.deepMatch(mutationEvent.oldRecord, eventDep.oldRecord)) {
+                return false
+            }
+        }
+        
+        return true
+    }
+
+    /**
+     * 深度匹配对象
+     * @param actual 实际的对象
+     * @param expected 期望匹配的模式
+     * @returns 是否匹配
+     */
+    private deepMatch(actual: any, expected: any): boolean {
+        // 如果期望值是 null 或 undefined，直接比较
+        if (expected === null || expected === undefined) {
+            return actual === expected
+        }
+        
+        // 如果期望值是原始类型，直接比较
+        if (typeof expected !== 'object') {
+            return actual === expected
+        }
+        
+        // 如果实际值不是对象，不匹配
+        if (typeof actual !== 'object' || actual === null) {
+            return false
+        }
+        
+        // 深度匹配对象的每个属性
+        for (const key in expected) {
+            if (expected.hasOwnProperty(key)) {
+                // 对于 actual 中不存在的 key，视为不匹配
+                // 这很重要，因为我们需要确保 expected 中声明的字段在 actual 中都存在
+                if (!(key in actual)) {
+                    return false
+                }
+                if (!this.deepMatch(actual[key], expected[key])) {
+                    return false
+                }
+            }
+        }
+        
+        return true
     }
 
     convertDataDepToERMutationEventsSourceMap(dataDepName:string, dataDep: DataDep, computation: Computation, eventType?: 'create'|'delete'|'update', isInitial: boolean = false): EntityEventSourceMap[] {

@@ -179,7 +179,9 @@ export interface DataBasedComputation {
 export type EventDep = {
     recordName:string,
     type: 'create'|'delete'|'update',
-    phase?: ComputationPhase
+    phase?: ComputationPhase,
+    record?: any,
+    oldRecord?: any
 }
 
 export interface EventBasedComputation {

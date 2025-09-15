@@ -326,6 +326,10 @@ export class Scheduler {
                         if(!this.sourceMapManager.shouldTriggerUpdateComputation(source, mutationEvent)) {
                             continue
                         }
+                        // 对于 EventBasedComputation，进行深度匹配检查
+                        if (!('dataDep' in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
+                            continue
+                        }
                         await this.runDirtyRecordsComputation(source, mutationEvent)
                     }
                 }

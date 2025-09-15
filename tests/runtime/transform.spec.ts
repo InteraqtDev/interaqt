@@ -1197,5 +1197,208 @@ describe('Transform computed handle', () => {
     expect(statusNotif.message).toContain('status changed to shipped');
   });
   
+  test('should support deep matching with eventDeps record field', async () => {
+    // Create entities
+    const orderEntity = Entity.create({
+      name: 'Order',
+      properties: [
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'status', type: 'string'}),
+        Property.create({name: 'priority', type: 'string'}),
+        Property.create({name: 'totalAmount', type: 'number'})
+      ]
+    });
+    
+    // Create audit entity that only tracks high priority orders
+    const highPriorityOrderAuditEntity = Entity.create({
+      name: 'HighPriorityOrderAudit',
+      properties: [
+        Property.create({name: 'action', type: 'string'}),
+        Property.create({name: 'orderId', type: 'string'}),
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'timestamp', type: 'string'}),
+        Property.create({name: 'details', type: 'object'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          HighPriorityOrderCreate: {
+            recordName: 'Order',
+            type: 'create',
+            record: {
+              priority: 'high'  // Only match orders with priority: 'high'
+            }
+          },
+          HighPriorityOrderUpdate: {
+            recordName: 'Order', 
+            type: 'update',
+            record: {
+              priority: 'high'  // Only match orders that are currently high priority
+            }
+          }
+        },
+        callback: function(mutationEvent: any) {
+          // Only process high priority orders
+          if (mutationEvent.recordName !== 'Order') {
+            return null;
+          }
+          
+          return {
+            action: mutationEvent.type,
+            orderId: mutationEvent.record.id.toString(),
+            orderNumber: mutationEvent.record.orderNumber,
+            timestamp: new Date().toISOString(),
+            details: {
+              status: mutationEvent.record.status,
+              totalAmount: mutationEvent.record.totalAmount,
+              oldStatus: mutationEvent.oldRecord?.status
+            }
+          };
+        }
+      })
+    });
+    
+    // Create another audit entity for status changes from pending to completed on high priority orders
+    const highPriorityStatusChangeAuditEntity = Entity.create({
+      name: 'HighPriorityStatusChangeAudit',
+      properties: [
+        Property.create({name: 'orderId', type: 'string'}),
+        Property.create({name: 'orderNumber', type: 'string'}),
+        Property.create({name: 'fromStatus', type: 'string'}),
+        Property.create({name: 'toStatus', type: 'string'}),
+        Property.create({name: 'changedAt', type: 'string'})
+      ],
+      computation: Transform.create({
+        eventDeps: {
+          StatusChange: {
+            recordName: 'Order',
+            type: 'update',
+            oldRecord: {
+              status: 'pending',  // Only match when old status was 'pending'
+              priority: 'high'    // AND old priority was 'high'
+            },
+            record: {
+              status: 'completed'  // And new status is 'completed'
+            }
+          }
+        },
+        callback: function(mutationEvent: any) {
+          if (mutationEvent.recordName !== 'Order' || mutationEvent.type !== 'update') {
+            return null;
+          }
+          
+          return {
+            orderId: mutationEvent.record.id.toString(),
+            orderNumber: mutationEvent.record.orderNumber || mutationEvent.oldRecord.orderNumber,
+            fromStatus: mutationEvent.oldRecord.status,
+            toStatus: mutationEvent.record.status,
+            changedAt: new Date().toISOString()
+          };
+        }
+      })
+    });
+    
+    const entities = [orderEntity, highPriorityOrderAuditEntity, highPriorityStatusChangeAuditEntity];
+    
+    // Setup system and controller
+    const system = new MonoSystem();
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+        system: system,
+        entities: entities,
+        relations: [],
+        activities: [],
+        interactions: []
+    });
+    await controller.setup(true);
+    
+    // Create a low priority order - should NOT trigger high priority audit
+    const lowPriorityOrder = await system.storage.create('Order', {
+      orderNumber: 'ORD-001',
+      status: 'pending',
+      priority: 'low',
+      totalAmount: 100
+    });
+    
+    // Check that no high priority audit was created
+    const highPriorityAudits1 = await system.storage.find('HighPriorityOrderAudit');
+    expect(highPriorityAudits1).toEqual([]);
+    
+    // Create a high priority order - should trigger high priority audit
+    const highPriorityOrder = await system.storage.create('Order', {
+      orderNumber: 'ORD-002',
+      status: 'pending',
+      priority: 'high',
+      totalAmount: 500
+    });
+    
+    // Check that high priority audit was created
+    const highPriorityAudits2 = await system.storage.find('HighPriorityOrderAudit', undefined, undefined, ['*']);
+    expect(highPriorityAudits2).toHaveLength(1);
+    expect(highPriorityAudits2[0].action).toBe('create');
+    expect(highPriorityAudits2[0].orderNumber).toBe('ORD-002');
+    expect(highPriorityAudits2[0].details.status).toBe('pending');
+    
+    // Update low priority order status - should NOT trigger high priority status change audit
+    await system.storage.update('Order',
+      BoolExp.atom({key: 'id', value: ['=', lowPriorityOrder.id]}),
+      {status: 'completed'}
+    );
+    
+    const highPriorityStatusChangeAudits1 = await system.storage.find('HighPriorityStatusChangeAudit');
+    expect(highPriorityStatusChangeAudits1).toEqual([]);
+    
+    // Update high priority order status from pending to completed - should trigger high priority status change audit
+    await system.storage.update('Order',
+      BoolExp.atom({key: 'id', value: ['=', highPriorityOrder.id]}),
+      {status: 'completed'}
+    );
+    
+    const highPriorityStatusChangeAudits2 = await system.storage.find('HighPriorityStatusChangeAudit', undefined, undefined, ['*']);
+    expect(highPriorityStatusChangeAudits2).toHaveLength(1);
+    expect(highPriorityStatusChangeAudits2[0].orderNumber).toBe('ORD-002');
+    expect(highPriorityStatusChangeAudits2[0].fromStatus).toBe('pending');
+    expect(highPriorityStatusChangeAudits2[0].toStatus).toBe('completed');
+    
+    // Also check that high priority order update was tracked
+    const highPriorityAudits3 = await system.storage.find('HighPriorityOrderAudit', undefined, undefined, ['*']);
+    expect(highPriorityAudits3).toHaveLength(2); // One create, one update
+    const updateAudit = highPriorityAudits3.find((a: any) => a.action === 'update');
+    expect(updateAudit).toBeDefined();
+    expect(updateAudit.details.status).toBe('completed');
+    expect(updateAudit.details.oldStatus).toBe('pending');
+    
+    // Update high priority order priority to low - future updates should NOT be tracked
+    await system.storage.update('Order',
+      BoolExp.atom({key: 'id', value: ['=', highPriorityOrder.id]}),
+      {priority: 'low'}
+    );
+    
+    // Update the now-low-priority order - should NOT trigger high priority audit
+    await system.storage.update('Order',
+      BoolExp.atom({key: 'id', value: ['=', highPriorityOrder.id]}),
+      {totalAmount: 600}
+    );
+    
+    // Verify no new high priority audits were created
+    const highPriorityAudits4 = await system.storage.find('HighPriorityOrderAudit');
+    expect(highPriorityAudits4).toHaveLength(2); // Still only 2
+    
+    // Create another high priority order and change status from processing to completed - should NOT trigger high priority status change audit
+    const order3 = await system.storage.create('Order', {
+      orderNumber: 'ORD-003',
+      status: 'processing',
+      priority: 'high',
+      totalAmount: 300
+    });
+    
+    await system.storage.update('Order',
+      BoolExp.atom({key: 'id', value: ['=', order3.id]}),
+      {status: 'completed'}
+    );
+    
+    // Verify no new high priority status change audits (only tracks pending->completed)
+    const highPriorityStatusChangeAudits3 = await system.storage.find('HighPriorityStatusChangeAudit');
+    expect(highPriorityStatusChangeAudits3).toHaveLength(1); // Still only 1
+  });
   
 });
