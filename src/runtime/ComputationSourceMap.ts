@@ -69,6 +69,11 @@ export type DataSourceMapTree = {
     }
 }
 
+export const PHASE_BEFORE_ALL = 0
+export const PHASE_NORMAL = 1
+export const PHASE_AFTER_ALL = 2
+export type ComputationPhase = typeof PHASE_BEFORE_ALL|typeof PHASE_NORMAL|typeof PHASE_AFTER_ALL
+
 // SourceMap 管理类 - 持有数据并提供查询接口
 export class ComputationSourceMapManager {
     private sourceMaps: EntityEventSourceMap[] = []
@@ -83,14 +88,22 @@ export class ComputationSourceMapManager {
      * @param sourceMaps EntityEventSourceMap 数组
      */
     initialize(computations: Set<Computation>): void {
-        const ERMutationEventSources: EntityEventSourceMap[]= []
+        const sortedERMutationEventSources: EntityEventSourceMap[][] = [[], [], []]
+
+        
 
         for(const computation of computations) {
             // 1. 根据 data deps 计算出 mutation events
             if( this.scheduler.isDataBasedComputation(computation)) {
-                ERMutationEventSources.push(
-                    ...Object.entries(computation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
-                )
+
+                Object.entries(computation.dataDeps).forEach(([dataDepName, dataDep]) => {
+                    const sources = this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)
+                    sortedERMutationEventSources[dataDep.phase || PHASE_NORMAL].push(...sources)
+                })
+
+                // ERMutationEventSources.push(
+                //     ...Object.entries(computation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
+                // )
 
                 // 2. 监听自身 record 的 create 事件，可能一开始创建就要执行一遍 computation. 如果依赖了已有的 global dict。
                 if (computation.dataContext.type === 'property' && Object.values(computation.dataDeps).some(dataDep => dataDep.type === 'global')) {
@@ -98,7 +111,8 @@ export class ComputationSourceMapManager {
                         type: 'records',
                         source: computation.dataContext.host,
                     }
-                    ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
+                    sortedERMutationEventSources[PHASE_NORMAL].push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
+                    // ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
                 }
             } else {
                 // const recordDataDep: RecordsDataDep = {
@@ -109,17 +123,25 @@ export class ComputationSourceMapManager {
                 // ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('record', recordDataDep, computation, 'create'))
                 const {eventDeps} = computation as EventBasedComputation
                 for(const eventDep of Object.values(eventDeps!)) {
-                    ERMutationEventSources.push({
+
+                    sortedERMutationEventSources[eventDep.phase||PHASE_NORMAL].push({
                         type: eventDep.type,
                         recordName: eventDep.recordName,
                         computation
                     } as EventBasedEntityEventsSourceMap)
+
+                    // ERMutationEventSources.push({
+                    //     type: eventDep.type,
+                    //     recordName: eventDep.recordName,
+                    //     computation
+                    // } as EventBasedEntityEventsSourceMap)
                 }
             }
         }
 
+        // const ERMutationEventSources: EntityEventSourceMap[]= sortedERMutationEventSources.flat()
 
-        this.sourceMaps = [...ERMutationEventSources]
+        this.sourceMaps =  sortedERMutationEventSources.flat()
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
     }
     /**

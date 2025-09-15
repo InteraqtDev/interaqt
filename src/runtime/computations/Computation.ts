@@ -5,6 +5,7 @@ import {
 } from "@shared";
 import { Controller } from "../Controller";
 import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
+import { ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
 
 // Types from ComputationHandle.ts
 export type GlobalDataContext = {
@@ -117,25 +118,29 @@ export class GlobalBoundState<T> {
     }
 }
 
+export { ComputationPhase, PHASE_BEFORE_ALL, PHASE_NORMAL, PHASE_AFTER_ALL }
 
 
 export type RecordsDataDep = {
     type: 'records',
-    source: EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
+source: EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
     match?: MatchExpressionData,
     modifier?: ModifierData,
     attributeQuery?: AttributeQueryData
+    phase?: ComputationPhase
 }
 
 export type GlobalDataDep = {
     type: 'global',
     source: DictionaryInstance
+    phase?: ComputationPhase
 }
 
 // 同一 record 的 property 依赖
 export type PropertyDataDep = {
     type: 'property',
     attributeQuery?: AttributeQueryData
+    phase?: ComputationPhase
 }
 
 
@@ -144,6 +149,7 @@ export type DictionaryDataDep = {
     type: 'dict',
     source: DictionaryInstance
     keys: string[]
+    phase?: ComputationPhase
 }
 
 export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep|DictionaryDataDep
@@ -161,7 +167,7 @@ export interface DataBasedComputation {
     // 增量计算，返回的是基于上一次结果的寄过增量
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    dataDeps: {[key: string]: any}
+    dataDeps: {[key: string]: DataDep}
     getDefaultValue?: (...args: any[]) => any
     useLastValue?: boolean
     // 异步计算，就会声明这个函数
@@ -173,6 +179,7 @@ export interface DataBasedComputation {
 export type EventDep = {
     recordName:string,
     type: 'create'|'delete'|'update',
+    phase?: ComputationPhase
 }
 
 export interface EventBasedComputation {

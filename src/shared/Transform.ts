@@ -3,11 +3,18 @@ import { stringifyAttribute } from './utils.js';
 import type { ComputationRecord, AttributeQueryData } from './types.js';
 import { DataDep } from './Computation.js';
 
+const PHASE_BEFORE_ALL = 0
+const PHASE_NORMAL = 1
+const PHASE_AFTER_ALL = 2
+type ComputationPhase = typeof PHASE_BEFORE_ALL|typeof PHASE_NORMAL|typeof PHASE_AFTER_ALL
+
+
 type EventDep = {
   recordName: string;
   type: 'create'|'delete'|'update';
   record?:any
   oldRecord?:any
+  phase?: ComputationPhase
 };
 
 export interface TransformInstance extends IInstance {
