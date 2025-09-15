@@ -26,13 +26,15 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         this.transitionFinder = new TransitionFinder(this.args)
         this.defaultState = this.args.defaultState
         // 从所有 transfer 中构建 eventDeps
+        // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
+        // 因为可能有多个 transfer 都是同样的 trigger。
+        // 使用的系统的 eventDeps 会执行完一个再执行另一个，这时有可能刚好记录转换成下一个状态，结果又被匹配中了。进行下一次转换。
         for(const transfer of this.args.transfers) {
             const eventDepName = `${transfer.trigger.recordName}_${transfer.trigger.type}`
             this.eventDeps[eventDepName] = {
                 recordName: transfer.trigger.recordName,
                 type: transfer.trigger.type
             }
-            // this.eventDeps[eventDepName] = transfer.trigger
         }
     }
     createState() {
@@ -72,6 +74,9 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         this.defaultState = this.args.defaultState
         this.dataContext = dataContext as PropertyDataContext
         // 从所有 transfer 中构建 eventDeps
+        // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
+        // 因为可能有多个 transfer 都是同样的 trigger。
+        // 使用的系统的 eventDeps 会执行完一个再执行另一个，这时有可能刚好记录转换成下一个状态，结果又被匹配中了。进行下一次转换。
         for(const transfer of this.args.transfers) {
             const eventDepName = `${transfer.trigger.recordName}_${transfer.trigger.type}`
             this.eventDeps[eventDepName] = {

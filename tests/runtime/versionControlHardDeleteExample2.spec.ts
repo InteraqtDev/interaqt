@@ -240,28 +240,27 @@ describe('Version Control Example with Hard Delete', () => {
           recordName: InteractionEventEntity.name,
           type: 'create',
           // 所有变化完成之后才 snapshot。
-          phase: PHASE_AFTER_ALL
+          phase: PHASE_AFTER_ALL,
+          record: {
+            interactionName: PublishStyle.name
+          }
         }
       },
       callback: async function(this: Controller, mutationEvent: RecordMutationEvent) {
         const event = mutationEvent.record!;
-        if (event.interactionName === PublishStyle.name) {
-          // Copy all current version styles to new version
-          const currentStyles = await this.system.storage.find('Style',
-            undefined,
-            undefined,
-            ['*']
-          );
+        // Copy all current version styles to new version
+        const currentStyles = await this.system.storage.find('Style',
+          undefined,
+          undefined,
+          ['*']
+        );
 
-          return currentStyles.map(style => {
-            return {
-              ...style,
-              id: undefined,
-              }
-            });
-        }
-        return null;
-
+        return currentStyles.map(style => {
+          return {
+            ...style,
+            id: undefined,
+            }
+          });
       }
     });
 
@@ -271,12 +270,18 @@ describe('Version Control Example with Hard Delete', () => {
         // Monitor style creation
         StyleCreate: {
           recordName: InteractionEventEntity.name,
-          type: 'create'
+          type: 'create',
+          record: {
+            interactionName: CreateStyle.name
+          }
         },
         // Monitor version info updates for publish/rollback
         VersionUpdate: {
           recordName: DictionaryEntity.name,
-          type: 'update'
+          type: 'update',
+          record: {
+            key: 'currentVersionInfo'
+          }
         }
       },
       callback: async function(this: Controller, mutationEvent: RecordMutationEvent) {
