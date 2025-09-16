@@ -44,12 +44,12 @@
   "license": "MIT",
   "dependencies": {
     "@electric-sql/pglite": "^0.3.2",
+    "@interaqt/uuidv7": "^1.0.0",
     "acorn": "^8.14.1",
     "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",
     "mysql2": "^3.13.0",
     "pg": "^8.14.0",
-    "uuidv7": "^1.0.2",
     "winston": "^3.17.0"
   },
   "types": "./dist/index.d.ts",
