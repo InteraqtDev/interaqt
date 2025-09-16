@@ -44,7 +44,7 @@
   "license": "MIT",
   "dependencies": {
     "@electric-sql/pglite": "^0.3.2",
-    "@interaqt/uuidv7": "^1.0.0",
+    "@interaqt/uuidv7": "^1.0.1",
     "acorn": "^8.14.1",
     "better-sqlite3": "^11.8.1",
     "chalk": "^5.4.1",
