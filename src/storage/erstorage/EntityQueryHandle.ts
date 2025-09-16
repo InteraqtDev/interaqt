@@ -42,7 +42,8 @@ export class EntityQueryHandle {
     }
 
     async create(entityName: string, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
-        assert(rawData[ID_ATTR] === null || rawData[ID_ATTR] === undefined, `${ID_ATTR} should be null or undefined when creating new record`)
+        // 支持使用外部 id。
+        // assert(rawData[ID_ATTR] === null || rawData[ID_ATTR] === undefined, `${ID_ATTR} should be null or undefined when creating new record`)
         const newEntityData = new NewRecordData(this.map, entityName, rawData)
         return this.agent.createRecord(newEntityData, `create record ${entityName} from handle`, events)
     }
