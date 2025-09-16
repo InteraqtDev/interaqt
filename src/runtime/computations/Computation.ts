@@ -5,7 +5,7 @@ import {
 } from "@shared";
 import { Controller } from "../Controller";
 import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
-import { ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
+import { type ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
 
 // Types from ComputationHandle.ts
 export type GlobalDataContext = {
