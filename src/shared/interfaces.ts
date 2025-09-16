@@ -1,4 +1,4 @@
-import { uuidv7 } from 'uuidv7';
+import { uuidv7 } from '@interaqt/uuidv7';
 // 基础实例接口
 export interface IInstance {
   uuid: string;
