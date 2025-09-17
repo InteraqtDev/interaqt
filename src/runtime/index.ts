@@ -15,11 +15,6 @@ export * from './computations/MathResolver.js'
 // error related
 export * from './errors/ComputationErrors.js'
 export { ConditionError } from './errors/ConditionErrors.js'
-// export database related stuff
-export * from './SQLite.js'
-export * from './PostgreSQL.js'
-export * from './PGLite.js'
-export * from './Mysql.js'
 // Export everything from util except indexBy to avoid conflict with shared module
 export { 
   assert, 

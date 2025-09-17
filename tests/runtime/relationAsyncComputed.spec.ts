@@ -1,13 +1,10 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
-  Controller,
-  Entity,
-  MonoSystem,
-  Property, MatchExp,
+  Controller, MonoSystem, MatchExp,
   DataDep,
-  RelationDataContext,
-  PGLiteDB,
-  DataBasedComputation, ComputationResultAsync, Relation
+  RelationDataContext, DataBasedComputation, ComputationResultAsync
 } from "interaqt";
 
 // RelationScoreComputed as a standard ES6 class

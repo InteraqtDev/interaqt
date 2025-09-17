@@ -1,10 +1,8 @@
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,EntityQueryHandle} from "@storage";
-import { SQLiteDB } from '@runtime';
+import { SQLiteDB } from '@dbclients';
 import TestLogger from "./testLogger.js";
-
-
 describe('modifier test', () => {
     let db: SQLiteDB
     let setup
@@ -14,12 +12,11 @@ describe('modifier test', () => {
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
-        // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
         await db.open()
 
         // logger.enable()
-        // db = new PostgreSQLDB('test', {
+        // db = new ('test', {
         //     host:'127.0.0.1',
         //     port: 5432,
         //     user: 'postgres',

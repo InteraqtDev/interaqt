@@ -1,8 +1,5 @@
 import SQLite from "better-sqlite3";
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
-import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import {InteractionContext} from "./Controller";
-import { dbConsoleLogger } from "./MonoSystem.js";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
 
 class IDSystem {
     constructor(public db: Database) {}

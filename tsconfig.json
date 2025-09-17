@@ -23,8 +23,7 @@
         "@runtime": ["src/runtime/index.ts"],
         "@shared": ["src/shared/index.ts"],
         "@storage": ["src/storage/index.ts"],
-        "@social-content-network": ["examples/social-content-network/src/index.ts"],
-        "@dormitory-management": ["examples/dormitory-management/src/index.ts"]
+        "@dbclients": ["src/dbclients/index.ts"]
     },
     "jsx": "react",
     "jsxFactory": "createElement",

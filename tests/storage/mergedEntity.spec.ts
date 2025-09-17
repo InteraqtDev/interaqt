@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from "@storage";
 import { Entity, Property } from '@shared';
 import TestLogger from "./testLogger.js";
-import { PGLiteDB } from '@runtime';
-
+import { PGLiteDB } from "@dbclients";
 describe('merged entity test', () => {
     let db: PGLiteDB;
     let setup: DBSetup;

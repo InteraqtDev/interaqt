@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { DBSetup } from "@storage";
-import { SQLiteDB } from '@runtime';
-import { EntityToTableMap } from "@storage";
+import { SQLiteDB } from '@dbclients';
 import { MatchExp } from "@storage";
 import { EntityQueryHandle } from "@storage";
 import TestLogger from "./testLogger.js";
 import { Entity, EntityInstance, Property } from '@shared';
+import { EntityToTableMap } from "@storage";
 describe('json field test', () => {
     let db: SQLiteDB
     let setup

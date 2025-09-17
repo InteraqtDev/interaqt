@@ -1,7 +1,7 @@
 import {expect, test, describe} from "vitest";
 import {existsSync, unlinkSync} from 'fs'
 import {DBSetup,RecordQueryAgent,EntityToTableMap,MatchExp,RecordQuery} from "@storage";
-import { PGLiteDB, SQLiteDB } from 'interaqt'
+import { PGLiteDB, SQLiteDB } from '@dbclients'
 import {createCommonData} from "./data/common";
 
 const { entities, relations } = createCommonData()
@@ -138,7 +138,7 @@ describe("db setup", () => {
         const clues = [
             'Profile.owner',
         ]
-        const db = new SQLiteDB()
+        const db = new PGLiteDB()
         await db.open()
         // File & User
         const setup = new DBSetup(entities, relations, db, clues);
@@ -203,7 +203,7 @@ describe("db setup", () => {
 
     test('validate n:n relation map', async () => {
         // User & User friends 关系
-        const db = new SQLiteDB()
+        const db = new PGLiteDB()
         await db.open()
         const setup = new DBSetup(entities, relations, db);
         expect(setup.map.records.User).toBeDefined()
@@ -263,7 +263,6 @@ describe("db setup", () => {
             unlinkSync(file)
         }
 
-        // @ts-ignore
         const db = new SQLiteDB(file)
         await db.open()
         const setup = new DBSetup(entities, relations, db )

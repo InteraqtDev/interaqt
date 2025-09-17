@@ -1,16 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
   BoolExp,
   Controller,
-  Dictionary,
-  Entity,
-  KlassByName,
+  Dictionary, KlassByName,
   MatchExp,
-  MonoSystem,
-  Property,
-  Relation,
-  WeightedSummation,
-  DICTIONARY_RECORD
+  MonoSystem, WeightedSummation
 } from 'interaqt';
 
 // 创建简单测试环境，直接测试 WeightedSummationHandle 的具体方法
@@ -48,7 +44,7 @@ describe('WeightedSummation computed handle', () => {
     ];
     
     // 设置系统和控制器
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -149,7 +145,7 @@ describe('WeightedSummation computed handle', () => {
     );
     
     // 设置系统和控制器
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -219,7 +215,7 @@ describe('WeightedSummation computed handle', () => {
     ];
     
     // 设置系统和控制器
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -277,7 +273,7 @@ describe('WeightedSummation computed handle', () => {
     ];
     
     // 设置系统和控制器
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -380,7 +376,7 @@ describe('WeightedSummation computed handle', () => {
     ];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,
@@ -550,7 +546,7 @@ describe('WeightedSummation computed handle', () => {
     const relations = [storeWarehouseInventoryRelation, storeShowroomInventoryRelation, storeTotalInventoryRelation];
 
     // Setup system
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,

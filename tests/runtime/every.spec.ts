@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Relation, MatchExp, DICTIONARY_RECORD, KlassByName, PGLiteDB } from 'interaqt';
-
+import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Relation, MatchExp, DICTIONARY_RECORD, KlassByName,  } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every computed handle', () => {
   
@@ -27,7 +27,7 @@ describe('Every computed handle', () => {
             }),
         })
     ]
-    const system = new MonoSystem()
+    const system = new MonoSystem(new PGLiteDB())
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -116,7 +116,7 @@ describe('Every computed handle', () => {
         })
     }))
 
-    const system = new MonoSystem() 
+    const system = new MonoSystem(new PGLiteDB()) 
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -582,7 +582,7 @@ describe('Every computed handle', () => {
         })
     }))
 
-    const system = new MonoSystem() 
+    const system = new MonoSystem(new PGLiteDB()) 
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -653,7 +653,7 @@ describe('Every computed handle', () => {
 
 
     const entities = [userEntity]
-    const system = new MonoSystem()
+    const system = new MonoSystem(new PGLiteDB())
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -772,7 +772,7 @@ describe('Every computed handle', () => {
     const relations = [teamPlayerRelation, activeStarterRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -834,9 +834,9 @@ describe('Every computed handle', () => {
     );
     
     // Every returns 0 when false, 1 when true
-    expect(team1Data.allPlayersEligible).toBe(0); // Tom is not eligible
+    expect(team1Data.allPlayersEligible).toBe(false); // Tom is not eligible
     // Active starters: John and Mike, both eligible
-    expect(team1Data.allStartersEligible).toBe(1); // All active starters are eligible
+    expect(team1Data.allStartersEligible).toBe(true); // All active starters are eligible
     
     // Make Tom a starter
     const tomRelation = await system.storage.findOne('TeamPlayer',
@@ -858,9 +858,9 @@ describe('Every computed handle', () => {
     );
     
     // Every returns 0 when false
-    expect(team1Data2.allPlayersEligible).toBe(0); // Tom is still not eligible
+    expect(team1Data2.allPlayersEligible).toBe(false); // Tom is still not eligible
     // Active starters now: John, Mike, and Tom - but Tom is not eligible
-    expect(team1Data2.allStartersEligible).toBe(0); // Not all active starters are eligible
+    expect(team1Data2.allStartersEligible).toBe(false); // Not all active starters are eligible
     
     // Make Tom eligible
     await system.storage.update('Player',
@@ -876,9 +876,9 @@ describe('Every computed handle', () => {
     );
     
     // Every returns 1 when true
-    expect(team1Data3.allPlayersEligible).toBe(1); // All players are now eligible
+    expect(team1Data3.allPlayersEligible).toBe(true); // All players are now eligible
     // All active starters (John, Mike, Tom) are now eligible
-    expect(team1Data3.allStartersEligible).toBe(1); // All active starters are eligible
+    expect(team1Data3.allStartersEligible).toBe(true); // All active starters are eligible
     
     // Deactivate Mike
     await system.storage.update('TeamPlayer',
@@ -894,9 +894,9 @@ describe('Every computed handle', () => {
     );
     
     // Every returns 1 when true
-    expect(team1Data4.allPlayersEligible).toBe(1); // Still all players eligible
+    expect(team1Data4.allPlayersEligible).toBe(true); // Still all players eligible
     // Active starters are now John and Tom (Mike is inactive), both eligible
-    expect(team1Data4.allStartersEligible).toBe(1); // All remaining active starters are eligible
+    expect(team1Data4.allStartersEligible).toBe(true); // All remaining active starters are eligible
   });
 
   test('should handle property level every with filtered relations - Quality Control Example', async () => {
@@ -1277,7 +1277,7 @@ describe('Every computed handle', () => {
     ];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,

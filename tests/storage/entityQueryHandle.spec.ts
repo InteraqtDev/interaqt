@@ -1,9 +1,8 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@storage";
+import { SQLiteDB } from '@dbclients';
 import TestLogger from "./testLogger.js";
-import {SQLiteDB} from '@runtime';
-
 
 describe('create data', () => {
     let db: SQLiteDB
@@ -15,7 +14,6 @@ describe('create data', () => {
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
 
-        // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
         await db.open()
 
@@ -32,7 +30,7 @@ describe('create data', () => {
     test('create and query with only value attribute', async () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17})
         expect(returnUser).toMatchObject({id: 1})
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({key:'name', value: ['=', 'aaa']}), {}, ['name', 'age', 'gender'])
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({key:'name', value: ['=', 'aaa']}), undefined, ['name', 'age', 'gender'])
         expect(findUser).toMatchObject({
             name: 'aaa',
             age: 17,
@@ -45,7 +43,7 @@ describe('create data', () => {
         const returnUser = await entityQueryHandle.create('User', {name: 'aaa', age: 17, profile: {title: 'aaa-profile'}})
         expect(returnUser.profile?.id).not.toBeUndefined()
         //
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key:'profile.title', value: ['=', 'aaa-profile']}), {}, ['name', 'age'])
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key:'profile.title', value: ['=', 'aaa-profile']}), undefined, ['name', 'age'])
         expect(findUser).toMatchObject({
             name: 'aaa',
             age: 17
@@ -79,7 +77,7 @@ describe('create data', () => {
         const findUser1 = await entityQueryHandle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user1.id]}),
-            {},
+            undefined,
             ['name', 'age', ['teams', { attributeQuery: ['name']}]]
         )
         
@@ -94,7 +92,7 @@ describe('create data', () => {
         const usersInTeamA = await entityQueryHandle.find(
             'User',
             MatchExp.atom({ key: 'teams.name', value: ['=', 'teamA']}),
-            {},
+            undefined,
             ['name']
         )
         expect(usersInTeamA).toHaveLength(2)
@@ -114,7 +112,7 @@ describe('create data', () => {
         const findUser3WithFriends = await entityQueryHandle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user3.id]}),
-            {},
+            undefined,
             ['name', ['friends', { attributeQuery: ['name']}]]
         )
         
@@ -137,7 +135,6 @@ describe('update data', () => {
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
-        // @ts-ignore
         db = new SQLiteDB()
         await db.open()
         setup = new DBSetup(entities, relations, db)
@@ -155,7 +152,7 @@ describe('update data', () => {
         const updated = await entityQueryHandle.update('User', MatchExp.atom({ key: 'name', value: ['=', 'aaa']}), {name: 'bbb', age: 18})
         expect(updated.length).toBe(1)
         expect(updated[0].id).toBe(returnUser.id)
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'name', value: ['=', 'bbb']}), {}, ['name', 'age'] )
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'name', value: ['=', 'bbb']}), undefined, ['name', 'age'] )
         expect(findUser.id).toBe(returnUser.id)
         expect(findUser.name).toBe('bbb')
         expect(findUser.age).toBe(18)
@@ -167,7 +164,7 @@ describe('update data', () => {
         const updated = await entityQueryHandle.update('User', MatchExp.atom({ key: 'leader.id', value: ['=', leader.id]}), {name: 'bbb', age: 18})
         expect(updated.length).toBe(1)
         expect(updated[0].id).toBe(returnUser.id)
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'name', value: ['=', 'bbb']}), {}, ['name', 'age'] )
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'name', value: ['=', 'bbb']}), undefined, ['name', 'age'] )
         expect(findUser.id).toBe(returnUser.id)
         expect(findUser.name).toBe('bbb')
         expect(findUser.age).toBe(18)
@@ -211,7 +208,7 @@ describe('update data', () => {
         const findUser = await entityQueryHandle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id]}),
-            {},
+            undefined,
             ['name', 'age', ['item', { attributeQuery: ['itemName']}]]
         )
         
@@ -262,7 +259,7 @@ describe('update data', () => {
         const findUser = await entityQueryHandle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id]}),
-            {},
+            undefined,
             ['name', 'age', ['profile', { attributeQuery: ['title']}]]
         )
         
@@ -278,7 +275,7 @@ describe('update data', () => {
         const originalProfileStillExists = await entityQueryHandle.findOne(
             'Profile',
             MatchExp.atom({ key: 'id', value: ['=', profile.id]}),
-            {},
+            undefined,
             ['title']
         )
         expect(originalProfileStillExists).toMatchObject({
@@ -295,7 +292,7 @@ describe('update data', () => {
         expect(updated.length).toBe(1)
         expect(updated[0].id).toBe(userA.id)
 
-        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), {}, ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]] )
+        const findUser = await entityQueryHandle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', userA.id]}), undefined, ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]] )
         expect(findUser).toMatchObject({
             name:'a1',
             leader: {
@@ -338,7 +335,7 @@ describe('update data', () => {
         const findUser = await entityQueryHandle.findOne(
             'User',
             MatchExp.atom({ key: 'id', value: ['=', user.id]}),
-            {},
+            undefined,
             ['name', 'age', ['teams', { attributeQuery: ['name']}]]
         )
 
@@ -380,7 +377,7 @@ describe('update data', () => {
         const userFiles = await entityQueryHandle.find(
             'File',
             MatchExp.atom({ key: 'owner.id', value: ['=', fileUser.id]}),
-            {},
+            undefined,
             ['fileName']
         )
 
@@ -396,7 +393,6 @@ describe('query data', () => {
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
-        // @ts-ignore
         db = new SQLiteDB()
         await db.open()
         setup = new DBSetup(entities, relations, db)
@@ -428,7 +424,7 @@ describe('query data', () => {
         })
 
         const foundUser = await entityQueryHandle.findOne('User', 
-            MatchExp.atom({key: 'id', value: ['=', user2.id]}), {}, 
+            MatchExp.atom({key: 'id', value: ['=', user2.id]}), undefined, 
             [
                 'name', 
                 [

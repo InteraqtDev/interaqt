@@ -1,8 +1,5 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
 import pg, { type ClientConfig} from 'pg'
-import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import {InteractionContext} from "./Controller";
-import { dbConsoleLogger } from "./MonoSystem.js";
 
 const { Client} = pg
 

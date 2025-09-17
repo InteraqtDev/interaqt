@@ -23,7 +23,7 @@ import {
     MatchExpressionData,
     RawEntityData
 } from '@storage';
-import { SQLiteDB } from "./SQLite.js";
+// SQLiteDB is now imported from @dbclients when needed
 import { RecordBoundState } from "./computations/Computation.js";
 
 function JSONStringify(value:any) {
@@ -238,7 +238,7 @@ export const systemConsoleLogger = new SystemConsoleLogger()
 export class MonoSystem implements System {
     conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
     storage: Storage
-    constructor(db: Database = new SQLiteDB(undefined,{logger: dbConsoleLogger}), public logger: SystemLogger = systemConsoleLogger) {
+    constructor(db: Database, public logger: SystemLogger = systemConsoleLogger) {
         this.storage = new MonoStorage(db)
     }
     

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
     Controller,
     MonoSystem,
@@ -9,10 +11,7 @@ import {
     Action,
     Condition,
     Conditions,
-    ConditionError,
-    Entity,
-    Property,
-    Payload,
+    ConditionError, Payload,
     PayloadItem
 } from 'interaqt';
 
@@ -22,7 +21,7 @@ describe('condition checks', () => {
 
     beforeEach(async () => {
         removeAllInstance()
-        system = new MonoSystem()
+        system = new MonoSystem(new SQLiteDB())
         system.conceptClass = KlassByName
     })
 

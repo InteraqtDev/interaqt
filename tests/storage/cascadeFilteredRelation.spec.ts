@@ -1,15 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from '@storage'
+import { SQLiteDB } from '@dbclients';
 import { Entity, Property, Relation } from '@shared'
-import { PGLiteDB } from '@runtime'
-
 describe('cascade filtered relation', () => {
-    let db: PGLiteDB
+    let db: SQLiteDB
     let setup: DBSetup
     let handle: EntityQueryHandle
 
     beforeEach(async () => {
-        db = new PGLiteDB()
+        db = new SQLiteDB()
         await db.open()
     })
 

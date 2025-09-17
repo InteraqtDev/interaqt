@@ -1,13 +1,10 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
-  Controller,
-  Entity,
-  MonoSystem,
-  Property, MatchExp,
+  Controller, MonoSystem, MatchExp,
   DataDep,
-  EntityDataContext,
-  PGLiteDB,
-  DataBasedComputation, ComputationResultAsync
+  EntityDataContext, DataBasedComputation, ComputationResultAsync
 } from "interaqt";
 
 // EntityRecommendationComputed as a standard ES6 class

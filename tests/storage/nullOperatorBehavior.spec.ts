@@ -1,8 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle} from "@storage";
-import {SQLiteDB} from '@runtime';
-
+import { SQLiteDB } from '@dbclients';
 describe('NULL value behavior with different operators', () => {
     let db: SQLiteDB
     let setup
@@ -10,7 +9,6 @@ describe('NULL value behavior with different operators', () => {
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
-        // @ts-ignore
         db = new SQLiteDB(':memory:')
         await db.open()
         setup = new DBSetup(entities, relations, db)

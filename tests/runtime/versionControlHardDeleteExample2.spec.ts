@@ -1,10 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { SQLiteDB } from '@dbclients';
 import {
   Controller,
-  MonoSystem,
-  Entity,
-  Property,
-  StateMachine,
+  MonoSystem, StateMachine,
   StateNode,
   StateTransfer,
   Interaction,
@@ -13,17 +12,13 @@ import {
   Payload,
   PayloadItem,
   Transform,
-  Dictionary,
-  DICTIONARY_RECORD,
-  MatchExp,
+  Dictionary, MatchExp,
   RecordMutationEvent,
   DictionaryEntity,
   HardDeletionProperty,
   DELETED_STATE,
   NON_DELETED_STATE,
-  HARD_DELETION_PROPERTY_NAME,
-  PropertyStateMachineHandle,
-  PHASE_AFTER_ALL
+  HARD_DELETION_PROPERTY_NAME, PHASE_AFTER_ALL
 } from 'interaqt';
 
 describe('Version Control Example with Hard Delete', () => {
@@ -359,7 +354,7 @@ describe('Version Control Example with Hard Delete', () => {
     });
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
       system: system,
       entities: [User, VersionedStyle, Style],

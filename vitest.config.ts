@@ -20,6 +20,7 @@ export default defineConfig({
             '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
             '@shared': path.resolve(__dirname, './src/shared/index.ts'),
             '@storage': path.resolve(__dirname, './src/storage/index.ts'),
+            '@dbclients': path.resolve(__dirname, './src/dbclients/index.ts'),
             'interaqt': path.resolve(__dirname, './src'),
         }
     }

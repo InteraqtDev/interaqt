@@ -1,8 +1,7 @@
-import { describe, test, beforeEach, afterEach, expect } from 'vitest'
-import { DBSetup, EntityToTableMap, EntityQueryHandle, MatchExp } from "@storage"
-import { PGLiteDB } from '@runtime'
-import { Entity, Property, Relation } from 'interaqt'
-
+import { describe, test, beforeEach, afterEach, expect } from 'vitest';
+import { DBSetup, EntityToTableMap, EntityQueryHandle, MatchExp } from "@storage";
+import { Entity, Property, Relation } from '@shared';
+import { PGLiteDB } from '@dbclients';
 describe('Default Value - Program Control', () => {
     let db: PGLiteDB
     let setup: DBSetup

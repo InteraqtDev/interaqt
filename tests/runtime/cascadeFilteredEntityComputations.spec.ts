@@ -1,22 +1,21 @@
 import { describe, expect, test, beforeEach, afterEach } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
   Controller,
-  MonoSystem,
-  Property,
-  Entity,
-  Count,
+  MonoSystem, Count,
   Average,
   Summation,
   Every,
   Any,
   WeightedSummation,
-  Dictionary, MatchExp, PGLiteDB
+  Dictionary, MatchExp
 } from 'interaqt';
 
 describe('Cascade Filtered Entity Computations', () => {
   let system: MonoSystem;
   let controller: Controller;
-  let db: PGLiteDB;
+  let db: SQLiteDB;
 
   // Entity definitions
   let userEntity: any;
@@ -82,7 +81,7 @@ describe('Cascade Filtered Entity Computations', () => {
     });
 
     // Setup system
-    system = new MonoSystem();
+    system = new MonoSystem(new SQLiteDB());
   });
 
   afterEach(async () => {

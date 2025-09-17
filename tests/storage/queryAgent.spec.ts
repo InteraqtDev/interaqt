@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { MatchExp, MatchExpressionData,RecordQueryAgent,AttributeQuery, AttributeQueryData,RecordQuery, RecordQueryData,EntityToTableMap } from "@storage";
-import { SQLiteDB } from '@runtime';
+import { SQLiteDB } from '@dbclients';
 import { entityToTableMapData } from "./data/mapData";
 
 

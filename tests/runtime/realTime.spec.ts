@@ -2,6 +2,7 @@ import { describe, expect, test, beforeAll } from "vitest";
 import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD, GlobalDataContext } from 'interaqt';
 import { Expression } from 'interaqt';
 
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 describe('RealTime computed handle', () => {
   
   test('should calculate global real-time value with Expression', async () => {
@@ -36,7 +37,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -115,7 +116,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -192,7 +193,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -265,7 +266,7 @@ describe('RealTime computed handle', () => {
     );
     
     const entities = [userEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -355,7 +356,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -435,7 +436,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -522,7 +523,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -601,7 +602,7 @@ describe('RealTime computed handle', () => {
     );
     
     const entities = [userEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -704,7 +705,7 @@ describe('RealTime computed handle', () => {
     ];
     
     const entities = [configEntity];
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,

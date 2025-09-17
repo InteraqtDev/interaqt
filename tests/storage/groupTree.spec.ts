@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
-import {SQLiteDB} from '@runtime';
+import {SQLiteDB} from '@dbclients';
 import {EntityToTableMap,MatchExp,EntityQueryHandle,RecursiveContext,DBSetup} from "@storage";
 import TestLogger from "./testLogger.js";
 
@@ -14,7 +14,6 @@ describe('group tree', () => {
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
 
-        // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
         await db.open()
 

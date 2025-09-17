@@ -1,19 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { 
-    Controller,
-    Entity, 
-    Property, 
-    Interaction, 
-    Action, 
-    Payload, 
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
+import {
+    Controller, Interaction,
+    Action,
+    Payload,
     PayloadItem,
-    Condition,
-    BoolExp,
-    MatchExp,
-    MonoSystem,
+    Condition, MonoSystem,
     Transform,
     InteractionEventEntity
-} from 'interaqt'
+} from 'interaqt';
 
 describe('Controller ignorePermission parameter', () => {
     let system: MonoSystem
@@ -23,7 +19,7 @@ describe('Controller ignorePermission parameter', () => {
     let restrictedCondition: any
 
     beforeEach(async () => {
-        system = new MonoSystem()
+        system = new MonoSystem(new PGLiteDB())
 
         // Define entities
         User = Entity.create({

@@ -1,10 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
   Controller,
-  MonoSystem,
-  Entity,
-  Property,
-  StateMachine,
+  MonoSystem, StateMachine,
   StateNode,
   StateTransfer,
   Interaction,
@@ -21,8 +20,7 @@ import {
   HardDeletionProperty,
   DELETED_STATE,
   NON_DELETED_STATE,
-  HARD_DELETION_PROPERTY_NAME,
-  PropertyStateMachineHandle
+  HARD_DELETION_PROPERTY_NAME
 } from 'interaqt';
 
 describe('Version Control Example with Hard Delete', () => {
@@ -288,7 +286,7 @@ describe('Version Control Example with Hard Delete', () => {
     });
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
       system: system,
       entities: [User, VersionedStyle],

@@ -1,8 +1,5 @@
-import {Database, DatabaseLogger, EntityIdRef} from "./System.js";
+import {Database, DatabaseLogger, EntityIdRef, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
 import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mysql2/promise'
-import {asyncInteractionContext} from "./asyncInteractionContext.js";
-import {InteractionContext} from "./Controller";
-import { dbConsoleLogger } from "./MonoSystem.js";
 
 class IDSystem {
     constructor(public db: Database) {}

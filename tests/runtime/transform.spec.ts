@@ -1,18 +1,15 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
   Action,
   BoolExp,
-  Controller,
-  Entity,
-  Interaction,
+  Controller, Interaction,
   InteractionEventEntity,
   KlassByName,
   MonoSystem,
   Payload,
-  PayloadItem,
-  Property,
-  Relation,
-  Transform
+  PayloadItem, Transform
 } from 'interaqt';
 
 describe('Transform computed handle', () => {
@@ -54,7 +51,7 @@ describe('Transform computed handle', () => {
     const entities = [productEntity, discountedProductEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -156,7 +153,7 @@ describe('Transform computed handle', () => {
     const relations = [orderRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -278,7 +275,7 @@ describe('Transform computed handle', () => {
     const entities = [productEntity, priceTierEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -491,7 +488,7 @@ describe('Transform computed handle', () => {
     const entities = [physicalBookEntity, ebookEntity, audiobookEntity, bookEntity, bookRecommendationEntity, bestsellerEntity];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,
@@ -693,7 +690,7 @@ describe('Transform computed handle', () => {
     const entities = [userEntity, userAuditEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -796,7 +793,7 @@ describe('Transform computed handle', () => {
     const entities = [postEntity, postRevisionEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -907,7 +904,7 @@ describe('Transform computed handle', () => {
     const entities = [documentEntity, trashEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1022,7 +1019,7 @@ describe('Transform computed handle', () => {
     const interactions = [testInteraction];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1153,7 +1150,7 @@ describe('Transform computed handle', () => {
     const entities = [orderEntity, notificationEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1300,7 +1297,7 @@ describe('Transform computed handle', () => {
     const entities = [orderEntity, highPriorityOrderAuditEntity, highPriorityStatusChangeAuditEntity];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,

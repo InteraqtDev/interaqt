@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Property, Entity, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD, PGLiteDB } from 'interaqt';
-
+import { Controller, MonoSystem, Property, Entity, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD,  } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 describe('Any computed handle', () => {
   test('should be true when any request is handled', async () => {
     const requestEntity = Entity.create({
@@ -24,7 +24,7 @@ describe('Any computed handle', () => {
             }),
         })
     ]
-    const system = new MonoSystem()
+    const system = new MonoSystem(new SQLiteDB())
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -107,7 +107,7 @@ describe('Any computed handle', () => {
         })
     }))
 
-    const system = new MonoSystem()
+    const system = new MonoSystem(new PGLiteDB())
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -407,7 +407,7 @@ describe('Any computed handle', () => {
     })
 
     const entities = [userEntity]
-    const system = new MonoSystem()
+    const system = new MonoSystem(new SQLiteDB())
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -533,7 +533,7 @@ describe('Any computed handle', () => {
     const relations = [projectTaskRelation, activeHighPriorityRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -884,7 +884,7 @@ describe('Any computed handle', () => {
     const relations = [teamAssignedTaskRelation, teamReviewingTaskRelation, teamAllTasksRelation];
 
     // Setup system
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
       system: system,
       entities: entities,

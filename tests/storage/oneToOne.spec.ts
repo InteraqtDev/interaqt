@@ -1,7 +1,8 @@
 import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle,LINK_SYMBOL} from "@storage";
-import { SQLiteDB,RecordMutationEvent } from '@runtime';
+import { RecordMutationEvent } from '@runtime';
+import { SQLiteDB } from '@dbclients';
 import TestLogger from "./testLogger.js";
 
 
@@ -14,7 +15,6 @@ describe('one to one', () => {
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
-        // @ts-ignore
         db = new SQLiteDB(':memory:', {logger: logger} )
         await db.open()
         setup = new DBSetup(entities, relations, db, ['Profile.owner'])
@@ -32,7 +32,7 @@ describe('one to one', () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12}, events)
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age']
         )
 
@@ -66,7 +66,7 @@ describe('one to one', () => {
         }, events)
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
 
@@ -111,7 +111,7 @@ describe('one to one', () => {
         const userA = await entityQueryHandle.create('User', {name:'a1', age:12, profile: profileA}, events)
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
 
@@ -148,7 +148,7 @@ describe('one to one', () => {
 
         const findUsers = await entityQueryHandle.find('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name']
         )
 
@@ -156,7 +156,7 @@ describe('one to one', () => {
 
         const findProfile = await entityQueryHandle.findOne('Profile',
             MatchExp.atom({ key: 'id', value: ['=', profileA.id]}),
-            {},
+            undefined,
             ['title']
         )
 
@@ -199,7 +199,7 @@ describe('one to one', () => {
 
         const findProfile = await entityQueryHandle.findOne('Profile',
             MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
-            {},
+            undefined,
             ['title', ['owner', {attributeQuery: ['id']}]]
         )
 
@@ -209,7 +209,7 @@ describe('one to one', () => {
         expect(findProfile.owner).toBeUndefined()
 
         const findItems = await entityQueryHandle.find('Item',
-            undefined, {},
+            undefined, undefined,
             ['itemName']
         )
 
@@ -301,7 +301,7 @@ describe('one to one', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
 
@@ -311,7 +311,7 @@ describe('one to one', () => {
 
         const findProfiles = await entityQueryHandle.find('Profile',
             MatchExp.atom({ key: 'title', value: ['=', 'f2']}),
-            {},
+            undefined,
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
         expect(findProfiles.length).toBe(1)
@@ -326,7 +326,7 @@ describe('one to one', () => {
         // f1 必须还存在，我们只是断开了联系。
         const findProfiles2 = await entityQueryHandle.find('Profile',
             MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
-            {},
+            undefined,
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
 
@@ -339,7 +339,7 @@ describe('one to one', () => {
 
         const profiles = await entityQueryHandle.find('Profile',
             undefined,
-            {},
+            undefined,
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
         expect(profiles.length).toBe(2)
@@ -414,7 +414,7 @@ describe('one to one', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['profile', {attributeQuery: ['title']}]]
         )
 
@@ -424,7 +424,7 @@ describe('one to one', () => {
 
         const findProfiles = await entityQueryHandle.find('Profile',
             MatchExp.atom({ key: 'title', value: ['=', 'f2']}),
-            {},
+            undefined,
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
         // f2 应该仍然只有一个，是被移动了的
@@ -439,7 +439,7 @@ describe('one to one', () => {
 
         const findProfiles2 = await entityQueryHandle.find('Profile',
             MatchExp.atom({ key: 'title', value: ['=', 'f1']}),
-            {},
+            undefined,
             ['title', ['owner', {attributeQuery: ['name']}]]
         )
 

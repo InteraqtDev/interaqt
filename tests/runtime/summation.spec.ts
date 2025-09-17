@@ -1,17 +1,13 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
   BoolExp,
   Controller,
-  Dictionary,
-  Entity,
-  KlassByName,
-  MonoSystem,
-  Property,
-  Relation,
-  Summation,
+  Dictionary, KlassByName,
+  MonoSystem, Summation,
   WeightedSummation,
-  MatchExp,
-  DICTIONARY_RECORD
+  MatchExp
 } from 'interaqt';
 
 describe('Sum computed handle', () => {
@@ -42,7 +38,7 @@ describe('Sum computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -117,7 +113,7 @@ describe('Sum computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -165,7 +161,7 @@ describe('Sum computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -206,7 +202,7 @@ describe('Sum computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -253,7 +249,7 @@ describe('Sum computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -325,7 +321,7 @@ describe('Sum computed handle', () => {
     ]
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -410,7 +406,7 @@ describe('Sum computed handle', () => {
     const relations = [customerPurchaseRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -608,7 +604,7 @@ describe('Sum computed handle', () => {
     const relations = [warehouseInventoryRelation, availableABZoneRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -936,7 +932,7 @@ describe('Sum computed handle', () => {
                       softwareSalesRelation, newDealRelation, q1SoftwareRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1105,7 +1101,7 @@ describe('Sum computed handle', () => {
     ];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,
@@ -1271,7 +1267,7 @@ describe('Sum computed handle', () => {
     const relations = [customerOnlinePurchaseRelation, customerStorePurchaseRelation, customerAllPurchasesRelation];
 
     // Setup system
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,

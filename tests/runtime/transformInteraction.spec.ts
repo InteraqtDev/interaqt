@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import { SQLiteDB } from '@dbclients';
 import {
     Controller, MonoSystem,
-    BoolExp, Interaction,
-    KlassByName, SQLiteDB, ConditionError
+    BoolExp, KlassByName, ConditionError
 } from 'interaqt';
 import { createData } from './data/leaveRequest.js';
 

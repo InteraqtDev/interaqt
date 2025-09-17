@@ -1,10 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
   Controller,
-  MonoSystem,
-  Entity,
-  Property,
-  StateMachine,
+  MonoSystem, StateMachine,
   StateNode,
   StateTransfer,
   Interaction,
@@ -284,7 +283,7 @@ describe('Version Control Example', () => {
     });
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     const controller = new Controller({
       system: system,
       entities: [User, VersionedStyle],

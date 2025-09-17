@@ -1,6 +1,6 @@
-import { Controller, Entity, MonoSystem, Property, MatchExp, DataDep, PropertyDataContext, PGLiteDB, DataBasedComputation, ComputationResult } from "interaqt";
-import { expect, test, describe } from "vitest";
-
+import { Controller, Entity, MonoSystem, Property, MatchExp, DataDep, PropertyDataContext,  DataBasedComputation, ComputationResult } from "interaqt";
+import { PGLiteDB, SQLiteDB } from '@dbclients';
+import { describe, expect, test } from "vitest";
 // TestCrawlerComputed as a standard ES6 class
 interface TestCrawlerComputedInstance {
   _type: string;

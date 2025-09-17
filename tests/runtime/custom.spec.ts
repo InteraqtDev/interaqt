@@ -1,26 +1,19 @@
 import { describe, expect, test, beforeEach } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
-  Controller,
-  Entity,
-  Property,
-  MonoSystem,
-  Custom,
-  RecordBoundState,
-  GlobalBoundState,
+  Controller, MonoSystem,
+  Custom, GlobalBoundState,
   ComputationResult,
-  Dictionary,
-  Relation,
-  MatchExp,
-  DICTIONARY_RECORD,
-  KlassByName
+  Dictionary, MatchExp, KlassByName
 } from 'interaqt';
 
 describe('Custom computation', () => {
-  let system: MonoSystem;
+  let system: MonoSystem; 
   let controller: Controller;
   
   beforeEach(() => {
-    system = new MonoSystem();
+    system = new MonoSystem(new SQLiteDB());
   });
 
   test('should allow custom compute function', async () => {
@@ -68,7 +61,7 @@ describe('Custom computation', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -170,7 +163,7 @@ describe('Custom computation', () => {
       })
     });
     
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -271,7 +264,7 @@ describe('Custom computation', () => {
       })
     });
     
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -395,7 +388,7 @@ describe('Custom computation', () => {
       })
     });
     
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -492,7 +485,7 @@ describe('Custom computation', () => {
       })
     });
     
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -685,7 +678,7 @@ describe('Custom computation', () => {
     ];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -865,7 +858,7 @@ describe('Custom computation', () => {
     });
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,
@@ -1035,7 +1028,7 @@ describe('Custom computation', () => {
     });
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     controller = new Controller({
       system: system,

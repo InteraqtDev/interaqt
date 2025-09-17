@@ -1,8 +1,8 @@
-import { describe, test, beforeEach, afterEach, expect } from 'vitest'
-import { DBSetup, EntityToTableMap, EntityQueryHandle, MatchExp, AttributeQueryData } from "@storage"
-import { PGLiteDB, SQLiteDB } from '@runtime'
-import TestLogger from "./testLogger.js"
-import { Entity, Property, Relation } from 'interaqt'
+import { describe, test, beforeEach, afterEach, expect } from 'vitest';
+import { DBSetup, EntityToTableMap, EntityQueryHandle, MatchExp, AttributeQueryData } from "@storage";
+import { PGLiteDB } from '@dbclients';
+import { Entity, Property, Relation } from '@shared';
+import TestLogger from './testLogger';
 
 // Define entities directly in test file
 const User = Entity.create({

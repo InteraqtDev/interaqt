@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
     Controller,
     MonoSystem,
@@ -6,16 +8,8 @@ import {
     Interaction,
     GetAction,
     Action,
-    Attributive,
-    DataAttributive,
-    Query,
-    QueryItem,
-    Entity,
-    Property,
-    Relation,
-    Payload,
-    PayloadItem,
-    removeAllInstance,
+    Attributive, Query,
+    QueryItem, removeAllInstance,
     MatchExp,
     Condition,
     Conditions,
@@ -28,7 +22,7 @@ describe('Get Data Interaction', () => {
 
     beforeEach(async () => {
         removeAllInstance()
-        system = new MonoSystem()
+        system = new MonoSystem(new PGLiteDB())
     })
 
     describe('Basic data retrieval', () => {
@@ -244,10 +238,10 @@ describe('Get Data Interaction', () => {
             })
             await controller.setup(true)
 
-            await system.storage.create('Product', { name: 'Laptop', category: 'electronics', price: 999, inStock: 1 })
-            await system.storage.create('Product', { name: 'Phone', category: 'electronics', price: 599, inStock: 0 })
-            await system.storage.create('Product', { name: 'Desk', category: 'furniture', price: 299, inStock: 1 })
-            await system.storage.create('Product', { name: 'Chair', category: 'furniture', price: 199, inStock: 1 })
+            await system.storage.create('Product', { name: 'Laptop', category: 'electronics', price: 999, inStock: true })
+            await system.storage.create('Product', { name: 'Phone', category: 'electronics', price: 599, inStock: false })
+            await system.storage.create('Product', { name: 'Desk', category: 'furniture', price: 299, inStock: true })
+            await system.storage.create('Product', { name: 'Chair', category: 'furniture', price: 199, inStock: true })
 
             // Filter for in-stock electronics using query.match 
             const result = await controller.callInteraction('getProducts', {
@@ -267,7 +261,7 @@ describe('Get Data Interaction', () => {
             const furnitureResult = await controller.callInteraction('getProducts', {
                 user: { id: 'test-user' },
                 query: {
-                    match: MatchExp.atom({ key: 'inStock', value: ['=', 1] }),
+                    match: MatchExp.atom({ key: 'inStock', value: ['=', true] }),
                     attributeQuery: ['id', 'name', 'category', 'price', 'inStock']
                 }
             })
@@ -677,16 +671,16 @@ describe('Get Data Interaction', () => {
             })
             await controller.setup(true)
 
-            await system.storage.create('Product', { name: 'Laptop', category: 'electronics', featured: 0 })
-            await system.storage.create('Product', { name: 'Featured Book', category: 'books', featured: 1 })
-            await system.storage.create('Product', { name: 'Regular Book', category: 'books', featured: 0 })
-            await system.storage.create('Product', { name: 'Phone', category: 'electronics', featured: 1 })
+            await system.storage.create('Product', { name: 'Laptop', category: 'electronics', featured: false })
+            await system.storage.create('Product', { name: 'Featured Book', category: 'books', featured: true })
+            await system.storage.create('Product', { name: 'Regular Book', category: 'books', featured: false})
+            await system.storage.create('Product', { name: 'Phone', category: 'electronics', featured: true })
 
             // Pass OR conditions through query.match
             const result = await controller.callInteraction('getSpecialProducts', {
                 user: { id: 'test-user' },
                 query: {
-                    match: MatchExp.atom({ key: 'featured', value: ['=', 1] })
+                    match: MatchExp.atom({ key: 'featured', value: ['=', true] })
                         .or(MatchExp.atom({ key: 'category', value: ['=', 'electronics'] })),
                     attributeQuery: ['id', 'name', 'category', 'featured']
                 }
@@ -697,7 +691,7 @@ describe('Get Data Interaction', () => {
             expect(data).toHaveLength(3)  // Laptop, Featured Book, Phone
             
             const hasElectronicsOrFeatured = data.every((p: any) => 
-                p.category === 'electronics' || p.featured === 1
+                p.category === 'electronics' || p.featured === true
             )
             expect(hasElectronicsOrFeatured).toBe(true)
         })

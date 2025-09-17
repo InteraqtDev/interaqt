@@ -4,6 +4,7 @@ import {
     ActivityCall, MonoSystem,
     RelationInstance
 } from 'interaqt';
+import { SQLiteDB } from '@dbclients';
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {
@@ -34,7 +35,7 @@ describe("activity state", () => {
          * message: Message
          */
 
-        system = new MonoSystem()
+        system = new MonoSystem(new SQLiteDB())
         system.conceptClass = KlassByName
 
         friendRelation = relations.find(r => (r as any).name === 'User_friends_friends_User')!

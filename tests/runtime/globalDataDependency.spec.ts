@@ -1,12 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
-  Controller,
-  Entity,
-  MonoSystem,
-  Property, DataDep,
-  PropertyDataContext, PGLiteDB,
-  DataBasedComputation, Dictionary, BoolExp,
-  DICTIONARY_RECORD
+  Controller, MonoSystem, DataDep,
+  PropertyDataContext, DataBasedComputation, Dictionary, BoolExp
 } from "interaqt";
 
 // GlobalDependentComputed as a standard ES6 class

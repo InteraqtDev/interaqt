@@ -1,15 +1,13 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from '@storage'
-import { Entity, Property, Relation } from '@shared'
-import { SQLiteDB } from '@runtime'
-
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from '@storage';
+import { SQLiteDB } from '@dbclients';
+import { Entity, Property, Relation } from '@shared';
 describe('filtered relation', () => {
     let db: SQLiteDB
     let setup: DBSetup
     let handle: EntityQueryHandle
 
     beforeEach(async () => {
-        // @ts-ignore
         db = new SQLiteDB()
         await db.open()
     })

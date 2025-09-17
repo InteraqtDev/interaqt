@@ -1,16 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 import {
   BoolExp,
   Controller,
-  Dictionary,
-  Entity,
-  KlassByName,
-  MonoSystem,
-  Property,
-  Relation,
-  Count,
-  MatchExp,
-  DICTIONARY_RECORD
+  Dictionary, KlassByName,
+  MonoSystem, Count,
+  MatchExp
 } from 'interaqt';
 
 describe('Count computed handle', () => {
@@ -40,7 +36,7 @@ describe('Count computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -130,7 +126,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -214,7 +210,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -320,7 +316,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -430,7 +426,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -500,7 +496,7 @@ describe('Count computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -599,7 +595,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -701,7 +697,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -765,7 +761,7 @@ describe('Count computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -851,7 +847,7 @@ describe('Count computed handle', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -975,7 +971,7 @@ describe('Count computed handle', () => {
     const relations = [departmentEmployeeRelation, activeFullTimeRelation];
     // const relations = [departmentEmployeeRelation];
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1211,7 +1207,7 @@ describe('Count computed handle', () => {
     const relations = [storeProductRelation, inStockRelation, lowStockRelation, outOfStockRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -1375,7 +1371,7 @@ describe('Count computed handle', () => {
     ];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,
@@ -1519,7 +1515,7 @@ describe('Count computed handle', () => {
     const relations = [userLikesPostRelation, userBookmarksPostRelation, userInteractsWithPostRelation];
 
     // Setup system
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,

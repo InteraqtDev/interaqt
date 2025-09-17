@@ -1,13 +1,10 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
   BoolExp,
-  Controller,
-  Entity,
-  KlassByName,
-  MonoSystem,
-  Property,
-  Relation,
-  Count,
+  Controller, KlassByName,
+  MonoSystem, Count,
   MatchExp
 } from 'interaqt';
 
@@ -51,7 +48,7 @@ describe('Symmetric relation computation', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -138,7 +135,7 @@ describe('Symmetric relation computation', () => {
     );
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -240,7 +237,7 @@ describe('Symmetric relation computation', () => {
     const relations = [friendRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,

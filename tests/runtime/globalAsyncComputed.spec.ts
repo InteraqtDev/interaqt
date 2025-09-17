@@ -1,15 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property } from 'interaqt';
+import { PGLiteDB } from '@dbclients';
 import {
-  Controller,
-  Entity,
-  MonoSystem,
-  Property, MatchExp,
+  Controller, MonoSystem, MatchExp,
   DataDep,
-  GlobalDataContext,
-  PGLiteDB,
-  DataBasedComputation,
+  GlobalDataContext, DataBasedComputation,
   ComputationResult,
-  Dictionary,
+  Dictionary
 } from "interaqt";
 
 // GlobalWeatherComputed as a standard ES6 class

@@ -1,15 +1,14 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { Entity, Relation, Property } from '@shared'
-import { SQLiteDB } from '@runtime'
-import { DBSetup } from '../../src/storage/erstorage/Setup.js'
 import TestLogger from './testLogger.js'
-import { EntityQueryHandle } from '../../src/storage/erstorage/EntityQueryHandle.js'
-import { EntityToTableMap } from '../../src/storage/erstorage/EntityToTableMap.js'
-import { MatchExp } from '../../src/storage/erstorage/MatchExp.js'
+import { SQLiteDB } from '@dbclients';
+import { DBSetup } from '@storage';
+import { EntityQueryHandle } from '@storage';
+import { EntityToTableMap } from '@storage';
+import { MatchExp } from '@storage';
 
 describe('Long column name tests', () => {
     let db: SQLiteDB
-    
     beforeEach(async () => {
         db = new SQLiteDB(':memory:', { logger: new TestLogger() })
         await db.open()
@@ -246,7 +245,7 @@ describe('Long column name tests', () => {
                 key: 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters', 
                 value: ['=', 'Test Value'] 
             }),
-            {},
+            undefined,
             [
                 'id',
                 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
@@ -280,7 +279,7 @@ describe('Long column name tests', () => {
         const updatedUser = await entityQueryHandle.findOne(
             'UserWithVeryLongPropertyNamesForCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
-            {},
+            undefined,
             [
                 'id',
                 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
@@ -303,7 +302,7 @@ describe('Long column name tests', () => {
         const deletedUser = await entityQueryHandle.findOne(
             'UserWithVeryLongPropertyNamesForCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
-            {},
+            undefined,
             ['id']
         )
         
@@ -423,7 +422,7 @@ describe('Long column name tests', () => {
         const foundUser = await entityQueryHandle.findOne(
             'UserWithExtremelyLongEntityNameForRelationCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', userWithTeams.id] }),
-            {},
+            undefined,
             [
                 'id',
                 'userName',
@@ -480,7 +479,7 @@ describe('Long column name tests', () => {
         const updatedUser = await entityQueryHandle.findOne(
             'UserWithExtremelyLongEntityNameForRelationCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', userWithTeams.id] }),
-            {},
+            undefined,
             [
                 'id',
                 'userName',
@@ -513,7 +512,7 @@ describe('Long column name tests', () => {
         const userAfterTeamDelete = await entityQueryHandle.findOne(
             'UserWithExtremelyLongEntityNameForRelationCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', userWithTeams.id] }),
-            {},
+            undefined,
             [
                 'id',
                 ['belongsToTeamsWithVeryLongPropertyNameToTestColumnShortening', {
@@ -535,7 +534,7 @@ describe('Long column name tests', () => {
         const deletedUser = await entityQueryHandle.findOne(
             'UserWithExtremelyLongEntityNameForRelationCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', userWithTeams.id] }),
-            {},
+            undefined,
             ['id']
         )
         

@@ -1,16 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { SQLiteDB } from '@dbclients';
 import {
   BoolExp,
   Controller,
-  Dictionary,
-  Entity,
-  KlassByName,
-  MonoSystem,
-  Property,
-  Relation,
-  Average,
-  MatchExp,
-  DICTIONARY_RECORD
+  Dictionary, KlassByName,
+  MonoSystem, Average,
+  MatchExp
 } from 'interaqt';
 
 describe('Average computed handle', () => {
@@ -41,7 +37,7 @@ describe('Average computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -116,7 +112,7 @@ describe('Average computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -166,7 +162,7 @@ describe('Average computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -219,7 +215,7 @@ describe('Average computed handle', () => {
     ]
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -308,7 +304,7 @@ describe('Average computed handle', () => {
     const relations = [studentExamRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -417,7 +413,7 @@ describe('Average computed handle', () => {
     ];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -531,7 +527,7 @@ describe('Average computed handle', () => {
     const relations = [storeSaleRelation, onlineNonRefundedRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     const controller = new Controller({
         system: system,
         entities: entities,
@@ -791,7 +787,7 @@ describe('Average computed handle', () => {
     const relations = [courseEnrollmentRelation, completedEnrollmentRelation, springCompletedRelation, fallCompletedRelation];
     
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
         system: system,
@@ -955,7 +951,7 @@ describe('Average computed handle', () => {
     ];
 
     // Setup system and controller
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,
@@ -1127,7 +1123,7 @@ describe('Average computed handle', () => {
     const relations = [studentMidtermExamRelation, studentFinalExamRelation, studentAllExamsRelation];
 
     // Setup system
-    const system = new MonoSystem();
+    const system = new MonoSystem(new SQLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system: system,

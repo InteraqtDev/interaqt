@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@storage";
-import {SQLiteDB} from '@runtime';
+import {SQLiteDB} from '@dbclients';
 import {removeAllInstance} from '@shared'
 import TestLogger from "./testLogger.js";
 
@@ -17,7 +17,6 @@ describe('find relation', () => {
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
 
-        // @ts-ignore
         db = new SQLiteDB(':memory:', {logger: logger} )
         await db.open()
 
@@ -35,7 +34,7 @@ describe('find relation', () => {
         await handle.create('User', {name: 'aaa', age: 17, profile: {title: 'aaa-profile'}})
 
         const relationName = handle.getRelationName('User', 'profile')
-        const result = await handle.findRelationByName(relationName, undefined, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result = await handle.findRelationByName(relationName, undefined, undefined, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result.length).toBe(1)
         expect(result[0].source.title).toBe('aaa-profile')
         expect(result[0].target.name).toBe('aaa')
@@ -44,7 +43,7 @@ describe('find relation', () => {
             key: 'source.title',
             value: ['=', 'xxx']
         })
-        const result1 = await handle.findRelationByName(relationName, match1, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result1 = await handle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result1.length).toBe(0)
 
         const match2 = MatchExp.atom({
@@ -53,7 +52,7 @@ describe('find relation', () => {
         })
 
 
-        const result2 = await handle.findRelationByName(relationName, match2, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result2 = await handle.findRelationByName(relationName, match2, undefined, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result2.length).toBe(1)
 
 
@@ -66,7 +65,7 @@ describe('find relation', () => {
         })
 
         await handle.removeRelationByName(relationName, match3)
-        const result3 = await handle.findRelationByName(relationName, match3, {}, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
+        const result3 = await handle.findRelationByName(relationName, match3, undefined, [['source', { attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]])
         expect(result3.length).toBe(0)
 
         // 只是关系断开，数据仍然要存在
@@ -103,7 +102,7 @@ describe('find relation', () => {
             key: 'target.name',
             value: ['=', 'aaa']
         })
-        const result1 = await handle.findRelationByName(relationName, match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
+        const result1 = await handle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
 
         expect( result1.length).toBe(2)
         expect( result1[0].source.fileName).toBe('file1')
@@ -120,7 +119,7 @@ describe('find relation', () => {
         })
 
         await handle.removeRelationByName(relationName, match2)
-        const result2 = await handle.findRelationByName(relationName, match1, {}, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
+        const result2 = await handle.findRelationByName(relationName, match1, undefined, [['source', { attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]])
 
         expect( result2.length).toBe(1)
         expect( result2[0].source.fileName).toBe('file2')

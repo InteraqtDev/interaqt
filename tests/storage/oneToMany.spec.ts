@@ -1,7 +1,8 @@
 
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle,LINK_SYMBOL} from "@storage";
-import {SQLiteDB,RecordMutationEvent} from '@runtime';
+import {RecordMutationEvent} from '@runtime';
+import { SQLiteDB } from '@dbclients';
 import TestLogger from "./testLogger.js";
 import { beforeEach, describe, expect, test,afterEach } from "vitest";
 
@@ -15,7 +16,6 @@ describe('one to many', () => {
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
 
-        // @ts-ignore
         db = new SQLiteDB(':memory:', {logger})
         await db.open()
 
@@ -44,7 +44,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['member', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -116,7 +116,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['member', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -170,7 +170,7 @@ describe('one to many', () => {
         const userA = await entityQueryHandle.create('User', rawData, events)
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -213,7 +213,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -264,7 +264,7 @@ describe('one to many', () => {
 
         const findUsers = await entityQueryHandle.find('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age']
         )
 
@@ -272,7 +272,7 @@ describe('one to many', () => {
 
         const findUsers2 = await entityQueryHandle.find('User',
             undefined,
-            {},
+            undefined,
             ['name', 'age']
         )
         // console.log(findUsers2)
@@ -335,7 +335,7 @@ describe('one to many', () => {
 
         const findUsers = await entityQueryHandle.find('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age']
         )
 
@@ -425,7 +425,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['member', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -470,7 +470,7 @@ describe('one to many', () => {
 
         const findUser2 = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['member', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -532,7 +532,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -553,7 +553,7 @@ describe('one to many', () => {
 
         const findUser2 = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -634,7 +634,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['member', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -671,7 +671,7 @@ describe('one to many', () => {
 
         const findUser2 = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['member', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -727,7 +727,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -758,7 +758,7 @@ describe('one to many', () => {
 
         const findUser2 = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -804,7 +804,7 @@ describe('one to many', () => {
 
         const findUser3 = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['leader', { attributeQuery: ['name', 'age']}]]
         )
 
@@ -826,7 +826,7 @@ describe('one to many', () => {
 
         const findUser = await entityQueryHandle.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['name', 'age', ['powers', { attributeQuery: ['id','powerName']}]])
 
         expect(findUser).toMatchObject({
@@ -839,7 +839,7 @@ describe('one to many', () => {
 
         const findPower = await entityQueryHandle.findOne('Power',
             MatchExp.atom({ key: 'id', value: ['=', firstPower.id]}),
-            {},
+            undefined,
             ['powerName', ['owner', {attributeQuery: ['name', ['&', {attributeQuery: ['id']}]]}]]
         )
 

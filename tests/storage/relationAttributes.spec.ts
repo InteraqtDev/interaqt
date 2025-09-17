@@ -1,8 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@storage";
-import {SQLiteDB} from '@runtime';
-
+import { SQLiteDB } from '@dbclients';
 describe('relation attributes', () => {
     let db: SQLiteDB
     let setup: DBSetup
@@ -10,7 +9,6 @@ describe('relation attributes', () => {
 
     beforeEach(async () => {
         const { entities, relations } = createCommonData()
-        // @ts-ignore
         db = new SQLiteDB()
         await db.open()
         setup = new DBSetup(entities, relations, db)
@@ -41,7 +39,7 @@ describe('relation attributes', () => {
         const findTeamRelation = await handle.findOne(
             relationName,
             match,
-            {},
+            undefined,
             ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name']}]]
         )
 
@@ -60,7 +58,7 @@ describe('relation attributes', () => {
         const findTeamRelation2 = await handle.findOne(
             relationName,
             match,
-            {},
+            undefined,
             ['role', ['source', {attributeQuery: ['name', 'age']}], ['target', {attributeQuery: ['name']}]]
         )
         expect(findTeamRelation2).toMatchObject({
@@ -89,7 +87,7 @@ describe('relation attributes', () => {
         const findTeamRelation = await handle.findOne(
             handle.getRelationName('User', 'file'),
             MatchExp.atom({ key: 'target.id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['viewed', ['source', {attributeQuery: ['fileName']}], ['target', {attributeQuery: ['name']}]]
         )
 
@@ -142,7 +140,7 @@ describe('relation attributes', () => {
         const findTeamRelation = await handle.findOne(
             handle.getRelationName('User', 'profile'),
             MatchExp.atom({ key: 'target.id', value: ['=', userA.id]}),
-            {},
+            undefined,
             ['viewed', ['source', {attributeQuery: ['title']}], ['target', {attributeQuery: ['name']}]]
         )
 
@@ -230,7 +228,7 @@ describe('relation attributes', () => {
         const findTeamRelation = await handle.findOne(
             handle.getRelationName('User', 'teams'),
             MatchExp.atom({ key: 'source.id', value: ['=', userA.id]}),
-            {},
+            undefined,
             [
                 ['base', {attributeQuery: ['name']}],
                 ['source', {attributeQuery: ['name', 'age']}],

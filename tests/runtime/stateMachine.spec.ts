@@ -3,6 +3,7 @@ import { Controller, MonoSystem, DICTIONARY_RECORD, Entity, Property, StateMachi
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
+import { PGLiteDB, SQLiteDB } from '@dbclients';
 describe('StateMachineRunner', () => {
 
     test('property state machine', async () => {
@@ -12,7 +13,7 @@ describe('StateMachineRunner', () => {
         const publishInteraction = interactions.publishInteraction
         const withdrawInteraction = interactions.withdrawInteraction
         
-        const system = new MonoSystem();
+        const system = new MonoSystem(new SQLiteDB());
         const controller = new Controller({
             system: system,
             entities: entities,
@@ -95,7 +96,7 @@ describe('StateMachineRunner', () => {
         const enableInteraction = interactions.enableInteraction
         const disableInteraction = interactions.disableInteraction
 
-        const system = new MonoSystem();
+        const system = new MonoSystem(new SQLiteDB());
         const controller = new Controller({
             system: system,
             entities: entities,
@@ -134,7 +135,7 @@ describe('StateMachineRunner', () => {
         const sendInteraction = interactions.sendInteraction
         const transferReviewersInteraction = interactions.transferReviewersInteraction
         
-        const system = new MonoSystem();
+        const system = new MonoSystem(new SQLiteDB());
         const controller = new Controller({
             system: system,
             entities: entities,
@@ -344,7 +345,7 @@ describe('StateMachineRunner', () => {
         stateProperty.computation = StateStateMachine
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system: system,
             entities: [User, Counter],
@@ -460,7 +461,7 @@ describe('StateMachineRunner', () => {
         timestampProperty.computation = TimestampStateMachine
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new SQLiteDB())
         const controller = new Controller({
             system: system,
             entities: [TimeLogger],
@@ -656,7 +657,7 @@ describe('StateMachineRunner', () => {
         countProperty.computation = CountStateMachine
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system: system,
             entities: [User, Message],
@@ -840,7 +841,7 @@ describe('StateMachineRunner', () => {
         })
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system: system,
             entities: [User, Document],
@@ -1107,7 +1108,7 @@ describe('StateMachineRunner', () => {
         })
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system: system,
             entities: [User, Project],
@@ -1387,7 +1388,7 @@ describe('StateMachineRunner', () => {
         })
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system: system,
             entities: [User, Task],
@@ -1651,7 +1652,7 @@ describe('StateMachineRunner', () => {
         })
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system,
             entities: [Project, Task],
@@ -1996,7 +1997,7 @@ describe('StateMachineRunner', () => {
         })
 
         // 设置测试环境
-        const system = new MonoSystem()
+        const system = new MonoSystem(new SQLiteDB())
         const controller = new Controller({
             system: system,
             entities: [User, Order],
@@ -2148,7 +2149,7 @@ describe('StateMachineRunner', () => {
         deletionProperty.computation = DeletionStateMachine
 
         // 创建系统和控制器
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system,
             entities: [UserEntity],
@@ -2352,7 +2353,7 @@ describe('StateMachineRunner', () => {
         hardDeleteProperty.computation = DeletionStateMachine
 
         // 创建系统
-        const system = new MonoSystem()
+        const system = new MonoSystem(new PGLiteDB())
         const controller = new Controller({
             system,
             entities: [ArticleEntity],

@@ -1,9 +1,6 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR} from "./System.js";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
 import { PGlite} from '@electric-sql/pglite'
-import {asyncInteractionContext} from "./asyncInteractionContext.js";
 import { uuidv7 } from "@interaqt/uuidv7";
-import {InteractionContext} from "./Controller.js";
-import { dbConsoleLogger } from "./MonoSystem.js";
 
 class IDSystem {
     constructor(public db: Database) {}
