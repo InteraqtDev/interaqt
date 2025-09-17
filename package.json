@@ -20,10 +20,11 @@
   },
   "scripts": {
     "check": "tsc --noEmit --skipLibCheck",
-    "check:all": "npm run check:shared && npm run check:runtime && npm run check:storage",
+    "check:all": "npm run check:shared && npm run check:runtime && npm run check:storage && npm run check:dbclients",
     "check:shared": "tsc --project tsconfig.shared.json",
     "check:runtime": "tsc --project tsconfig.runtime.json",
     "check:storage": "tsc --project tsconfig.storage.json",
+    "check:dbclients": "tsc --project tsconfig.dbclients.json",
     "prebuild": "rimraf dist",
     "build": "vite build --config vite.prod.config.ts",
     "postbuild": "npm run check:build",

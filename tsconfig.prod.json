@@ -22,7 +22,8 @@
     "paths": {
         "@runtime": ["src/runtime/index.ts"],
         "@shared": ["src/shared/index.ts"],
-        "@storage": ["src/storage/index.ts"]
+        "@storage": ["src/storage/index.ts"],
+        "interaqt": ["src"]
     }
   },
   "include": [
