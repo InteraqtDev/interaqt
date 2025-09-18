@@ -106,6 +106,9 @@ export type Database = {
     getPlaceholder?: () => (name?:string) => string,
     mapToDBFieldType: (type: string, collection?: boolean) => string
     close: () => Promise<any>
+    beginTransaction?: (name?:string) => Promise<any>
+    commitTransaction?: (name?:string) => Promise<any>
+    rollbackTransaction?: (name?:string) => Promise<any>
 } // activity 数据
 // state 等系统配置数据的实体化
 // FIXME 应该独立到外部

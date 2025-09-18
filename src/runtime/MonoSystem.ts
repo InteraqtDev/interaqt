@@ -62,13 +62,13 @@ class MonoStorage implements Storage{
     }
     public callbacks: Set<RecordMutationCallback> = new Set()
     beginTransaction(name='') {
-        return this.db.scheme('BEGIN', name)
+        return this.db.beginTransaction ? this.db.beginTransaction(name) : this.db.scheme('BEGIN', name)
     }
     commitTransaction(name='') {
-        return this.db.scheme('COMMIT', name)
+        return this.db.commitTransaction ? this.db.commitTransaction(name) : this.db.scheme('COMMIT', name)
     }
     rollbackTransaction(name='') {
-        return this.db.scheme('ROLLBACK', name)
+        return this.db.rollbackTransaction ? this.db.rollbackTransaction(name) : this.db.scheme('ROLLBACK', name)
     }
     // CAUTION kv 结构数据的实现也用 er。这是系统约定，因为也需要  Record 事件！
     async get(concept: string, key: string, initialValue?: any) {
