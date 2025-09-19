@@ -199,6 +199,8 @@ export class Scheduler {
                 }
             }
         }
+
+        // this.addMutationListeners()
     }
     
     private buildComputationHandleMap(computationHandles: Array<{ new(...args: any[]): Computation }>) {
@@ -266,16 +268,10 @@ export class Scheduler {
         assert(!!computationHandle, `cannot find computation handle`)
         return computationHandle!.createStateData?.(...args) ?? {}
     }
-
-    async setupDefaultValues() {
+    addMutationPropertyComputationDefaultValueListeners() {
         for(const computation of this.computationsHandles.values()) {
-            // CAUTION 非 property 的 computation 的 defaultValue 直接 applyResult 即可。
-            
             if(computation.getDefaultValue) {
-                if (computation.dataContext.type==='global' || computation.dataContext.type==='entity' || computation.dataContext.type==='relation') {
-                    const defaultValue = await computation.getDefaultValue()
-                    await this.controller.applyResult(computation.dataContext, defaultValue)
-                } else {
+                if (computation.dataContext.type==='property') {
                     // property 的默认值需要在 scheduler 监听 property 的 record 创建事件，来设置默认值。
                     // 监听 record 的创建事件，来设置默认值。
                     const propertyDataContext = computation.dataContext as PropertyDataContext
@@ -298,6 +294,18 @@ export class Scheduler {
             }
         }
     }
+    async setupGlobalComputationDefaultValue() {
+        for(const computation of this.computationsHandles.values()) {
+            // CAUTION 非 property 的 computation 的 defaultValue 直接 applyResult 即可。
+            if(computation.getDefaultValue) {
+                if (computation.dataContext.type==='global' ) {
+                // if (computation.dataContext.type==='global' || computation.dataContext.type==='entity' || computation.dataContext.type==='relation') {
+                    const defaultValue = await computation.getDefaultValue()
+                    await this.controller.applyResult(computation.dataContext, defaultValue)
+                }
+            }
+        }
+    }
     async setupGlobalBoundStateDefaultValues() {
         for(const computation of this.computationsHandles.values()) {
             const computationHandle = computation as Computation
@@ -314,7 +322,7 @@ export class Scheduler {
     }
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
-    async setupMutationListeners() {
+    addMutationComputationListeners() {
         this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
@@ -335,8 +343,6 @@ export class Scheduler {
                 }
             }
         })
-
-        // TODO 未来也许要监听 MutationEvent，让开发者能观测系统的变化。
     }
     async computeDirtyDataDepRecords(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {
         // 1. 就是自身的变化
@@ -816,58 +822,22 @@ export class Scheduler {
             return {}
         }
     }
-    async setupGlobalDict() {
+    async setupDictDefaultValue() {
         const globalDict = this.controller.dict.filter(dict => dict.defaultValue !== undefined)
         for (const dict of globalDict) {
             await this.controller.system.storage.dict.set(dict.name, dict.defaultValue!())
         }
     }
     
-    async setup() {
+    async setup(createDefaultDictValue: boolean = false) {
         try {
-            // entity/relation/dict 是 computation 时的 defaultValue.
-            try {
-                await this.setupDefaultValues()
-            } catch (e) {
-                const error = new SchedulerError('Failed to setup computation default values', {
-                    schedulingPhase: 'default-values-setup',
-                    causedBy: e instanceof Error ? e : new Error(String(e))
-                })
-                throw error
-            }
-
-            // entity/relation/dict 中的 computation 内部的 state 的 default value.
-            try {
+            this.addMutationPropertyComputationDefaultValueListeners()
+            this.addMutationComputationListeners()
+            if (createDefaultDictValue) {   
+                // 一定要先把 bound state default value 设置后，因为后面开始设置 dict default value 时，可能触发 computation。可能要读 state。
                 await this.setupGlobalBoundStateDefaultValues()
-            } catch (e) {
-                const error = new SchedulerError('Failed to setup computation state default values', {
-                    schedulingPhase: 'state-default-values-setup',
-                    causedBy: e instanceof Error ? e : new Error(String(e))
-                })
-                throw error
-            }
-
-            // 设置 computation 对 mutation 事件 的监听
-            try {
-                await this.setupMutationListeners()
-            } catch (e) {
-                const error = new SchedulerError('Failed to setup mutation listeners for computations', {
-                    schedulingPhase: 'mutation-listeners-setup',
-                    causedBy: e instanceof Error ? e : new Error(String(e))
-                })
-                throw error
-            }
-
-            // 可能需要的 computation 初始化行为。
-            // 为什么放在这里，因为 global dict 的赋值行为可能触发初始化的其他 computation.
-            try {
-                await this.setupGlobalDict()
-            } catch (e) {
-                const error = new SchedulerError('Failed to setup global dictionary', {
-                    schedulingPhase: 'global-dict-setup',
-                    causedBy: e instanceof Error ? e : new Error(String(e))
-                })
-                throw error
+                await this.setupGlobalComputationDefaultValue()
+                await this.setupDictDefaultValue()
             }
         } catch (e) {
             if (e instanceof SchedulerError) {

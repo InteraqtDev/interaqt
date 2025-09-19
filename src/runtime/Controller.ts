@@ -161,7 +161,7 @@ export class Controller {
     async setup(install?: boolean) {
         const states = this.scheduler.createStates()
         await this.system.setup(this.entities, this.relations, states, install)
-        await this.scheduler.setup()
+        await this.scheduler.setup(install)
 
         // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
