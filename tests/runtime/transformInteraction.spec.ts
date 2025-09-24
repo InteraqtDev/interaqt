@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { SQLiteDB } from '@dbclients';
 import {
     Controller, MonoSystem,
-    BoolExp, KlassByName, ConditionError
+    BoolExp, KlassByName, ConditionError,
+    ACTIVITY_RECORD
 } from 'interaqt';
 import { createData } from './data/leaveRequest.js';
 
@@ -94,6 +95,8 @@ describe('map interaction', () => {
         }
         const res1 = await controller.callInteraction(sendRequestName,  {user: userA, payload})
         expect(res1.error).toBeUndefined()
+
+        expect(res1.effects?.filter(e => e.recordName === ACTIVITY_RECORD)).toHaveLength(0)
 
         const requests1 = await controller.system.storage.find('Request', undefined, undefined, ['*', ['from', {attributeQuery: ["*"]}], ['to', {attributeQuery: ["*"]}]])
         expect(requests1.length).toBe(1)

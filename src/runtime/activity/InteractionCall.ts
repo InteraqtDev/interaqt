@@ -39,7 +39,10 @@ export type InteractionEvent  = {
     user: EventUser,
     query: EventQuery,
     payload: EventPayload,
-    activityId?: string,
+    activity?: {
+        id: string,
+    },
+    args: InteractionEventArgs,
 }
 
 export type InteractionEventArgs = {
@@ -458,16 +461,16 @@ export class InteractionCall {
         response.error  = await this.check(interactionEventArgs, activityId, checkUserRef, context)
 
         if (!response.error) {
-            const event = {
+            const event: InteractionEvent = {
                 interactionName: this.interaction.name,
                 interactionId: this.interaction.uuid,
                 user: interactionEventArgs.user,
                 query: interactionEventArgs.query || {},
                 payload: interactionEventArgs.payload||{},
                 args: interactionEventArgs,
-                activity: {
-                    id: activityId,
-                }
+            }
+            if(activityId && activityId !== undefined) {
+                event.activity = {id: activityId}
             }
 
             await this.saveEvent(event)
