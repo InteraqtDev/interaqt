@@ -70,7 +70,7 @@ export interface ControllerOptions {
     recordMutationSideEffects?: RecordMutationSideEffect[]
     computations?: (new (...args: any[]) => Computation)[]
     ignorePermission?: boolean
-    forceThtrowInteractionError?: boolean
+    forceThrowInteractionError?: boolean
 }
 
 export const HARD_DELETION_PROPERTY_NAME = '_isDeleted_'
@@ -101,7 +101,7 @@ export class Controller {
     public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect[] = []
     public ignorePermission: boolean
-    public forceThtrowInteractionError: boolean
+    public forceThrowInteractionError: boolean
     constructor(options: ControllerOptions) {
         const {
             system,
@@ -113,13 +113,13 @@ export class Controller {
             recordMutationSideEffects = [],
             computations = [],
             ignorePermission = false,
-            forceThtrowInteractionError = false // 会 catch 住 error，并在 result 中返回。
+            forceThrowInteractionError = false // 会 catch 住 error，并在 result 中返回。
         } = options
         
         // 首先初始化 system
         this.system = system
         this.ignorePermission = ignorePermission
-        this.forceThtrowInteractionError = forceThtrowInteractionError
+        this.forceThrowInteractionError = forceThrowInteractionError
         // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
         this.entities = [...entities]
         this.relations = [...relations]
@@ -256,68 +256,41 @@ export class Controller {
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
 
-    async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs) {
+    async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs, activityName?: string, activityId?: string) {
         try {
             // Run the interaction call within the effects context
             const effectsContext = { effects: [] as RecordMutationEvent[] }
             const result = await asyncEffectsContext.run(effectsContext, async () => {
-                // 内部 error 已经 catch 住了，如果 option 中没有声明 returnInteractionError，则直接 throw 出去。
-                return await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+                if (activityName) {
+                    // Call activity interaction
+                    return await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
+                } else {
+                    // Call regular interaction
+                    return await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+                }
             })
             
             result.effects = effectsContext.effects
             
-            if (result.error && this.forceThtrowInteractionError) {
+            if (result.error && this.forceThrowInteractionError) {
                 throw result.error
             } else {
+                await this.runRecordChangeSideEffects(result, this.system.logger)
                 return result
             }
         } catch (e) {
-            const error = new InteractionExecutionError('Failed to call interaction', {
-                interactionName,
-                userId: interactionEventArgs.user?.id,
-                payload: interactionEventArgs.payload,
-                executionPhase: 'callInteraction',
-                causedBy: e instanceof Error ? e : new Error(String(e))
-            })
-            throw error
-        }
-    }
-    async callActivityInteraction(activityName:string, interactionName:string, activityId: string|undefined, interactionEventArgs: InteractionEventArgs) {
-        try {
-            // Run the interaction call within the effects context
-            const effectsContext = { effects: [] as RecordMutationEvent[] }
-            const result = await asyncEffectsContext.run(effectsContext, async () => {
-                return await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
-            })
-            
-            // Merge effects from context into result
-            if (result.effects && effectsContext.effects.length > 0) {
-                // Add any effects collected during computation execution
-                const computationEffects = effectsContext.effects.filter(e => 
-                    !result.effects!.some(re => 
-                        re.type === e.type && 
-                        re.recordName === e.recordName && 
-                        re.record?.id === e.record?.id
-                    )
-                )
-                result.effects.push(...computationEffects)
-            }
-            
-            if (result.error && this.forceThtrowInteractionError) {
-                throw result.error
-            } else {
-                return result
-            }
-        } catch (e) {
-            const error = new InteractionExecutionError('Failed to call activity interaction', {
-                interactionName,
-                userId: interactionEventArgs.user?.id,
-                payload: interactionEventArgs.payload,
-                executionPhase: 'callActivityInteraction',
-                context: { activityName, activityId },
-                causedBy: e instanceof Error ? e : new Error(String(e))
-            })
+            const isActivityInteraction = !!activityName
+            const error = new InteractionExecutionError(
+                isActivityInteraction ? 'Failed to call activity interaction' : 'Failed to call interaction', 
+                {
+                    interactionName,
+                    userId: interactionEventArgs.user?.id,
+                    payload: interactionEventArgs.payload,
+                    executionPhase: isActivityInteraction ? 'callActivityInteraction' : 'callInteraction',
+                    ...(isActivityInteraction ? { context: { activityName, activityId } } : {}),
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                }
+            )
             throw error
         }
     }

@@ -68,7 +68,7 @@ describe("activity state", () => {
         let activityId: string | undefined
 
         // 2. 交互顺序错误 approve
-        const res1 = await controller.callActivityInteraction(activityName, approveName, activityId, {user: userA})
+        const res1 = await controller.callInteraction(approveName, {user: userA}, activityName, activityId)
         expect(res1.error).toBeDefined()
 
         // 3. sendFriendRequest payload 错误
@@ -77,20 +77,20 @@ describe("activity state", () => {
         // expect(res11.error).toBeDefined()
 
         // 3. a 发起 sendFriendRequest
-        const res2 = await controller.callActivityInteraction(activityName, sendRequestName, activityId, {user: userA, payload: {to: userB}})
+        const res2 = await controller.callInteraction(sendRequestName, {user: userA, payload: {to: userB}}, activityName, activityId)
         expect(res2.error).toBeUndefined()
         activityId = res2.context!.activityId as string
 
 
         // 4. 交互顺序错误 a sendFriendRequest
-        const res3 =await  controller.callActivityInteraction(activityName, sendRequestName, activityId,{user: userA})
+        const res3 =await  controller.callInteraction(sendRequestName, {user: userA}, activityName, activityId)
         expect(res3.error).toBeDefined()
 
         // 5. 角色错误 a approve
-        const res4 = await controller.callActivityInteraction(activityName,  approveName, activityId,{user: userA})
+        const res4 = await controller.callInteraction(approveName, {user: userA}, activityName, activityId)
         expect(res4.error).toBeDefined()
         // 6. 正确 b approve
-        const res5 = await controller.callActivityInteraction(activityName, approveName, activityId,{user: userB})
+        const res5 = await controller.callInteraction(approveName, {user: userB}, activityName, activityId)
         // 查询关系是否正确建立
         const relations = await controller.system.storage.findRelationByName(friendRelation.name!, undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
         expect(relations.length).toBe(1)
@@ -100,11 +100,11 @@ describe("activity state", () => {
         expect(res5.error).toBeUndefined()
 
         // 7. 错误 b reject
-        const res6 = await controller.callActivityInteraction(activityName, rejectName, activityId,{user: userB})
+        const res6 = await controller.callInteraction(rejectName, {user: userB}, activityName, activityId)
         expect(res6.error).toBeDefined()
 
         // 8. 错误 a cancel
-        const res7 = await controller.callActivityInteraction(activityName,cancelName, activityId, {user: userA})
+        const res7 = await controller.callInteraction(cancelName, {user: userA}, activityName, activityId)
         expect(res7.error).toBeDefined()
         // 8. 获取 activity 状态是否 complete
         const currentState = await createFriendRelationActivityCall.getState(activityId!)
@@ -118,15 +118,15 @@ describe("activity state", () => {
         const { activityId} = await createFriendRelationActivityCall.create()
 
         // 3. a 发起 sendFriendRequest
-        const res2 = await controller.callActivityInteraction(activityName,sendRequestName, activityId, {user: userA, payload: {to: userB}})
+        const res2 = await controller.callInteraction(sendRequestName, {user: userA, payload: {to: userB}}, activityName, activityId)
         expect(res2.error).toBeUndefined()
 
         // 6. 正确 a cancel
-        const res5 = await controller.callActivityInteraction(activityName,cancelName, activityId, {user: userA})
+        const res5 = await controller.callInteraction(cancelName, {user: userA}, activityName, activityId)
         expect(res5.error).toBeUndefined()
 
         // 7. 错误 b reject
-        const res6 = await controller.callActivityInteraction(activityName, rejectName, activityId,{user: userB})
+        const res6 = await controller.callInteraction(rejectName, {user: userB}, activityName, activityId)
         expect(res6.error).toBeDefined()
 
         // 8. 获取 activity 状态是否 complete
