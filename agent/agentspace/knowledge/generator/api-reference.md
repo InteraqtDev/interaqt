@@ -2799,6 +2799,137 @@ new Controller({
 
 ⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter. All computations should be defined within the `computation` field of Entity/Relation/Property definitions. The 6th parameter `dict` is for global dictionary definitions (Dictionary.create), not for computation definitions.
 
+### RecordMutationSideEffect
+
+RecordMutationSideEffect allows you to execute custom logic when records are created, updated, or deleted within interaction contexts. It's useful for triggering external operations, logging, or custom business logic in response to data changes.
+
+**Syntax**
+```typescript
+RecordMutationSideEffect.create(config: RecordMutationSideEffectConfig): RecordMutationSideEffectInstance
+```
+
+**Parameters**
+- `config.name` (string, required): Unique name for the side effect
+- `config.record` (object, required): Target record configuration
+  - `record.name` (string, required): Entity or relation name to monitor
+- `config.content` (function, required): Async function executed when mutation occurs
+  ```typescript
+  async (event: RecordMutationEvent) => Promise<any>
+  ```
+
+**RecordMutationEvent Structure**
+```typescript
+type RecordMutationEvent = {
+    recordName: string                    // Entity/relation name
+    type: 'create' | 'update' | 'delete' // Mutation type
+    record?: { id: string, ... }         // New/current record (for create/update)
+    oldRecord?: { id: string, ... }      // Previous record (for update/delete)
+    keys?: string[]                      // Changed fields (for update)
+}
+```
+
+**Important Notes**
+- RecordMutationSideEffect **only** triggers within interaction execution context
+- Direct storage operations (e.g., `controller.system.storage.create()`) do **NOT** trigger side effects
+- All side effects registered for an entity are called on any mutation of that entity
+- Side effects run after the storage operation completes
+- Side effect errors are captured but don't fail the interaction
+
+**Examples**
+
+```typescript
+// Log user creation events
+const userCreatedLogger = RecordMutationSideEffect.create({
+    name: 'userCreatedLogger',
+    record: { name: 'User' },
+    content: async (event) => {
+        if (event.type === 'create') {
+            console.log('New user created:', event.record?.id);
+            // Send welcome email, update analytics, etc.
+            return { logged: true, userId: event.record?.id };
+        }
+        return null;
+    }
+});
+
+// Audit trail for data changes
+const auditLogger = RecordMutationSideEffect.create({
+    name: 'auditLogger',
+    record: { name: 'Order' },
+    content: async (event) => {
+        const audit = {
+            action: event.type,
+            entityId: event.record?.id || event.oldRecord?.id,
+            timestamp: new Date().toISOString(),
+            changes: event.type === 'update' ? {
+                before: event.oldRecord,
+                after: event.record,
+                fields: event.keys
+            } : null
+        };
+        
+        // Store audit log (pseudo-code)
+        await auditService.log(audit);
+        return { audited: true };
+    }
+});
+
+// Cache invalidation on updates
+const cacheInvalidator = RecordMutationSideEffect.create({
+    name: 'cacheInvalidator',
+    record: { name: 'Product' },
+    content: async (event) => {
+        if (event.type === 'update' || event.type === 'delete') {
+            const productId = event.record?.id || event.oldRecord?.id;
+            await cacheService.invalidate(`product:${productId}`);
+            return { invalidated: true, productId };
+        }
+        return null;
+    }
+});
+
+// Using in Controller
+const controller = new Controller({
+    system: system,
+    entities: [User, Order, Product],
+    relations: [],
+    interactions: [CreateUserInteraction, UpdateOrderInteraction],
+    recordMutationSideEffects: [
+        userCreatedLogger,
+        auditLogger,
+        cacheInvalidator
+    ]
+});
+
+// When interaction is called, side effects are triggered
+const result = await controller.callInteraction('createUser', {
+    user: { id: 'admin' },
+    payload: { name: 'John', email: 'john@example.com' }
+});
+
+// Access side effect results
+if (result.sideEffects?.userCreatedLogger?.error) {
+    console.warn('Logger failed:', result.sideEffects.userCreatedLogger.error);
+} else {
+    console.log('Logger result:', result.sideEffects.userCreatedLogger.result);
+}
+```
+
+**Common Use Cases**
+1. **Audit Logging**: Track all changes to sensitive data
+2. **External System Sync**: Update external systems when data changes
+3. **Cache Management**: Invalidate caches on data mutations
+4. **Notifications**: Send notifications when specific events occur
+5. **Analytics**: Track user actions and data changes
+6. **Cleanup Tasks**: Perform cleanup when records are deleted
+
+**Best Practices**
+1. Filter by event type within the content function if needed
+2. Handle errors gracefully - side effect failures shouldn't break the main operation
+3. Keep side effects lightweight to avoid impacting performance
+4. Use descriptive names for debugging
+5. Return meaningful results for monitoring
+
 **Main Methods**
 
 #### setup(install?: boolean)
