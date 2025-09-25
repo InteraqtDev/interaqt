@@ -150,12 +150,12 @@ const result = await controller.callInteraction(interactionName: string, args: {
   payload?: { [key: string]: any }           // Optional payload
 })
 
-// Call activity interaction
-const result = await controller.callActivityInteraction(
-  activityName: string,
+// Call activity interaction (using the same callInteraction method)
+const result = await controller.callInteraction(
   interactionName: string,
-  activityId: string,
-  args: InteractionEventArgs
+  args: InteractionEventArgs,
+  activityName: string,    // Optional: for activity interactions
+  activityId: string       // Optional: for activity interactions
 )
 ```
 

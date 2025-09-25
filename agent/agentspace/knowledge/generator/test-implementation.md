@@ -35,7 +35,19 @@ expect(result.error).toBeUndefined()
 
 ## callInteraction Return Value
 
-The `controller.callInteraction()` method returns a `InteractionCallResponse` object with the following structure:
+The `controller.callInteraction()` method is used for both regular interactions and activity interactions. 
+
+**Method Signature:**
+```typescript
+callInteraction(
+  interactionName: string, 
+  args: InteractionEventArgs, 
+  activityName?: string,    // Optional: for activity interactions
+  activityId?: string       // Optional: for activity interactions
+): Promise<InteractionCallResponse>
+```
+
+The method returns a `InteractionCallResponse` object with the following structure:
 
 ```typescript
 type InteractionCallResponse = {
@@ -232,11 +244,11 @@ expect(publishResult.error).toBeUndefined()
 expect(publishResult.sideEffects?.emailNotification?.result).toBe('sent')
 
 // 4. Activity interactions return activityId
-const activityResult = await controller.callActivityInteraction(
-  'ApprovalWorkflow', 
-  'StartApproval', 
-  undefined, 
-  {...}
+const activityResult = await controller.callInteraction(
+  'StartApproval',
+  {...},
+  'ApprovalWorkflow',
+  undefined
 )
 const activityId = activityResult.context?.activityId
 ```

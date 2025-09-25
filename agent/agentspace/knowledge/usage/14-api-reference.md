@@ -1200,8 +1200,16 @@ Initialize system.
 await controller.setup(true) // Create database tables
 ```
 
-#### callInteraction(interactionName: string, args: InteractionEventArgs)
-Call interaction.
+#### callInteraction(interactionName: string, args: InteractionEventArgs, activityName?: string, activityId?: string)
+Call interaction or activity interaction.
+
+**Parameters:**
+- `interactionName`: The name of the interaction to call
+- `args`: The interaction event arguments containing user and payload
+- `activityName` (optional): The name of the activity when calling an activity interaction
+- `activityId` (optional): The ID of the activity instance when calling an activity interaction
+
+**Example - Regular Interaction:**
 ```typescript
 const result = await controller.callInteraction('createPost', {
     user: { id: 'user1' },
@@ -1209,16 +1217,16 @@ const result = await controller.callInteraction('createPost', {
 })
 ```
 
-#### callActivityInteraction(activityName: string, interactionName: string, activityId: string, args: InteractionEventArgs)
-Call interaction within activity.
+**Example - Activity Interaction:**
 ```typescript
-const result = await controller.callActivityInteraction(
-    'OrderProcess',
+const result = await controller.callInteraction(
     'confirmOrder',
-    'activity-instance-1',
-    { user: { id: 'user1' }, payload: { orderData: {...} } }
+    { user: { id: 'user1' }, payload: { orderData: {...} } },
+    'OrderProcess',
+    'activity-instance-1'
 )
 ```
+
 
 ### System
 
