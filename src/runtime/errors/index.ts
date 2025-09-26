@@ -25,6 +25,10 @@ export {
     SchedulerError
 } from './SystemErrors.js'
 
+export {
+    SideEffectError
+} from './SideEffectError.js'
+
 // Condition errors
 export {
     ConditionError

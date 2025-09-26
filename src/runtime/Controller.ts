@@ -22,7 +22,8 @@ import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
 import {
-    InteractionExecutionError
+    InteractionExecutionError,
+    SideEffectError
 } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
@@ -86,7 +87,7 @@ export const HardDeletionProperty = {
 
 export class Controller {
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
-    public recordNameToSideEffects = new Map<string, Set<IInstance | RecordMutationSideEffect>>()
+    public recordNameToSideEffects = new Map<string, Set<RecordMutationSideEffect>>()
     public globals = {
         BoolExp,
         MatchExp
@@ -301,30 +302,31 @@ export class Controller {
             if (sideEffects) {
                 for(let sideEffect of sideEffects) {
                     try {
-                        if (sideEffect instanceof RecordMutationSideEffect) {
-                            result.sideEffects![sideEffect.name] = {
-                                result: await sideEffect.content.call(this, event),
-                            }
-                        } else {
-                            // Handle IInstance case - check if it has the required properties
-                            const instanceSideEffect = sideEffect as IInstance & { name?: string; content?: (event: RecordMutationEvent) => Promise<unknown> };
-                            if (instanceSideEffect.name && typeof instanceSideEffect.content === 'function') {
-                                result.sideEffects![instanceSideEffect.name] = {
-                                    result: await instanceSideEffect.content(event),
-                                }
-                            }
+                        result.sideEffects![sideEffect.name] = {
+                            result: await sideEffect.content.call(this, event),
                         }
+                      
                     } catch (e){
-                        let effectName = 'unknown';
-                        if (sideEffect instanceof RecordMutationSideEffect) {
-                            effectName = sideEffect.name;
-                        } else {
-                            const instanceSideEffect = sideEffect as IInstance & { name?: string };
-                            effectName = instanceSideEffect.name || 'unknown';
-                        }
-                        logger.error({label: "recordMutationSideEffect", message: effectName})
-                        result.sideEffects![effectName] = {
-                            error: e
+                        
+                        const sideEffectError = new SideEffectError(
+                            `Side effect '${sideEffect.name}' failed for ${event.type} on ${event.recordName}`,
+                            {
+                                sideEffectName: sideEffect.name,
+                                recordName: event.recordName,
+                                mutationType: event.type,
+                                recordId: event.record?.id,
+                                context: {
+                                    record: event.record,
+                                    oldRecord: event.oldRecord,
+                                    keys: event.keys
+                                },
+                                causedBy: e instanceof Error ? e : new Error(String(e))
+                            }
+                        )
+                        
+                        logger.error({label: "recordMutationSideEffect", message: sideEffect.name, error: sideEffectError})
+                        result.sideEffects![sideEffect.name] = {
+                            error: sideEffectError
                         }
                     }
                 }
