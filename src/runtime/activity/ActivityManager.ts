@@ -177,7 +177,6 @@ export class ActivityManager {
                     await this.controller.system.storage.rollbackTransaction(interactionCall.interaction.name)
                 } else {
                     await this.controller.system.storage.commitTransaction(interactionCall.interaction.name)
-                    await this.runRecordChangeSideEffects(result!, logger)
                 }
             }
 
@@ -236,7 +235,6 @@ export class ActivityManager {
                 await this.controller.system.storage.rollbackTransaction(activityCall.activity.name)
             } else {
                 await this.controller.system.storage.commitTransaction(activityCall.activity.name)
-                await this.runRecordChangeSideEffects(result, logger)
             }
 
             return result
@@ -254,46 +252,6 @@ export class ActivityManager {
         }
     }
 
-    private async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
-        const mutationEvents = result.effects as RecordMutationEvent[]
-        for(let event of mutationEvents || []) {
-            const sideEffects = this.controller.recordNameToSideEffects.get(event.recordName)
-            if (sideEffects) {
-                if (!result.sideEffects) {
-                    result.sideEffects = {}
-                }
-                for(let sideEffect of sideEffects) {
-                    try {
-                        if (sideEffect instanceof RecordMutationSideEffect) {
-                            result.sideEffects[sideEffect.name] = {
-                                result: await sideEffect.content(event),
-                            }
-                        } else {
-                            // Handle IInstance case - check if it has the required properties
-                            const instanceSideEffect = sideEffect as IInstance & { name?: string; content?: (event: RecordMutationEvent) => Promise<unknown> };
-                            if (instanceSideEffect.name && typeof instanceSideEffect.content === 'function') {
-                                result.sideEffects[instanceSideEffect.name] = {
-                                    result: await instanceSideEffect.content(event),
-                                }
-                            }
-                        }
-                    } catch (e){
-                        let effectName = 'unknown';
-                        if (sideEffect instanceof RecordMutationSideEffect) {
-                            effectName = sideEffect.name;
-                        } else {
-                            const instanceSideEffect = sideEffect as IInstance & { name?: string };
-                            effectName = instanceSideEffect.name || 'unknown';
-                        }
-                        logger.error({label: "recordMutationSideEffect", message: effectName})
-                        result.sideEffects[effectName] = {
-                            error: e
-                        }
-                    }
-                }
-            }
-        }
-    }
     async createActivity(activity: {
         name: string;
         uuid: string;

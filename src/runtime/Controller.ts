@@ -33,14 +33,14 @@ export const USER_ENTITY = 'User'
 export interface IRecordMutationSideEffect {
     name: string;
     record: { name: string };
-    content: (event: RecordMutationEvent) => Promise<any>;
+    content: (this: Controller, event: RecordMutationEvent) => Promise<any>;
 }
 
 // Create a class to use as a type and value
 export class RecordMutationSideEffect implements IRecordMutationSideEffect {
     name: string;
     record: { name: string };
-    content: (event: RecordMutationEvent) => Promise<any>;
+    content: (this: Controller, event: RecordMutationEvent) => Promise<any>;
 
     constructor(data: IRecordMutationSideEffect) {
         this.name = data.name;
@@ -303,7 +303,7 @@ export class Controller {
                     try {
                         if (sideEffect instanceof RecordMutationSideEffect) {
                             result.sideEffects![sideEffect.name] = {
-                                result: await sideEffect.content(event),
+                                result: await sideEffect.content.call(this, event),
                             }
                         } else {
                             // Handle IInstance case - check if it has the required properties
