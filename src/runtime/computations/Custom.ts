@@ -137,9 +137,9 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     return {};
   }
   
-  getInitialValue() {
+  getInitialValue(record?:any) {
     if (this.getInitialValueCallback) {
-      return this.getInitialValueCallback.call(this.controller);
+      return this.getInitialValueCallback.call(this.controller, record);
     }
     return undefined;
   }
