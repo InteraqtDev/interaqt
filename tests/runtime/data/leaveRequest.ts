@@ -281,7 +281,7 @@ const pendingToRejectedTransfer = StateTransfer.create({
 const resultSM = StateMachine.create({
     states: [pendingStateNode, approvedStateNode, rejectedStateNode],
     transfers: [pendingToApprovedTransfer, pendingToRejectedTransfer],
-    defaultState: pendingStateNode
+    initialState: pendingStateNode
 })
 
 
@@ -376,7 +376,7 @@ deletionProperty.computation = StateMachine.create({
             }
         })
     ],
-    defaultState: NON_DELETED_STATE
+    initialState: NON_DELETED_STATE
 })
 
 RequestEntity.properties.push(

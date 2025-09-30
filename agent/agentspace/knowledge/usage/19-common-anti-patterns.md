@@ -235,7 +235,7 @@ StateMachine.create({
       trigger: SomeInteraction
     })
   ],
-  defaultState: 'active'  // Should be object reference!
+  initialState: 'active'  // Should be object reference!
 });
 
 // ✅ CORRECT: Use object references
@@ -251,7 +251,7 @@ StateMachine.create({
       trigger: SomeInteraction
     })
   ],
-  defaultState: activeState     // Object reference
+  initialState: activeState     // Object reference
 });
 ```
 

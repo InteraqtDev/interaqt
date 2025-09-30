@@ -105,12 +105,12 @@ describe("Computation System - createClass functionality", () => {
       const machine = StateMachine.create({
         states: [pendingNode, activeNode, doneNode],
         transfers: [startTransfer, completeTransfer],
-        defaultState: pendingNode
+        initialState: pendingNode
       });
 
       expect(machine.states).toHaveLength(3);
       expect(machine.transfers).toHaveLength(2);
-      expect(machine.defaultState).toBe(pendingNode);
+      expect(machine.initialState).toBe(pendingNode);
       expect(machine._type).toBe("StateMachine");
     });
 

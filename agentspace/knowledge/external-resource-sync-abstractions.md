@@ -75,7 +75,7 @@ const ExternalResource = Entity.create({
       computed: StateMachine.create({
         name: 'syncStatusMachine',
         states: [pendingState, syncingState, syncedState, failedState, stalledState],
-        defaultState: pendingState,
+        initialState: pendingState,
         transfers: [
           // pending -> syncing
           StateTransfer.create({
@@ -165,7 +165,7 @@ const ExternalResource = Entity.create({
           name: 'timestamp',
           computeValue: () => new Date().toISOString()
         })],
-        defaultState: StateNode.create({ name: 'timestamp' }),
+        initialState: StateNode.create({ name: 'timestamp' }),
         transfers: [
           StateTransfer.create({
             current: StateNode.create({ name: 'timestamp' }),
@@ -194,7 +194,7 @@ const ExternalResource = Entity.create({
           name: 'timestamp',
           computeValue: () => new Date().toISOString()
         })],
-        defaultState: StateNode.create({ name: 'timestamp' }),
+        initialState: StateNode.create({ name: 'timestamp' }),
         transfers: [
           StateTransfer.create({
             current: StateNode.create({ name: 'timestamp' }),
@@ -267,7 +267,7 @@ const FileResource = Entity.create({
           uploadingState,
           StateNode.create({ name: 'complete', computeValue: () => 100 })
         ],
-        defaultState: StateNode.create({ name: 'idle' }),
+        initialState: StateNode.create({ name: 'idle' }),
         transfers: [
           StateTransfer.create({
             current: StateNode.create({ name: 'idle' }),
@@ -383,7 +383,7 @@ const PaymentResource = Entity.create({
           refundedState,
           failedState
         ],
-        defaultState: pendingState,
+        initialState: pendingState,
         transfers: [
           StateTransfer.create({
             current: pendingState,
@@ -487,7 +487,7 @@ const WebhookEvent = Entity.create({
       computed: StateMachine.create({
         name: 'webhookProcessStatus',
         states: [unprocessedState, processedState, errorState],
-        defaultState: unprocessedState,
+        initialState: unprocessedState,
         transfers: [
           StateTransfer.create({
             current: unprocessedState,
@@ -518,7 +518,7 @@ const WebhookEvent = Entity.create({
           name: 'timestamp',
           computeValue: () => new Date().toISOString()
         })],
-        defaultState: StateNode.create({ name: 'timestamp' }),
+        initialState: StateNode.create({ name: 'timestamp' }),
         transfers: [
           StateTransfer.create({
             current: StateNode.create({ name: 'timestamp' }),
@@ -693,7 +693,7 @@ const RetryStateMachine = StateMachine.create({
     failedState,
     retryState
   ],
-  defaultState: pendingState,
+  initialState: pendingState,
   transfers: [
     // ... 其他转换
     StateTransfer.create({

@@ -175,7 +175,7 @@ import { DELETED_STATE, NON_DELETED_STATE, HARD_DELETION_PROPERTY_NAME } from 'i
 // Define deletion StateMachine for the HardDeletionProperty
 const deletionStateMachine = StateMachine.create({
     states: [NON_DELETED_STATE, DELETED_STATE],
-    defaultState: NON_DELETED_STATE,
+    initialState: NON_DELETED_STATE,
     transfers: [
         StateTransfer.create({
             trigger: {
@@ -263,7 +263,7 @@ const Article = Entity.create({
 const deletionProperty = HardDeletionProperty.create()
 deletionProperty.computation = StateMachine.create({
     states: [NON_DELETED_STATE, DELETED_STATE],
-    defaultState: NON_DELETED_STATE,
+    initialState: NON_DELETED_STATE,
     transfers: [
         StateTransfer.create({
             trigger: {
@@ -1028,20 +1028,20 @@ StateMachine.create(config: StateMachineConfig): StateMachineInstance
 **Parameters**
 - `config.states` (StateNode[], required): List of state nodes
 - `config.transfers` (StateTransfer[], required): List of state transfers
-- `config.defaultState` (StateNode, required): Default state
+- `config.initialState` (StateNode, required): Default state
 
 **Important: Initial Value Handling**
 
 When using StateMachine for entity/relation properties:
 - If the property's initial value is set when the entity/relation is created, handle it in the entity/relation's computation
-- If the StateMachine needs to save or modify this initial value, explicitly define `computeValue` on the `defaultState` to handle it
+- If the StateMachine needs to save or modify this initial value, explicitly define `computeValue` on the `initialState` to handle it
 
 ```typescript
 // Example: StateMachine handling initial value
 const MyStateMachine = StateMachine.create({
     states: [pendingState, activeState],
     transfers: [...],
-    defaultState: StateNode.create({
+    initialState: StateNode.create({
         name: 'pending',
         computeValue: (lastValue, mutationEvent) => {
             // Explicitly handle initial value
@@ -1074,7 +1074,7 @@ const OrderStateMachine = StateMachine.create({
             computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.orderId })
         })
     ],
-    defaultState: pendingState
+    initialState: pendingState
 });
 
 // Relation with HardDeletionProperty for deletion management
@@ -1128,7 +1128,7 @@ const relationDeletionProperty = HardDeletionProperty.create()
 // Configure deletion for relation's HardDeletionProperty
 relationDeletionProperty.computation = StateMachine.create({
     states: [NON_DELETED_STATE, DELETED_STATE],
-    defaultState: NON_DELETED_STATE,
+    initialState: NON_DELETED_STATE,
     transfers: [
         StateTransfer.create({
             trigger: {
@@ -2016,7 +2016,7 @@ const CounterStateMachine = StateMachine.create({
             computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.counterId })
         })
     ],
-    defaultState: idleState
+    initialState: idleState
 });
 
 // Timestamp tracking
@@ -2041,7 +2041,7 @@ const ProcessingStateMachine = StateMachine.create({
             computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.itemId })
         })
     ],
-    defaultState: pendingState
+    initialState: pendingState
 });
 
 // Apply to property

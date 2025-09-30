@@ -264,7 +264,7 @@ export function createData() {
                 }
             })
         ],
-        defaultState: NON_DELETED_STATE
+        initialState: NON_DELETED_STATE
     })
     
     
@@ -330,7 +330,7 @@ export function createData() {
     })
     
     const resultStateMachine = StateMachine.create({
-        defaultState: resultPendingState,
+        initialState: resultPendingState,
         states: [resultPendingState, resultApprovedState, resultRejectedState],
         transfers: [pendingToApprovedTransfer, pendingToRejectedTransfer]
     })

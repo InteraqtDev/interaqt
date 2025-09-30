@@ -133,7 +133,7 @@ When using `InteractionEventEntity` as the Transform input source, understand th
    });
    statusProperty.computation = StateMachine.create({
      states: [activeState, deletedState],
-     defaultState: activeState,  // StateMachine controls initial value
+     initialState: activeState,  // StateMachine controls initial value
      transfers: [
        StateTransfer.create({
          trigger: DeleteStyleInteraction,
@@ -386,7 +386,7 @@ const statusProperty = Property.create({
 statusProperty.computation = StateMachine.create({
   name: 'StyleStatus',
   states: [draftState, activeState, offlineState],
-  defaultState: draftState,  // defaultState determines initial value
+  initialState: draftState,  // initialState determines initial value
   transfers: [
     StateTransfer.create({
       current: draftState,
@@ -432,7 +432,7 @@ const updatedAtProperty = Property.create({
 updatedAtProperty.computation = StateMachine.create({
   name: 'UpdatedAt',
   states: [updatedState],
-  defaultState: updatedState,  // computeValue in updatedState provides initial value
+  initialState: updatedState,  // computeValue in updatedState provides initial value
   transfers: [
     StateTransfer.create({
       current: updatedState,
@@ -495,7 +495,7 @@ const modificationInfoProperty = Property.create({
 modificationInfoProperty.computation = StateMachine.create({
   name: 'ModificationTracker',
   states: [modifiedState],
-  defaultState: modifiedState,  // computeValue in modifiedState handles initial value
+  initialState: modifiedState,  // computeValue in modifiedState handles initial value
   transfers: [
     StateTransfer.create({
       current: modifiedState,
@@ -813,7 +813,7 @@ const updatedAtProperty = Property.create({
 });
 updatedAtProperty.computation = StateMachine.create({
   states: [updatedState],
-  defaultState: updatedState,
+  initialState: updatedState,
   transfers: [
     StateTransfer.create({
       current: updatedState,
@@ -849,7 +849,7 @@ const statusProperty = Property.create({
 });
 statusProperty.computation = StateMachine.create({
   states: [activeState, offlineState],
-  defaultState: activeState,
+  initialState: activeState,
   transfers: [
     StateTransfer.create({
       current: activeState,
@@ -921,7 +921,7 @@ const updatedAtProperty = Property.create({
 });
 updatedAtProperty.computation = StateMachine.create({
   states: [updatedState],
-  defaultState: updatedState,
+  initialState: updatedState,
   transfers: [
     StateTransfer.create({
       current: updatedState,

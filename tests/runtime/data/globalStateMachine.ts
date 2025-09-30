@@ -69,7 +69,7 @@ export function createData() {
     const globalStateMachine = StateMachine.create({
         states: [globalEnabledState, globalDisabledState],
         transfers: [globalEnabledToDisabledTransfer, globalDisabledToEnabledTransfer],
-        defaultState: globalEnabledState
+        initialState: globalEnabledState
     })
 
     const dict = Dictionary.create({

@@ -96,7 +96,7 @@ describe('Version Control Example with Hard Delete', () => {
     const statusProperty = VersionedStyle.properties!.find(p => p.name === 'status')!;
     statusProperty.computation = StateMachine.create({
       states: [draftState, publishedState, offlineState],
-      defaultState: draftState,
+      initialState: draftState,
       transfers: [
         StateTransfer.create({ 
           trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: OfflineStyle.name } }, 
@@ -147,7 +147,7 @@ describe('Version Control Example with Hard Delete', () => {
     // StateMachine for currentVersionInfo
     currentVersionInfo.computation = StateMachine.create({
       states: [versionUpdatedState],
-      defaultState: versionUpdatedState,
+      initialState: versionUpdatedState,
       transfers: [
         StateTransfer.create({
           current: versionUpdatedState,
@@ -250,7 +250,7 @@ describe('Version Control Example with Hard Delete', () => {
     const hardDeletionProperty = VersionedStyle.properties!.find(p => p.name === HARD_DELETION_PROPERTY_NAME)!;
     hardDeletionProperty.computation = StateMachine.create({
       states: [NON_DELETED_STATE, DELETED_STATE],
-      defaultState: NON_DELETED_STATE,
+      initialState: NON_DELETED_STATE,
       transfers: [
         StateTransfer.create({ 
           current: NON_DELETED_STATE, 

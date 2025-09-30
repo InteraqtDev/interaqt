@@ -216,7 +216,7 @@ const statusProperty = Property.create({
   type: 'string',
   computation: StateMachine.create({
     states: [activeState, inactiveState],
-    defaultState: inactiveState,
+    initialState: inactiveState,
     transfers: [
       StateTransfer.create({
         current: inactiveState,

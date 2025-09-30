@@ -299,7 +299,7 @@ describe('StateMachineRunner', () => {
         const CountStateMachine = StateMachine.create({
             states: [IdleState, IncrementingState],
             transfers: [IdleToIncrementingTransfer, IncrementingToIdleTransfer],
-            defaultState: IdleState
+            initialState: IdleState
         })
 
         // 创建状态机 - 用于 state 属性（只返回状态名）
@@ -334,7 +334,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.counter.id })
                 })
             ],
-            defaultState: idleStateForName
+            initialState: idleStateForName
         })
 
         // 将状态机附加到属性
@@ -453,7 +453,7 @@ describe('StateMachineRunner', () => {
         const TimestampStateMachine = StateMachine.create({
             states: [LoggingState],
             transfers: [LoggingToLoggingTransfer],
-            defaultState: LoggingState
+            initialState: LoggingState
         })
 
         // 将状态机附加到属性
@@ -626,7 +626,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.message.id })
                 })
             ],
-            defaultState: UpdatedState
+            initialState: UpdatedState
         })
 
         // 创建状态机 - 用于 updateCount
@@ -646,7 +646,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.message.id })
                 })
             ],
-            defaultState: CountingState
+            initialState: CountingState
         })
 
         // 将状态机附加到属性
@@ -837,7 +837,7 @@ describe('StateMachineRunner', () => {
                     }
                 })
             ],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 设置测试环境
@@ -1104,7 +1104,7 @@ describe('StateMachineRunner', () => {
                     }
                 })
             ],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 设置测试环境
@@ -1363,7 +1363,7 @@ describe('StateMachineRunner', () => {
                     }
                 })
             ],
-            defaultState: PendingState
+            initialState: PendingState
         })
 
         // 为 HardDeletionProperty 创建删除状态机
@@ -1384,7 +1384,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.task.id })
                 })
             ],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 设置测试环境
@@ -1474,7 +1474,7 @@ describe('StateMachineRunner', () => {
     })
 
     test('create entity with custom initial state through Transform and createStateData', async () => {
-        // 测试使用 Transform 创建实体时，通过 createStateData 设置初始状态（而非 defaultState）
+        // 测试使用 Transform 创建实体时，通过 createStateData 设置初始状态（而非 initialState）
         const { Transform, BoolExp } = await import('interaqt')
         
         // 创建任务实体，包含状态属性
@@ -1616,7 +1616,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.task.id })
                 })
             ],
-            defaultState: TodoState
+            initialState: TodoState
         })
         statusProperty.computation = statusStateMachine
 
@@ -1692,7 +1692,7 @@ describe('StateMachineRunner', () => {
         const stateKey = '_Task_status_bound_currentState'
         const urgentTaskWithState = await controller.system.storage.findOne('Task', BoolExp.atom({key: 'id', value: ['=', urgentTask.id]}), undefined, ['*', stateKey])
         expect(urgentTaskWithState[stateKey]).toBe('urgent')
-        expect(urgentTask.status).toBe('urgent') // 自定义的初始状态，不是 defaultState
+        expect(urgentTask.status).toBe('urgent') // 自定义的初始状态，不是 initialState
 
         // 测试状态机的后续转换是否正常工作
         // urgent 状态的任务需要使用 escalateTask 才能转换（而不是 startTask）
@@ -1939,7 +1939,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload.order.id })
                 })
             ],
-            defaultState: PendingState
+            initialState: PendingState
         })
 
         // 为订单的 HardDeletionProperty 创建删除状态机
@@ -1960,7 +1960,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.order.id })
                 })
             ],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 为关系的 HardDeletionProperty 创建删除状态机（级联删除）
@@ -1993,7 +1993,7 @@ describe('StateMachineRunner', () => {
                     }
                 })
             ],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 设置测试环境
@@ -2141,7 +2141,7 @@ describe('StateMachineRunner', () => {
         const DeletionStateMachine = StateMachine.create({
             states: [NON_DELETED_STATE, DELETED_STATE],
             transfers: [DeleteTransfer],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 将状态机绑定到 _isDeleted_ 属性
@@ -2314,7 +2314,7 @@ describe('StateMachineRunner', () => {
                     computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.article.id })
                 })
             ],
-            defaultState: DraftState
+            initialState: DraftState
         })
 
         // 删除状态机 - 只有归档的文章才能删除
@@ -2343,7 +2343,7 @@ describe('StateMachineRunner', () => {
                     }
                 })
             ],
-            defaultState: NON_DELETED_STATE
+            initialState: NON_DELETED_STATE
         })
 
         // 绑定状态机

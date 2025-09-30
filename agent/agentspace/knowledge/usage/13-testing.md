@@ -618,7 +618,7 @@ describe('Approval Process Activity', () => {
       name: 'ApprovalProcess',
       states: [submittedState, reviewingState, approvedState, rejectedState],
       transfers: [submitTransfer, approveTransfer, rejectTransfer],
-      defaultState: submittedState
+      initialState: submittedState
     });
     
     const controller = new Controller({

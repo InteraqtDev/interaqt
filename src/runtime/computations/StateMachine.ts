@@ -21,10 +21,10 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
     useMutationEvent: boolean = true
-    defaultState: StateNodeInstance
+    initialState: StateNodeInstance
     constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
-        this.defaultState = this.args.defaultState
+        this.initialState = this.args.initialState
         // 从所有 transfer 中构建 eventDeps
         // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
         // 因为可能有多个 transfer 都是同样的 trigger。
@@ -39,11 +39,11 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     }
     createState() {
         return {
-            currentState: new GlobalBoundState<string>(this.defaultState.name),
+            currentState: new GlobalBoundState<string>(this.initialState.name),
         }
     }
     async getInitialValue(event:any) {
-        return this.defaultState.computeValue ? await this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
+        return this.initialState.computeValue ? await this.initialState.computeValue.call(this.controller, undefined, event) : this.initialState.name
     }
     async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
         // Now we can handle any mutationEvent, not just interaction events
@@ -65,12 +65,12 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     useLastValue: boolean = true
     eventDeps: {[key: string]: EventDep} = {}
-    defaultState: StateNodeInstance
+    initialState: StateNodeInstance
     dataContext: PropertyDataContext
     useMutationEvent: boolean = true
     constructor(public controller: Controller, public args: StateMachineInstance, dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
-        this.defaultState = this.args.defaultState
+        this.initialState = this.args.initialState
         this.dataContext = dataContext as PropertyDataContext
         // 从所有 transfer 中构建 eventDeps
         // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
@@ -87,22 +87,22 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     }
     createState() {
         return {
-            currentState: new RecordBoundState<string>(this.defaultState.name),
+            currentState: new RecordBoundState<string>(this.initialState.name),
         }
     }
     async getInitialValue(initialRecord:any) {
         const lastValue = initialRecord[this.dataContext.id.name]
         assert(
-            !(lastValue !== undefined && !this.defaultState.computeValue), 
+            !(lastValue !== undefined && !this.initialState.computeValue), 
             `${this.dataContext.host.name}.${this.dataContext.id.name} have been set when ${this.dataContext.host.name} created, 
-if you want to save the use the initial value, you need to define computeValue in defaultState to save it.
+if you want to save the use the initial value, you need to define computeValue in initialState to save it.
 Or if you want to use state name as value, you should not set ${this.dataContext.host.name}.${this.dataContext.id.name} when ${this.dataContext.host.name} created.
 `
         )
-        if (lastValue !== undefined || this.defaultState.computeValue) {
-            return await this.defaultState.computeValue!.call(this.controller, lastValue, undefined)
+        if (lastValue !== undefined || this.initialState.computeValue) {
+            return await this.initialState.computeValue!.call(this.controller, lastValue, undefined)
         } else {
-            return this.defaultState.name
+            return this.initialState.name
         }
     }
     async computeDirtyRecords(mutationEvent: RecordMutationEvent) {

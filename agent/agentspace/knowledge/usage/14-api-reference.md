@@ -527,7 +527,7 @@ StateMachine.create(config: StateMachineConfig): KlassInstance<typeof StateMachi
 **Parameters**
 - `config.states` (StateNode[], required): List of state nodes
 - `config.transfers` (StateTransfer[], required): List of state transfers
-- `config.defaultState` (StateNode, required): Default state
+- `config.initialState` (StateNode, required): Default state
 
 **Examples**
 ```typescript
@@ -547,7 +547,7 @@ const OrderStateMachine = StateMachine.create({
             trigger: ConfirmOrderInteraction
         })
     ],
-    defaultState: pendingState
+    initialState: pendingState
 })
 ```
 

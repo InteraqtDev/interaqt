@@ -5,13 +5,13 @@ import { StateTransferInstance } from './StateTransfer.js';
 export interface StateMachineInstance extends IInstance {
   states: StateNodeInstance[];
   transfers: StateTransferInstance[];
-  defaultState: StateNodeInstance;
+  initialState: StateNodeInstance;
 }
 
 export interface StateMachineCreateArgs {
   states: StateNodeInstance[];
   transfers: StateTransferInstance[];
-  defaultState: StateNodeInstance;
+  initialState: StateNodeInstance;
 }
 
 export class StateMachine implements StateMachineInstance {
@@ -20,14 +20,14 @@ export class StateMachine implements StateMachineInstance {
   public _options?: { uuid?: string };
   public states: StateNodeInstance[];
   public transfers: StateTransferInstance[];
-  public defaultState: StateNodeInstance;
+  public initialState: StateNodeInstance;
   
   constructor(args: StateMachineCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
     this.states = args.states;
     this.transfers = args.transfers;
-    this.defaultState = args.defaultState;
+    this.initialState = args.initialState;
   }
   
   // 静态属性和方法
@@ -46,7 +46,7 @@ export class StateMachine implements StateMachineInstance {
       collection: true as const,
       required: true as const
     },
-    defaultState: {
+    initialState: {
       type: 'StateNode' as const,
       collection: false as const,
       required: true as const
@@ -74,7 +74,7 @@ export class StateMachine implements StateMachineInstance {
       public: {
         states: instance.states,
         transfers: instance.transfers,
-        defaultState: instance.defaultState
+        initialState: instance.initialState
       }
     };
     return JSON.stringify(data);
@@ -84,7 +84,7 @@ export class StateMachine implements StateMachineInstance {
     return this.create({
       states: instance.states,
       transfers: instance.transfers,
-      defaultState: instance.defaultState
+      initialState: instance.initialState
     });
   }
   

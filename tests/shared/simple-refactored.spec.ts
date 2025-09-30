@@ -242,12 +242,12 @@ describe("Simple Objects Refactored - compatibility test", () => {
       const machine = StateMachine.create({
         states: [idle, active],
         transfers: [transfer],
-        defaultState: idle
+        initialState: idle
       });
       
       expect(machine.states).toHaveLength(2);
       expect(machine.transfers).toHaveLength(1);
-      expect(machine.defaultState).toBe(idle);
+      expect(machine.initialState).toBe(idle);
       expect(machine._type).toBe("StateMachine");
     });
   });
@@ -299,7 +299,7 @@ describe("Simple Objects Refactored - compatibility test", () => {
       const m1 = StateMachine.create({ 
         states: [n1, n2], 
         transfers: [t1], 
-        defaultState: n1 
+        initialState: n1 
       });
 
       expect(Gateway.instances).toHaveLength(2);

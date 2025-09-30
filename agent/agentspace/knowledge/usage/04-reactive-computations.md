@@ -1223,7 +1223,7 @@ const EventEntity = Entity.create({
             computeTarget: (event) => ({ id: event.payload.eventId })
           })
         ],
-        defaultState: triggeredState
+        initialState: triggeredState
       })
     })
   ]
@@ -1274,7 +1274,7 @@ const CounterEntity = Entity.create({
             computeTarget: (event) => ({ id: event.payload.counterId })
           })
         ],
-        defaultState: idleState
+        initialState: idleState
       })
     })
   ]
@@ -1341,7 +1341,7 @@ const TaskEntity = Entity.create({
             computeTarget: (event) => ({ id: event.payload.taskId })
           })
         ],
-        defaultState: newState
+        initialState: newState
       })
     })
   ]

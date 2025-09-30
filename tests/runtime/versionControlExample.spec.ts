@@ -92,7 +92,7 @@ describe('Version Control Example', () => {
     const statusProperty = VersionedStyle.properties!.find(p => p.name === 'status')!;
     statusProperty.computation = StateMachine.create({
       states: [draftState, publishedState, offlineState],
-      defaultState: draftState,
+      initialState: draftState,
       transfers: [
         StateTransfer.create({ 
           trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: OfflineStyle.name } }, 
@@ -143,7 +143,7 @@ describe('Version Control Example', () => {
     // StateMachine for currentVersionInfo
     currentVersionInfo.computation = StateMachine.create({
       states: [versionUpdatedState],
-      defaultState: versionUpdatedState,
+      initialState: versionUpdatedState,
       transfers: [
         StateTransfer.create({
           current: versionUpdatedState,
@@ -247,7 +247,7 @@ describe('Version Control Example', () => {
     const deletedState = StateNode.create({ name: 'deleted', computeValue: (lastValue, mutationEvent) => lastValue || true });
     isDeletedProperty.computation = StateMachine.create({
       states: [notDeletedState, deletedState],
-      defaultState: notDeletedState,
+      initialState: notDeletedState,
       transfers: [
         StateTransfer.create({ 
           current: notDeletedState, 

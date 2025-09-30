@@ -180,7 +180,7 @@ export function createData() {
     const stateMachine = StateMachine.create({
         states: [draftState, normalState, publishedState],
         transfers: [draftToNormalTransfer, normalToDraftTransfer, normalToPublishedTransfer, publishedToNormalTransfer],
-        defaultState: normalState
+        initialState: normalState
     })
 
     statusProperty.computation = stateMachine

@@ -609,7 +609,7 @@ const User = Entity.create({
             computeTarget: (event) => ({ id: event.payload.userId })
           })
         ],
-        defaultState: NameUpdatedState
+        initialState: NameUpdatedState
       })
     }),
     Property.create({
@@ -625,7 +625,7 @@ const User = Entity.create({
             computeTarget: (event) => ({ id: event.payload.userId })
           })
         ],
-        defaultState: BioUpdatedState
+        initialState: BioUpdatedState
       })
     })
   ]
@@ -675,7 +675,7 @@ const Post = Entity.create({
       computation: StateMachine.create({
         name: 'PostStatus',
         states: [draftState, publishedState, deletedState],
-        defaultState: draftState,
+        initialState: draftState,
         transfers: [
           StateTransfer.create({
             current: draftState,
@@ -792,7 +792,7 @@ const Order = Entity.create({
       computation: StateMachine.create({
         name: 'OrderStatus',
         states: [pendingState, confirmedState, shippedState, deliveredState, cancelledState],
-        defaultState: pendingState,
+        initialState: pendingState,
         transfers: [
           StateTransfer.create({
             current: pendingState,
@@ -1101,7 +1101,7 @@ const DeliveredState = StateNode.create({ name: 'delivered' });
 const OrderStateMachine = StateMachine.create({
   name: 'OrderStatus',
   states: [PendingState, PaidState, ShippedState, DeliveredState],
-  defaultState: PendingState,
+  initialState: PendingState,
   transfers: [
     StateTransfer.create({
       current: PendingState,

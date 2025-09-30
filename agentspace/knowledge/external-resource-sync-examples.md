@@ -59,7 +59,7 @@ const File = Entity.create({
       computed: StateMachine.create({
         name: 'fileStatusMachine',
         states: [pendingState, uploadingState, processingState, readyState, failedState],
-        defaultState: pendingState,
+        initialState: pendingState,
         transfers: [
           StateTransfer.create({
             current: pendingState,
@@ -674,7 +674,7 @@ const Payment = Entity.create({
           paymentRefundedState,
           paymentFailedState
         ],
-        defaultState: paymentPendingState,
+        initialState: paymentPendingState,
         transfers: [
           StateTransfer.create({
             current: paymentPendingState,
@@ -1017,7 +1017,7 @@ const Email = Entity.create({
           emailBouncedState,
           emailFailedState
         ],
-        defaultState: emailQueuedState,
+        initialState: emailQueuedState,
         transfers: [
           StateTransfer.create({
             current: emailQueuedState,

@@ -158,7 +158,7 @@ const UserDepartmentType = Property.create({
   type: 'string',
   computation: StateMachine.create({
     states: [techState, nonTechState],
-    defaultState: nonTechState,
+    initialState: nonTechState,
     transfers: [
       StateTransfer.create({
         current: nonTechState,

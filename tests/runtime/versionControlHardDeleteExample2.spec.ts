@@ -103,7 +103,7 @@ describe('Version Control Example with Hard Delete', () => {
     const statusProperty = Style.properties!.find(p => p.name === 'status')!;
     statusProperty.computation = StateMachine.create({
       states: [draftState, publishedState, offlineState],
-      defaultState: draftState,
+      initialState: draftState,
       transfers: [
         StateTransfer.create({ 
           trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: PublishStyle.name } }, 
@@ -137,7 +137,7 @@ describe('Version Control Example with Hard Delete', () => {
     // publish 的时候，就全体使用最新的 version
     versionProperty.computation = StateMachine.create({
       states: [versionUpdateState],
-      defaultState: versionUpdateState,
+      initialState: versionUpdateState,
       transfers: [
         StateTransfer.create({ 
           current: versionUpdateState, 
@@ -199,7 +199,7 @@ describe('Version Control Example with Hard Delete', () => {
     // StateMachine for currentVersionInfo
     currentVersionInfo.computation = StateMachine.create({
       states: [versionUpdatedState],
-      defaultState: versionUpdatedState,
+      initialState: versionUpdatedState,
       transfers: [
         StateTransfer.create({
           current: versionUpdatedState,
@@ -319,7 +319,7 @@ describe('Version Control Example with Hard Delete', () => {
     const hardDeletionProperty = Style.properties!.find(p => p.name === HARD_DELETION_PROPERTY_NAME)!;
     hardDeletionProperty.computation = StateMachine.create({
       states: [NON_DELETED_STATE, DELETED_STATE],
-      defaultState: NON_DELETED_STATE,
+      initialState: NON_DELETED_STATE,
       transfers: [
         StateTransfer.create({ 
           current: NON_DELETED_STATE, 

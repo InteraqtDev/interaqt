@@ -358,7 +358,7 @@ const DeletedState = StateNode.create({ name: 'deleted' });
 const ArticleStatusStateMachine = StateMachine.create({
   name: 'ArticleStatus',
   states: [ActiveState, DeletedState],
-  defaultState: ActiveState,
+  initialState: ActiveState,
   transfers: [
     StateTransfer.create({
       current: ActiveState,
@@ -393,7 +393,7 @@ const Article = Entity.create({
       name: 'status',
       type: 'string',
       computation: ArticleStatusStateMachine,
-      defaultValue: () => ArticleStatusStateMachine.defaultState.name
+      defaultValue: () => ArticleStatusStateMachine.initialState.name
     }),
     Property.create({
       name: 'deletedAt',
@@ -428,7 +428,7 @@ const Article = Entity.create({
               computeTarget: (event) => ({ id: event.payload.articleId })
             })
           ],
-          defaultState: activeState
+          initialState: activeState
         });
       })()
     })
@@ -473,7 +473,7 @@ const Article = Entity.create({
 const deletionProperty = Article.properties.find(p => p.name === '_isDeleted_');
 deletionProperty.computation = StateMachine.create({
   states: [NON_DELETED_STATE, DELETED_STATE],
-  defaultState: NON_DELETED_STATE,
+  initialState: NON_DELETED_STATE,
   transfers: [
     StateTransfer.create({
       trigger: DeleteArticle,
@@ -606,7 +606,7 @@ const PublishedState = StateNode.create({ name: 'published' });
 const ArticlePublishStateMachine = StateMachine.create({
   name: 'ArticlePublishStatus',
   states: [DraftState, PublishedState],
-  defaultState: DraftState,
+  initialState: DraftState,
   transfers: [
     StateTransfer.create({
       current: DraftState,
@@ -716,7 +716,7 @@ const TimestampState = StateNode.create({
 const TimestampStateMachine = StateMachine.create({
   name: 'TimestampRecorder',
   states: [TimestampState],
-  defaultState: TimestampState,
+  initialState: TimestampState,
   transfers: [
     // Self-transition: stays in same state but triggers computeValue
     StateTransfer.create({
@@ -771,7 +771,7 @@ const User = Entity.create({
             computeTarget: (event) => ({ id: event.user.id })
           })
         ],
-        defaultState: activeState
+        initialState: activeState
       })
     })
   ]
@@ -805,7 +805,7 @@ const Article = Entity.create({
             computeTarget: (event) => ({ id: event.payload.articleId })
           })
         ],
-        defaultState: modifiedState
+        initialState: modifiedState
       })
     })
   ]
@@ -838,7 +838,7 @@ const Sensor = Entity.create({
             computeTarget: (event) => ({ id: event.payload.sensorId })
           })
         ],
-        defaultState: triggeredState
+        initialState: triggeredState
       })
     })
   ]
@@ -891,7 +891,7 @@ Property.create({
   name: 'lastActivityAt',
   computation: StateMachine.create({
     states: [activeState],
-    defaultState: activeState,
+    initialState: activeState,
     transfers: [
       StateTransfer.create({
         current: activeState,
@@ -1028,7 +1028,7 @@ const DeletedState = StateNode.create({ name: 'deleted' });
 const ArticleLifecycleStateMachine = StateMachine.create({
   name: 'ArticleLifecycle',
   states: [DraftState, PublishedState, DeletedState],
-  defaultState: DraftState,
+  initialState: DraftState,
   transfers: [
     StateTransfer.create({
       current: DraftState,

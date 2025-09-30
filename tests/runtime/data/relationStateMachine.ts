@@ -167,7 +167,7 @@ export function createData() {
                 }
             })
         ],
-        defaultState: NON_DELETED_STATE
+        initialState: NON_DELETED_STATE
     })
         
 
