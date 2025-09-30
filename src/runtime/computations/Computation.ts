@@ -168,7 +168,7 @@ export interface DataBasedComputation {
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     dataDeps: {[key: string]: DataDep}
-    getDefaultValue?: (...args: any[]) => any
+    getInitialValue?: (...args: any[]) => any
     useLastValue?: boolean
     // 异步计算，就会声明这个函数
     asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
@@ -194,7 +194,7 @@ export interface EventBasedComputation {
     createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
     eventDeps?: {[key: string]: EventDep}
     useLastValue?: boolean
-    getDefaultValue?: (...args: any[]) => any
+    getInitialValue?: (...args: any[]) => any
     computeDirtyRecords?: (...args: any[]) => Promise<any[]|undefined>
     asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
     createStateData?: (...args: any[]) => Promise<{[key: string]: any}>

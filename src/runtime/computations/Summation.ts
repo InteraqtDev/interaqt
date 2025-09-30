@@ -46,7 +46,7 @@ export class GlobalSumHandle implements DataBasedComputation {
         }   
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
 
@@ -159,7 +159,7 @@ export class PropertySumHandle implements DataBasedComputation {
         }    
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
     resolveSumField(record:any, sumFieldPath = this.sumFieldPath) {

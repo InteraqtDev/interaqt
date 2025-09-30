@@ -9,7 +9,7 @@ export interface CustomInstance extends IInstance {
   incrementalCompute?: Function; // (lastValue: any, mutationEvent: any, record: any, dataDeps: any) => any
   incrementalPatchCompute?: Function; // (lastValue: any, mutationEvent: any, record: any, dataDeps: any) => any
   createState?: Function; // () => { [key: string]: BoundState }
-  getDefaultValue?: Function; // () => any
+  getInitialValue?: Function; // () => any
   asyncReturn?: Function; // (asyncResult: any, dataDeps: any, record?: any) => any
   useLastValue?: boolean;
 }
@@ -21,7 +21,7 @@ export interface CustomCreateArgs {
   incrementalCompute?: Function;
   incrementalPatchCompute?: Function;
   createState?: Function;
-  getDefaultValue?: Function;
+  getInitialValue?: Function;
   asyncReturn?: Function;
   useLastValue?: boolean;
 }
@@ -36,7 +36,7 @@ export class Custom implements CustomInstance {
   public incrementalCompute?: Function;
   public incrementalPatchCompute?: Function;
   public createState?: Function;
-  public getDefaultValue?: Function;
+  public getInitialValue?: Function;
   public asyncReturn?: Function;
   public useLastValue?: boolean;
   
@@ -49,7 +49,7 @@ export class Custom implements CustomInstance {
     this.incrementalCompute = args.incrementalCompute;
     this.incrementalPatchCompute = args.incrementalPatchCompute;
     this.createState = args.createState;
-    this.getDefaultValue = args.getDefaultValue;
+    this.getInitialValue = args.getInitialValue;
     this.asyncReturn = args.asyncReturn;
     this.useLastValue = args.useLastValue;
   }
@@ -90,7 +90,7 @@ export class Custom implements CustomInstance {
       collection: false as const,
       required: false as const
     },
-    getDefaultValue: {
+    getInitialValue: {
       type: 'function' as const,
       collection: false as const,
       required: false as const
@@ -129,7 +129,7 @@ export class Custom implements CustomInstance {
     if (instance.incrementalCompute !== undefined) args.incrementalCompute = stringifyAttribute(instance.incrementalCompute) as Function;
     if (instance.incrementalPatchCompute !== undefined) args.incrementalPatchCompute = stringifyAttribute(instance.incrementalPatchCompute) as Function;
     if (instance.createState !== undefined) args.createState = stringifyAttribute(instance.createState) as Function;
-    if (instance.getDefaultValue !== undefined) args.getDefaultValue = stringifyAttribute(instance.getDefaultValue) as Function;
+    if (instance.getInitialValue !== undefined) args.getInitialValue = stringifyAttribute(instance.getInitialValue) as Function;
     if (instance.asyncReturn !== undefined) args.asyncReturn = stringifyAttribute(instance.asyncReturn) as Function;
     if (instance.useLastValue !== undefined) args.useLastValue = instance.useLastValue;
     
@@ -150,7 +150,7 @@ export class Custom implements CustomInstance {
       incrementalCompute: instance.incrementalCompute,
       incrementalPatchCompute: instance.incrementalPatchCompute,
       createState: instance.createState,
-      getDefaultValue: instance.getDefaultValue,
+      getInitialValue: instance.getInitialValue,
       asyncReturn: instance.asyncReturn,
       useLastValue: instance.useLastValue
     });
@@ -169,7 +169,7 @@ export class Custom implements CustomInstance {
     const args = { ...data.public };
     
     // 反序列化函数
-    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getDefaultValue', 'asyncReturn'];
+    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'asyncReturn'];
     functionFields.forEach(field => {
       if (typeof args[field] === 'string' && args[field].startsWith('func::')) {
         args[field] = new Function('return ' + args[field].substring(6))();

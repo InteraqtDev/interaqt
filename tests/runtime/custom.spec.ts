@@ -53,7 +53,7 @@ describe('Custom computation', () => {
             console.log('Total value:', total);
             return total;
           },
-          getDefaultValue: function() {
+          getInitialValue: function() {
             return 0;
           }
         })
@@ -157,7 +157,7 @@ describe('Custom computation', () => {
           
           return ComputationResult.fullRecompute();
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
           return 0;
         }
       })
@@ -231,7 +231,7 @@ describe('Custom computation', () => {
             myState: new GlobalBoundState({ count: 0 })
           };
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
           return { value: 0 };
         },
         compute: async function(this: any, dataDeps: any) {
@@ -382,7 +382,7 @@ describe('Custom computation', () => {
             value: `${settings.prefix || 'Default'}: computed`
           };
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
           return { prefix: 'Custom', value: 'Custom: default' };
         }
       })
@@ -479,7 +479,7 @@ describe('Custom computation', () => {
           console.log('Computed result:', result);
           return result;
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
           return {};
         }
       })
@@ -629,7 +629,7 @@ describe('Custom computation', () => {
 
             return stats;
           },
-          getDefaultValue: function() {
+          getInitialValue: function() {
             return {
               total: 0,
               byType: { local: 0, virtual: 0, hybrid: 0 },
@@ -670,7 +670,7 @@ describe('Custom computation', () => {
 
             return popular;
           },
-          getDefaultValue: function() {
+          getInitialValue: function() {
             return [];
           }
         })
@@ -820,7 +820,7 @@ describe('Custom computation', () => {
               console.log('Calculated finalPrice:', finalPrice, 'from basePrice:', basePrice, 'taxRate:', taxRate, 'discount:', discount);
               return Math.round(finalPrice * 100) / 100; // Round to 2 decimal places
             },
-            getDefaultValue: function() {
+            getInitialValue: function() {
               return 0;
             }
           })
@@ -849,7 +849,7 @@ describe('Custom computation', () => {
                 return `${name}: $${finalPrice}`;
               }
             },
-            getDefaultValue: function() {
+            getInitialValue: function() {
               return '';
             }
           })
@@ -982,7 +982,7 @@ describe('Custom computation', () => {
                 return `${employeeName} (${position}) - No department assigned`;
               }
             },
-            getDefaultValue: function() {
+            getInitialValue: function() {
               return 'No department info';
             }
           })
@@ -1009,7 +1009,7 @@ describe('Custom computation', () => {
               }
               return 0;
             },
-            getDefaultValue: function() {
+            getInitialValue: function() {
               return 0;
             }
           })

@@ -37,7 +37,7 @@ export class GlobalCountHandle implements DataBasedComputation {
         }
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
 
@@ -159,7 +159,7 @@ export class PropertyCountHandle implements DataBasedComputation {
         } : {}
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
 

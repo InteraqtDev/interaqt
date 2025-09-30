@@ -56,7 +56,7 @@ export class GlobalXXXHandle implements DataBasedComputation {
     }
     
     // 默认值
-    getDefaultValue() {
+    getInitialValue() {
         // 返回默认值...
     }
     
@@ -231,7 +231,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
         }
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
 
@@ -308,11 +308,11 @@ export class PropertyXXXHandle implements DataBasedComputation {
 
     createState() {
         return {
-            result: new RecordBoundState<any>(this.getDefaultValue())
+            result: new RecordBoundState<any>(this.getInitialValue())
         }   
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0 // 或其他默认值
     }
 

@@ -597,7 +597,7 @@ totalProductValue.computation = Custom.create({
     }, 0);
     return total;
   },
-  getDefaultValue: function() {
+  getInitialValue: function() {
     return 0;
   }
 });
@@ -637,7 +637,7 @@ finalPriceProperty.computation = Custom.create({
     
     return Math.round(finalPrice * 100) / 100; // Round to 2 decimals
   },
-  getDefaultValue: function() {
+  getInitialValue: function() {
     return 0;
   }
 });
@@ -702,7 +702,7 @@ EmployeeDepartmentInfoProperty.computation = Custom.create({
     }
     return `${employeeName} ($${salary}) - No department assigned`;
   },
-  getDefaultValue: function() {
+  getInitialValue: function() {
     return 'No info available';
   }
 });

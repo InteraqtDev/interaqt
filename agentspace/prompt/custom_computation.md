@@ -9,7 +9,7 @@ interaqt 中需要一种完全由用户自由控制的 computation 类型，来�
 2. 阅读 `tests/runtime` 下的测试用例理解 computation 的用法和测试用例的写法。
 3. 参考其他的 computation，在 `src/runtime/computations/` 下新建一种新的 computation 类型。
   3.1. 这种类型允许用户自定义 dataDeps。
-  3.2. 允许用户完全自定义 compute/incrementalCompute/incrementalPatchCompute/createState/getDefaultValue/asyncReturn
+  3.2. 允许用户完全自定义 compute/incrementalCompute/incrementalPatchCompute/createState/getInitialValue/asyncReturn
 4. 在 `tests/runtime` 下新增测试用例，并保障测试用例全部通过。 
 
 ## 完成报告
@@ -21,7 +21,7 @@ interaqt 中需要一种完全由用户自由控制的 computation 类型，来�
 1. **创建了 Custom computation 类型**
    - 文件位置：`src/shared/refactored/Custom.ts`
    - 支持用户完全自定义计算逻辑
-   - 支持多种回调函数：compute、incrementalCompute、incrementalPatchCompute、createState、getDefaultValue、asyncReturn
+   - 支持多种回调函数：compute、incrementalCompute、incrementalPatchCompute、createState、getInitialValue、asyncReturn
 
 2. **创建了运行时实现**
    - 文件位置：`src/runtime/computations/Custom.ts`
@@ -64,7 +64,7 @@ Dictionary.create({
       const products = dataDeps.products || [];
       return products.reduce((sum, p) => sum + p.price, 0);
     },
-    getDefaultValue: () => 0
+    getInitialValue: () => 0
   })
 })
 ```

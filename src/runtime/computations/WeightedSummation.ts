@@ -33,7 +33,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
     }
 
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
     createState() {
@@ -135,7 +135,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         }   
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
 

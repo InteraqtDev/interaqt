@@ -47,7 +47,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
         }   
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
 
@@ -194,7 +194,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
         }   
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0
     }
     

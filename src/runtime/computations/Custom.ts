@@ -23,7 +23,7 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   incrementalComputeCallback?: Function
   incrementalPatchComputeCallback?: Function
   createStateCallback?: Function
-  getDefaultValueCallback?: Function
+  getInitialValueCallback?: Function
   asyncReturnCallback?: Function
 
   incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
@@ -95,8 +95,8 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     if (args.createState) {
       this.createStateCallback = args.createState;
     }
-    if (args.getDefaultValue) {
-      this.getDefaultValueCallback = args.getDefaultValue;
+    if (args.getInitialValue) {
+      this.getInitialValueCallback = args.getInitialValue;
     }
     if (args.asyncReturn) {
       this.asyncReturnCallback = args.asyncReturn;
@@ -137,9 +137,9 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     return {};
   }
   
-  getDefaultValue() {
-    if (this.getDefaultValueCallback) {
-      return this.getDefaultValueCallback.call(this.controller);
+  getInitialValue() {
+    if (this.getInitialValueCallback) {
+      return this.getInitialValueCallback.call(this.controller);
     }
     return undefined;
   }

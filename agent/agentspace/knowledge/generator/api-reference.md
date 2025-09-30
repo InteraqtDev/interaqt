@@ -1384,7 +1384,7 @@ Custom.create(config: CustomConfig): CustomInstance
   ```typescript
   function(): any
   ```
-- `config.getDefaultValue` (function, optional): Provide default value when computation hasn't run:
+- `config.getInitialValue` (function, optional): Provide default value when computation hasn't run:
   ```typescript
   function(): any
   ```
@@ -1438,7 +1438,7 @@ const userStats = Dictionary.create({
                 avgPostsPerUser: dataDeps.posts.length / dataDeps.users.length || 0
             };
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
             return {
                 totalUsers: 0,
                 activeUsers: 0,
@@ -1481,7 +1481,7 @@ const counterDict = Dictionary.create({
                 timestamp: Math.floor(Date.now()/1000)  // In seconds
             };
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
             return { total: 0, count: 0, lastChange: 0 };
         }
     })
@@ -1549,7 +1549,7 @@ const apiDataProcessor = Dictionary.create({
                 processAt: Date.now()
             };
         },
-        getDefaultValue: function() {
+        getInitialValue: function() {
             return { status: 'pending', data: null };
         }
     })
@@ -1721,7 +1721,7 @@ const Order = Entity.create({
 
 **Best Practices**
 
-1. **Always provide `getDefaultValue`**: This ensures the computation has a valid initial value
+1. **Always provide `getInitialValue`**: This ensures the computation has a valid initial value
 2. **Use appropriate context type**: Global computations for system-wide values, property computations for entity-specific values
 3. **Use correct dataDeps type**: 
    - `type: 'property'` for accessing current record data in Property computations (use nested attributeQuery for relations)

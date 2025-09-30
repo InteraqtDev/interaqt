@@ -42,9 +42,8 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
             currentState: new GlobalBoundState<string>(this.defaultState.name),
         }
     }
-    // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
-    getDefaultValue(event:any) {
-        return this.defaultState.computeValue ? this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
+    async getInitialValue(event:any) {
+        return this.defaultState.computeValue ? await this.defaultState.computeValue.call(this.controller, undefined, event) : this.defaultState.name
     }
     async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
         // Now we can handle any mutationEvent, not just interaction events
@@ -91,8 +90,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
             currentState: new RecordBoundState<string>(this.defaultState.name),
         }
     }
-    // 这里的 defaultValue 不能是 async 的模式。因为是直接创建时填入的。
-    getDefaultValue(initialRecord:any) {
+    async getInitialValue(initialRecord:any) {
         const lastValue = initialRecord[this.dataContext.id.name]
         assert(
             !(lastValue !== undefined && !this.defaultState.computeValue), 
@@ -102,7 +100,7 @@ Or if you want to use state name as value, you should not set ${this.dataContext
 `
         )
         if (lastValue !== undefined || this.defaultState.computeValue) {
-            return this.defaultState.computeValue!.call(this.controller, lastValue, undefined)
+            return await this.defaultState.computeValue!.call(this.controller, lastValue, undefined)
         } else {
             return this.defaultState.name
         }

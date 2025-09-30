@@ -48,7 +48,7 @@ Property<Type>:
 - name: string
 - type: TypeString<Type>
 - collection: boolean
-- getDefaultValue: () => Type. 可以根据其他初始字段计算初始值
+- getInitialValue: () => Type. 可以根据其他初始字段计算初始值
 - getValue: () => Type. 基于当前记录其他字段的计算表达，同样会写入数据库。但是是在增删时直接计算。
 - computed: Computation. 响应式表达
 

@@ -42,7 +42,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
         }
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return []
     }
 

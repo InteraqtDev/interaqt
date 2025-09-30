@@ -35,7 +35,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
         }
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return false
     }
 
@@ -158,7 +158,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
         }   
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return false
     }
 

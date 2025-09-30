@@ -34,7 +34,7 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
         }
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return null; // Default value for global real-time computation
     }
     
@@ -98,7 +98,7 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
         }
     }
     
-    getDefaultValue() {
+    getInitialValue() {
         return 0; // Default value for property real-time computation
     }
     
