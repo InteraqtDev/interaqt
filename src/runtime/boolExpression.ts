@@ -1,7 +1,3 @@
-import {parse as parseStr} from 'acorn'
-import {indexBy} from "./util.js";
-
-
 export const OperatorNames = {
     '||': '||',
     '&&': '&&',
@@ -54,11 +50,4 @@ function astNodeToAttrNode(astNode, optionsByName): BoolExpression {
     } else {
         throw new Error('unknown ast node type')
     }
-}
-
-export function parse(exp: string, options: any[] = []) {
-    const optionsByName = indexBy(options, 'name')
-    const ast = parseStr(exp, {ecmaVersion: 2020})
-    // @ts-ignore
-    return astNodeToAttrNode(ast.body[0].expression, optionsByName)
 }
