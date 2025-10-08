@@ -280,10 +280,11 @@ export class InteractionCall {
         return result === true ? true : {name: '', type: 'matchAttributives', stack, error: result}
     }
     async checkPayload(interactionEvent: InteractionEventArgs) {
+        const payload = interactionEvent.payload || {}
         const payloadDefs = this.interaction.payload?.items || []
 
         // 检查是否存在传了没定义的字段的情况。
-        const payloadKeys = Object.keys(interactionEvent.payload || {})
+        const payloadKeys = Object.keys(payload)
         for(let payloadKey of payloadKeys) {
             if (!payloadDefs.some(payloadDef => payloadDef.name === payloadKey)) {
                 throw new Error(`${payloadKey} in payload is not defined in interaction ${this.interaction.name}`)
@@ -293,11 +294,11 @@ export class InteractionCall {
         for(let payloadDef of payloadDefs) {
 
 
-            if (payloadDef.required && !(payloadDef.name in interactionEvent.payload!)) {
-                throw ConditionError.payloadValidationFailed(payloadDef.name!, 'missing', interactionEvent.payload)
+            if (payloadDef.required && !(payloadDef.name in payload)) {
+                throw ConditionError.payloadValidationFailed(payloadDef.name!, 'missing', payload)
             }
 
-            const payloadItem = interactionEvent.payload![payloadDef.name!]
+            const payloadItem = payload[payloadDef.name!]
             if (payloadItem===undefined) return
 
             if (payloadDef.isCollection && !Array.isArray(payloadItem)) {
