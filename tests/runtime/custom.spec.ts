@@ -1131,4 +1131,160 @@ describe('Custom computation', () => {
     expect(result3.departmentInfo).toBe('Alice (Senior Developer) works in Engineering department with budget $500000');
     expect(result3.salaryPercentageOfBudget).toBe(24); // 120000 / 500000 * 100 = 24%
   });
-}); 
+
+
+  test('should correctly resolve n:n relation properties when accessing single x:n relation in property computation', async () => {
+    // This test reproduces the bug where accessing user.donationRecords returns undefined
+    // when there's only one relation in the attributeQuery, but works when there are two.
+    
+    const User = Entity.create({
+      name: 'TestUser',
+      properties: [
+        Property.create({ name: 'name', type: 'string' })
+      ]
+    });
+
+    const Profile = Entity.create({
+      name: 'TestProfile',
+      properties: [
+        Property.create({ name: 'nickname', type: 'string' }),
+        Property.create({
+          name: 'totalAmount',
+          type: 'number',
+          computation: Custom.create({
+            name: 'TotalAmountCalculator',
+            dataDeps: {
+              profileData: {
+                type: 'property',
+                attributeQuery: [
+                  'id',
+                  ['user', {
+                    attributeQuery: [
+                      'id',
+                      // BUG: This x:n relation (donations) is undefined when queried alone
+                      ['donations', { attributeQuery: [['&', { attributeQuery: ['amount'] }]] }]
+                      // WORKAROUND: If we add another relation like recharges, it works:
+                      // ['recharges', { attributeQuery: ['amount'] }]
+                    ]
+                  }]
+                ]
+              }
+            },
+            compute: async function(this: Controller, dataDeps: any, record: any) {
+              console.log('[BUG TEST] dataDeps:', JSON.stringify({
+                profileData: {
+                  id: dataDeps.profileData?.id,
+                  user: {
+                    id: dataDeps.profileData?.user?.id,
+                    donationsLength: dataDeps.profileData?.user?.donations?.length,
+                    donations: dataDeps.profileData?.user?.donations
+                  }
+                }
+              }, null, 2));
+
+              // This should work but returns undefined for user.donations
+              const donations = dataDeps.profileData?.user?.donations || [];
+              const total = donations.reduce((sum: number, donation: any) => {
+                return sum + (donation['&']?.amount || 0);
+              }, 0);
+              
+              return total;
+            },
+            getInitialValue: function() {
+              return 0;
+            }
+          })
+        })
+      ]
+    });
+
+    const Item = Entity.create({
+      name: 'TestItem',
+      properties: [
+        Property.create({ name: 'title', type: 'string' })
+      ]
+    });
+
+    const Recharge = Entity.create({
+      name: 'TestRecharge',
+      properties: [
+        Property.create({ name: 'amount', type: 'number' })
+      ]
+    });
+
+    // User to Profile (1:1)
+    const UserProfileRelation = Relation.create({
+      name: 'TestUserProfileRelation',
+      source: User,
+      target: Profile,
+      sourceProperty: 'profile',
+      targetProperty: 'user',
+      type: '1:1'
+    });
+
+    // User to Recharge (1:n)
+    const UserRechargeRelation = Relation.create({
+      name: 'TestUserRechargeRelation',
+      source: User,
+      target: Recharge,
+      sourceProperty: 'recharges',
+      targetProperty: 'user',
+      type: '1:n'
+    });
+
+    // User to Item with Donation properties (n:n)
+    const DonationRelation = Relation.create({
+      name: 'TestDonation',
+      source: User,
+      sourceProperty: 'donations',
+      target: Item,
+      targetProperty: 'receivedDonations',
+      type: 'n:n',
+      properties: [
+        Property.create({ name: 'amount', type: 'number' })
+      ]
+    });
+
+    // Setup system
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system: system,
+      entities: [User, Profile, Item, Recharge],
+      relations: [UserProfileRelation, UserRechargeRelation, DonationRelation],
+      dict: [],
+      activities: [],
+      interactions: []
+    });
+    await controller.setup(true);
+
+    // Create test data
+    const user = await system.storage.create('TestUser', { name: 'Alice', profile: { nickname: 'alice123' } });
+    // const profile = await system.storage.create('TestProfile', { nickname: 'alice123' });
+    // await system.storage.addRelationByNameById('TestUserProfileRelation', user.id, profile.id, {});
+
+    const item1 = await system.storage.create('TestItem', { title: 'Item 1' });
+    const item2 = await system.storage.create('TestItem', { title: 'Item 2' });
+
+    // Add donations
+    await system.storage.addRelationByNameById('TestDonation', user.id, item1.id, { amount: 100 });
+    await system.storage.addRelationByNameById('TestDonation', user.id, item2.id, { amount: 50 });
+
+    // Wait for computation
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Check result
+    const result = await system.storage.findOne(
+      'TestProfile',
+      MatchExp.atom({ key: 'id', value: ['=', user.profile.id] }),
+      undefined,
+      ['totalAmount']
+    );
+
+    console.log('[BUG TEST] Result totalAmount:', result.totalAmount);
+    
+    // This should be 150, but will likely fail due to the bug
+    expect(result.totalAmount).toBe(150);
+  });
+});
+ 

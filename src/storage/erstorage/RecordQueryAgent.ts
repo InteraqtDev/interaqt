@@ -247,14 +247,15 @@ ${modifierClause}
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
         const [querySQL, params, fieldAliasMap] = this.buildXToOneFindQuery(entityQuery, '')
-        const records = this.structureRawReturns(await this.database.query(querySQL, params, queryName), this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap) as any[]
+        const rawReturns: { [k: string]: any }[] = await this.database.query(querySQL, params, queryName)
+        const records = this.structureRawReturns(rawReturns, this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap) as any[]
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context
 
         // 第一步的 x:1 的递归形式的查询，相当与一个递归的减掉了所有 x:n 枝干的查询，我们也得递归的把所有 x:n 枝干补出来才行，不只是 parentLink 上的。
         // 1. 补全所有 x:1 查询主干上的 x:n 关联实体及关系查询
-        this.completeXToOneLeftoverRecords(entityQuery, records, recordQueryRef, nextRecursiveContext)
+        await this.completeXToOneLeftoverRecords(entityQuery, records, recordQueryRef, nextRecursiveContext)
 
         
 
@@ -364,6 +365,11 @@ ${modifierClause}
         for(let xToOneSubQuery of entityQuery.attributeQuery.xToOneRecords) {
             for (let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
                 for(let record of records) {
+                    if (!record[xToOneSubQuery.attributeName!]) {
+                        // Skip this record if the x:1 relation is null
+                        continue;
+                    }
+                    
                     const nextContext = entityQuery.label ? context.concat(record) : context
                     record[xToOneSubQuery.attributeName!][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
                         xToManySubSubQuery.parentRecord!,
@@ -412,6 +418,7 @@ ${modifierClause}
         // CAUTION 注意这里的第二个参数。因为任何两个具体的实体之间只能有一条关系。所以即使是 n:n 和关系表关联上时，也只有一条关系数据，所以这里可以带上 relation data。
         // 1. 查询 x:n 的实体，以及和父亲的关联关系上的 x:1 的数据
         const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`, recordQueryRef, context))
+        
         // 1.1 这里再反向处理一下关系数据。因为在上一步 withParentLinkData 查出来的时候是用的是反向的关系名字
         const records = relatedRecordQuery.attributeQuery.parentLinkRecordQuery ? data.map(item => {
             let itemWithParentLinkData: Record
