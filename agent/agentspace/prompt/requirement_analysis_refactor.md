@@ -29,6 +29,6 @@
 6. 最终产出的 interactions-design.json 仍然使用原文档里的 interaction 数据结构，但以流程为组来组织。
 
 注意，在每一个步骤中，都要给出清晰的数据结构定义，用 json 来写。
-整体用简洁的英语完成文档重写。注意原本文档中的在关键步骤 update STATUS.json 仍然按照原文档的方式写。
+整体用简洁的英语完成文档重写。注意原本文档中的在关键步骤 update docs/{module}.status.json 仍然按照原文档的方式写。
 
 

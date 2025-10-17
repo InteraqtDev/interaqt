@@ -2,14 +2,20 @@
 
 ## Overview
 
-This guide helps you select the appropriate computation type for each entity, property, relation, and dictionary based on the structured information in `data-design.json` and `interaction-design.md`.
+This guide helps you select the appropriate computation type for each entity, property, relation, and dictionary based on the structured information in `requirements/{module}.data-design.json` and `requirements/{module}.interaction-design.md`.
+
+**IMPORTANT**: First read the current module name from `.currentmodule` file in project root, and use it to construct the file paths. For example, if `.currentmodule` contains `user-management`, then the paths would be:
+- `requirements/user-management.data-design.json`
+- `requirements/user-management.interaction-design.md`
 
 
 ## Input Files
 
 You will receive two input files:
-1. **data-design.json**: Contains structured data dependencies and lifecycle information
-2. **interaction-design.md**: Describes all interactions and their effects
+1. **requirements/{module}.data-design.json**: Contains structured data dependencies and lifecycle information
+2. **requirements/{module}.interaction-design.md**: Describes all interactions and their effects
+
+Note: Replace `{module}` with the value from `.currentmodule` file.
 
 ## Direct Mapping Rules
 
@@ -33,6 +39,7 @@ Look at the entity's `lifecycle.creation` and `lifecycle.deletion`:
 
 | Creation Type | Deletion | Computation Decision |
 |---------------|----------|---------------------|
+| `"integration-event"` | Always `canBeDeleted: false` | `None` - Entity is externally controlled by webhook/callback from external systems |
 | `"created-with-parent"` | Any | `_parent:[lifecycle.creation.parent]` (created by parent's computation) |
 | `"interaction-created"` | `canBeDeleted: false` | `Transform` with `InteractionEventEntity` |
 | `"interaction-created"` | `canBeDeleted: true` with `hard-delete` | `Transform` + `HardDeletionProperty` with `StateMachine` |
@@ -123,32 +130,37 @@ Based on `computationMethod` description:
 ## Automated Decision Process
 
 ### Step 1: Parse Input Files
-Read `data-design.json` and extract:
+First, read the module name from `.currentmodule` file in project root to get the current module name.
+
+Then read `requirements/{module}.data-design.json` and extract:
 - Entity definitions with their properties and lifecycle (creation and deletion)
 - Relation definitions with their lifecycle
 - Dictionary definitions
 
 ### Step 2: Apply Mapping Rules
 For each element:
-1. Check lifecycle.creation.type and lifecycle.deletion for entities and relations
-2. For properties, check controlType first:
+1. **For entities**: Check in this priority order:
+   - First check if `isIntegrationEvent: true` → set computation to "None" (externally controlled)
+   - Then check lifecycle.creation.type and lifecycle.deletion
+   - For entities that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
+2. **For relations**: Check lifecycle.creation.type and lifecycle.deletion
+   - For relations that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
+3. **For properties**: Check controlType first:
    - If `creation-only` or `derived-with-parent` → use `_owner`
    - If `independent` → apply standard dependency analysis rules
-3. Apply the appropriate rules based on creation type
-4. For entities/relations that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
 
 ### Step 3: Generate Output Document
 
-Create `docs/computation-analysis.json` with this structure:
+Create `requirements/{module}.computation-analysis.json` (using the module name from `.currentmodule`) with this structure:
 
 ```json
 {
   "entities": [
     {
-      "name": "<from data-design.json>",
+      "name": "<from requirements/{module}.data-design.json>",
       "entityAnalysis": {
-        "purpose": "<from data-design.json>",
-        "lifecycle": "<directly copy from lifecycle field in data-design.json>",
+        "purpose": "<from requirements/{module}.data-design.json>",
+        "lifecycle": "<directly copy from lifecycle field in requirements/{module}.data-design.json>",
         "computationDecision": "<Transform/_parent:[ParentName]/None based on rules>",
         "reasoning": "<automated based on lifecycle and deletion capability>",
         "calculationMethod": "<from computationMethod>"
@@ -156,14 +168,14 @@ Create `docs/computation-analysis.json` with this structure:
       "propertyAnalysis": [
         {
           "propertyName": "<property name>",
-          "type": "<from data-design.json>",
-          "purpose": "<from data-design.json>",
-          "controlType": "<from data-design.json: creation-only/derived-with-parent/independent>",
+          "type": "<from requirements/{module}.data-design.json>",
+          "purpose": "<from requirements/{module}.data-design.json>",
+          "controlType": "<from requirements/{module}.data-design.json: creation-only/derived-with-parent/independent>",
           "dataSource": "<from computationMethod>",
           "computationDecision": "<_owner/StateMachine/Count/etc. based on controlType and rules>",
           "reasoning": "<automated based on controlType and rules>",
           "dependencies": <convert dataDependencies to proper format>,
-          "interactionDependencies": <from data-design.json>,
+          "interactionDependencies": <from requirements/{module}.data-design.json>,
           "calculationMethod": "<from computationMethod>"
         }
       ]
@@ -171,10 +183,10 @@ Create `docs/computation-analysis.json` with this structure:
   ],
   "relations": [
     {
-      "name": "<from data-design.json>",
+      "name": "<from requirements/{module}.data-design.json>",
       "relationAnalysis": {
-        "purpose": "<from data-design.json>",
-        "lifecycle": "<directly copy from lifecycle field in data-design.json>",
+        "purpose": "<from requirements/{module}.data-design.json>",
+        "lifecycle": "<directly copy from lifecycle field in requirements/{module}.data-design.json>",
         "computationDecision": "<Transform/_parent:[ParentName] based on rules>",
         "reasoning": "<automated based on lifecycle>",
         "calculationMethod": "<from computationMethod>"
@@ -183,15 +195,15 @@ Create `docs/computation-analysis.json` with this structure:
   ],
   "dictionaries": [
     {
-      "name": "<from data-design.json>",
+      "name": "<from requirements/{module}.data-design.json>",
       "dictionaryAnalysis": {
-        "purpose": "<from data-design.json>",
-        "type": "<from data-design.json>",
+        "purpose": "<from requirements/{module}.data-design.json>",
+        "type": "<from requirements/{module}.data-design.json>",
         "collection": "<determine from type>",
         "computationDecision": "<apply dictionary rules>",
         "reasoning": "<automated based on computationMethod>",
         "dependencies": <format properly>,
-        "interactionDependencies": <from data-design.json>,
+        "interactionDependencies": <from requirements/{module}.data-design.json>,
         "calculationMethod": "<from computationMethod>"
       }
     }
@@ -218,6 +230,7 @@ Examples:
 
 ```
 1. Entity Lifecycle?
+   ├─ lifecycle.creation.type: "integration-event"? → None (externally controlled)
    ├─ lifecycle.creation.type: "created-with-parent"? → _parent:[parent]
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (hard)? → Transform + HardDeletionProperty with StateMachine
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (soft)? → Transform + status StateMachine
@@ -278,23 +291,26 @@ Examples:
 ## Validation
 
 Before finalizing, verify:
-1. Every entity with `interactionDependencies` has appropriate computation:
+1. Every entity with `lifecycle.creation.type: "integration-event"` has `computationDecision: "None"` or no computation
+2. Every entity with `interactionDependencies` has appropriate computation:
    - If `canBeDeleted: true` with `hard-delete` → Must use Transform + HardDeletionProperty with StateMachine
-   - If `canBeDeleted: false` → Can use Transform (unless `created-with-parent`)
-2. Entities/relations with `lifecycle.creation.type: "created-with-parent/entity"` use `_parent:[ParentName]`
-3. Properties with `controlType: "creation-only"` or `"derived-with-parent"` have computation `_owner`
-4. Properties with `controlType: "independent"` are analyzed for appropriate computation
-5. Properties with modifying `interactionDependencies` use StateMachine (if `controlType: "independent"`)
-6. Properties with only `dataDependencies` use data-based computation (if `controlType: "independent"`)
-7. All entities or relations with `canBeDeleted:true` and `hard-delete` use Transform + HardDeletionProperty
-8. All dependencies are properly formatted with specific properties
-9. `InteractionEventEntity` is included when interactions are dependencies
-10. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`
+   - If `canBeDeleted: false` → Can use Transform (unless `created-with-parent` or `integration-event`)
+3. Entities/relations with `lifecycle.creation.type: "created-with-parent/entity"` use `_parent:[ParentName]`
+4. Properties with `controlType: "creation-only"` or `"derived-with-parent"` have computation `_owner`
+5. Properties with `controlType: "independent"` are analyzed for appropriate computation
+6. Properties with modifying `interactionDependencies` use StateMachine (if `controlType: "independent"`)
+7. Properties with only `dataDependencies` use data-based computation (if `controlType: "independent"`)
+8. All entities or relations with `canBeDeleted:true` and `hard-delete` use Transform + HardDeletionProperty
+9. All dependencies are properly formatted with specific properties
+10. `InteractionEventEntity` is included when interactions are dependencies
+11. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`
 
 
 ## Implementation Checklist
 
-- [ ] Parse `data-design.json` completely
+- [ ] Read module name from `.currentmodule` file in project root
+- [ ] Parse `requirements/{module}.data-design.json` completely
+- [ ] Check for entities with `isIntegrationEvent: true` and set computation to "None"
 - [ ] Apply mapping rules for every entity (check deletion capability)
 - [ ] Check `controlType` for every property first
 - [ ] Apply mapping rules for properties based on `controlType`
@@ -304,6 +320,7 @@ Before finalizing, verify:
 - [ ] Separate `dependencies` and `interactionDependencies`
 - [ ] Add `InteractionEventEntity` when needed
 - [ ] Verify properties with `controlType: "creation-only"` or `"derived-with-parent"` use `_owner`
+- [ ] Verify entities with `lifecycle.creation.type: "integration-event"` have no computation
 - [ ] Verify Transform + HardDeletionProperty is used for deletable entities (hard-delete)
 - [ ] Verify Transform + HardDeletionProperty is used for deletable relations (hard-delete)
-- [ ] Generate complete `computation-analysis.json`
+- [ ] Generate complete `requirements/{module}.computation-analysis.json`
