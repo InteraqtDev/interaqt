@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { DataAttributive, QueryItem, Query } from "../../src/shared/Data";
+import { DataAttributive, DataPolicy } from "../../src/shared/Data";
 import { Activity, ActivityGroup, Transfer } from "../../src/shared/Activity";
 import { Interaction } from "../../src/shared/Interaction";
 import { Gateway } from "../../src/shared/Gateway";
@@ -15,7 +15,7 @@ describe("Data and Activity Classes Refactored", () => {
   beforeEach(() => {
     // 清空实例列表
     clearAllInstances(
-      DataAttributive, QueryItem, Query,
+      DataAttributive, DataPolicy,
       Activity, ActivityGroup, Transfer,
       Interaction, Gateway, Event, Action
     );
@@ -63,70 +63,64 @@ describe("Data and Activity Classes Refactored", () => {
       });
     });
 
-    describe("QueryItem", () => {
-      test("should create query item instance", () => {
-        const item = QueryItem.create({
-          name: "status",
-          value: "active"
+    describe("DataPolicy", () => {
+      test("should create data policy instance with match", () => {
+        const policy = DataPolicy.create({
+          match: { key: "status", value: ["=", "active"] }
         });
 
-        expect(item.name).toBe("status");
-        expect(item.value).toBe("active");
-        expect(item._type).toBe("QueryItem");
+        expect(policy.match).toBeDefined();
+        expect(policy._type).toBe("DataPolicy");
       });
 
-      test("should stringify and parse query item", () => {
-        const original = QueryItem.create({
-          name: "filter",
-          value: "type:user"
+      test("should create data policy with all fields", () => {
+        const policy = DataPolicy.create({
+          match: { key: "status", value: ["=", "published"] },
+          modifier: { limit: 10, offset: 0 },
+          attributeQuery: ["id", "name", "email"]
+        });
+
+        expect(policy.match).toBeDefined();
+        expect(policy.modifier).toEqual({ limit: 10, offset: 0 });
+        expect(policy.attributeQuery).toEqual(["id", "name", "email"]);
+      });
+
+      test("should stringify and parse data policy", () => {
+        const original = DataPolicy.create({
+          match: { key: "type", value: ["=", "user"] },
+          modifier: { limit: 5 },
+          attributeQuery: ["id", "name"]
         });
         
-        const stringified = QueryItem.stringify(original);
-        const parsed = QueryItem.parse(stringified);
+        const stringified = DataPolicy.stringify(original);
+        const parsed = DataPolicy.parse(stringified);
 
-        expect(parsed.name).toBe("filter");
-        expect(parsed.value).toBe("type:user");
+        expect(parsed.match).toEqual(original.match);
+        expect(parsed.modifier).toEqual(original.modifier);
+        expect(parsed.attributeQuery).toEqual(original.attributeQuery);
       });
 
-      test("should clone query item", () => {
-        const original = QueryItem.create({
-          name: "sort",
-          value: "createdAt:desc"
+      test("should clone data policy", () => {
+        const original = DataPolicy.create({
+          match: { key: "status", value: ["=", "active"] },
+          modifier: { limit: 10 }
         });
-        const cloned = QueryItem.clone(original, false);
+        const cloned = DataPolicy.clone(original, false);
 
         expect(cloned).not.toBe(original);
         expect(cloned.uuid).not.toBe(original.uuid);
-        expect(cloned.name).toBe(original.name);
-        expect(cloned.value).toBe(original.value);
-      });
-    });
-
-    describe("Query", () => {
-      test("should create query instance", () => {
-        const item1 = QueryItem.create({ name: "key1", value: "value1" });
-        const item2 = QueryItem.create({ name: "key2", value: "value2" });
-        
-        const query = Query.create({
-          items: [item1, item2]
-        });
-
-        expect(query.items).toHaveLength(2);
-        expect(query.items[0]).toBe(item1);
-        expect(query.items[1]).toBe(item2);
-        expect(query._type).toBe("Query");
+        expect(cloned.match).toEqual(original.match);
+        expect(cloned.modifier).toEqual(original.modifier);
       });
 
-      test("should stringify and parse query", () => {
-        const item = QueryItem.create({ name: "test", value: "value" });
-        const original = Query.create({
-          items: [item]
+      test("should create data policy with only attributeQuery", () => {
+        const policy = DataPolicy.create({
+          attributeQuery: ["id", "title", "content"]
         });
-        
-        const stringified = Query.stringify(original);
-        const parsed = Query.parse(stringified);
 
-        expect(parsed.items).toHaveLength(1);
+        expect(policy.match).toBeUndefined();
+        expect(policy.modifier).toBeUndefined();
+        expect(policy.attributeQuery).toEqual(["id", "title", "content"]);
       });
     });
   });
@@ -260,8 +254,7 @@ describe("Data and Activity Classes Refactored", () => {
   describe("Common functionality", () => {
     test("should have isKlass marker", () => {
       expect(DataAttributive.isKlass).toBe(true);
-      expect(QueryItem.isKlass).toBe(true);
-      expect(Query.isKlass).toBe(true);
+      expect(DataPolicy.isKlass).toBe(true);
       expect(Activity.isKlass).toBe(true);
       expect(ActivityGroup.isKlass).toBe(true);
       expect(Transfer.isKlass).toBe(true);
@@ -269,8 +262,7 @@ describe("Data and Activity Classes Refactored", () => {
 
     test("should have displayName", () => {
       expect(DataAttributive.displayName).toBe("DataAttributive");
-      expect(QueryItem.displayName).toBe("QueryItem");
-      expect(Query.displayName).toBe("Query");
+      expect(DataPolicy.displayName).toBe("DataPolicy");
       expect(Activity.displayName).toBe("Activity");
       expect(ActivityGroup.displayName).toBe("ActivityGroup");
       expect(Transfer.displayName).toBe("Transfer");
@@ -278,15 +270,13 @@ describe("Data and Activity Classes Refactored", () => {
 
     test("should track instances", () => {
       const da1 = DataAttributive.create({ content: () => 1 });
-      const qi1 = QueryItem.create({ name: "a", value: "b" });
-      const q1 = Query.create({ items: [qi1] });
+      const dp1 = DataPolicy.create({ match: { key: "status", value: ["=", "active"] } });
       const a1 = Activity.create({ name: "A1" });
       const ag1 = ActivityGroup.create({ type: "seq" });
       const t1 = Transfer.create({ name: "t1", source: testInteraction, target: testGateway });
 
       expect(DataAttributive.instances).toHaveLength(1);
-      expect(QueryItem.instances).toHaveLength(1);
-      expect(Query.instances).toHaveLength(1);
+      expect(DataPolicy.instances).toHaveLength(1);
       expect(Activity.instances).toHaveLength(1);
       expect(ActivityGroup.instances).toHaveLength(1);
       expect(Transfer.instances).toHaveLength(1);
@@ -294,13 +284,13 @@ describe("Data and Activity Classes Refactored", () => {
 
     test("should use is() for type checking", () => {
       const dataAttr = DataAttributive.create({ content: () => 1 });
-      const queryItem = QueryItem.create({ name: "a", value: "b" });
+      const dataPolicy = DataPolicy.create({ match: { key: "status", value: ["=", "active"] } });
       const activity = Activity.create({ name: "A" });
       
       expect(DataAttributive.is(dataAttr)).toBe(true);
-      expect(DataAttributive.is(queryItem)).toBe(false);
-      expect(QueryItem.is(queryItem)).toBe(true);
-      expect(QueryItem.is(activity)).toBe(false);
+      expect(DataAttributive.is(dataPolicy)).toBe(false);
+      expect(DataPolicy.is(dataPolicy)).toBe(true);
+      expect(DataPolicy.is(activity)).toBe(false);
       expect(Activity.is(activity)).toBe(true);
       expect(Activity.is(dataAttr)).toBe(false);
     });

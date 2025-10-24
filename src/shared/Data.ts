@@ -100,171 +100,105 @@ export class DataAttributive implements DataAttributiveInstance {
   }
 }
 
-// QueryItem
-export interface QueryItemInstance extends IInstance {
-  name: string;
-  value: string;
+// DataPolicy - defines fixed constraints for data fetching in interactions
+export interface DataPolicyInstance extends IInstance {
+  match?: any;
+  modifier?: any;
+  attributeQuery?: any;
 }
 
-export interface QueryItemCreateArgs {
-  name: string;
-  value: any;
+export interface DataPolicyCreateArgs {
+  match?: any;
+  modifier?: any;
+  attributeQuery?: any;
 }
 
-export class QueryItem implements QueryItemInstance {
+export class DataPolicy implements DataPolicyInstance {
   public uuid: string;
-  public _type = 'QueryItem';
+  public _type = 'DataPolicy';
   public _options?: { uuid?: string };
-  public name: string;
-  public value: string;
+  public match?: any;
+  public modifier?: any;
+  public attributeQuery?: any;
   
-  constructor(args: QueryItemCreateArgs, options?: { uuid?: string }) {
+  constructor(args: DataPolicyCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
-    this.name = args.name;
-    this.value = args.value;
+    this.match = args.match;
+    this.modifier = args.modifier;
+    this.attributeQuery = args.attributeQuery;
   }
   
   // 静态属性和方法
   static isKlass = true as const;
-  static displayName = 'QueryItem';
-  static instances: QueryItemInstance[] = [];
+  static displayName = 'DataPolicy';
+  static instances: DataPolicyInstance[] = [];
   
   static public = {
-    name: {
-      type: 'string' as const,
-      required: true as const,
+    match: {
+      type: 'any' as const,
+      required: false as const,
       collection: false as const,
     },
-    value: {
-      type: 'string' as const,
-      required: true as const,
+    modifier: {
+      type: 'any' as const,
+      required: false as const,
+      collection: false as const,
+    },
+    attributeQuery: {
+      type: 'any' as const,
+      required: false as const,
       collection: false as const,
     }
   };
   
-  static create(args: QueryItemCreateArgs, options?: { uuid?: string }): QueryItemInstance {
-    const instance = new QueryItem(args, options);
+  static create(args: DataPolicyCreateArgs, options?: { uuid?: string }): DataPolicyInstance {
+    const instance = new DataPolicy(args, options);
     
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
-      throw new Error(`duplicate uuid in options ${instance.uuid}, QueryItem`);
+      throw new Error(`duplicate uuid in options ${instance.uuid}, DataPolicy`);
     }
     
     this.instances.push(instance);
     return instance;
   }
   
-  static stringify(instance: QueryItemInstance): string {
-    const data: SerializedData<QueryItemCreateArgs> = {
-      type: 'QueryItem',
+  static stringify(instance: DataPolicyInstance): string {
+    const args: DataPolicyCreateArgs = {};
+    if (instance.match !== undefined) args.match = instance.match;
+    if (instance.modifier !== undefined) args.modifier = instance.modifier;
+    if (instance.attributeQuery !== undefined) args.attributeQuery = instance.attributeQuery;
+    
+    const data: SerializedData<DataPolicyCreateArgs> = {
+      type: 'DataPolicy',
       options: instance._options,
       uuid: instance.uuid,
-      public: {
-        name: instance.name,
-        value: instance.value
-      }
+      public: args
     };
     return JSON.stringify(data);
   }
   
-  static clone(instance: QueryItemInstance, deep: boolean): QueryItemInstance {
-    return this.create({
-      name: instance.name,
-      value: instance.value
-    });
+  static clone(instance: DataPolicyInstance, deep: boolean): DataPolicyInstance {
+    const args: DataPolicyCreateArgs = {};
+    if (instance.match !== undefined) args.match = instance.match;
+    if (instance.modifier !== undefined) args.modifier = instance.modifier;
+    if (instance.attributeQuery !== undefined) args.attributeQuery = instance.attributeQuery;
+    
+    return this.create(args);
   }
   
-  static is(obj: unknown): obj is QueryItemInstance {
-    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'QueryItem';
+  static is(obj: unknown): obj is DataPolicyInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'DataPolicy';
   }
   
-    static check(data: unknown): boolean {
+  static check(data: unknown): boolean {
     return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
   }
   
-  static parse(json: string): QueryItemInstance {
-    const data: SerializedData<QueryItemCreateArgs> = JSON.parse(json);
+  static parse(json: string): DataPolicyInstance {
+    const data: SerializedData<DataPolicyCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }
-
-// Query
-export interface QueryInstance extends IInstance {
-  items: QueryItemInstance[];
-}
-
-export interface QueryCreateArgs {
-  items: QueryItemInstance[];
-}
-
-export class Query implements QueryInstance {
-  public uuid: string;
-  public _type = 'Query';
-  public _options?: { uuid?: string };
-  public items: QueryItemInstance[];
-  
-  constructor(args: QueryCreateArgs, options?: { uuid?: string }) {
-    this._options = options;
-    this.uuid = generateUUID(options);
-    this.items = args.items;
-  }
-  
-  // 静态属性和方法
-  static isKlass = true as const;
-  static displayName = 'Query';
-  static instances: QueryInstance[] = [];
-  
-  static public = {
-    items: {
-      type: 'QueryItem' as const,
-      required: true as const,
-      collection: true as const,
-    }
-  };
-  
-  static create(args: QueryCreateArgs, options?: { uuid?: string }): QueryInstance {
-    const instance = new Query(args, options);
-    
-    // 检查 uuid 是否重复
-    const existing = this.instances.find(i => i.uuid === instance.uuid);
-    if (existing) {
-      throw new Error(`duplicate uuid in options ${instance.uuid}, Query`);
-    }
-    
-    this.instances.push(instance);
-    return instance;
-  }
-  
-  static stringify(instance: QueryInstance): string {
-    const data: SerializedData<QueryCreateArgs> = {
-      type: 'Query',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: {
-        items: instance.items
-      }
-    };
-    return JSON.stringify(data);
-  }
-  
-  static clone(instance: QueryInstance, deep: boolean): QueryInstance {
-    return this.create({
-      items: instance.items
-    });
-  }
-  
-  static is(obj: unknown): obj is QueryInstance {
-    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'Query';
-  }
-  
-    static check(data: unknown): boolean {
-    return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
-  }
-  
-  static parse(json: string): QueryInstance {
-    const data: SerializedData<QueryCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
-  }
-} 

@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import {
   Action, Interaction, Activity, ActivityGroup, Transfer,
-  Condition, PayloadItem, Payload, SideEffect, Query, QueryItem,
+  Condition, PayloadItem, Payload, SideEffect, DataPolicy,
   Gateway, Event, Property, Entity,
   forEachInteraction, getInteractions,
   clearAllInstances
@@ -12,7 +12,7 @@ describe("Interaction System Refactored - compatibility test", () => {
     // Clear all instances
     clearAllInstances(
       Action, Interaction, Activity, ActivityGroup, Transfer,
-      Condition, PayloadItem, Payload, SideEffect, Query, QueryItem,
+      Condition, PayloadItem, Payload, SideEffect, DataPolicy,
       Gateway, Event, Property, Entity
     );
   });
@@ -74,18 +74,18 @@ describe("Interaction System Refactored - compatibility test", () => {
     });
   });
 
-  describe("Query", () => {
-    test("should create query with items", () => {
-      const item1 = QueryItem.create({ name: "status", value: "active" });
-      const item2 = QueryItem.create({ name: "type", value: "admin" });
-      
-      const query = Query.create({
-        items: [item1, item2]
+  describe("DataPolicy", () => {
+    test("should create data policy with all properties", () => {
+      const policy = DataPolicy.create({
+        match: { key: "status", value: ["=", "active"] },
+        modifier: { limit: 10, offset: 0 },
+        attributeQuery: ["id", "name", "email"]
       });
       
-      expect(query.items).toHaveLength(2);
-      expect(query.items[0].name).toBe("status");
-      expect(query.items[0].value).toBe("active");
+      expect(policy.match).toEqual({ key: "status", value: ["=", "active"] });
+      expect(policy.modifier).toEqual({ limit: 10, offset: 0 });
+      expect(policy.attributeQuery).toEqual(["id", "name", "email"]);
+      expect(policy._type).toBe("DataPolicy");
     });
   });
 

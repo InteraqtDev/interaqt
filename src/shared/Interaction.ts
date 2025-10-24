@@ -7,7 +7,7 @@ import { PayloadInstance } from './Payload.js';
 import { SideEffectInstance } from './SideEffect.js';
 import { EntityInstance } from './Entity.js';
 import { RelationInstance } from './Relation.js';
-import { QueryInstance } from './Data.js';
+import { DataPolicyInstance } from './Data.js';
 
 export interface InteractionInstance extends IInstance {
   name: string;
@@ -18,7 +18,7 @@ export interface InteractionInstance extends IInstance {
   payload?: PayloadInstance;
   sideEffects?: SideEffectInstance[];
   data?: EntityInstance | RelationInstance;
-  query?: QueryInstance;
+  dataPolicy?: DataPolicyInstance;
 }
 
 export interface InteractionCreateArgs {
@@ -30,7 +30,7 @@ export interface InteractionCreateArgs {
   payload?: PayloadInstance;
   sideEffects?: SideEffectInstance[];
   data?: EntityInstance | RelationInstance;
-  query?: QueryInstance;
+  dataPolicy?: DataPolicyInstance;
 }
 
 export class Interaction implements InteractionInstance {
@@ -45,7 +45,7 @@ export class Interaction implements InteractionInstance {
   public payload?: PayloadInstance;
   public sideEffects: SideEffectInstance[];
   public data?: EntityInstance | RelationInstance;
-  public query?: QueryInstance;
+  public dataPolicy?: DataPolicyInstance;
   
   constructor(args: InteractionCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -58,7 +58,7 @@ export class Interaction implements InteractionInstance {
     this.payload = args.payload;
     this.sideEffects = args.sideEffects || [];
     this.data = args.data;
-    this.query = args.query;
+    this.dataPolicy = args.dataPolicy;
   }
   
   // 静态属性和方法
@@ -105,8 +105,8 @@ export class Interaction implements InteractionInstance {
       required: false as const,
       collection: false as const
     },
-    query: {
-      type: 'Query' as const,
+    dataPolicy: {
+      type: 'DataPolicy' as const,
       required: false as const,
       collection: false as const
     }
@@ -137,7 +137,7 @@ export class Interaction implements InteractionInstance {
     if (instance.sideEffects && instance.sideEffects.length > 0) args.sideEffects = instance.sideEffects;
 
     if (instance.data !== undefined) args.data = instance.data;
-    if (instance.query !== undefined) args.query = instance.query;
+    if (instance.dataPolicy !== undefined) args.dataPolicy = instance.dataPolicy;
     
     const data: SerializedData<InteractionCreateArgs> = {
       type: 'Interaction',
@@ -160,7 +160,7 @@ export class Interaction implements InteractionInstance {
     if (instance.sideEffects && instance.sideEffects.length > 0) args.sideEffects = instance.sideEffects;
 
     if (instance.data !== undefined) args.data = instance.data;
-    if (instance.query !== undefined) args.query = instance.query;
+    if (instance.dataPolicy !== undefined) args.dataPolicy = instance.dataPolicy;
     
     return this.create(args);
   }

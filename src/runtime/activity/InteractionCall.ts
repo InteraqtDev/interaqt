@@ -419,11 +419,11 @@ export class InteractionCall {
         let data: any
         if (Entity.is(this.interaction.data) || Relation.is(this.interaction.data)) {
             const recordName = (this.interaction.data as EntityInstance).name!
-            const queryItems = Object.fromEntries(
-                this.interaction.query?.items?.map(item => [(item as any).name, (item as any).value as any]) || []
-            )
-
-            const {match: fixedMatch, modifier: fixedModifier, attributeQuery: allowedAttributeQuery} = queryItems
+            
+            // Get fixed constraints from dataPolicy
+            const fixedMatch = this.interaction.dataPolicy?.match
+            const fixedModifier = this.interaction.dataPolicy?.modifier
+            const allowedAttributeQuery = this.interaction.dataPolicy?.attributeQuery
             
             const modifier = {...(interactionEvent.query?.modifier||{}), ...(fixedModifier||{})}
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？这里涉及到复合 attrubuteQuery 的深度检测问题。

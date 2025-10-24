@@ -163,7 +163,37 @@ For **EACH entity** in `requirements/{module}.data-concepts.json`:
 
 Analyze `requirements/{module}.interactions-design.json` (using the module name from `.currentmodule`) to identify how entities are created:
 
-**Step A: Find Creation Interactions**
+**Step A: Check if Entity is Integration Event (PRIORITY CHECK)**
+⚠️ **CRITICAL: This check MUST be performed FIRST, before analyzing interactions.**
+
+1. Check if entity's `entityType` in `requirements/{module}.data-concepts.json` is `"integration-event"`
+2. Check if entity's `note` or `description` in `requirements/{module}.data-concepts.json` contains keywords: "external event", "integration event", "webhook", "external system"
+3. If EITHER condition is true:
+   - **Type = "integration-event"**
+   - **creationInteractions = [] (empty array)**
+   - **computationMethod = "Created by external system integration/webhook/callback"**
+   - **STOP and skip Step B and Step C**
+   - Note: Even if this entity appears in interactions-design.json's creates array, ignore it - the creates entry is only for tracking data flow, not for actual creation logic
+
+**Step B: Check if Entity is API Call Entity (PRIORITY CHECK)**
+⚠️ **CRITICAL: This check MUST be performed after Step A.**
+
+1. Check if entity's `entityType` in `requirements/{module}.data-concepts.json` is `"api-call"`
+2. If true, API Call entities require special handling as they need dual creation sources:
+   - **Type = "mutation-derived"**
+   - Set `isAPICallEntity: true` in the output
+   - Set `relatedBusinessEntity` to identify the primary business entity that triggers API calls
+   - **computationMethod**: Describe using Transform computation to auto-create when business entity is created AND support retry through explicit interactions
+   - **STOP and skip Step C and Step D**
+   
+**Rationale**: API Call entities track external API invocations. They must be:
+- Auto-created when business data is created (via record mutation)
+- Re-creatable through retry interactions when failures occur
+Since both interactions and entity creation produce record mutations, mutation-derived handles both scenarios via Transform computations.
+
+**Step C: Find Creation Interactions**
+(Only perform this step if entity is NOT an integration event AND NOT an API call entity)
+
 1. Search all interactions where the entity appears in `interactions.specification.data.creates`
 2. For each creation interaction, capture:
    - Interaction name (not ID)
@@ -171,12 +201,22 @@ Analyze `requirements/{module}.interactions-design.json` (using the module name 
    - Dependencies from the creates entry
 3. Store as `creationInteractions` with detailed information for each interaction
 
-**Step B: Determine Creation Type**
+**Step D: Determine Creation Type**
+(Only perform this step if entity is NOT an integration event AND NOT an API call entity)
+
+**Priority Check: User Profile Entity Type**
+1. Check if entity has `entityType` field in `requirements/{module}.data-concepts.json`
+2. If `entityType === "user-profile"`:
+   - **Type = "derived"**
+   - **parent = "User"**
+   - **Reason**: User profile entities are automatically derived from the User entity upon User creation
+   - **STOP and skip remaining type analysis**
+
 Analyze the creation pattern:
 
 - **integration-event**: Entity is an event entity for external system integration
-  - Identified in Step 1.3 from `requirements/{module}.integration.json`
-  - Created when external system sends asynchronous responses (webhooks, callbacks)
+  - Should have been caught in Step A
+  - If you reach this point, review Step A logic
   
 - **interaction-created**: Entity is created independently by interactions
   - Entity appears alone in `data.creates` 
@@ -190,15 +230,75 @@ Analyze the creation pattern:
 - **derived**: Entity is filtered/computed from other entities
   - No interactions directly create it
   - Views in `requirements/{module}.data-concepts.json` are typically derived
+  - **Special case**: User profile entities (`entityType: "user-profile"`) are derived from User entity (caught by Priority Check above)
   
 - **mutation-derived**: Entity is created from record mutation events
   - Not directly in any interaction's `data.creates`
   - Created by reactive computations (e.g., Transform) responding to other entities' creation/update/deletion
   - Check for descriptions mentioning "when X is created/updated/deleted, create Y"
   - Often used for audit logs, history tracking, or event-driven workflows
+  - **Dual-creation pattern**: Entities that need to be both auto-created with business data AND manually created through interactions
+    - Both scenarios produce record mutations, so Transform can handle both
+    - Example: API Call entities that auto-create when business entity is created, but also support retry interactions
+    - Set `relatedBusinessEntity` field to identify the triggering business entity
 
 **Example Analysis**:
 ```json
+// Example 1: User Profile Entity (PRIORITY CHECK catches it)
+// In requirements/user.data-concepts.json:
+{
+  "name": "UserProfile",
+  "entityType": "user-profile",
+  "description": "Extended profile information for users",
+  "properties": {
+    "bio": {"type": "string"},
+    "avatar": {"type": "string"}
+  }
+}
+// Analysis using Step D Priority Check:
+// - Entity has entityType field with value "user-profile" ✓
+// - Result: Type = "derived", parent = "User"
+// - STOP, skip remaining type analysis
+// ⚠️ Note: User profile entities are automatically generated with User creation
+
+// Example 2: Integration Event (PRIORITY CHECK catches it)
+// In requirements/donate.data-concepts.json:
+{
+  "name": "TTSGenerationEvent",
+  "note": "External event entity - created when TTS service returns response..."
+}
+// In requirements/donate.interactions-design.json (DonateToContent):
+"creates": [
+  {
+    "target": "TTSGenerationEvent",
+    "description": "Create initial TTSGenerationEvent with status='pending'...",
+    "dependencies": ["DonationRecord"]
+  }
+]
+// Analysis using Step A:
+// - Step A check 2: entity note contains "External event entity" ✓
+// - Result: Type = "integration-event", creationInteractions = []
+// - STOP, skip Step B, C and D
+// ⚠️ Note: Ignore the creates entry in interactions - it's only for tracking data flow
+
+// Example 3: API Call Entity (mutation-derived with dual creation)
+// In requirements/donate.data-concepts.json:
+{
+  "name": "TTSAPICall",
+  "entityType": "api-call",
+  "description": "Records TTS API call execution for tracking"
+}
+// Analysis using Step B:
+// - Step A: No integration event indicators ✗
+// - Step B: entityType is "api-call" ✓
+// - Result: Type = "mutation-derived"
+//           Set isAPICallEntity: true
+//           Set relatedBusinessEntity: "DonationRecord"
+//           computationMethod: "Transform: Auto-create when DonationRecord is created. Also supports retry via RetryTTSCall interaction. Both paths produce mutations handled by same Transform."
+// - STOP, skip Step C and D
+// ⚠️ Note: Dual creation pattern - auto-created with business entity AND manually via retry interaction
+
+// Example 4: Interaction-created
 // In interaction "CreateDormitory":
 "data": {
   "creates": [
@@ -214,15 +314,23 @@ Analyze the creation pattern:
     }
   ]
 }
-// Result: 
-// Dormitory is interaction-created with creation details
-// Bed is created-with-parent (parent: Dormitory) with creation details
+// Analysis:
+// - Step A: No integration event indicators ✗
+// - Step B: No api-call entityType ✗
+// - Step D Priority Check: No user-profile entityType ✗
+// - Step C: Find creates entries
+// - Step D: Dormitory is interaction-created, Bed is created-with-parent (parent: Dormitory)
 
-// For mutation-derived entity (not in any interaction's creates):
+// Example 5: Mutation-derived
 // In requirements/{module}.data-concepts.json: "UserActivityLog: Records all user actions"
 // In interactions: No interaction directly creates UserActivityLog
 // In descriptions: "Activity logs are automatically created when users perform actions"
-// Result: UserActivityLog is mutation-derived
+// Analysis:
+// - Step A: No integration event indicators ✗
+// - Step B: No api-call entityType ✗
+// - Step D Priority Check: No user-profile entityType ✗
+// - Step C: Not in any creates array
+// - Step D: Result = mutation-derived
 ```
 
 #### 2.2 Determine Deletion Pattern
@@ -272,10 +380,31 @@ Transform the computation description using semantic best practices:
 
 #### 3.4 Determine Control Type
 
-Based on the analysis:
-- **creation-only**: Only set when entity is created (no updates found)
-- **derived-with-parent**: Property of a derived entity
-- **independent**: Has separate update logic (found in `data.updates`)
+Follow this decision process:
+
+1. **Check if property has `computation.method: "integration-result"` in `requirements/{module}.data-concepts.json`**
+   - If YES → **integration-result**
+   - Used for properties computed from external API/integration results
+   - These properties react to API call entity updates
+
+2. **Check if parent entity's `lifecycle.creation.type` is `"derived"`**
+   - If YES → **derived-with-parent**
+   - Property belongs to a derived entity (e.g., UserProfile)
+
+3. **Check if property appears in any interaction's `data.updates`**
+   - If YES → **independent**
+   - Property has explicit update interactions
+
+4. **Check if property is computed**
+   - If NO (not computed) → **creation-only**
+   - If YES (computed) → **derived-with-parent**
+   - Covers reactive computed properties (Count, Summation, etc.)
+
+**Control Type Definitions**:
+- **creation-only**: Set once at entity creation, never changes
+- **integration-result**: Computed from external API/integration results, reacts to API call entity changes
+- **derived-with-parent**: Property of a derived entity, or reactive computed property
+- **independent**: Has explicit update interactions separate from creation
 
 ### Step 4: Analyze Relations
 
@@ -523,6 +652,7 @@ Transform the analyzed data into the standard output format:
   "entities": {
     "[EntityName]": {
       "purpose": "[From requirements/{module}.data-concepts.json description]",
+      "isAPICallEntity": "[true if entityType is 'api-call', omit otherwise]",
       "isIntegrationEvent": "[true if this is an integration event entity, false otherwise]",
       "dataDependencies": "[Dependencies identified in Step 2]",
       "computationMethod": "[Creation pattern description]",
@@ -530,6 +660,7 @@ Transform the analyzed data into the standard output format:
         "creation": {
           "type": "[integration-event | interaction-created | derived | created-with-parent | mutation-derived]",
           "parent": "[Parent entity name if created-with-parent]",
+          "relatedBusinessEntity": "[For API Call entities with mutation-derived type: the business entity that triggers API calls]",
           "creationInteractions": [
             {
               "name": "[Interaction name]",
@@ -676,7 +807,62 @@ Properties affected by multiple sources:
 }
 ```
 
-### 4. Derived Entities
+### 4. Integration Result Properties
+Properties computed from external API/integration results:
+```json
+"voiceUrl": {
+  "type": "string",
+  "purpose": "AI-generated audio URL from TTS service",
+  "controlType": "integration-result",
+  "dataDependencies": ["TTSAPICall.responseData", "TTSAPICall.status"],
+  "interactionDependencies": [],
+  "computationMethod": "Statemachine: Extract from latest TTSAPICall.responseData where status='completed'",
+  "initialValue": "null"
+}
+```
+
+Note: Use `controlType: "integration-result"` when:
+- Property value comes from external API/service responses
+- Property is computed from API Call entity's response data
+- Always specified in `requirements/{module}.data-concepts.json` with `computation.method: "integration-result"`
+
+### 5. Derived Entities
+
+#### 5.1 User Profile Entity (Special Case)
+User profile entities with `entityType: "user-profile"`:
+```json
+"UserProfile": {
+  "purpose": "Extended profile information for users",
+  "isIntegrationEvent": false,
+  "dataDependencies": ["User"],
+  "computationMethod": "Automatically created with User entity creation",
+  "lifecycle": {
+    "creation": {
+      "type": "derived",
+      "parent": "User",
+      "creationInteractions": []
+    },
+    "deletion": {
+      "canBeDeleted": true,
+      "deletionType": "auto-delete",
+      "deletionInteractions": []
+    }
+  },
+  "properties": {
+    "bio": {
+      "type": "string",
+      "purpose": "User biography",
+      "controlType": "independent",
+      "dataDependencies": [],
+      "interactionDependencies": ["UpdateProfile"],
+      "computationMethod": "Set by user through UpdateProfile interaction",
+      "initialValue": "''"
+    }
+  }
+}
+```
+
+#### 5.2 Filtered/Computed Entities
 Entities filtered from base entities:
 ```json
 "ActiveUser": {
@@ -691,7 +877,7 @@ Entities filtered from base entities:
 }
 ```
 
-### 5. Multiple Creation Interactions
+### 6. Multiple Creation Interactions
 Entity created by different interactions with different logic:
 ```json
 "Style": {
@@ -716,7 +902,7 @@ Entity created by different interactions with different logic:
 }
 ```
 
-### 6. Integration Event Entity
+### 7. Integration Event Entity
 Event entity for tracking asynchronous external system responses:
 ```json
 "PaymentEvent": {
@@ -776,10 +962,18 @@ Note: Other business entities (like `Order.paymentStatus`, `User.premiumUntil`) 
 - [ ] All entities from `requirements/{module}.data-concepts.json` are analyzed
 - [ ] All relations from `requirements/{module}.data-concepts.json` are analyzed
 - [ ] All dictionaries from `requirements/{module}.data-concepts.json` are analyzed
-- [ ] Integration event entities identified from `requirements/{module}.integration.json`
+- [ ] **🔴 CRITICAL: For EACH entity, performed Step A (Integration Event Priority Check) FIRST**
+- [ ] **🔴 CRITICAL: For EACH entity, performed Step B (API Call Entity Priority Check) after Step A**
+- [ ] **🔴 CRITICAL: For EACH entity, performed Step D Priority Check (User Profile Entity Type) after Step A and B**
+- [ ] API Call entities (with `entityType: "api-call"`) have `isAPICallEntity: true` flag set
+- [ ] User profile entities (with `entityType: "user-profile"`) have lifecycle.creation.type set to "derived"
+- [ ] User profile entities have lifecycle.creation.parent set to "User"
+- [ ] Integration event entities identified from `requirements/{module}.integration.json` OR entity notes/descriptions
 - [ ] Event entities properly marked with `isIntegrationEvent: true`
 - [ ] Event entities have lifecycle.creation.type set to "integration-event"
+- [ ] Event entities have lifecycle.creation.creationInteractions set to [] (empty array)
 - [ ] Event entities have deletion.canBeDeleted set to false
+- [ ] **🔴 CRITICAL: Integration event entities do NOT have computationMethod from interactions** (should be "Created by external system...")
 - [ ] Creation patterns identified for each entity/relation
 - [ ] **🔴 CRITICAL: For EACH relation, executed the 5-step algorithm in Step 4.2 to determine lifecycle type**
 - [ ] **🔴 CRITICAL: For relations with type "created-with-entity", verified parent field is set correctly**

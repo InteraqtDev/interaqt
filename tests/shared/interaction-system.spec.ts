@@ -3,7 +3,7 @@ import {
   Action, PayloadItem, Payload, SideEffect,
   Interaction, Gateway, Event, Activity, ActivityGroup, Transfer,
   Condition, Conditions, DataAttributive, DataAttributives,
-  QueryItem, Query, Attributive, Attributives, Dictionary,
+  DataPolicy, Attributive, Attributives, Dictionary,
   BoolAtomData, BoolExpressionData
 } from "@shared";
 
@@ -263,30 +263,27 @@ describe("Interaction System - createClass functionality", () => {
     });
   });
 
-  describe("Query", () => {
-    test("should create query item", () => {
-      const item = QueryItem.create({
-        name: "filter",
-        value: "active"
+  describe("DataPolicy", () => {
+    test("should create data policy with match", () => {
+      const policy = DataPolicy.create({
+        match: { key: "status", value: ["=", "active"] }
       });
 
-      expect(item.name).toBe("filter");
-      expect(item.value).toBe("active");
-      expect(item._type).toBe("QueryItem");
+      expect(policy.match).toEqual({ key: "status", value: ["=", "active"] });
+      expect(policy._type).toBe("DataPolicy");
     });
 
-    test("should create query with items", () => {
-      const item = QueryItem.create({
-        name: "sort",
-        value: "desc"
+    test("should create data policy with all properties", () => {
+      const policy = DataPolicy.create({
+        match: { key: "status", value: ["=", "published"] },
+        modifier: { limit: 10, orderBy: { createdAt: "desc" } },
+        attributeQuery: ["id", "title", "content"]
       });
 
-      const query = Query.create({
-        items: [item]
-      });
-
-      expect(query.items).toHaveLength(1);
-      expect(query._type).toBe("Query");
+      expect(policy.match).toBeDefined();
+      expect(policy.modifier).toEqual({ limit: 10, orderBy: { createdAt: "desc" } });
+      expect(policy.attributeQuery).toEqual(["id", "title", "content"]);
+      expect(policy._type).toBe("DataPolicy");
     });
   });
 

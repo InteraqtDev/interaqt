@@ -20,8 +20,7 @@ import {
     InteractionEventArgs, 
     InteractionEventEntity,
     Count,
-    Query,
-    QueryItem
+    DataPolicy
 } from 'interaqt';
 
 export const globalUserRole = createUserRoleAttributive({})
@@ -239,13 +238,8 @@ const getMyPendingRequests = Interaction.create({
     name: 'getMyPendingRequests',
     action: GetAction,
     data: RequestEntity,
-    query: Query.create({
-        items: [
-            QueryItem.create({
-                name: 'attributeQuery',
-                value: ['id', 'reason', 'result', 'reviewer']
-            })
-        ]
+    dataPolicy: DataPolicy.create({
+        attributeQuery: ['id', 'reason', 'result', 'reviewer']
     })
 })
 

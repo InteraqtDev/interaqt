@@ -8,8 +8,8 @@ import {
     Interaction,
     GetAction,
     Action,
-    Attributive, Query,
-    QueryItem, removeAllInstance,
+    Attributive, DataPolicy,
+    removeAllInstance,
     MatchExp,
     Condition,
     Conditions,
@@ -350,17 +350,9 @@ describe('Get Data Interaction', () => {
                 name: 'getTopArticles',
                 action: GetAction,
                 data: Article,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'modifier',
-                            value: { limit: 3 } as any
-                        }),
-                        QueryItem.create({
-                            name: 'attributeQuery',
-                            value: ['id', 'title', 'views'] as any
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    modifier: { limit: 3 } as any,
+                    attributeQuery: ['id', 'title', 'views'] as any
                 })
             })
 
@@ -765,13 +757,8 @@ describe('Get Data Interaction', () => {
                 name: 'getActiveProducts',
                 action: GetAction,
                 data: Product,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
                 })
             })
 
@@ -818,13 +805,8 @@ describe('Get Data Interaction', () => {
                 name: 'getActiveProducts',
                 action: GetAction,
                 data: Product,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
                 })
             })
 
@@ -874,21 +856,10 @@ describe('Get Data Interaction', () => {
                 name: 'getPublishedArticles',
                 action: GetAction,
                 data: Article,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: MatchExp.atom({ key: 'status', value: ['=', 'published'] })
-                        }),
-                        QueryItem.create({
-                            name: 'modifier',
-                            value: { limit: 5, orderBy: { views: 'desc' } } as any
-                        }),
-                        QueryItem.create({
-                            name: 'attributeQuery',
-                            value: ['id', 'title', 'author', 'views'] as any
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: MatchExp.atom({ key: 'status', value: ['=', 'published'] }),
+                    modifier: { limit: 5, orderBy: { views: 'desc' } } as any,
+                    attributeQuery: ['id', 'title', 'author', 'views'] as any
                 })
             })
 
@@ -982,14 +953,9 @@ describe('Get Data Interaction', () => {
                 name: 'getUrgentTasks',
                 action: GetAction,
                 data: Task,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: MatchExp.atom({ key: 'status', value: ['=', 'open'] })
-                                .and(MatchExp.atom({ key: 'priority', value: ['in', ['high', 'critical']] }))
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: MatchExp.atom({ key: 'status', value: ['=', 'open'] })
+                        .and(MatchExp.atom({ key: 'priority', value: ['in', ['high', 'critical']] }))
                 })
             })
 
@@ -1056,17 +1022,12 @@ describe('Get Data Interaction', () => {
                 name: 'getTasksByPriority',
                 action: GetAction,
                 data: Task,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: function(this: Controller, event: any) {
-                                // Dynamic match based on current state
-                                const priorityFilter = event.user?.preferredPriority || 'high'
-                                return MatchExp.atom({ key: 'priority', value: ['=', priorityFilter] })
-                            }
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: function(this: Controller, event: any) {
+                        // Dynamic match based on current state
+                        const priorityFilter = event.user?.preferredPriority || 'high'
+                        return MatchExp.atom({ key: 'priority', value: ['=', priorityFilter] })
+                    }
                 })
             })
 
@@ -1127,20 +1088,15 @@ describe('Get Data Interaction', () => {
                 name: 'getFilteredProducts',
                 action: GetAction,
                 data: Product,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: async function(this: Controller, event: any) {
-                                // Simulate async operation (e.g., fetching from Dictionary)
-                                await new Promise(resolve => setTimeout(resolve, 10))
-                                return MatchExp.atom({ 
-                                    key: 'category', 
-                                    value: ['=', categoryFilter.current] 
-                                })
-                            }
+                dataPolicy: DataPolicy.create({
+                    match: async function(this: Controller, event: any) {
+                        // Simulate async operation (e.g., fetching from Dictionary)
+                        await new Promise(resolve => setTimeout(resolve, 10))
+                        return MatchExp.atom({ 
+                            key: 'category', 
+                            value: ['=', categoryFilter.current] 
                         })
-                    ]
+                    }
                 })
             })
 
@@ -1201,20 +1157,15 @@ describe('Get Data Interaction', () => {
                 name: 'getHighValueOrders',
                 action: GetAction,
                 data: Order,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: function(this: Controller, event: any) {
-                                // High value threshold changes based on context
-                                const threshold = event.user?.isVip ? 500 : 1000
-                                return MatchExp.atom({ 
-                                    key: 'amount', 
-                                    value: ['>=', threshold] 
-                                })
-                            }
+                dataPolicy: DataPolicy.create({
+                    match: function(this: Controller, event: any) {
+                        // High value threshold changes based on context
+                        const threshold = event.user?.isVip ? 500 : 1000
+                        return MatchExp.atom({ 
+                            key: 'amount', 
+                            value: ['>=', threshold] 
                         })
-                    ]
+                    }
                 })
             })
 
@@ -1275,19 +1226,14 @@ describe('Get Data Interaction', () => {
                 name: 'getDepartmentDocuments',
                 action: GetAction,
                 data: Document,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: function(this: Controller, event: any) {
-                                // Return raw match data instead of MatchExp
-                                return {
-                                    key: 'department',
-                                    value: ['=', event.user?.department || 'general']
-                                }
-                            }
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: function(this: Controller, event: any) {
+                        // Return raw match data instead of MatchExp
+                        return {
+                            key: 'department',
+                            value: ['=', event.user?.department || 'general']
+                        }
+                    }
                 })
             })
 
@@ -1330,19 +1276,14 @@ describe('Get Data Interaction', () => {
                 name: 'getConditionalItems',
                 action: GetAction,
                 data: Item,
-                query: Query.create({
-                    items: [
-                        QueryItem.create({
-                            name: 'match',
-                            value: function(this: Controller, event: any) {
-                                // Return null if no filter should be applied
-                                if (event.user?.applyFilter === false) {
-                                    return null
-                                }
-                                return MatchExp.atom({ key: 'status', value: ['=', 'active'] })
-                            }
-                        })
-                    ]
+                dataPolicy: DataPolicy.create({
+                    match: function(this: Controller, event: any) {
+                        // Return null if no filter should be applied
+                        if (event.user?.applyFilter === false) {
+                            return null
+                        }
+                        return MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+                    }
                 })
             })
 

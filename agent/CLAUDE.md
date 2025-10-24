@@ -42,26 +42,62 @@ Each module has its own progress tracking file:
 
 ** IMPORTANT: All tasks in this guide use a global unique numbering system (Task x.x.x.x). You can always find your current position by checking `docs/{module}.status.json`, which tracks the exact Task number you were working on for that module.**
 
+**Task Numbering Hierarchy:**
+- **Top-level tasks**: Task 1, Task 2, Task 3 (major phases)
+- **Sub-tasks**: Task 1.1, Task 1.2, Task 1.3, Task 1.4, etc. (steps within a phase)
+- **Sub-sub-tasks**: Task 1.1.1, Task 3.1.4.3, etc. (nested steps)
+- **Rule**: Extract the first digit to determine which sub-agent handles the task
+
 ** IMPORTANT: Module-Based Generation - All generated artifacts should be organized by module name read from `.currentmodule` file.**
 
 ## Task-Based Workflow System
 
 **📖 STEP 1: Check Current Progress**
 1. Read current module name from `.currentmodule` file
-2. Read `docs/{module}.status.json` to find your current task number (e.g., "Task 1", "Task 2", "Task 3")
+2. Read `docs/{module}.status.json` to find your current task number (e.g., "Task 1.3", "Task 2.1", "Task 3.1.4.3")
 3. If the status file doesn't exist, you should start with Task 1
 
-**📖 STEP 2: Execute Corresponding Task**
-Based on the current task in `docs/{module}.status.json`, use the appropriate sub-agent:
+**📖 STEP 2: Determine Sub-Agent from Task Number**
 
-- **Task 1** → Use sub-agent `requirements-analysis-handler`
-- **Task 2** → Use sub-agent `implement-design-handler`
-- **Task 3** → Use sub-agent `code-generation-handler` (default for Task 3)
-  - **Exception: Task 3.1.4.3 - Computation Implementation Loop** → Use sub-agent `computation-generation-handler` during the implementation loop
-  - **Exception: Task 3.2.2 - Permission and Business Rule Implementation Loop** → Use sub-agent `permission-generation-handler` during the implementation loop
-- **Error Checking** → Use sub-agent `error-check-handler` when user requests error checking or quality assurance
+**Extract top-level task (first digit) from currentTask to determine sub-agent:**
 
-**📋 STEP 3: Error Checking (Optional)**
+Algorithm:
+```
+if currentTask starts with "Task 3.1.4.3": use computation-generation-handler
+else if currentTask starts with "Task 3.2.2": use permission-generation-handler
+else:
+  topLevel = first digit of currentTask
+  if topLevel == 1: use requirements-analysis-handler
+  if topLevel == 2: use implement-design-handler
+  if topLevel == 3: use code-generation-handler
+  if topLevel == 4: use implement-integration-handler
+```
+
+Examples:
+- "Task 1.3" → Top-level is 1 → `requirements-analysis-handler`
+- "Task 2.5.2" → Top-level is 2 → `implement-design-handler`
+- "Task 3.1.4.3" → Exception → `computation-generation-handler`
+- "Task 3.2.2" → Exception → `permission-generation-handler`
+- "Task 3.x" (other) → Top-level is 3 → `code-generation-handler`
+- "Task 4.2" → Top-level is 4 → `implement-integration-handler`
+
+**📖 STEP 3: Execute Task with Sub-Agent**
+
+Sub-agent mapping:
+- **Task 1.x** (any sub-task of Task 1) → Use `requirements-analysis-handler`
+- **Task 2.x** (any sub-task of Task 2) → Use `implement-design-handler`
+- **Task 3.x** (any sub-task of Task 3) → Use `code-generation-handler`
+  - **Exception: Task 3.1.4.3.x** → Use `computation-generation-handler`
+  - **Exception: Task 3.2.2.x** → Use `permission-generation-handler`
+- **Task 4.x** (any sub-task of Task 4) → Use `implement-integration-handler`
+- **Error Checking** → Use `error-check-handler` when user requests error checking
+
+**CRITICAL - Task Continuation Logic:**
+- **Within same top-level**: Task 1.3 → Task 1.4 (stay in same sub-agent, do NOT jump to Task 2)
+- **Move to next top-level**: Only when status shows `"currentTask": "Task 1"` (no suffix) AND `"completed": true`, then move to Task 2
+- Each sub-agent handles its own task progression; only switch sub-agents when explicitly moving to a new top-level task
+
+**📋 STEP 4: Error Checking (Optional)**
 
 At any point in the workflow, you can use the `error-check-handler` sub-agent to perform comprehensive error checking:
 - Creates a detailed error report in `docs/{module}.error-check-report.md`
@@ -78,9 +114,13 @@ At any point in the workflow, you can use the `error-check-handler` sub-agent to
 
 **🔴 CRITICAL - AUTORUN EXECUTION CONTROL:**
 
-**For Top-Level Tasks (Task 1, Task 2, Task 3):**
-- **Check `SCHEDULE.json`**: When `"autorun": true`, automatically proceed to the next top-level task after completing the current one
-- **Example**: If Task 1 is completed and `autorun: true`, automatically start Task 2 without waiting for user instruction
+**For Top-Level Tasks (Task 1, Task 2, Task 3, Task 4):**
+- **IMPORTANT**: "Task 1 complete" means status shows `"currentTask": "Task 1"` (NOT "Task 1.x") AND `"completed": true`
+- **Task 1.3 is WITHIN Task 1**: Continue to Task 1.4 within same sub-agent; do NOT jump to Task 2
+- **Check `SCHEDULE.json`**: When `"autorun": true`, automatically proceed to next top-level task ONLY after current top-level shows as fully completed
+- **Example**: Status shows "Task 1.3" → Continue to Task 1.4 (stay in requirements-analysis-handler)
+- **Example**: Status shows "Task 1" with `completed: true` and `autorun: true` → Start Task 2 (switch to implement-design-handler)
+- **Example**: Status shows "Task 3" with `completed: true` and `autorun: true` → Start Task 4 (switch to implement-integration-handler)
 - **When `autorun` is false or doesn't exist**: Stop after completing each top-level task and wait for user's instruction to continue
 
 **For Loop Tasks Within Sub-Tasks:**

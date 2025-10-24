@@ -33,6 +33,8 @@ The `_owner` notation indicates that this property's value is fully controlled b
 
 Properties marked with `_owner` don't need separate computation control - their logic is embedded in the owner's creation or derivation process.
 
+Note: Properties with `controlType: "integration-result"` are NOT marked as `_owner` - they use `StateMachine` to observe and extract values from API Call entity updates.
+
 ### 1. Entity-Level Computations
 
 Look at the entity's `lifecycle.creation` and `lifecycle.deletion`:
@@ -41,6 +43,7 @@ Look at the entity's `lifecycle.creation` and `lifecycle.deletion`:
 |---------------|----------|---------------------|
 | `"integration-event"` | Always `canBeDeleted: false` | `None` - Entity is externally controlled by webhook/callback from external systems |
 | `"created-with-parent"` | Any | `_parent:[lifecycle.creation.parent]` (created by parent's computation) |
+| `"mutation-derived"` | Any | `Transform` from record mutation events (both interaction-created and entity-created produce mutations) |
 | `"interaction-created"` | `canBeDeleted: false` | `Transform` with `InteractionEventEntity` |
 | `"interaction-created"` | `canBeDeleted: true` with `hard-delete` | `Transform` + `HardDeletionProperty` with `StateMachine` |
 | `"interaction-created"` | `canBeDeleted: true` with `soft-delete` | `Transform` + status property with `StateMachine` |
@@ -68,11 +71,17 @@ Check `lifecycle.creation` and `lifecycle.deletion`:
 
 ### 3. Property-Level Computations
 
+**🔴 CRITICAL RULE: Properties can NEVER use Transform computation**
+- Transform is ONLY for Entity/Relation creation
+- Properties must use: _owner, StateMachine, computed, aggregations (Count/Sum/etc.), or Custom
+- Even if a property needs to respond to external events (like Integration Events), use StateMachine with appropriate triggers
+
 First check the property's `controlType`, then analyze dependencies if needed:
 
 | Control Type | Computation Decision |
 |--------------|---------------------|
 | `creation-only` | `_owner` - controlled by entity/relation creation |
+| `integration-result` | `StateMachine` - observes API Call entity updates, extracts result from response data |
 | `derived-with-parent` | `_owner` - controlled by parent's derivation |
 | `independent` | Further analysis needed (see below) |
 
@@ -82,29 +91,52 @@ Analyze the property's `dataDependencies`, `interactionDependencies`, and `compu
 
 | Condition | Computation Decision |
 |-----------|---------------------|
-| Has `interactionDependencies` that can modify it | `StateMachine` for state transitions or value updates |
-| Has `dataDependencies` with relations/entities | Aggregation computation based on `computationMethod` |
+| `calculationMethod` contains "sum of", "count of", "aggregate", or involves Record entities | `Custom` or aggregation (e.g., balance = sum(deposits) - sum(withdrawals)) |
+| Has `interactionDependencies` that can modify it | `StateMachine` for state transitions or value updates (even for external events) |
+| Has `dataDependencies` with relations/entities (including Integration Events) | `StateMachine` if triggered by events, otherwise aggregation computation |
 | `dataDependencies` = self properties only | `computed` function |
 | Complex calculation with multiple entities | `Custom` |
 | Only has `initialValue`, no dependencies | No computation (use `defaultValue`) |
+
+**Common Pattern - Integration Result Properties:**
+- **If `controlType: "integration-result"`** → **Always use `StateMachine`**
+- Pattern: Property computed from API Call entity's response data
+- Example: `Donation.voiceUrl` computed from `TTSAPICall.responseData`
+- Implementation:
+  - Trigger: Monitor API Call entity creation/update
+  - ComputeTarget: Find the business entity that needs the result
+  - ComputeValue: Extract value from API Call entity's response field
+
+**Common Pattern - Integration Event Updates:**
+- Property needs to update based on Integration Event (e.g., TTSEvent) → Use `StateMachine`
+- Set trigger to monitor the Integration Event Entity creation: `trigger: { recordName: 'TTSEvent', type: 'create' }`
+- Use `computeTarget` to find the target entity/relation to update
+- Use `computeValue` to extract and return the new value from the event
 
 #### Decision Priority (check in order):
 
 1. **Check `controlType` first**:
    - `creation-only` → **_owner** (property controlled by entity/relation creation)
+   - `integration-result` → **StateMachine** (observes API Call entity, extracts from response)
    - `derived-with-parent` → **_owner** (property controlled by parent derivation)
    - `independent` → Continue to step 2
 
-2. **If has `interactionDependencies` that can modify**:
+2. **Check `calculationMethod` for aggregate patterns**:
+   - Contains "sum of", "count of", "aggregate" keywords → `Custom` or aggregation
+   - Involves multiple Record entities (deposits/withdrawals) → `Custom` 
+   - Example: balance = sum(RechargeRecord) - sum(DonationRecord) → `Custom`
+   - If found, use `Custom` or aggregation, **skip step 3**
+
+3. **If has `interactionDependencies` that can modify**:
    - Property changes in response to interactions → `StateMachine`
    - For timestamps: Use StateMachine with `computeValue`
    - For status fields: Use StateMachine with StateNodes
 
-3. **If has `dataDependencies` (no interactions)**:
+4. **If has `dataDependencies` (no interactions)**:
    - Check `computationMethod` for aggregation type
    - Relations/entities involved → Use appropriate aggregation
 
-4. **If uses only own entity properties**:
+5. **If uses only own entity properties**:
    - Simple derivation → `computed` function
    - Better performance than Custom
 
@@ -141,12 +173,14 @@ Then read `requirements/{module}.data-design.json` and extract:
 For each element:
 1. **For entities**: Check in this priority order:
    - First check if `isIntegrationEvent: true` → set computation to "None" (externally controlled)
+   - Then check if `isAPICallEntity: true` → set computation to "Transform" (mutation-derived pattern)
    - Then check lifecycle.creation.type and lifecycle.deletion
    - For entities that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
 2. **For relations**: Check lifecycle.creation.type and lifecycle.deletion
    - For relations that can be hard-deleted, use Transform + HardDeletionProperty with StateMachine
-3. **For properties**: Check controlType first:
+3. **For properties**: Check controlType first (PRIORITY ORDER):
    - If `creation-only` or `derived-with-parent` → use `_owner`
+   - **If `integration-result` → DIRECTLY use `StateMachine` (no further analysis)**
    - If `independent` → apply standard dependency analysis rules
 
 ### Step 3: Generate Output Document
@@ -170,7 +204,7 @@ Create `requirements/{module}.computation-analysis.json` (using the module name 
           "propertyName": "<property name>",
           "type": "<from requirements/{module}.data-design.json>",
           "purpose": "<from requirements/{module}.data-design.json>",
-          "controlType": "<from requirements/{module}.data-design.json: creation-only/derived-with-parent/independent>",
+          "controlType": "<from requirements/{module}.data-design.json: creation-only/integration-result/derived-with-parent/independent>",
           "dataSource": "<from computationMethod>",
           "computationDecision": "<_owner/StateMachine/Count/etc. based on controlType and rules>",
           "reasoning": "<automated based on controlType and rules>",
@@ -230,13 +264,14 @@ Examples:
 
 ```
 1. Entity Lifecycle?
-   ├─ lifecycle.creation.type: "integration-event"? → None (externally controlled)
+   ├─ isIntegrationEvent: true? → None (externally controlled)
+   ├─ isAPICallEntity: true? → Transform (mutation-derived pattern)
    ├─ lifecycle.creation.type: "created-with-parent"? → _parent:[parent]
+   ├─ lifecycle.creation.type: "mutation-derived"? → Transform from record mutation event
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (hard)? → Transform + HardDeletionProperty with StateMachine
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: true (soft)? → Transform + status StateMachine
    ├─ lifecycle.creation.type: "interaction-created" + canBeDeleted: false? → Transform with InteractionEventEntity
    └─ lifecycle.creation.type: "derived"? → Transform from source entity
-   └─ lifecycle.creation.type: "mutation-derived"? → Transform from record mutation event
    
 2. Relation Lifecycle?
    ├─ lifecycle.creation.type: "created-with-entity"? → _parent:[parent]
@@ -244,11 +279,14 @@ Examples:
    ├─ Needs audit trail? → Transform + status StateMachine (soft delete)
    └─ Never deleted? → Transform (if interaction-created) or _parent:[parent]
 
-3. Property Value?
+3. Property Value? (🔴 NEVER Transform - Transform is ONLY for Entity/Relation)
    ├─ controlType: "creation-only"? → _owner (controlled by entity/relation)
+   ├─ controlType: "integration-result"? → StateMachine (observe API Call entity)
    ├─ controlType: "derived-with-parent"? → _owner (controlled by parent)
    ├─ controlType: "independent"?
+   │  ├─ calculationMethod has "sum of"/"count of"/"aggregate" or Record entities? → Custom or aggregation
    │  ├─ Has interactionDependencies that can modify? → StateMachine
+   │  ├─ Depends on Integration Event? → StateMachine with event trigger
    │  ├─ Has dataDependencies with relations? → Aggregation computation
    │  ├─ Only uses own properties? → computed
    │  └─ Complex with multiple entities? → Custom
@@ -268,10 +306,51 @@ Examples:
 - With defined transitions: Use StateMachine with StateNodes
 - Example: pending → approved/rejected
 
+### Integration Result Properties
+**🔴 DIRECT RULE: `controlType: "integration-result"` → Always `StateMachine`**
+
+Properties with `controlType: "integration-result"` are computed from external API/integration results:
+- **Pattern**: Extract values from API Call entity's response data
+- **Computation**: Always use `StateMachine`
+- **Trigger**: Observe API Call entity creation/update events
+- **Logic**: 
+  - Use `computeTarget` to find the business entity that owns this property
+  - Use `computeValue` to extract the result from API Call entity's response field
+  - Typically extract from the LATEST successful API Call (status='completed')
+
+**Example**:
+```json
+{
+  "propertyName": "voiceUrl",
+  "controlType": "integration-result",
+  "dataDependencies": ["TTSAPICall.responseData", "TTSAPICall.status"],
+  "computationDecision": "StateMachine",
+  "reasoning": "controlType is 'integration-result' - directly maps to StateMachine to observe API Call entity"
+}
+```
+
+**Implementation notes**:
+- Monitor related API Call entity (via relation) for updates
+- Extract result when API Call reaches completed status
+- Handle multiple API Call attempts (retries) by using the latest successful one
+
 ### Counts and Aggregations
 - Simple counts: Use `Count`
 - Sums: Use `Summation`
 - Calculated totals (price × quantity): Use `WeightedSummation`
+
+### Balance/Accumulation Properties
+**🔴 CRITICAL**: Properties that aggregate from transaction records should use `Custom`, NOT `StateMachine`
+- Pattern: `balance = sum(deposits) - sum(withdrawals)`
+- Examples:
+  - `UserGiftProfile.giftBalance = sum(RechargeRecord.amount) - sum(DonationRecord.giftAmount)`
+  - `Account.balance = sum(CreditRecord.amount) - sum(DebitRecord.amount)`
+  - `Inventory.stockLevel = sum(PurchaseOrder.quantity) - sum(SalesOrder.quantity)`
+- **How to identify**: 
+  - `calculationMethod` contains "sum of", "aggregate", "increased by", "decreased by"
+  - Involves multiple Record entities (entities ending in "Record", "Transaction", "Event")
+  - Even if has `interactionDependencies`, prioritize aggregation over StateMachine
+- Use `Custom` computation to aggregate from related records reactively
 
 ### Deletion Patterns
 
@@ -291,19 +370,23 @@ Examples:
 ## Validation
 
 Before finalizing, verify:
-1. Every entity with `lifecycle.creation.type: "integration-event"` has `computationDecision: "None"` or no computation
-2. Every entity with `interactionDependencies` has appropriate computation:
+1. **🔴 CRITICAL**: NO property has `computationDecision: "Transform"` - Transform is ONLY for Entity/Relation
+2. Every entity with `isIntegrationEvent: true` has `computationDecision: "None"` or no computation
+3. Every entity with `isAPICallEntity: true` has `computationDecision: "Transform"`
+4. Every entity with `interactionDependencies` has appropriate computation:
    - If `canBeDeleted: true` with `hard-delete` → Must use Transform + HardDeletionProperty with StateMachine
    - If `canBeDeleted: false` → Can use Transform (unless `created-with-parent` or `integration-event`)
-3. Entities/relations with `lifecycle.creation.type: "created-with-parent/entity"` use `_parent:[ParentName]`
-4. Properties with `controlType: "creation-only"` or `"derived-with-parent"` have computation `_owner`
-5. Properties with `controlType: "independent"` are analyzed for appropriate computation
-6. Properties with modifying `interactionDependencies` use StateMachine (if `controlType: "independent"`)
-7. Properties with only `dataDependencies` use data-based computation (if `controlType: "independent"`)
-8. All entities or relations with `canBeDeleted:true` and `hard-delete` use Transform + HardDeletionProperty
-9. All dependencies are properly formatted with specific properties
-10. `InteractionEventEntity` is included when interactions are dependencies
-11. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`
+5. Entities/relations with `lifecycle.creation.type: "created-with-parent/entity"` use `_parent:[ParentName]`
+6. Properties with `controlType: "creation-only"` or `"derived-with-parent"` have computation `_owner`
+7. Properties with `controlType: "integration-result"` use `StateMachine` to observe API Call entities
+8. Properties with `controlType: "independent"` are analyzed for appropriate computation
+9. Properties with modifying `interactionDependencies` use StateMachine (if `controlType: "independent"`)
+10. Properties that depend on Integration Events use StateMachine with event triggers (NOT Transform)
+11. Properties with only `dataDependencies` use data-based computation (if `controlType: "independent"`)
+12. All entities or relations with `canBeDeleted:true` and `hard-delete` use Transform + HardDeletionProperty
+13. All dependencies are properly formatted with specific properties
+14. `InteractionEventEntity` is included when interactions are dependencies
+15. The parent name in `_parent:[ParentName]` matches `lifecycle.creation.parent`
 
 
 ## Implementation Checklist
@@ -311,6 +394,7 @@ Before finalizing, verify:
 - [ ] Read module name from `.currentmodule` file in project root
 - [ ] Parse `requirements/{module}.data-design.json` completely
 - [ ] Check for entities with `isIntegrationEvent: true` and set computation to "None"
+- [ ] Check for entities with `isAPICallEntity: true` and set computation to "Transform"
 - [ ] Apply mapping rules for every entity (check deletion capability)
 - [ ] Check `controlType` for every property first
 - [ ] Apply mapping rules for properties based on `controlType`
