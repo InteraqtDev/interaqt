@@ -231,7 +231,40 @@ npm run generate-frontend-api
    }
    ```
 
-2. **Reference Existing Components for Patterns:**
+2. **Query Interactions Always Return Arrays:**
+   - Backend query-type interactions always return arrays in `response.data`
+   - To query a specific entity/relation, use the `match` field in the query options (2nd parameter)
+   - Do NOT put match criteria in the payload (1st parameter)
+   
+   ```typescript
+   // ✅ Correct: Use match in query options
+   const response = await apiClient.ViewVideoGenerationStatus(
+     { videoGenerationRequestId: videoId },  // payload
+     {
+       attributeQuery: ['id', 'status', 'videoUrl'],
+       match: {
+         key: 'id',
+         value: ['=', videoId]  // Match condition here
+       }
+     }
+   );
+   const item = response.data[0];  // Extract first item from array
+   
+   // ❌ Wrong: Don't rely on payload for filtering
+   const response = await apiClient.ViewVideoGenerationStatus(
+     { videoGenerationRequestId: videoId }  // This won't filter results
+   );
+   ```
+
+3. **Handling Asynchronous External System Tasks:**
+   - For asynchronous tasks that call external systems, backend typically does NOT implement polling unless explicitly specified in requirements
+   - Backend usually provides a separate API endpoint to trigger status updates
+   - Frontend can call this API to trigger backend status updates
+   - Frontend implementation options:
+     - **Manual trigger**: Add a button in the component for users to manually trigger the status update API
+     - **Automatic polling**: Implement polling in the component (on mount) until the task reaches a completion state
+
+4. **Reference Existing Components for Patterns:**
    - Look at `frontend/src/components/*.tsx` files
    - Follow the same patterns for API client usage
    - Check how error handling is implemented

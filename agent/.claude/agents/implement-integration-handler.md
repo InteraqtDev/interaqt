@@ -45,6 +45,27 @@ This applies to BOTH async APIs (with task IDs) and sync APIs (immediate results
 - All integration documentation files MUST be prefixed with current module name from `.currentmodule`
 - Format: `docs/{module}.{integration-name}.integration-design.md`
 
+**🔴 CRITICAL PRINCIPLE: Status Polling Strategy**
+
+**Default Approach: Frontend Polling with Manual Query API**
+
+Backend polling consumes significant server resources. Follow this priority order:
+
+1. **Default (ALWAYS implement)**: Provide manual query API for frontend
+   - Create API endpoint to query external status
+   - Frontend can poll this API at its own pace
+   - Even if polling is needed, frontend handles it unless explicitly stated otherwise
+
+2. **Backend Polling (ONLY if explicitly required)**: Implement server-side polling
+   - ONLY implement if user explicitly requests "backend polling" in requirements
+   - Use with caution due to resource consumption
+   - Example: volcjmeng integration (only because explicitly required)
+
+3. **Webhook (ONLY if both conditions met)**: Implement webhook endpoint
+   - ONLY if external service supports webhook registration
+   - AND user can register webhook themselves
+   - Requires exposing public endpoint for external callbacks
+
 # Core Concepts
 
 ## Interaqt Framework

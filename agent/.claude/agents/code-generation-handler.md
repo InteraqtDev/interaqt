@@ -162,27 +162,41 @@ git commit -m "feat: Task 3.1.2 - Complete entity and relation implementation"
 - [ ] Ensure all payloads match the documented fields
 - [ ] **🔴 CRITICAL: For query interactions (action: GetAction):**
   - **MUST declare `data` field** - specify the Entity or Relation to query
-  - **SHOULD declare `query` field** if there are predefined filters/fields (use Query.create with QueryItem)
-  - Example:
+  - **SHOULD declare `dataPolicy` field** if there are predefined filters/fields or access restrictions
+  - **⚠️ IMPORTANT: Data Access Scope vs Business Rules**
+    - If `dataConstraints` express **data access scope restrictions** (e.g., "can only view own entities", "can only view specific fields"), use `dataPolicy` NOT `condition`
+    - `dataPolicy` controls what data can be accessed AFTER the operation is permitted
+    - `condition` controls WHETHER the operation can execute (permissions/business rules)
+    - Example of data policy: Restricting visible fields, filtering by ownership
+  - Example with dynamic data policy (user-based filtering):
+    ```typescript
+    const ViewMyOrders = Interaction.create({
+      name: 'ViewMyOrders',
+      action: GetAction,
+      data: Order,
+      dataPolicy: DataPolicy.create({
+        match: function(this: Controller, event: any) {
+          // Only show user's own orders
+          return MatchExp.atom({key: 'owner.id', value:['=', event.user.id]})
+        }
+      })
+    })
+    ```
+  - Example with combined data policy (filtering + field restrictions + pagination):
     ```typescript
     const ViewMyFollowers = Interaction.create({
-      name: 'ViewUsers',
+      name: 'ViewMyFollowers',
       action: GetAction,
       data: User,  // REQUIRED: specify what to query
-      query: Query.create({  // OPTIONAL: predefined query config
-        items: [
-          QueryItem.create({
-            name: 'attributeQuery',
-            value: ['id', 'name', 'email']
-          }),
-          // Use function-based value to add conditional restrictions based on current context user
-          QueryItem.create({
-            name: 'match',
-            value: function(this:Controller, event:any) {
-              return MatchExp.atom({key: 'follow.id', value:['=', event.user.id]})
-            }
-          })
-        ]
+      dataPolicy: DataPolicy.create({
+        // Dynamic filter: only users who follow the current user
+        match: function(this: Controller, event: any) {
+          return MatchExp.atom({key: 'following.id', value:['=', event.user.id]})
+        },
+        // Field restrictions: only expose specific fields
+        attributeQuery: ['id', 'name', 'email'],
+        // Default pagination
+        modifier: { limit: 20, orderBy: { name: 'asc' } }
       })
     })
     ```

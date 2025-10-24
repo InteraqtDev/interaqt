@@ -1015,6 +1015,23 @@ const GetUserDonations = Interaction.create({
     ]
   })
 })
+
+// Query interaction with dataPolicy for access control
+const GetMyDonations = Interaction.create({
+  name: 'GetMyDonations',
+  action: GetAction,
+  data: Donation,  // ✅ Entity reference
+  dataPolicy: DataPolicy.create({
+    // ✅ Dynamic filter: users can only see their own donations
+    match: function(this: Controller, event: any) {
+      return MatchExp.atom({key: 'donor.id', value: ['=', event.user.id]})
+    },
+    // ✅ Field restrictions: limit exposed fields
+    attributeQuery: ['id', 'amount', 'createdAt', 'status'],
+    // ✅ Default pagination
+    modifier: { limit: 20, orderBy: { createdAt: 'desc' } }
+  })
+})
 ```
 
 ### Pattern 5: Test Error Checking

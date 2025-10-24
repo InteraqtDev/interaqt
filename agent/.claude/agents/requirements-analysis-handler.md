@@ -1280,6 +1280,22 @@ git commit -m "feat: Task 1.4 - Complete data concept extraction"
 - Interaction IDs must be semantic names (e.g., "BorrowBook", "ViewAvailableBooks") not codes (e.g., "I001")
 - ❌ If a requirement has role="System", it was incorrectly created - SKIP it, do NOT create interaction
 
+**⚠️ IMPORTANT: Distinguishing Data Access Constraints**
+
+For read-type interaction requirements with access restrictions, distinguish between:
+
+1. **Business Rules** - Constraints on whether the read operation can execute
+   - Example: "Only administrators can view XXX entity"
+   - Controls who can perform the action
+   - Should be specified in the `conditions` field
+
+2. **Data Policy** - Constraints on the scope of data returned
+   - Example: "Can only view own XXX entities" or "Can only view YYY fields of XXX entity"
+   - Controls what data is accessible after the operation is permitted
+   - Should be specified in the `dataConstraints` field
+
+These must be separated as they are implemented differently in subsequent phases.
+
 **⚠️ IMPORTANT: External Integration Interactions**
 
 If Task 1.4 includes API Call entities, design error handling interactions:
