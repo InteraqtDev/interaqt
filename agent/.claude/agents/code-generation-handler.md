@@ -14,11 +14,23 @@ You are a honest software expert with the following capabilities:
 
 # Task 3: Code Generation and Progressive Testing
 
-**📖 START: Read `docs/STATUS.json` to check current progress before proceeding.**
+**📖 START: Determine current module and check progress before proceeding.**
 
-**🔄 Update `docs/STATUS.json`:**
+**🔴 STEP 0: Determine Current Module**
+1. Read module name from `.currentmodule` file in project root
+2. If file doesn't exist, STOP and ask user which module to work on
+3. Use this module name for all subsequent file operations
+
+**🔴 CRITICAL: Module-Based File Naming**
+- All output files MUST be prefixed with current module name from `.currentmodule`
+- Format: `{module}.{filename}` (e.g., if module is "user", output `docs/user.computation-implementation-plan.json`)
+- All input file references MUST also use module prefix when reading previous outputs
+- Module status file location: `docs/{module}.status.json`
+
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3",
   "completed": false
 }
@@ -37,56 +49,42 @@ This approach prevents the accumulation of errors and makes debugging much easie
 
 ## Task 3.1: Code Generation and Implementation
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1",
   "completed": false
 }
 ```
-- Clear next steps
 
 **Based on the analysis documents created in Tasks 2.1-2.3, now implement the actual code.**
 
-### Task 3.1.1: 🔴 CRITICAL: Read Complete API Reference First
+### Task 3.1.1: 🔴 CRITICAL: Setup and API Reference
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.1",
   "completed": false
 }
 ```
-**Before generating ANY code, you MUST thoroughly read `./agentspace/knowledge/generator/api-reference.md`**
 
-This document contains:
-- Complete and accurate API syntax and parameters
-- Common mistakes and correct usage patterns
-- Type definitions and constraints
-- Real working examples
+#### Step 1: Read API Reference
+**Read `./agentspace/knowledge/generator/api-reference.md`** for correct syntax and common mistakes.
 
-**Important Guidelines:**
-- ✅ Always refer to the API reference for correct syntax
-- ✅ When tests fail, FIRST check the API reference for correct usage
-- ✅ Follow the exact parameter names and types shown in the API reference
-- ❌ Do NOT rely on memory or assumptions about API usage
-- ❌ Do NOT guess parameter names or syntax
+#### Step 2: Create Module File
+- [ ] Copy `backend/business.template.ts` to `backend/{module}.ts` (replace `{module}` with actual name from `.currentmodule`)
 
-Common issues that can be avoided by reading the API reference:
-- Missing required parameters (e.g., `attributeQuery` in storage operations)
-- Wrong property usage (e.g., `symmetric` doesn't exist in Relation.create)
-- Incorrect computation placement (e.g., Transform cannot be used in Property computation)
-- Hardcoded relation names (always use `RelationInstance.name` when querying relations)
+#### Step 3: Register in backend/index.ts
+- [ ] Add import: `import {entities as {module}Entities, relations as {module}Relations, interactions as {module}Interactions, activities as {module}Activities, dicts as {module}Dicts} from './{module}'`
+- [ ] Update exports to merge: `export const entities = [...basicEntities, ...{module}Entities]` (repeat for relations, activities, interactions, dicts)
 
-## 🔴 Recommended: Single File Approach
-**To avoid complex circular references between files, it's recommended to generate all backend code in a single file:**
-
-- ✅ Define all entities, relations, interactions, and computations in one file
-- ✅ Example structure: `backend/index.ts` containing all definitions
-
-**✅ END Task 3.1.1: Update `docs/STATUS.json`:**
+**✅ END Task 3.1.1: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.1",
   "completed": true
 }
@@ -95,21 +93,23 @@ Common issues that can be avoided by reading the API reference:
 **📝 Commit changes:**
 ```bash
 git add .
-git commit -m "feat: Task 3.1.1 - Complete API reference study"
+git commit -m "feat: Task 3.1.1 - Setup module file and register in index"
 ```
 
 ### Task 3.1.2: Entity and Relation Implementation
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.2",
   "completed": false
 }
 ```
-- Clear next steps
 
-- [ ] Generate all entities based on `docs/data-design.json`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
+**🔴 All code in Task 3.1.2-3.1.3 goes in `backend/{module}.ts`**
+
+- [ ] Generate all entities based on `docs/{module}.data-design.json`. **DO NOT define any computations yet**. No `computed` or `computation` on properties
 - [ ] Define entity properties with correct types
   - **🔴 CRITICAL: NO reference ID fields in entities!**
     - ❌ NEVER: `userId`, `postId`, `requestId`, `dormitoryId` as properties
@@ -122,13 +122,19 @@ git commit -m "feat: Task 3.1.1 - Complete API reference study"
   - Relations define how entities connect
   - Relations create the property names for accessing related entities
 - [ ] Define relation properties
+- [ ] Update exports in `backend/{module}.ts`:
+  ```typescript
+  export const entities = [Entity1, Entity2, ...]
+  export const relations = [Relation1, Relation2, ...]
+  ```
 - [ ] **Type Check**: Run `npm run check` to ensure TypeScript compilation passes
   - Fix any type errors before proceeding
   - Do NOT continue until all type errors are resolved
 
-**✅ END Task 3.1.2: Update `docs/STATUS.json`:**
+**✅ END Task 3.1.2: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.2",
   "completed": true
 }
@@ -142,26 +148,56 @@ git commit -m "feat: Task 3.1.2 - Complete entity and relation implementation"
 
 ### Task 3.1.3: Interaction Implementation
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.3",
   "completed": false
 }
 ```
-- Clear next step
 
-
-- [ ] Generate all interactions based on `requirements/interaction-designs.json`. **DO NOT define any conditions yet** - we will add permissions and business rules later in Task 3.2. No `condition` parameter in Interaction.create()
+- [ ] Generate all interactions based on `requirements/{module}.interactions-design.json`. **DO NOT define any conditions yet** - we will add permissions and business rules later in Task 3.2. No `condition` parameter in Interaction.create()
 - [ ] Start with simple payload-only interactions (no conditions initially)
 - [ ] Ensure all payloads match the documented fields
+- [ ] **🔴 CRITICAL: For query interactions (action: GetAction):**
+  - **MUST declare `data` field** - specify the Entity or Relation to query
+  - **SHOULD declare `query` field** if there are predefined filters/fields (use Query.create with QueryItem)
+  - Example:
+    ```typescript
+    const ViewMyFollowers = Interaction.create({
+      name: 'ViewUsers',
+      action: GetAction,
+      data: User,  // REQUIRED: specify what to query
+      query: Query.create({  // OPTIONAL: predefined query config
+        items: [
+          QueryItem.create({
+            name: 'attributeQuery',
+            value: ['id', 'name', 'email']
+          }),
+          // Use function-based value to add conditional restrictions based on current context user
+          QueryItem.create({
+            name: 'match',
+            value: function(this:Controller, event:any) {
+              return MatchExp.atom({key: 'follow.id', value:['=', event.user.id]})
+            }
+          })
+        ]
+      })
+    })
+    ```
+- [ ] Update exports in `backend/{module}.ts`:
+  ```typescript
+  export const interactions = [Interaction1, Interaction2, ...]
+  ```
 - [ ] **Type Check**: Run `npm run check` to ensure TypeScript compilation passes
   - Fix any type errors before proceeding
   - Do NOT continue until all type errors are resolved
 
-**✅ END Task 3.1.3: Update `docs/STATUS.json`:**
+**✅ END Task 3.1.3: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.3",
   "completed": true
 }
@@ -175,9 +211,10 @@ git commit -m "feat: Task 3.1.3 - Complete interaction implementation"
 
 ### Task 3.1.4: Progressive Computation Implementation with Testing
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4",
   "completed": false
 }
@@ -193,20 +230,115 @@ This section follows a **test-driven progressive approach** where each computati
 
 #### Task 3.1.4.1: Create Test File
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.1",
   "completed": false
 }
 ```
-- [ ] Copy contents from `tests/basic.template.test.ts` to create `tests/basic.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
+- [ ] Copy contents from `tests/business.template.test.ts` to create `tests/{module}.business.test.ts`. **DO NOT add any test cases yet** - we will add them progressively as we implement each computation
 - [ ] This will be your main test file for progressive implementation
-- [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
+- [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend/{module}.js'`
 
-**✅ END Task 3.1.4.1: Update `docs/STATUS.json`:**
+**⚠️ CRITICAL: Testing Integration-Related Logic**
+
+When testing business logic that depends on external integrations, you do NOT need to wait for real integration implementation. Instead, simulate the external system's behavior by creating the appropriate event entities:
+
+**Testing Pattern for Integration Event Entities:**
+
+1. **Use `storage.create()` to simulate external events**, NOT `callInteraction()`:
+   ```typescript
+   // ✅ CORRECT: Simulating external webhook creating an event
+   const ttsEvent = await controller.system.storage.create(
+     'VolcTTSEvent',
+     {
+       voiceUrl: 'https://example.com/voice.mp3',
+       status: 'completed',
+       timestamp: Date.now(),
+       // ... other event properties
+     }
+   )
+   ```
+   
+   ```typescript
+   // ❌ WRONG: Trying to create integration event via interaction
+   const result = await controller.callInteraction('CreateTTSEvent', {
+     user: testUser,
+     payload: { voiceUrl: 'test.mp3' }
+   })
+   // Integration events are NOT created by user interactions!
+   ```
+
+2. **Test business logic reactivity**:
+   - Create APICall entity first (via user interaction if applicable)
+   - Create integration event entity using `storage.create()`
+   - Verify that APICall entity properties update reactively
+   - Verify that business entity properties update based on APICall
+
+3. **Example test flow for Type 1 integration (api-call-with-return)**:
+   ```typescript
+   // Step 1: User creates a business entity that needs external API result
+   const greetingResult = await controller.callInteraction('CreateGreeting', {
+     user: testUser,
+     payload: { text: 'Hello world' }
+   })
+   const greeting = greetingResult.data
+   
+   // Step 2: System would create APICall entity (this might be part of CreateGreeting)
+   // Find the created APICall
+   const apiCall = await controller.system.storage.findOne(
+     'VolcTTSCall',
+     MatchExp.atom({ key: 'greeting.id', value: ['=', greeting.id] }),
+     undefined,
+     ['status']
+   )
+   expect(apiCall.status).toBe('pending')
+   
+   // Step 3: Simulate external system completing the API call
+   const event = await controller.system.storage.create(
+     'VolcTTSEvent',
+     {
+       apiCallId: apiCall.id,  // Link to the APICall
+       voiceUrl: 'https://example.com/voice.mp3',
+       status: 'completed',
+       timestamp: Date.now()
+     }
+   )
+   
+   // Step 4: Verify reactive updates
+   const updatedApiCall = await controller.system.storage.findOne(
+     'VolcTTSCall',
+     MatchExp.atom({ key: 'id', value: ['=', apiCall.id] }),
+     undefined,
+     ['status', 'responseData']
+   )
+
+   expect(updatedApiCall.status).toBe('completed')
+   expect(updatedApiCall.responseData).toContain('voice.mp3')
+   
+   // Step 5: Verify business entity property computed correctly
+   const updatedGreeting = await controller.system.storage.findOne(
+     'Greeting',
+     MatchExp.atom({ key: 'id', value: ['=', greeting.id] }),
+     undefined,
+     ['voiceUrl']
+   )
+   expect(updatedGreeting.voiceUrl).toBe('https://example.com/voice.mp3')
+   ```
+
+**Benefits of this testing approach:**
+- ✅ Tests the complete internal business logic without external dependencies
+- ✅ Verifies the reactive computation chain works correctly
+- ✅ Can be run without any integration implementation
+- ✅ Fast, reliable, and deterministic tests
+- ✅ Clearly separates internal logic from external integration concerns
+
+**✅ END Task 3.1.4.1: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.1",
   "completed": true
 }
@@ -220,9 +352,10 @@ git commit -m "feat: Task 3.1.4.1 - Create test file structure"
 
 #### Task 3.1.4.2: Create Implementation Plan
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.2",
   "completed": false
 }
@@ -231,26 +364,27 @@ git commit -m "feat: Task 3.1.4.1 - Create test file structure"
 **📋 Generate the Computation Implementation Plan:**
 
 - [ ] Run the command: `npm run plan`
-  - This command analyzes `docs/computation-analysis.json` and automatically generates the implementation plan
-  - The plan will be created at `docs/computation-implementation-plan.json`
+  - This command analyzes `docs/{module}.computation-analysis.json` and automatically generates the implementation plan
+  - The plan will be created at `docs/{module}.computation-implementation-plan.json`
   - Computations are automatically ordered by dependencies (least to most dependent)
 
 - [ ] **Verify the generated file:**
-  - Check that `docs/computation-implementation-plan.json` exists
+  - Check that `docs/{module}.computation-implementation-plan.json` exists
   - Open the file and confirm it contains:
     - Multiple phases organized by dependency complexity
     - Each computation with its decision, method, and dependencies
     - A logical progression from simple to complex computations
 
 **🔴 CRITICAL: If the command fails or the file is not generated:**
-1. Check that `docs/computation-analysis.json` exists and is valid JSON
+1. Check that `docs/{module}.computation-analysis.json` exists and is valid JSON
 2. If issues persist, stop and wait for user commands
 
-**🛑 STOP: Computation implementation plan generated. Review `docs/computation-implementation-plan.json` and wait for user instructions before proceeding to Task 3.1.4.3.**
+**🛑 STOP: Computation implementation plan generated. Review `docs/{module}.computation-implementation-plan.json` and wait for user instructions before proceeding to Task 3.1.4.3.**
 
-**✅ END Task 3.1.4.2: Update `docs/STATUS.json`:**
+**✅ END Task 3.1.4.2: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.2",
   "completed": true
 }
@@ -264,12 +398,13 @@ git commit -m "feat: Task 3.1.4.2 - Generate computation implementation plan"
 
 #### Task 3.1.4.3: Progressive Implementation Loop
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.3",
   "completed": false,
-  "completionCriteria": "All items in `docs/computation-implementation-plan.json` have `completed: true`"
+  "completionCriteria": "All items in `docs/{module}.computation-implementation-plan.json` have `completed: true`"
 }
 ```
 
@@ -277,13 +412,14 @@ git commit -m "feat: Task 3.1.4.2 - Generate computation implementation plan"
 
 This task has its own dedicated sub-agent that handles the progressive implementation of computations one by one.
 
-**🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
+**🛑 STOP GATE: DO NOT proceed to Task 3.1.4.4 until ALL computations in `docs/{module}.computation-implementation-plan.json` are marked as complete with passing tests.**
 
-** CRETICA:L use the specialized sub-agent `computation-generation-handler` until ALL computations in `docs/computation-implementation-plan.json` are marked as complete with passing tests.**
+** CRITICAL: use the specialized sub-agent `computation-generation-handler` until ALL computations in `docs/{module}.computation-implementation-plan.json` are marked as complete with passing tests.**
 
-**✅ END Task 3.1.4.3: Update `docs/STATUS.json`:**
+**✅ END Task 3.1.4.3: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.3",
   "completed": true
 }
@@ -297,22 +433,24 @@ git commit -m "feat: Task 3.1.4.3 - Complete progressive computation implementat
 
 #### Task 3.1.4.4: Completion Checklist
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1.4.4",
   "completed": false
 }
 ```
-- [ ] All computations from `docs/computation-analysis.json` are implemented
+- [ ] All computations from `docs/{module}.computation-analysis.json` are implemented
 - [ ] Each computation has at least one passing test
 - [ ] All type checks pass (`npm run check`)
-- [ ] All tests pass (`npm run test tests/basic.test.ts`)
+- [ ] All tests pass (`npm run test tests/{module}.business.test.ts`)
 
 
-**✅ END Task 3.1: Update `docs/STATUS.json`:**
+**✅ END Task 3.1: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.1",
   "completed": true
 }
@@ -326,9 +464,10 @@ git commit -m "feat: Task 3.1 - Complete code generation and implementation"
 
 ## Task 3.2: Progressive Permission and Business Rules Implementation with Testing
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2",
   "completed": false
 }
@@ -336,9 +475,10 @@ git commit -m "feat: Task 3.1 - Complete code generation and implementation"
 
 ### Task 3.2.0: Create Permission Test File
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.0",
   "completed": false
 }
@@ -346,16 +486,17 @@ git commit -m "feat: Task 3.1 - Complete code generation and implementation"
 
 **📋 Set up dedicated test file for permissions and business rules:**
 
-- [ ] Copy contents from `tests/permission.template.test.ts` to create `tests/permission.test.ts`
+- [ ] Copy contents from `tests/permission.template.test.ts` to create `tests/{module}.permission.test.ts`
   - This template is specifically designed for permission and business rule testing
   - **DO NOT add any test cases yet** - we will add them progressively as we implement each rule
 - [ ] This will be your dedicated test file for all permission and business rule tests
-- [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend'`
+- [ ] Import your backend definitions: `import { entities, relations, interactions } from '../backend/{module}'`
 - [ ] Verify the file structure includes the 'Permission and Business Rules' describe group
 
-**✅ END Task 3.2.0: Update `docs/STATUS.json`:**
+**✅ END Task 3.2.0: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.0",
   "completed": true
 }
@@ -369,9 +510,10 @@ git commit -m "feat: Task 3.2.0 - Create permission test file"
 
 ### Task 3.2.1: Create Implementation Plan
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.1",
   "completed": false
 }
@@ -379,10 +521,9 @@ git commit -m "feat: Task 3.2.0 - Create permission test file"
 
 **📋 Create the Permission and Business Rules Implementation Plan:**
 
-- [ ] Create `docs/business-rules-and-permission-control-implementation-plan.json` based on:
-  - `requirements/interactions-design.json` 
-  - `requirements/interaction-matrix.md` (permission requirements)
-  - `requirements/test-cases.md` (business rule scenarios)
+- [ ] Create `docs/{module}.business-rules-and-permission-control-implementation-plan.json` based on:
+  - `requirements/{module}.interactions-design.json` 
+  - `requirements/{module}.test-cases.md` (business rule scenarios)
 
 - [ ] **Structure the plan with progressive phases:**
   ```json
@@ -456,9 +597,10 @@ git commit -m "feat: Task 3.2.0 - Create permission test file"
   - Phase 2: Simple payload validations
   - Phase 3: Complex rules
 
-**✅ END Task 3.2.1: Update `docs/STATUS.json`:**
+**✅ END Task 3.2.1: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.1",
   "completed": true
 }
@@ -472,12 +614,13 @@ git commit -m "feat: Task 3.2.1 - Create permission and business rules implement
 
 ### Task 3.2.2: Progressive Implementation Loop
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.2",
   "completed": false,
-  "completionCriteria": "All items in `docs/business-rules-and-permission-control-implementation-plan.json` have `completed: true`"
+  "completionCriteria": "All items in `docs/{module}.business-rules-and-permission-control-implementation-plan.json` have `completed: true`"
 }
 ```
 
@@ -485,11 +628,12 @@ git commit -m "feat: Task 3.2.1 - Create permission and business rules implement
 
 This task has its own dedicated sub-agent that handles the progressive implementation of permissions and business rules one by one.
 
-**🛑 STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
+**🛑 STOP GATE: DO NOT proceed to Task 3.2.3 until ALL rules in `docs/{module}.business-rules-and-permission-control-implementation-plan.json` are marked as complete with passing tests.**
 
-**✅ END Task 3.2.2: Update `docs/STATUS.json`:**
+**✅ END Task 3.2.2: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.2",
   "completed": true
 }
@@ -503,19 +647,20 @@ git commit -m "feat: Task 3.2.2 - Complete progressive permission and business r
 
 ### Task 3.2.3: Completion Checklist
 
-**🔄 Update `docs/STATUS.json`:**
+**🔄 Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.3",
   "completed": false
 }
 ```
 
-- [ ] All permissions from `requirements/interactions-design.json` are implemented
+- [ ] All permissions from `requirements/{module}.interactions-design.json` are implemented
 - [ ] All business rules from requirements are implemented
 - [ ] Each rule has comprehensive test coverage (success and failure cases)
 - [ ] All type checks pass (`npm run check`)
-- [ ] All permission tests pass (`npm run test tests/permission.test.ts`)
+- [ ] All permission tests pass (`npm run test tests/{module}.permission.test.ts`)
 - [ ] Error scenarios are properly documented
 
 **Note on Error Messages:**
@@ -528,9 +673,10 @@ Since permissions and business rules are unified in the `conditions` API, the fr
   - Test both permission failures and business rule violations separately
   - Consider logging more detailed information within the condition's content function for debugging
 
-**✅ END Task 3.2.3: Update `docs/STATUS.json`:**
+**✅ END Task 3.2.3: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2.3",
   "completed": true
 }
@@ -542,17 +688,18 @@ git add .
 git commit -m "feat: Task 3.2.3 - Complete permission and business rules checklist"
 ```
 
-**✅ END Task 3.2: Update `docs/STATUS.json`:**
+**✅ END Task 3.2: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3.2",
   "completed": true,
   "completedItems": [
     "Permission test file created from template",
     "All permissions implemented with tests in permission.test.ts",
     "All business rules implemented with tests in permission.test.ts",
-    "business-rules-and-permission-control-implementation-plan.json completed",
-    "Both test suites passing (basic.test.ts and permission.test.ts)"
+    "{module}.business-rules-and-permission-control-implementation-plan.json completed",
+    "Both test suites passing (business.test.ts and permission.test.ts)"
   ]
 }
 ```
@@ -564,9 +711,10 @@ git commit -m "feat: Task 3.2 - Complete permission and business rules implement
 ```
 
 
-**✅ END Task 3: Update `docs/STATUS.json`:**
+**✅ END Task 3: Update `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "Task 3",
   "completed": true,
   "completedItems": [
@@ -584,9 +732,10 @@ git add .
 git commit -m "feat: Task 3 - Complete code generation and progressive testing"
 ```
 
-**✅ PROJECT COMPLETE: Final update to `docs/STATUS.json`:**
+**✅ PROJECT COMPLETE: Final update to `docs/{module}.status.json` (keep existing `module` field unchanged):**
 ```json
 {
+  "module": "<keep existing value>",
   "currentTask": "COMPLETE",
   "completed": true,
   "completedItems": [

@@ -9,9 +9,21 @@ color: red
 
 ## START: Select Next Uncompleted Item
 
+**📖 FIRST: Determine current module and confirm context.**
+
+**🔴 STEP 0: Determine Current Module**
+1. Read module name from `.currentmodule` file in project root
+2. If file doesn't exist, STOP and ask user which module to work on
+3. Use this module name for all subsequent file operations
+4. Module status file location: `docs/{module}.status.json`
+
 **📖 MUST READ FIRST:**
 - `./agentspace/knowledge/generator/permission-implementation.md`
 - `./agentspace/knowledge/generator/permission-test-implementation.md`
+
+**🔴 CRITICAL: Module-Based File Naming**
+- Read module name from `.currentmodule` and use it as file prefix
+- All file references must use `{module}.` prefix format
 
 **🔴 IMPORTANT: Required Imports**
 When implementing conditions, ensure you import the necessary classes:
@@ -25,15 +37,15 @@ import {
 ```
 
 1. **Select Rule to Implement**
-  - [ ] Read `docs/business-rules-and-permission-control-implementation-plan.json`
+  - [ ] Read `docs/{module}.business-rules-and-permission-control-implementation-plan.json`
   - [ ] Select the **FIRST** item with `"completed": false`
   - [ ] **🔴 CRITICAL: Implement ONLY ONE rule at a time - do not select multiple items**
   - [ ] Note the rule ID and description for implementation
 
 2. **Implement the Rule**
   - **📖 MANDATORY FIRST STEP: Completely read `./agentspace/knowledge/generator/api-reference.md` to understand all API usage before writing any code**
-  - **📖 MANDATORY SECOND STEP: Completely read `./backend/index.ts` to understand all existing implementations from previous tasks**
-  - [ ] **Use assignment pattern (`Interaction.conditions = ...`)** to add conditions at the end of `./backend/index.ts` file
+  - **📖 MANDATORY SECOND STEP: Completely read `./backend/{module}.ts` to understand all existing implementations from previous tasks**
+  - [ ] **Use assignment pattern (`Interaction.conditions = ...`)** to add conditions at the end of `./backend/{module}.ts` file
   - [ ] Use Condition.create() for creating conditions
   - [ ] For complex logic, combine multiple conditions using BoolExp
   - [ ] **Example implementation pattern:**
@@ -143,7 +155,7 @@ import {
   - [ ] Do NOT write tests until type checking passes
 
 4. **Write Focused Test Cases**
-  - [ ] Add test cases in `tests/permission.test.ts` under the 'Permission and Business Rules' describe group
+  - [ ] Add test cases in `tests/{module}.permission.test.ts` under the 'Permission and Business Rules' describe group
   - [ ] Test EVERY scenario listed in the implementation plan
   - [ ] Test both success and failure cases
   - [ ] **🔴 CRITICAL: Always explicitly check `result.error` after `controller.callInteraction`:**
@@ -158,14 +170,13 @@ import {
    
 6. **Run Test**
   - First run type check: `npm run check` to ensure test code has no type errors
-  - Run full test suite: `npm run test tests/permission.test.ts`
+  - Run full test suite: `npm run test tests/{module}.permission.test.ts`
   - Must fix any failures (new tests or regressions) before proceeding
   
   **If test fails:**
   - Review permission condition logic - is the business rule correctly implemented?
   - Verify user roles and permissions are properly set up in test data
   - Check interaction payload matches expected structure
-  - Verify against `requirements/interaction-matrix.md` for correct permission requirements
   - Common issues: incorrect role checks, wrong condition logic
   
   **🔴 CRITICAL: Never cheat to pass tests:**
@@ -175,18 +186,18 @@ import {
   
   **Error handling:**
   - After 10 fix attempts, STOP IMMEDIATELY and wait for user guidance
-  - Create error document in `docs/errors/` with descriptive filename (e.g., `permission-admin-error.md`)
-  - Update `lastError` field in business-rules-and-permission-control-implementation-plan.json with error doc path
+  - Create error document in `docs/errors/{module}.{error-name}.md` with descriptive filename
+  - Update `lastError` field in `docs/{module}.business-rules-and-permission-control-implementation-plan.json` with error doc path
   - Never skip tests or fake data to pass
 
 7. **Document Progress**
-  - **🔴 CRITICAL: Update `docs/business-rules-and-permission-control-implementation-plan.json` based on test results:**
-    - **If ALL tests pass** (`npm run test tests/permission.test.ts` shows ALL tests passing):
+  - **🔴 CRITICAL: Update `docs/{module}.business-rules-and-permission-control-implementation-plan.json` based on test results:**
+    - **If ALL tests pass** (`npm run test tests/{module}.permission.test.ts` shows ALL tests passing):
       - Set `"completed": true`
       - Remove `lastError` field if it exists
     - **If ANY test fails** (including regression tests):
       - Keep `"completed": false` - the item is NOT done
-      - Add/update `lastError` field with path to error document in `docs/errors/`
+      - Add/update `lastError` field with path to error document in `docs/errors/{module}.{error-name}.md`
       - The item remains incomplete and needs fixing
 
 8. **Commit Changes (only if tests pass)**

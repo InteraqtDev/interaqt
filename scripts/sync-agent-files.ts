@@ -16,6 +16,7 @@ const __dirname = path.dirname(__filename);
 
 // Define the files and directories to sync
 const SYNC_ITEMS = [
+  '.claude',
   'agentspace',
   'CLAUDE.md'
 ];
@@ -26,6 +27,26 @@ async function pathExists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function removeDirectory(dir: string) {
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await removeDirectory(fullPath);
+      } else {
+        await fs.unlink(fullPath);
+      }
+    }
+    
+    await fs.rmdir(dir);
+  } catch (error) {
+    console.error(`Error removing directory ${dir}:`, error);
+    throw error;
   }
 }
 
@@ -43,7 +64,7 @@ async function copyDirectory(src: string, dest: string) {
       await copyDirectory(srcPath, destPath);
     } else if (entry.isFile()) {
       await fs.copyFile(srcPath, destPath);
-      console.log(`  Copied: ${srcPath} -> ${destPath}`);
+      console.log(`  ✓ ${entry.name}`);
     }
   }
 }
@@ -59,10 +80,7 @@ async function syncAgentFiles(projectName: string) {
     process.exit(1);
   }
 
-  console.log(`🔄 Syncing agent files from examples/${projectName} to agent/`);
-  console.log(`  Source: ${exampleDir}`);
-  console.log(`  Destination: ${agentDir}`);
-  console.log('');
+  console.log(`🔄 Syncing agent files from examples/${projectName} to agent/\n`);
 
   let syncedCount = 0;
 
@@ -75,29 +93,34 @@ async function syncAgentFiles(projectName: string) {
       
       if (stat.isDirectory()) {
         console.log(`📁 Syncing directory: ${item}`);
+        
         // Backup existing directory if it exists
         if (await pathExists(destPath)) {
           const backupPath = `${destPath}.backup.${Date.now()}`;
           await fs.rename(destPath, backupPath);
-          console.log(`  Backed up existing directory to: ${backupPath}`);
+          console.log(`  📦 Backed up to: ${path.basename(backupPath)}`);
         }
+        
         await copyDirectory(srcPath, destPath);
         syncedCount++;
+        console.log('');
       } else if (stat.isFile()) {
         console.log(`📄 Syncing file: ${item}`);
+        
         // Backup existing file if it exists
         if (await pathExists(destPath)) {
           const backupPath = `${destPath}.backup.${Date.now()}`;
           await fs.copyFile(destPath, backupPath);
-          console.log(`  Backed up existing file to: ${backupPath}`);
+          console.log(`  📦 Backed up to: ${path.basename(backupPath)}`);
         }
+        
         await fs.copyFile(srcPath, destPath);
-        console.log(`  Copied: ${srcPath} -> ${destPath}`);
+        console.log(`  ✓ Copied`);
         syncedCount++;
+        console.log('');
       }
-      console.log('');
     } else {
-      console.log(`⚠️  Skipping ${item} - not found in examples/${projectName}`);
+      console.log(`⚠️  Skipping ${item} - not found in examples/${projectName}\n`);
     }
   }
 
