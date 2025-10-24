@@ -2240,7 +2240,7 @@ Interaction.create(config: InteractionConfig): InteractionInstance
 - `config.conditions` (Condition|Conditions, optional): Execution conditions
 - `config.sideEffects` (SideEffect[], optional): Side effect handlers
 - `config.data` (Entity|Relation, optional): Associated data entity
-- `config.query` (Query, optional): Query definition for data fetching
+- `config.dataPolicy` (DataPolicy, optional): Data access policy for data fetching interactions
 
 **Examples**
 
@@ -2280,37 +2280,33 @@ const GetAllUsers = Interaction.create({
     data: User          // Entity to query
 })
 
-// Get filtered data with query configuration
+// Get filtered data with dataPolicy configuration
 const GetActiveUsers = Interaction.create({
     name: 'getActiveUsers',
     action: GetAction,
     data: User,
-    query: Query.create({
-        items: [
-            QueryItem.create({
-                name: 'attributeQuery',
-                value: ['id', 'name', 'email', 'status']  // Fields to retrieve
-            })
-        ]
+    dataPolicy: DataPolicy.create({
+        attributeQuery: ['id', 'name', 'email', 'status']  // Fields to retrieve
     })
 })
 
-// Get data with complex conditions
+// Get data with dynamic access control using dataPolicy
 const GetUserPosts = Interaction.create({
     name: 'getUserPosts',
     action: GetAction,
     data: Post,
-    conditions: Condition.create({
-        name: 'canViewPosts',
-        content: async function(this: Controller, event) {
-            // Check if user can view posts based on query
-            const targetUserId = event.query?.match?.key === 'author.id' 
-                ? event.query.match.value[1] 
-                : null;
-            
-            // Allow users to see their own posts or public posts
-            return targetUserId === event.user.id || event.user.role === 'admin';
-        }
+    dataPolicy: DataPolicy.create({
+        match: function(this: Controller, event: any) {
+            // Users can only see their own posts unless they are admin
+            if (event.user.role === 'admin') {
+                return null  // Admin can see all posts
+            }
+            return MatchExp.atom({ 
+                key: 'author.id', 
+                value: ['=', event.user.id] 
+            })
+        },
+        attributeQuery: ['id', 'title', 'content', 'author', 'createdAt']
     })
 })
 
@@ -2319,17 +2315,9 @@ const GetPostsPaginated = Interaction.create({
     name: 'getPostsPaginated',
     action: GetAction,
     data: Post,
-    query: Query.create({
-        items: [
-            QueryItem.create({
-                name: 'attributeQuery',
-                value: ['id', 'title', 'content', 'createdAt', 'author']
-            }),
-            QueryItem.create({
-                name: 'modifier',
-                value: { limit: 10, offset: 0 }  // Pagination
-            })
-        ]
+    dataPolicy: DataPolicy.create({
+        attributeQuery: ['id', 'title', 'content', 'createdAt', 'author'],
+        modifier: { limit: 10, offset: 0 }  // Pagination
     })
 })
 ```
@@ -2379,10 +2367,15 @@ const paginatedResult = await controller.callInteraction('getPostsPaginated', {
 
 1. **Required**: Must use `GetAction` as the action
 2. **Required**: Must specify `data` field with the Entity or Relation to query
-3. **Optional**: Use `query` in Interaction definition for fixed query configuration
-4. **Runtime Query**: Pass `query` object in `callInteraction` to dynamically filter data
+3. **Optional**: Use `dataPolicy` in Interaction definition to set fixed data access policies (match constraints, field restrictions, default sorting/pagination)
+4. **Runtime Query**: Pass `query` object in `callInteraction` to dynamically filter data at runtime (user-provided filters)
 5. **Conditions**: Can use conditions to control access based on query parameters
 6. **Response**: Retrieved data is returned in `result.data` field
+
+**About dataPolicy vs runtime query:**
+- `dataPolicy` defines **fixed constraints** set by developers (e.g., "users can only see published posts", "limit to 10 items max")
+- Runtime `query` is **user-provided filters** passed at call time (e.g., "show me posts from last week")
+- The framework combines both: fixed dataPolicy constraints AND user runtime query filters
 
 ### Action.create()
 
@@ -2464,6 +2457,141 @@ const UserPostRelation = Relation.create({
   })
 });
 ```
+
+### DataPolicy.create()
+
+Create data access policy for data fetching interactions. DataPolicy defines fixed constraints that developers set to control what data users can access and how it's retrieved.
+
+**Syntax**
+```typescript
+DataPolicy.create(config: DataPolicyConfig): DataPolicyInstance
+```
+
+**Parameters**
+- `config.match` (MatchExpression | Function, optional): Fixed match constraints that limit which records can be retrieved
+  - Can be a static `MatchExp` for fixed filters
+  - Can be a function `(event) => MatchExp | MatchAtom | null` for dynamic filters based on user context
+  - Returning `null` means no fixed constraint (allow all records)
+- `config.modifier` (ModifierData, optional): Default sorting and pagination settings
+  - `limit`: Maximum number of records to return
+  - `offset`: Number of records to skip
+  - `orderBy`: Sorting configuration `{ field: 'asc' | 'desc' }`
+- `config.attributeQuery` (AttributeQueryData, optional): Fields that are allowed to be retrieved
+  - Restricts which fields users can query
+  - Can be used for security (hide sensitive fields) or performance (limit data transfer)
+
+**Examples**
+
+```typescript
+// Basic field restriction
+const GetUsers = Interaction.create({
+    name: 'getUsers',
+    action: GetAction,
+    data: User,
+    dataPolicy: DataPolicy.create({
+        attributeQuery: ['id', 'name', 'email']  // Don't allow password field
+    })
+})
+
+// Fixed filter - only published posts
+const GetPublishedPosts = Interaction.create({
+    name: 'getPublishedPosts',
+    action: GetAction,
+    data: Post,
+    dataPolicy: DataPolicy.create({
+        match: MatchExp.atom({ key: 'status', value: ['=', 'published'] })
+    })
+})
+
+// Combined constraints
+const GetTopArticles = Interaction.create({
+    name: 'getTopArticles',
+    action: GetAction,
+    data: Article,
+    dataPolicy: DataPolicy.create({
+        match: MatchExp.atom({ key: 'status', value: ['=', 'published'] }),
+        modifier: { limit: 10, orderBy: { views: 'desc' } },
+        attributeQuery: ['id', 'title', 'author', 'views', 'createdAt']
+    })
+})
+
+// Dynamic filter based on user context
+const GetMyPosts = Interaction.create({
+    name: 'getMyPosts',
+    action: GetAction,
+    data: Post,
+    dataPolicy: DataPolicy.create({
+        match: function(this: Controller, event: any) {
+            // Non-admin users can only see their own posts
+            if (event.user.role === 'admin') {
+                return null  // Admin can see all
+            }
+            return MatchExp.atom({ 
+                key: 'author.id', 
+                value: ['=', event.user.id] 
+            })
+        },
+        attributeQuery: ['id', 'title', 'content', 'status', 'createdAt']
+    })
+})
+
+// Async dynamic filter
+const GetDepartmentDocuments = Interaction.create({
+    name: 'getDepartmentDocuments',
+    action: GetAction,
+    data: Document,
+    dataPolicy: DataPolicy.create({
+        match: async function(this: Controller, event: any) {
+            // Fetch user's department from database
+            const user = await this.system.storage.findOne('User',
+                MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+                undefined,
+                ['id', 'department']
+            )
+            return MatchExp.atom({ 
+                key: 'department', 
+                value: ['=', user?.department || 'general'] 
+            })
+        }
+    })
+})
+```
+
+**How dataPolicy Works with Runtime Query**
+
+When users call the interaction, they can provide additional filters via the `query` parameter:
+
+```typescript
+// Developer defines dataPolicy
+const GetProducts = Interaction.create({
+    name: 'getProducts',
+    action: GetAction,
+    data: Product,
+    dataPolicy: DataPolicy.create({
+        match: MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
+        modifier: { limit: 50 },  // Max 50 items
+        attributeQuery: ['id', 'name', 'price', 'category']
+    })
+})
+
+// User calls with additional filters
+const result = await controller.callInteraction('getProducts', {
+    user: { id: 'user123' },
+    query: {
+        match: MatchExp.atom({ key: 'category', value: ['=', 'electronics'] }),
+        modifier: { limit: 10 },  // Will use 10 (smaller than policy's 50)
+        attributeQuery: ['id', 'name', 'price']  // Subset of allowed fields
+    }
+})
+// Result: products that are BOTH active (from dataPolicy) AND electronics (from runtime query)
+```
+
+**Key Points**
+
+1. **dataPolicy.match** is combined with runtime `query.match` using AND logic
+2. **dataPolicy.modifier** provides defaults that can be overridden by runtime query (but can enforce max limits)
+3. **dataPolicy.attributeQuery** restricts which fields can be retrieved (security layer)
+4. **Function-based match** allows dynamic constraints based on user context (roles, permissions, etc.)
 
 ### Payload.create()
 
