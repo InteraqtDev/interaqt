@@ -35,17 +35,6 @@ describe("Bool and Attributive Classes Refactored", () => {
       expect(atom.type).toBe("custom");
     });
 
-    test("should stringify and parse bool atom", () => {
-      const original = BoolAtomData.create({
-        data: { value: 42 }
-      });
-      
-      const stringified = BoolAtomData.stringify(original);
-      const parsed = BoolAtomData.parse(stringified);
-
-      expect(parsed.type).toBe("atom");
-      expect(parsed.data).toEqual({ value: 42 });
-    });
   });
 
   describe("BoolExpressionData", () => {

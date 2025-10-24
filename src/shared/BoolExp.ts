@@ -1,6 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute, indexBy } from './utils.js';
-import { parse as parseStr } from 'acorn';
+import { stringifyAttribute } from './utils.js';
 
 // BoolAtomData
 export interface BoolAtomDataInstance extends IInstance {
@@ -59,20 +58,6 @@ export class BoolAtomData implements BoolAtomDataInstance {
     return instance;
   }
   
-  static stringify(instance: BoolAtomDataInstance): string {
-    const args: BoolAtomDataCreateArgs = {
-      type: instance.type,
-      data: stringifyAttribute(instance.data) as { content?: Function; [key: string]: unknown }
-    };
-    
-    const data: SerializedData<BoolAtomDataCreateArgs> = {
-      type: 'BoolAtomData',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
-  }
   
   static clone(instance: BoolAtomDataInstance, deep: boolean): BoolAtomDataInstance {
     const args: BoolAtomDataCreateArgs = {
@@ -91,10 +76,6 @@ export class BoolAtomData implements BoolAtomDataInstance {
     return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
   }
   
-  static parse(json: string): BoolAtomDataInstance {
-    const data: SerializedData<BoolAtomDataCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
-  }
 }
 
 // BoolExpressionData
@@ -253,7 +234,7 @@ export class BoolExp<T> {
       return undefined
     }
     const [first, ...rest] = atomValueWithoutUndefined
-    return rest.reduce((acc, cur) => acc.and(cur), first instanceof BoolExp ? first : BoolExp.atom(first))
+    return rest.reduce((acc, cur) => acc.and(cur), first instanceof BoolExp ? first : new BoolExp<U>(BoolExp.standardizeData<U>(first)))
   }
   
   public static or<U>(...atomValues:U[]) {
@@ -299,7 +280,7 @@ export class BoolExp<T> {
     return this.raw as AtomData<T>
   }
   
-  static fromValue<T>(value: ExpressionData<T>) {
+  static fromValue<T>(value: ExpressionData<T> | BoolExp<T>) {
     if (value instanceof BoolExp) {
       return value
     }
@@ -316,18 +297,22 @@ export class BoolExp<T> {
   isExpression() {
     return this.raw.type === 'expression'
   }
+
+  static standardizeData<T>(atomValueOrExp: unknown) :ExpressionData<T> {
+    return atomValueOrExp instanceof BoolExp ?
+    atomValueOrExp.raw :
+    (atomValueOrExp && typeof atomValueOrExp === 'object' && 
+     (atomValueOrExp as any).type === 'atom' || (atomValueOrExp as any).type === 'expression') ?
+      atomValueOrExp as ExpressionData<T>:
+      { type: 'atom', data: atomValueOrExp as T}
+  }
   
   and(atomValueOrExp: unknown) {
     return new BoolExp<T>({
       type: 'expression',
       operator: 'and',
       left: this.raw,
-      right: atomValueOrExp instanceof BoolExp ?
-        atomValueOrExp.raw :
-        (atomValueOrExp && typeof atomValueOrExp === 'object' && 
-         (atomValueOrExp as any).type === 'atom' || (atomValueOrExp as any).type === 'expression') ?
-          atomValueOrExp as ExpressionData<T>:
-          { type: 'atom', data: atomValueOrExp as T}
+      right: BoolExp.standardizeData<T>(atomValueOrExp)
     })
   }
   
@@ -499,11 +484,3 @@ function astNodeToBoolExpressionNode<T>(astNode: any, optionsByName: {[k:string]
 
   throw new Error('unknown ast node type')
 }
-
-export function parse<T>(exp: string, options: unknown[] = [], parseAtomNameToObject: ParseAtomNameToObjectType = defaultParse): BoolExp<T> {
-  const optionsByName = indexBy(options as any[], 'name')
-  const ast = parseStr(exp, {ecmaVersion: 2020} as any)
-  return new BoolExp<T>(
-    astNodeToBoolExpressionNode<T>((ast.body[0] as any).expression, optionsByName, parseAtomNameToObject)
-  )
-} 

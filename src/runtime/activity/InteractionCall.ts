@@ -429,9 +429,8 @@ export class InteractionCall {
             // TODO 怎么判断 attributeQuery 是在 fixed 的q范围里面？？？？这里涉及到复合 attrubuteQuery 的深度检测问题。
             const attributeQuery = interactionEvent.query?.attributeQuery || []
             
-            const matchValue = typeof fixedMatch === 'function' ? await fixedMatch.call(this.controller, interactionEvent) : fixedMatch
-            const fixedMatchBoolExp: BoolExp<MatchAtom> | undefined = matchValue instanceof BoolExp ? matchValue : matchValue ? BoolExp.atom(matchValue) : undefined
-            const combinedMatch = BoolExp.and(fixedMatchBoolExp, interactionEvent.query?.match)
+            const matchValue : BoolExp<MatchAtom> | undefined = typeof fixedMatch === 'function' ? await fixedMatch.call(this.controller, interactionEvent) : fixedMatch
+            const combinedMatch = BoolExp.and(matchValue, interactionEvent.query?.match)
 
             data = await this.system.storage.find(recordName, combinedMatch, modifier, attributeQuery)
         } else {

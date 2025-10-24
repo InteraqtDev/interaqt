@@ -57,6 +57,7 @@
   },
   "type": "module",
   "release-it": {
+    "ci": true,
     "plugins": {
       "@release-it/conventional-changelog": {
         "preset": "conventionalcommits"
