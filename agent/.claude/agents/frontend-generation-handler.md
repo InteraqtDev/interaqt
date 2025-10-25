@@ -205,6 +205,7 @@ npm run generate-frontend-api
 - **Framework**: React + TypeScript
 - **Build Tool**: Vite
 - **Styling**: Tailwind CSS
+- **Routing**: React Router
 - **State Management**: React Context (for API client and global state)
 
 **Project Structure:**
@@ -306,6 +307,22 @@ npm run generate-frontend-api
    - Use Tailwind responsive utilities
    - Test on different screen sizes
    - Ensure mobile-friendly layouts
+
+7. **Modular Navigation:**
+   - **Module Entry Points**: Create a main navigation menu listing all modules
+   - **Route Organization**: Structure routes with module prefixes (e.g., `/donate/*`, `/livestream/*`)
+   - **Active Module Indicator**: Highlight current module in navigation menu
+   - **Breadcrumb Navigation**: Show module name → page hierarchy
+   - **Module Switching**: Enable seamless navigation between modules
+   - **Example Structure**:
+     ```typescript
+     // Main App Router
+     <Routes>
+       <Route path="/" element={<ModuleSelector />} />
+       <Route path="/donate/*" element={<DonateModule />} />
+       <Route path="/livestream/*" element={<LivestreamModule />} />
+     </Routes>
+     ```
 
 **🔴 CRITICAL: Completeness Check**
 

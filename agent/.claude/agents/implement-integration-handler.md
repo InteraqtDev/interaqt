@@ -302,6 +302,7 @@ interface IIntegration {
     setup?(controller: Controller): Promise<any>  // Setup phase with controller access
     createSideEffects(): RecordMutationSideEffect[]  // Listen to data mutations and create events
     createAPIs?(): APIs              // Expose custom APIs (e.g., webhook endpoints)
+    createMiddlewares?(): MiddlewareHandler[]  // Optional: Create HTTP middleware for request processing
 }
 ```
 
@@ -313,6 +314,63 @@ interface IIntegration {
   1. Webhook endpoints to receive external system callbacks
   2. Manual trigger/query APIs for status checks and retries
   3. Frontend support APIs (e.g., pre-signed URLs for uploads)
+- **createMiddlewares()**: Optional method to create HTTP middleware for request processing (e.g., authentication, authorization, request validation)
+
+**🔴 CRITICAL: Separation Between API Layer and Integration Layer**
+
+**API File Responsibilities** (`integrations/{name}/externalApi.ts` or `integrations/{name}/volcApi.ts`):
+- Construct HTTP requests according to external API documentation
+- Call external APIs and return raw responses
+- **NO data transformation** - return data as-is from external system
+- Define **strict TypeScript types** based on official API documentation:
+  - Input parameter types (exactly matching API requirements)
+  - Output response types (exactly matching API responses)
+- Handle only HTTP-level errors (network failures, status codes)
+
+**Integration File Responsibilities** (`integrations/{name}/index.ts`):
+- Call API file methods to interact with external system
+- **Transform external API responses** into internal event format
+- Map external data structures to business event entity fields
+- Create integration events following unified sequence
+- Handle business-level error scenarios
+
+**Example:**
+```typescript
+// ❌ WRONG: API file transforms data
+// integrations/tts/externalApi.ts
+export async function callTTSApi(params: TTSParams): Promise<{ audioUrl: string }> {
+  const response = await fetch(...)
+  const data = await response.json()
+  return { audioUrl: data.result.url }  // ❌ Transformation in API file
+}
+
+// ✅ CORRECT: API file returns raw response
+// integrations/tts/externalApi.ts
+export type TTSApiResponse = {
+  taskId: string
+  status: string
+  result?: {
+    url: string
+    duration: number
+  }
+}
+
+export async function callTTSApi(params: TTSParams): Promise<TTSApiResponse> {
+  const response = await fetch(...)
+  return await response.json()  // ✅ Raw response with strict types
+}
+
+// ✅ CORRECT: Integration file transforms data
+// integrations/tts/index.ts
+const apiResponse = await callTTSApi(requestParams)
+
+// Transform to internal event format
+await this.createIntegrationEvent(controller, apiCall.id, apiResponse.taskId, 'initialized', {
+  taskId: apiResponse.taskId,           // Map to event fields
+  status: apiResponse.status,
+  audioUrl: apiResponse.result?.url     // Extract what business needs
+}, null)
+```
 
 # Task 4: Integration Implementation
 
@@ -831,14 +889,26 @@ mkdir -p integrations/{integration-name}
 
 ### 4.4.2 Create External API Wrapper (if no SDK)
 
+**🔴 CRITICAL: API File Responsibilities**
+
+This file MUST:
+- Return raw API responses without transformation
+- Define strict TypeScript types matching official API documentation
+- Handle only HTTP-level errors
+
+This file MUST NOT:
+- Transform data to internal event format (that's integration file's job)
+- Create any integration events
+- Handle business logic
+
 Create `integrations/{integration-name}/externalApi.ts`:
 
 ```typescript
 /**
  * External API wrapper for {System Name}
  * 
- * This module encapsulates all external API calls to keep the integration
- * logic clean and testable.
+ * CRITICAL: This file returns raw API responses with strict types.
+ * NO data transformation - integration file handles that.
  */
 
 export type ExternalApiConfig = {
@@ -846,16 +916,37 @@ export type ExternalApiConfig = {
   baseUrl?: string
 }
 
+/**
+ * Request parameters - MUST match external API documentation exactly
+ */
 export type RequestParams = {
-  // Define request parameters
+  // Define according to official API docs
+  param1: string
+  param2: number
+  // ... more parameters
 }
 
+/**
+ * Response data - MUST match external API response exactly
+ */
 export type ResponseData = {
-  // Define response structure
+  // Define according to official API docs
+  taskId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  result?: {
+    // Define result structure from API docs
+    data: any
+  }
+  error?: {
+    code: string
+    message: string
+  }
 }
 
 /**
  * Call external API
+ * 
+ * Returns raw API response - NO transformation
  */
 export async function callExternalApi(
   params: RequestParams,
@@ -882,7 +973,8 @@ export async function callExternalApi(
       throw new Error(`API call failed: ${response.statusText}`)
     }
 
-    const data = await response.json()
+    // Return raw response - integration file will transform it
+    const data: ResponseData = await response.json()
     return data
   } catch (error: any) {
     console.error('[ExternalAPI] Call failed:', error.message)
@@ -892,12 +984,26 @@ export async function callExternalApi(
 
 /**
  * Query external status
+ * 
+ * Returns raw status response - NO transformation
  */
 export async function queryExternalStatus(
   taskId: string,
   config?: ExternalApiConfig
 ): Promise<ResponseData> {
-  // Similar implementation
+  // Similar implementation - return raw response
+  const apiKey = config?.apiKey
+  const baseUrl = config?.baseUrl
+  
+  const response = await fetch(`${baseUrl}/v1/status/${taskId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`
+    }
+  })
+
+  const data: ResponseData = await response.json()
+  return data  // Raw response
 }
 ```
 
@@ -912,8 +1018,9 @@ Create `integrations/{integration-name}/index.ts`:
  * Purpose: {Brief description}
  * 
  * Features:
- * - Listen to {Entity} mutations and trigger external API calls
- * - Convert external status updates to internal events
+ * - Listen to APICall entity creation and trigger external API calls
+ * - Transform external API responses to internal event format
+ * - Create integration events following unified sequence
  * - Provide manual status refresh API
  * - Factory function pattern for configuration flexibility
  */
@@ -1107,18 +1214,29 @@ export function create{IntegrationName}Integration(config: {IntegrationName}Conf
                 requestParams
               })
               
-              // Step 2: Call external API and create unified event sequence
+              // Step 2: Call external API (returns raw response with strict types)
               try {
-                const result = await callExternalApi(requestParams)
+                const apiResponse = await callExternalApi(requestParams)
+                // apiResponse has type ResponseData from API file
                 
+                // Step 3: Transform external response to internal event format
                 // Determine externalId: use API's task ID or generate one
-                const externalId = result.taskId || result.id || crypto.randomUUID()
+                const externalId = apiResponse.taskId 
                 
                 console.log('[{IntegrationName}] External API called', {
                   apiCallId: apiCall.id,
                   externalId,
-                  hasTaskId: !!(result.taskId || result.id)
+                  hasTaskId: !!(apiResponse.taskId)
                 })
+                
+                // Step 4: Transform and create 'initialized' event
+                // Map external fields to internal event format
+                const eventData = {
+                  taskId: apiResponse.taskId,
+                  status: apiResponse.status,
+                  // Map other fields as needed for business logic
+                  rawResponse: apiResponse  // Keep raw response if needed
+                }
                 
                 // ALWAYS create 'initialized' event with both entityId and externalId
                 await self.createIntegrationEvent(
@@ -1126,12 +1244,12 @@ export function create{IntegrationName}Integration(config: {IntegrationName}Conf
                   apiCall.id,              // entityId - APICall's id
                   externalId,              // externalId - task ID or generated UUID
                   'initialized',
-                  result,
+                  eventData,               // Transformed data, not raw response
                   null
                 )
                 
                 // For sync APIs (no task ID): immediately create processing and completed events
-                if (!result.taskId && !result.id) {
+                if (!apiResponse.taskId) {
                   // Immediately create processing event
                   await self.createIntegrationEvent(
                     this,
@@ -1142,19 +1260,26 @@ export function create{IntegrationName}Integration(config: {IntegrationName}Conf
                     null
                   )
                   
-                  // Immediately create completed event
+                  // Transform completion data
+                  const completedData = {
+                    status: 'completed',
+                    result: apiResponse.result,
+                    // Map other completion fields
+                  }
+                  
+                  // Immediately create completed event with transformed data
                   await self.createIntegrationEvent(
                     this,
                     null,
                     externalId,
                     'completed',
-                    result,
+                    completedData,         // Transformed data
                     null
                   )
                   
                   console.log('[{IntegrationName}] Sync API completed with unified event sequence')
                 }
-                // For async APIs: result will come later via webhook or polling
+                // For async APIs: status will come later via webhook or polling
                 
               } catch (error: any) {
                 console.error('[{IntegrationName}] External API call failed', {
@@ -1212,10 +1337,11 @@ export function create{IntegrationName}Integration(config: {IntegrationName}Conf
             apiCallId: string
           }) {
             try {
-              await self.checkAndUpdateStatus(params.apiCallId)
+              const apiResponse = await self.checkAndUpdateStatus(params.apiCallId)
               return {
                 success: true,
-                message: 'Status check triggered, integration event created'
+                message: 'Status check triggered, integration event created',
+                response: apiResponse
               }
             } catch (error: any) {
               console.error('[{IntegrationName}] Failed to query status', {
@@ -1343,14 +1469,23 @@ export function create{IntegrationName}Integration(config: {IntegrationName}Conf
         throw new Error(`No external ID found for APICall: ${apiCallId}`)
       }
 
-      // Query external system
-      const result = await queryExternalStatus(externalId)
+      // Query external system (returns raw response)
+      const apiResponse = await queryExternalStatus(externalId)
 
       console.log('[{IntegrationName}] Status checked', {
         apiCallId,
         externalId,
-        status: result.status
+        status: apiResponse.status
       })
+
+      // Transform external response to internal event format
+      const eventType = apiResponse.status  // Map external status to event type
+      const eventData = apiResponse.result ? {
+        status: apiResponse.status,
+        result: apiResponse.result,
+        // Map other fields as needed
+      } : null
+      const errorMessage = apiResponse.error?.message || null
 
       // Create integration event based on status
       // entityId is null because APICall already exists (not 'initialized' event)
@@ -1358,10 +1493,12 @@ export function create{IntegrationName}Integration(config: {IntegrationName}Conf
         this.controller,
         null,              // entityId - not needed for status updates
         externalId,        // externalId - to match with existing APICall
-        result.status,     // eventType - 'processing' | 'completed' | 'failed'
-        result.data || null,
-        result.error || null
+        eventType,         // eventType - 'processing' | 'completed' | 'failed'
+        eventData,         // Transformed data, not raw response
+        errorMessage       // Extracted error message
       )
+
+      return apiResponse
     }
   }
 }
@@ -1686,6 +1823,101 @@ createAPIs() {
   }
 }
 ```
+
+## Integration Middleware
+
+**🔴 CRITICAL: Middleware for Request Processing**
+
+Integrations can provide HTTP middleware to handle cross-cutting concerns like authentication, authorization, request validation, logging, etc.
+
+**When to use middleware:**
+- Authentication and authorization (e.g., JWT verification)
+- Request/response transformation
+- Logging and monitoring
+- Rate limiting
+- CORS handling
+- Custom header processing
+
+**Middleware execution:**
+- Middleware runs BEFORE API handlers
+- Can access and modify request context
+- Can short-circuit request processing
+- Can inject context data for API handlers
+
+**Example: Authentication Middleware**
+
+```typescript
+export function createAuthIntegration(config: AuthIntegrationConfig) {
+  return class AuthIntegration implements IIntegration {
+    createMiddlewares(): MiddlewareHandler[] {
+      return [
+        async (c, next) => {
+          // Extract token from multiple sources
+          let token: string | undefined
+          const authToken = c.req.query('authToken')
+          const authHeader = c.req.header('authorization')
+          const cookieHeader = c.req.header('cookie')
+
+          if (authToken) {
+            token = authToken
+          } else if (authHeader?.startsWith('Bearer ')) {
+            token = authHeader.substring(7)
+          } else if (cookieHeader) {
+            const allCookies: Record<string, string> = {}
+            cookieHeader.split(';').forEach((cookie) => {
+              const [name, value] = cookie.trim().split('=')
+              if (name && value) {
+                allCookies[name] = decodeURIComponent(value)
+              }
+            })
+            token = allCookies.token
+          }
+
+          // Verify token and inject userId into context
+          if (token) {
+            try {
+              const decoded = await verify(token, jwtSecret) as any
+              c.set('userId', decoded.userId)
+            } catch (err) {
+              console.log('Invalid token', err)
+            }
+          }
+
+          await next()
+        }
+      ]
+    }
+
+    createAPIs() {
+      return {
+        login: createAPI(
+          async function(context, params: { identifier: string; password: string }) {
+            // Authenticate user
+            // Generate JWT token
+            // Return token to client
+          },
+          { allowAnonymous: true }
+        )
+      }
+    }
+  }
+}
+```
+
+**Key principles:**
+- **Middleware is optional**: Only use when needed for cross-cutting concerns
+- **Order matters**: Middleware executes in the order returned from createMiddlewares()
+- **Context injection**: Use `c.set()` to inject data into context for API handlers
+- **Non-blocking**: Always call `await next()` to continue the middleware chain
+- **Error handling**: Middleware can catch and handle errors before they reach API handlers
+
+**Common use cases:**
+1. **Authentication** (`integrations/auth/index.ts`): JWT verification, session management
+2. **Authorization**: Role-based access control, permission checks
+3. **Request validation**: Schema validation, sanitization
+4. **Logging**: Request/response logging, performance monitoring
+5. **Rate limiting**: Throttle requests per user/IP
+6. **CORS**: Handle cross-origin requests
 
 ## Example: Stripe Payment Integration
 

@@ -553,6 +553,80 @@ git commit -m "feat: Task 1.2 - Complete functional requirements analysis"
 
 **External side-effects requiring third-party APIs must be identified separately.**
 
+### Special Case: Authentication Integration
+
+**⚠️ CRITICAL: Authentication for Basic Module**
+
+If the current module is "basic", authentication (login/registration) requirements must be handled as an integration named **"auth"**.
+
+**Authentication vs Business Logic:**
+1. **Authentication (Integration)**:
+   - User login with credentials
+   - User registration/signup
+   - Password reset/recovery
+   - OAuth/social login
+   - These are NOT part of business logic - treat as integration "auth"
+
+2. **User Management (Business Logic)**:
+   - Administrator creates user accounts
+   - Administrator updates user information
+   - Administrator deactivates users
+   - These ARE business data operations - design as regular interactions
+
+**Handling Authentication Requirements:**
+
+**Case 1: User explicitly described login/registration requirements**
+- Extract ALL authentication-related requirements into integration "auth"
+- Do NOT create interactions for login/registration in Task 1.5
+- Document the specific authentication flow in integration.json
+
+**Case 2: User did NOT mention login/registration**
+- For "basic" module, assume authentication is needed
+- Design a simple password-based authentication integration
+- Use default specification (see example below)
+
+**Default Password Authentication Integration:**
+```json
+{
+  "id": "INT_AUTH",
+  "name": "auth",
+  "type": "stateful-system",
+  "type_explanation": "Authentication system maintains session state and user credentials. Requires bidirectional communication for login, registration, and session management.",
+  "external_system": "Authentication Service",
+  "purpose": "Handle user authentication and registration for the system",
+  "related_requirements": ["User login", "User registration"],
+  "flow_description": "For registration: User provides username/email and password in current system. System sends registration request (username, password) to authentication service. Authentication service validates uniqueness, hashes password, creates auth record, and returns user credentials. Current system receives response and creates User entity with returned user ID. For login: User provides credentials in current system. System sends login request to authentication service. Authentication service validates credentials and returns session token. Current system stores session and grants access.",
+  "user_interactions": {
+    "in_current_system": [
+      "User enters username/email and password for registration",
+      "User enters credentials for login",
+      "User views login success/failure messages"
+    ],
+    "in_external_system": [
+      "Authentication service validates credential format",
+      "Authentication service checks username/email uniqueness",
+      "Authentication service hashes password securely",
+      "Authentication service generates session tokens"
+    ]
+  },
+  "current_system_data": [
+    {
+      "entity": "User",
+      "properties": ["id", "username", "email"],
+      "usage": "Created after successful registration using ID returned from authentication service. Read during login to fetch user profile."
+    }
+  ],
+  "notes": "This is a default password-based authentication. If user requirements specify OAuth, biometric, or other authentication methods, adjust accordingly."
+}
+```
+
+**Important Notes:**
+- Authentication integration should ALWAYS be named "auth" for consistency
+- Do NOT create "User" entity properties for password, passwordHash, or session tokens - these belong to the auth integration
+- User entity should only contain business-related properties (username, email, profile info)
+- In Task 1.4, do NOT create entities for authentication (no AuthSession, no Credentials entities)
+- In Task 1.5, do NOT create login/registration interactions - these are handled by the auth integration
+
 ### What is NOT an Integration
 
 **⚠️ CRITICAL: Intra-Project Module Access**
