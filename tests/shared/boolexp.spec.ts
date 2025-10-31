@@ -104,7 +104,7 @@ describe("BoolExp Complete Test Suite", () => {
       const atom = BoolAtomData.create({ data: { content: fn } });
       
       expect(atom.data.content).toBe(fn);
-      expect(atom.data.content(15)).toBe(true);
+      expect(atom.data.content!(15)).toBe(true);
     });
   });
 

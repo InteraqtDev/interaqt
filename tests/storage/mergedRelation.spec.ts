@@ -550,6 +550,247 @@ describe('complex merged relation test', () => {
         await db3.close();
     });
 
+    test('merged relation with valid commonProperties', async () => {
+        // 测试场景：merged relation 定义 commonProperties，所有 input relations 都包含这些 properties
+        
+        const userEntity = Entity.create({
+            name: 'User',
+            properties: [Property.create({ name: 'username', type: 'string' })]
+        });
+
+        const itemEntity = Entity.create({
+            name: 'Item',
+            properties: [Property.create({ name: 'title', type: 'string' })]
+        });
+
+        const relation1 = Relation.create({
+            name: 'UserPurchasesItem',
+            source: userEntity,
+            sourceProperty: 'purchasedItems',
+            target: itemEntity,
+            targetProperty: 'purchasedBy',
+            type: 'n:n',
+            properties: [
+                Property.create({ name: 'timestamp', type: 'string' }),
+                Property.create({ name: 'quantity', type: 'number' }),
+                Property.create({ name: 'price', type: 'number' })
+            ]
+        });
+
+        const relation2 = Relation.create({
+            name: 'UserViewsItem',
+            source: userEntity,
+            sourceProperty: 'viewedItems',
+            target: itemEntity,
+            targetProperty: 'viewedBy',
+            type: 'n:n',
+            properties: [
+                Property.create({ name: 'timestamp', type: 'string' }),
+                Property.create({ name: 'quantity', type: 'number' }),
+                Property.create({ name: 'duration', type: 'number' })
+            ]
+        });
+
+        // 定义 commonProperties
+        const commonProps = [
+            Property.create({ name: 'timestamp', type: 'string' }),
+            Property.create({ name: 'quantity', type: 'number' })
+        ];
+
+        const mergedRelation = Relation.create({
+            name: 'UserInteractsItem',
+            sourceProperty: 'interactedItems',
+            targetProperty: 'interactedBy',
+            inputRelations: [relation1, relation2],
+            commonProperties: commonProps
+        });
+
+        const entities = [userEntity, itemEntity];
+        const relations = [relation1, relation2, mergedRelation];
+        
+        const db = new PGLiteDB(undefined, {logger});
+        await db.open();
+
+        // 应该成功创建，因为所有 input relations 都有 timestamp 和 quantity 属性
+        const setup = new DBSetup(entities, relations, db);
+        await setup.createTables();
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+
+        // 验证可以正常创建和查询
+        const user = await entityQueryHandle.create('User', { username: 'testuser' });
+        const item = await entityQueryHandle.create('Item', { title: 'Test Item' });
+
+        await entityQueryHandle.create('UserPurchasesItem', {
+            source: { id: user.id },
+            target: { id: item.id },
+            timestamp: '2024-01-01',
+            quantity: 2,
+            price: 100
+        });
+
+        await entityQueryHandle.create('UserViewsItem', {
+            source: { id: user.id },
+            target: { id: item.id },
+            timestamp: '2024-01-02',
+            quantity: 1,
+            duration: 120
+        });
+
+        const allInteractions = await entityQueryHandle.find('UserInteractsItem',
+            undefined,
+            undefined,
+            ['id', 'timestamp', 'quantity']
+        );
+
+        expect(allInteractions).toHaveLength(2);
+
+        await db.close();
+    });
+
+    test('merged relation with missing commonProperties should fail', async () => {
+        // 测试场景：merged relation 定义 commonProperties，但某个 input relation 缺少这些 properties
+        
+        const userEntity = Entity.create({
+            name: 'User',
+            properties: [Property.create({ name: 'username', type: 'string' })]
+        });
+
+        const contentEntity = Entity.create({
+            name: 'Content',
+            properties: [Property.create({ name: 'title', type: 'string' })]
+        });
+
+        const relation1 = Relation.create({
+            name: 'UserLikesContent',
+            source: userEntity,
+            sourceProperty: 'likedContent',
+            target: contentEntity,
+            targetProperty: 'likedBy',
+            type: 'n:n',
+            properties: [
+                Property.create({ name: 'createdAt', type: 'string' }),
+                Property.create({ name: 'rating', type: 'number' })
+            ]
+        });
+
+        const relation2 = Relation.create({
+            name: 'UserSharesContent',
+            source: userEntity,
+            sourceProperty: 'sharedContent',
+            target: contentEntity,
+            targetProperty: 'sharedBy',
+            type: 'n:n',
+            properties: [
+                Property.create({ name: 'createdAt', type: 'string' })
+                // 缺少 rating 属性
+            ]
+        });
+
+        // 定义 commonProperties，要求所有 input relations 都有 createdAt 和 rating
+        const commonProps = [
+            Property.create({ name: 'createdAt', type: 'string' }),
+            Property.create({ name: 'rating', type: 'number' })
+        ];
+
+        const mergedRelation = Relation.create({
+            name: 'UserEngagesContent',
+            sourceProperty: 'engagedContent',
+            targetProperty: 'engagedBy',
+            inputRelations: [relation1, relation2],
+            commonProperties: commonProps
+        });
+
+        const entities = [userEntity, contentEntity];
+        const relations = [relation1, relation2, mergedRelation];
+        
+        const db = new PGLiteDB(undefined, {logger});
+        await db.open();
+
+        try {
+            // 应该抛出错误，因为 UserSharesContent 缺少 rating 属性
+            const setup = new DBSetup(entities, relations, db);
+            await setup.createTables();
+            expect.fail('Should throw error for missing commonProperties');
+        } catch (error: any) {
+            expect(error.message).toContain('Merged relation UserEngagesContent defined commonProperties');
+            expect(error.message).toContain('UserSharesContent');
+        } finally {
+            await db.close();
+        }
+    });
+
+    test('merged relation with mismatched commonProperties type should fail', async () => {
+        // 测试场景：merged relation 定义 commonProperties，但某个 input relation 的 property type 不匹配
+        
+        const authorEntity = Entity.create({
+            name: 'Author',
+            properties: [Property.create({ name: 'name', type: 'string' })]
+        });
+
+        const documentEntity = Entity.create({
+            name: 'Document',
+            properties: [Property.create({ name: 'title', type: 'string' })]
+        });
+
+        const relation1 = Relation.create({
+            name: 'AuthorCreatesDocument',
+            source: authorEntity,
+            sourceProperty: 'createdDocs',
+            target: documentEntity,
+            targetProperty: 'createdBy',
+            type: 'n:n',
+            properties: [
+                Property.create({ name: 'version', type: 'number' }),
+                Property.create({ name: 'notes', type: 'string' })
+            ]
+        });
+
+        const relation2 = Relation.create({
+            name: 'AuthorReviewsDocument',
+            source: authorEntity,
+            sourceProperty: 'reviewedDocs',
+            target: documentEntity,
+            targetProperty: 'reviewedBy',
+            type: 'n:n',
+            properties: [
+                Property.create({ name: 'version', type: 'string' }), // 类型不匹配
+                Property.create({ name: 'notes', type: 'string' })
+            ]
+        });
+
+        // 定义 commonProperties
+        const commonProps = [
+            Property.create({ name: 'version', type: 'number' }),
+            Property.create({ name: 'notes', type: 'string' })
+        ];
+
+        const mergedRelation = Relation.create({
+            name: 'AuthorWorksOnDocument',
+            sourceProperty: 'workedDocs',
+            targetProperty: 'workedBy',
+            inputRelations: [relation1, relation2],
+            commonProperties: commonProps
+        });
+
+        const entities = [authorEntity, documentEntity];
+        const relations = [relation1, relation2, mergedRelation];
+        
+        const db = new PGLiteDB(undefined, {logger});
+        await db.open();
+
+        try {
+            // 应该抛出错误，因为 AuthorReviewsDocument 的 version 类型是 string 而不是 number
+            const setup = new DBSetup(entities, relations, db);
+            await setup.createTables();
+            expect.fail('Should throw error for mismatched commonProperties type');
+        } catch (error: any) {
+            expect(error.message).toContain('Merged relation AuthorWorksOnDocument defined commonProperties');
+            expect(error.message).toContain('AuthorReviewsDocument');
+        } finally {
+            await db.close();
+        }
+    });
+
     test('nested merged relations - merged relation as inputRelation', async () => {
         // 测试场景：使用 merged relation 作为另一个 merged relation 的 inputRelations
         

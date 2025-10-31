@@ -12,6 +12,7 @@ export interface EntityInstance extends IInstance {
   baseEntity?: EntityInstance | RelationInstance; // for Filtered Entity
   matchExpression?: object; // for Filtered Entity
   inputEntities?: EntityInstance[]; // for Merged Entity
+  commonProperties?: PropertyInstance[]; // for Merged Entity
 }
 
 export interface EntityCreateArgs {
@@ -21,6 +22,7 @@ export interface EntityCreateArgs {
   baseEntity?: EntityInstance | RelationInstance;
   matchExpression?: object;
   inputEntities?: EntityInstance[]; // for Merged Entity
+  commonProperties?: PropertyInstance[]; // for Merged Entity
 }
 
 export class Entity implements EntityInstance {
@@ -33,7 +35,7 @@ export class Entity implements EntityInstance {
   public baseEntity?: EntityInstance | RelationInstance;
   public matchExpression?: object;
   public inputEntities?: EntityInstance[]; // for Merged Entity
-  
+  public commonProperties?: PropertyInstance[]; // for Merged Entity
   constructor(args: EntityCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
@@ -43,6 +45,7 @@ export class Entity implements EntityInstance {
     this.baseEntity = args.baseEntity;
     this.matchExpression = args.matchExpression;
     this.inputEntities = args.inputEntities;
+    this.commonProperties = args.commonProperties;
   }
   
   // 静态属性和方法
@@ -64,6 +67,18 @@ export class Entity implements EntityInstance {
       type: 'Property' as const,
       collection: true as const,
       required: true as const,
+      constraints: {
+        eachNameUnique: ({properties}: {properties: PropertyInstance[]}) => {
+          const uniqueNames = new Set(properties.map((p: PropertyInstance) => p.name));
+          return uniqueNames.size === properties.length;
+        }
+      },
+      defaultValue: () => []
+    },
+    commonProperties: {
+      type: 'Property' as const,
+      collection: true as const,
+      required: false as const,
       constraints: {
         eachNameUnique: ({properties}: {properties: PropertyInstance[]}) => {
           const uniqueNames = new Set(properties.map((p: PropertyInstance) => p.name));

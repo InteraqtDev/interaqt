@@ -16,6 +16,7 @@ export interface RelationInstance extends IInstance {
   baseRelation?: RelationInstance; // for Filtered Relation
   matchExpression?: object; // for Filtered Relation
   inputRelations?: RelationInstance[]; // for Merged Relation
+  commonProperties?: PropertyInstance[]; // for Merged Relation
 }
 
 export interface RelationCreateArgs {
@@ -31,6 +32,7 @@ export interface RelationCreateArgs {
   baseRelation?: RelationInstance;
   matchExpression?: object;
   inputRelations?: RelationInstance[]; // for Merged Relation
+  commonProperties?: PropertyInstance[]; // for Merged Relation
 }
 
 export class Relation implements RelationInstance {
@@ -49,7 +51,7 @@ export class Relation implements RelationInstance {
   public baseRelation?: RelationInstance;
   public matchExpression?: object;
   public inputRelations?: RelationInstance[]; // for Merged Relation
-  
+  public commonProperties?: PropertyInstance[]; // for Merged Relation
   // Getter for name that returns computed name if _name is undefined
   get name(): string | undefined {
     if (this._name !== undefined) {
@@ -105,6 +107,7 @@ export class Relation implements RelationInstance {
       this.type = firstRelation.type; // Inherit type from first input relation
       this.isTargetReliance = firstRelation.isTargetReliance;
       this._name = args.name;
+      this.commonProperties = args.commonProperties;
     }
     // For filtered relation, inherit from baseRelation
     else if (args.baseRelation) {

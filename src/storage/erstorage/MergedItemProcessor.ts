@@ -144,6 +144,19 @@ function processSingleMergedItem<T extends MergedItem>(
 
         // 获取 input items（对于 entity 需要更新）
         const inputItems = getInputItems(mergedItem);
+        // 如果 mergedItem 约定了 commonProperties，那么要检查是不是所有的 input item 都有 commonProperties，如果没有就报错。
+        if( mergedItem.commonProperties) {
+            const notValidItems = inputItems.filter(inputItem => {
+                // inputItem.properties 是否全部包含了 mergedItem.commonProperties
+                return mergedItem.commonProperties!.some(commonProperty => {
+                    return !inputItem.properties.some(property => property.name === commonProperty.name && property.type === commonProperty.type );
+                });
+            });
+            if(notValidItems.length > 0) {
+                throw new Error(`Merged ${itemType} ${mergedItem.name} defined commonProperties, but these ${itemType}s do not have commonProperties: ${notValidItems.map(item => item.name).join(', ')}`);
+            }
+        }
+
         // 处理 input items。让所有 input item 都是 virtual base item 的 filtered item。
         if (inputItems) {
             for (const inputItem of inputItems) {

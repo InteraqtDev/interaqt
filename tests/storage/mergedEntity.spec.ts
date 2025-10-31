@@ -451,7 +451,173 @@ describe('more complex merged entity test', () => {
         await db3.close();
     });
 
-    
+    test('merged entity with valid commonProperties', async () => {
+        // 测试场景：merged entity 定义 commonProperties，所有 input entities 都包含这些 properties
+        
+        const entity1 = Entity.create({
+            name: 'Person',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'email', type: 'string' }),
+                Property.create({ name: 'age', type: 'number' })
+            ]
+        });
+
+        const entity2 = Entity.create({
+            name: 'Company',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'email', type: 'string' }),
+                Property.create({ name: 'industry', type: 'string' })
+            ]
+        });
+
+        // 定义 commonProperties
+        const commonProps = [
+            Property.create({ name: 'name', type: 'string' }),
+            Property.create({ name: 'email', type: 'string' })
+        ];
+
+        const mergedEntity = Entity.create({
+            name: 'Contact',
+            inputEntities: [entity1, entity2],
+            commonProperties: commonProps
+        });
+
+        const entities = [entity1, entity2, mergedEntity];
+        
+        const db = new PGLiteDB(undefined, {logger});
+        await db.open();
+
+        // 应该成功创建，因为所有 input entities 都有 name 和 email 属性
+        const setup = new DBSetup(entities, [], db);
+        await setup.createTables();
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+
+        // 验证可以正常创建和查询
+        await entityQueryHandle.create('Person', {
+            name: 'John Doe',
+            email: 'john@example.com',
+            age: 30
+        });
+
+        await entityQueryHandle.create('Company', {
+            name: 'Acme Corp',
+            email: 'info@acme.com',
+            industry: 'Tech'
+        });
+
+        const allContacts = await entityQueryHandle.find('Contact',
+            undefined,
+            undefined,
+            ['id', 'name', 'email']
+        );
+
+        expect(allContacts).toHaveLength(2);
+        expect(allContacts.map(c => c.name).sort()).toEqual(['Acme Corp', 'John Doe']);
+
+        await db.close();
+    });
+
+    test('merged entity with missing commonProperties should fail', async () => {
+        // 测试场景：merged entity 定义 commonProperties，但某个 input entity 缺少这些 properties
+        
+        const entity1 = Entity.create({
+            name: 'Employee',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'email', type: 'string' }),
+                Property.create({ name: 'employeeId', type: 'string' })
+            ]
+        });
+
+        const entity2 = Entity.create({
+            name: 'Customer',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                // 缺少 email 属性
+                Property.create({ name: 'customerId', type: 'string' })
+            ]
+        });
+
+        // 定义 commonProperties，要求所有 input entities 都有 name 和 email
+        const commonProps = [
+            Property.create({ name: 'name', type: 'string' }),
+            Property.create({ name: 'email', type: 'string' })
+        ];
+
+        const mergedEntity = Entity.create({
+            name: 'Contact',
+            inputEntities: [entity1, entity2],
+            commonProperties: commonProps
+        });
+
+        const entities = [entity1, entity2, mergedEntity];
+        
+        const db = new PGLiteDB(undefined, {logger});
+        await db.open();
+
+        try {
+            // 应该抛出错误，因为 Customer 缺少 email 属性
+            const setup = new DBSetup(entities, [], db);
+            await setup.createTables();
+            expect.fail('Should throw error for missing commonProperties');
+        } catch (error: any) {
+            expect(error.message).toContain('Merged entity Contact defined commonProperties');
+            expect(error.message).toContain('Customer');
+        } finally {
+            await db.close();
+        }
+    });
+
+    test('merged entity with mismatched commonProperties type should fail', async () => {
+        // 测试场景：merged entity 定义 commonProperties，但某个 input entity 的 property type 不匹配
+        
+        const entity1 = Entity.create({
+            name: 'Student',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'score', type: 'number' })
+            ]
+        });
+
+        const entity2 = Entity.create({
+            name: 'Teacher',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({ name: 'score', type: 'string' }) // 类型不匹配
+            ]
+        });
+
+        // 定义 commonProperties
+        const commonProps = [
+            Property.create({ name: 'name', type: 'string' }),
+            Property.create({ name: 'score', type: 'number' })
+        ];
+
+        const mergedEntity = Entity.create({
+            name: 'Person',
+            inputEntities: [entity1, entity2],
+            commonProperties: commonProps
+        });
+
+        const entities = [entity1, entity2, mergedEntity];
+        
+        const db = new PGLiteDB(undefined, {logger});
+        await db.open();
+
+        try {
+            // 应该抛出错误，因为 Teacher 的 score 类型是 string 而不是 number
+            const setup = new DBSetup(entities, [], db);
+            await setup.createTables();
+            expect.fail('Should throw error for mismatched commonProperties type');
+        } catch (error: any) {
+            expect(error.message).toContain('Merged entity Person defined commonProperties');
+            expect(error.message).toContain('Teacher');
+        } finally {
+            await db.close();
+        }
+    });
 
     test('nested merged entities - merged entity as input entity', async () => {
         // 测试场景：使用 merged entity 作为另一个 merged entity 的 inputEntities（精简版）
