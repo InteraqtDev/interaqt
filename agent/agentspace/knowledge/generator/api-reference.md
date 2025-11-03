@@ -19,6 +19,8 @@ Entity.create(config: EntityConfig): EntityInstance
 - `config.computation` (Computation[], optional): Entity-level computed data
 - `config.baseEntity` (Entity|Relation, optional): Base entity for filtered entity (used to create filtered entities)
 - `config.matchExpression` (MatchExp, optional): Match expression (used to create filtered entities)
+- `config.inputEntities` (Entity[], optional): Input entities for merged entity (used to create merged entities)
+- `config.commonProperties` (Property[], optional): Common properties that all input entities must have (used with merged entities to define shared attributes)
 
 **Examples**
 ```typescript
@@ -95,6 +97,42 @@ const TechYoungUser = Entity.create({
 ```
 
 3. **Automatic Updates**: When source entity records are created, updated, or deleted, filtered entities automatically reflect these changes based on their match expressions.
+
+**Merged Entities**
+
+Merged entities represent a unified view of multiple entities, treating them as a single type. Use `commonProperties` to define shared attributes:
+
+```typescript
+const Teacher = Entity.create({
+    name: 'Teacher',
+    properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'age', type: 'number' }),
+        Property.create({ name: 'subject', type: 'string' })
+    ]
+})
+
+const Student = Entity.create({
+    name: 'Student',
+    properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'age', type: 'number' }),
+        Property.create({ name: 'grade', type: 'number' })
+    ]
+})
+
+// Merged entity with common properties
+const TeacherStudent = Entity.create({
+    name: 'TeacherStudent',
+    inputEntities: [Teacher, Student],
+    commonProperties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'age', type: 'number' })
+    ]
+})
+```
+
+**Note**: Merged entities cannot define their own `properties` - only `commonProperties` that specify the shared attribute contract.
 
 ### Property.create()
 
@@ -293,9 +331,10 @@ Create relationship definition between entities or create filtered views of exis
 Relation.create(config: RelationConfig): RelationInstance
 ```
 
-**Two Types of Relations**
+**Three Types of Relations**
 1. **Base Relations**: Define direct relationships between entities (requires `source`, `target`, `type`)
 2. **Filtered Relations**: Create filtered views of existing relations (requires `baseRelation`, `matchExpression`)
+3. **Merged Relations**: Combine multiple relations with same source/target into unified view (requires `inputRelations`, `sourceProperty`, `targetProperty`)
 
 **Important: Auto-Generated Relation Names**
 
@@ -314,6 +353,8 @@ If you did not specify a `name` property when creating relations, The framework 
 - `config.computation` (Computation, optional): Relationship-level computed data
 - `config.baseRelation` (Relation, required for filtered relations): Base relation to filter from
 - `config.matchExpression` (MatchExp, required for filtered relations): Filter condition for the relation records
+- `config.inputRelations` (Relation[], required for merged relations): Input relations with same source/target to merge
+- `config.commonProperties` (Property[], optional): Common properties that all input relations must have (used with merged relations)
 
 
 **Note on Symmetric Relations**: The system automatically detects symmetric relations when `source === target` AND `sourceProperty === targetProperty`. There is no need to specify a `symmetric` parameter.
@@ -439,6 +480,49 @@ const ImportantActiveRelation = Relation.create({
 ```
 
 4. **Automatic Updates**: When source relation records are created, updated, or deleted, filtered relations automatically reflect these changes based on their match expressions. For example, if a relation's `isActive` property is updated from `false` to `true`, it will automatically appear in the corresponding filtered relation.
+
+**Merged Relations**
+
+Merged relations combine multiple relations with the same source/target into a unified view. Use `commonProperties` to define shared relation attributes:
+
+```typescript
+// Base relations between User and Project
+const UserProjectOwnerRelation = Relation.create({
+    source: User,
+    sourceProperty: 'ownedProjects',
+    target: Project,
+    targetProperty: 'owners',
+    type: 'n:n',
+    properties: [
+        Property.create({ name: 'since', type: 'number' }),
+        Property.create({ name: 'equity', type: 'number' })
+    ]
+})
+
+const UserProjectMemberRelation = Relation.create({
+    source: User,
+    sourceProperty: 'memberProjects',
+    target: Project,
+    targetProperty: 'members',
+    type: 'n:n',
+    properties: [
+        Property.create({ name: 'since', type: 'number' }),
+        Property.create({ name: 'role', type: 'string' })
+    ]
+})
+
+// Merged relation with common properties
+const UserProjectRelation = Relation.create({
+    inputRelations: [UserProjectOwnerRelation, UserProjectMemberRelation],
+    sourceProperty: 'allProjects',
+    targetProperty: 'allUsers',
+    commonProperties: [
+        Property.create({ name: 'since', type: 'number' })
+    ]
+})
+```
+
+**Note**: Merged relations cannot define their own `properties` - only `commonProperties` that specify the shared attribute contract. The `source`, `target`, and `type` are inherited from input relations (which must all have the same source/target).
 
 ## 13.2 Computation-Related APIs
 

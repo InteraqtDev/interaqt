@@ -157,7 +157,8 @@ export class Entity implements EntityInstance {
       computation: instance.computation,
       baseEntity: instance.baseEntity,
       matchExpression: instance.matchExpression,
-      inputEntities: instance.inputEntities
+      inputEntities: instance.inputEntities,
+      commonProperties: instance.commonProperties
     };
     
     return this.create(args);

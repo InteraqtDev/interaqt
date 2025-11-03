@@ -3,6 +3,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 import path from 'path'
 export default defineConfig({
     test: {
+        watch: false,
         setupFiles: './scripts/vitest.setup.js',
         include: [
             'tests/**/*.test.ts', 

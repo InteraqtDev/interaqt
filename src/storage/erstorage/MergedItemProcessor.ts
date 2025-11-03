@@ -90,14 +90,8 @@ function processMergedItemsOfType<T extends MergedItem>(
         // 过滤出有 input items 的项
         const mergedItems = items.filter(item => {
             const inputItems = getInputItems(item);
-            return inputItems && inputItems.length > 0;
+            return inputItems !== undefined;
         });
-        
-        if (mergedItems.length === 0) {
-            return;
-        }
-        
-        
         
         // 处理每个 merged item
         for (const mergedItem of mergedItems) {
@@ -143,7 +137,7 @@ function processSingleMergedItem<T extends MergedItem>(
         }
 
         // 获取 input items（对于 entity 需要更新）
-        const inputItems = getInputItems(mergedItem);
+        const inputItems = getInputItems(mergedItem) || [];
         // 如果 mergedItem 约定了 commonProperties，那么要检查是不是所有的 input item 都有 commonProperties，如果没有就报错。
         if( mergedItem.commonProperties) {
             const notValidItems = inputItems.filter(inputItem => {
@@ -253,7 +247,7 @@ function createInputTypeProperty(
             name: inputFieldName,
             type: 'json',
             defaultValue: (record: any, entityName: string) => {
-                const inputItems = getInputItems(mergedItem);
+                const inputItems = getInputItems(mergedItem) || [];
                 const inputCandidates = leafToInputMap.get(entityName) || [];
                 const inputNames = inputCandidates.filter(name => 
                     inputItems.some(input => getItemName(input) === name)
@@ -282,10 +276,10 @@ function mergeProperties(
         // 3. inputEntity 是个 merged entity，那就在子孙 input entity 的 root base entity（可能就是子孙自己，取决于它是不是 filtered） 上获取 defaultValue。
         // 4. inputEntity 如果是个 merged entity，并且 prop 是用来区分 input item 的，那 defaultValue 就是应该是 transform 时构造出来的。
         
-        const inputItems = getInputItems(mergedItem);
+        const inputItems = getInputItems(mergedItem) || [];
         const mergedProperties: PropertyInstance[] = [];
         const itemPropertyMap = new Map<string, {[key: string]: PropertyInstance}>();
-        const mergedPropertyMap: {[k: string]: PropertyInstance} = {};
+        const mergedPropertyMap: {[k: string]: PropertyInstance} = Object.fromEntries(mergedItem.commonProperties?.map(prop => [prop.name, prop]) || []);
         
         // 收集所有同名 properties。
         // 如果这个 item 已经是 filtered item，那么就从 base item 获取 properties。
@@ -542,11 +536,11 @@ function isRelation(item: MergedItem): item is RelationInstance {
         return 'sourceProperty' in item;
     }
     
-function getInputItems(item: MergedItem): MergedItem[] {
+function getInputItems(item: MergedItem): MergedItem[]|undefined {
         if (isEntity(item)) {
-            return (item as EntityInstance).inputEntities || [];
+            return (item as EntityInstance).inputEntities;
         } else {
-            return (item as RelationInstance).inputRelations || [];
+            return (item as RelationInstance).inputRelations;
         }
     }
     
