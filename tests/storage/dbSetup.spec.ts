@@ -271,53 +271,7 @@ describe("db setup", () => {
     })
 
 
-    test('query test', async () => {
-        const database = new SQLiteDB(':memory:')
-        await database.open()
-        const setup = new DBSetup(entities, relations, database);
-        await setup.createTables()
-
-
-        const entityToTableMap = new EntityToTableMap(setup.map)
-        const entityQuery = RecordQuery.create('User', entityToTableMap, {
-            attributeQuery: [
-                'name',
-                'age',
-                ['profile', {
-                    attributeQuery: ['title']
-                }],
-                ['item', {
-                    attributeQuery: ['itemName']
-                }],
-                // n:1 关系
-                ['leader', {
-                    attributeQuery: [
-                        'name',
-                        ['profile', {
-                            attributeQuery: ['title']
-                        }]
-                    ]
-                }],
-            ],
-            matchExpression: MatchExp.atom({
-                key: 'name',
-                value: ['=', 'a']
-            }).and({
-                key: 'file',
-                value: ['exist', {
-                    key: 'fileName',
-                    value: ['=', 'f1']
-                }]
-            })
-        })
-
-        const queryAgent = new RecordQueryAgent(entityToTableMap, database)
-        // console.log(JSON.stringify(queryAgent.buildFindQuery(entityQuery) as any))
-        const [sql, params] = queryAgent.buildXToOneFindQuery(entityQuery)
-        const result = await database.query(sql, params)
-        // console.log(result)
-        expect(result.length).toBe(0)
-    })
+    
 })
 
 

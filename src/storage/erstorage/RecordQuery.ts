@@ -4,7 +4,7 @@ import {Modifier, ModifierData} from "./Modifier.js";
 import {EntityToTableMap} from "./EntityToTableMap.js";
 import {AttributeInfo} from "./AttributeInfo.js";
 import {assert} from "../utils.js";
-import {RecursiveContext} from "./RecordQueryAgent.js";
+import {RecursiveContext} from "./util/RecursiveContext.js";
 
 export type RecordQueryData = {
     matchExpression?: MatchExpressionData,

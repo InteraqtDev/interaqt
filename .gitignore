@@ -33,3 +33,4 @@ temp
 pgdata
 test-create.sqlite
 examples
+:memory:
