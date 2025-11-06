@@ -207,8 +207,15 @@ export class MatchExp {
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
 
         if (simpleOp.includes(value[0]) || (value[0] === 'not' && value[1] !== null)) {
-            fieldValue = `${value[0]} ${p()}`
-            fieldParams = [isReferenceValue ? this.getReferenceFieldValue(value[1]) : value[1]]
+            if (isReferenceValue) {
+                // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL，不使用占位符
+                const referenceField = this.getReferenceFieldValue(value[1])
+                fieldValue = `${value[0]} "${referenceField.split('.')[0]}"."${referenceField.split('.')[1]}"`
+                fieldParams = []
+            } else {
+                fieldValue = `${value[0]} ${p()}`
+                fieldParams = [value[1]]
+            }
         } else if((value[0] === 'not' && value[1] === null)) {
             fieldValue = `IS NOT NULL`
         } else if (value[0].toLowerCase() === 'in') {
@@ -216,11 +223,16 @@ export class MatchExp {
             fieldValue = `IN (${value[1].map((x: any) => p()).join(',')})`
             fieldParams = value[1]
         } else if (value[0].toLowerCase() === 'between') {
-            fieldValue = `BETWEEN ${p()} AND ${p()}`
-            fieldParams = [
-                isReferenceValue ? this.getReferenceFieldValue(value[1][0]) : value[1][0],
-                isReferenceValue ? this.getReferenceFieldValue(value[1][1]) : value[1][1]
-            ]
+            if (isReferenceValue) {
+                // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL
+                const ref1 = this.getReferenceFieldValue(value[1][0])
+                const ref2 = this.getReferenceFieldValue(value[1][1])
+                fieldValue = `BETWEEN "${ref1.split('.')[0]}"."${ref1.split('.')[1]}" AND "${ref2.split('.')[0]}"."${ref2.split('.')[1]}"`
+                fieldParams = []
+            } else {
+                fieldValue = `BETWEEN ${p()} AND ${p()}`
+                fieldParams = [value[1][0], value[1][1]]
+            }
         } else {
             let result
             if (db) {
