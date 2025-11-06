@@ -396,13 +396,33 @@ export class DBSetup {
         return `${relationName}_${isSource? 'source' :'target'}`
     }
 
-    
+    /**
+     * 验证 relations：不允许 filtered entity 作为 relation 的 source 或 target
+     */
+    private validateRelations() {
+        this.relations.forEach(relation => {
+            if (relation.baseRelation) return // filtered relation 本身是允许的
+            
+            const checks = [
+                { entity: relation.source as any, name: relation.source.name, role: 'source' },
+                { entity: relation.target as any, name: relation.target.name, role: 'target' }
+            ]
+            
+            for (const { entity, name, role } of checks) {
+                if (entity.baseEntity) {
+                    throw new Error(
+                        `Cannot create Relation with filtered entity '${name}' as ${role}. ` +
+                        `Please define the relation on the base entity '${entity.baseEntity.name}' instead.`
+                    )
+                }
+            }
+        })
+    }
 
-    buildMap() {
-        // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
-        this.processMergedItems();
-        
-        // 1. 按照范式生成基础 entity record
+    /**
+     * 生成基础 entity records
+     */
+    private buildEntityRecords() {
         this.entities.forEach(entity => {
             assert(!this.map.records[entity.name], `entity name ${entity.name} is duplicated`)
             this.map.records[entity.name] = entity.baseEntity ? this.createFilteredEntityRecord(entity) : this.createRecord(entity)
@@ -411,8 +431,12 @@ export class DBSetup {
                 this.createRecordToTable(entity.name, this.map.records[entity.name].table)
             }
         })
+    }
 
-        // 2. 生成 relation record 以及所有的 link
+    /**
+     * 生成 relation records 以及所有的 links
+     */
+    private buildRelationRecordsAndLinks() {
         this.relations.forEach(relation => {
             const sourceName = relation.source.name
             const targetName = relation.target.name
@@ -430,8 +454,12 @@ export class DBSetup {
                 this.createRecordToTable(relationName, this.map.records[relationName].table)
             }
         })
+    }
 
-        // 3. 根据 Link 补充 record attribute 到 record 里面。方便之后的查询。
+    /**
+     * 根据 Link 补充 record attributes，方便之后的查询
+     */
+    private populateRecordAttributes() {
         Object.entries(this.map.links).forEach(([relation, relationData]) => {
             assert(!relationData.isSourceRelation || (relationData.sourceProperty === 'source' || relationData.sourceProperty === 'target'), 'virtual relation sourceProperty should only be source/target')
             
@@ -478,8 +506,12 @@ export class DBSetup {
                 } as RecordAttribute
             }
         })
+    }
 
-        // 4. 验证所有 filtered entity 的路径
+    /**
+     * 验证所有 filtered entities 的路径（不包含 x:n 关系）
+     */
+    private validateAllFilteredEntityPaths() {
         this.entities.forEach(entity => {
             const entityWithProps = entity as any;
             if (entityWithProps.baseEntity && entityWithProps.matchExpression) {
@@ -487,10 +519,32 @@ export class DBSetup {
                 this.validateFilteredEntityPaths(entityWithProps.baseEntity.name, entityWithProps.matchExpression);
             }
         });
+    }
 
-        this.mergeRecords()
-        this.assignTableAndField()
+    buildMap() {
+        // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
+        this.processMergedItems();
+        
+        // 1. 验证：不允许 filtered entity 作为 relation 的 source 或 target
+        this.validateRelations();
+        
+        // 2. 生成基础 entity records
+        this.buildEntityRecords();
 
+        // 3. 生成 relation records 以及所有的 links
+        this.buildRelationRecordsAndLinks();
+
+        // 4. 根据 Link 补充 record attributes
+        this.populateRecordAttributes();
+
+        // 5. 验证所有 filtered entity 的路径
+        this.validateAllFilteredEntityPaths();
+
+        // 6. 合并记录到同一张表
+        this.mergeRecords();
+        
+        // 7. 分配表名和字段名
+        this.assignTableAndField();
     }
     /**
      * 统一处理 merged entities 和 merged relations
