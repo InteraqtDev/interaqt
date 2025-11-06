@@ -175,15 +175,8 @@ export class EntityToTableMap {
                 currentEntity = (attributeData! as RecordAttribute).linkName
                 attributeData = undefined
             } else {
-                let data = this.data.records[currentEntity]
-                // 递归查找根源实体
-                while (data.isFilteredRelation || data.isFilteredEntity) {
-                    if (data.isFilteredRelation) {
-                        data = this.data.records[data.baseRelationName!]
-                    } else if (data.isFilteredEntity) {
-                        data = this.data.records[data.baseRecordName!]
-                    }
-                }
+                const data = this.data.records[currentEntity]
+                // Filtered entity/relation 的 attributes 已经在 Setup 阶段复制过了，直接使用即可
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute
                 assert(!!attributeData, `attribute ${currentAttribute} not found in ${currentEntity}. namePath: ${namePath.join('.')}`)
                 parentEntity = currentEntity

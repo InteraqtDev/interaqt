@@ -521,6 +521,69 @@ export class DBSetup {
         });
     }
 
+    /**
+     * 复制 base entity/relation 的 attributes 到 filtered entity/relation
+     * 这样在查询时就不需要递归查找 base entity 了
+     */
+    private copyAttributesToFilteredEntities() {
+        Object.entries(this.map.records).forEach(([recordName, record]) => {
+            // 处理 filtered entity
+            if (record.isFilteredEntity) {
+                // 使用 resolvedBaseRecordName 确保找到最底层的 base entity
+                const baseRecordName = record.resolvedBaseRecordName || record.baseRecordName
+                if (!baseRecordName) return
+                
+                const baseRecord = this.map.records[baseRecordName]
+                if (!baseRecord) {
+                    throw new Error(`Base record ${baseRecordName} not found for filtered entity ${recordName}`)
+                }
+                
+                // 复制 attributes，保留函数引用
+                record.attributes = this.copyAttributes(baseRecord.attributes)
+            }
+            
+            // 处理 filtered relation
+            if (record.isFilteredRelation) {
+                // 使用 resolvedBaseRecordName 确保找到最底层的 base relation
+                const baseRelationName = record.resolvedBaseRecordName || record.baseRelationName
+                if (!baseRelationName) return
+                
+                const baseRelationRecord = this.map.records[baseRelationName]
+                if (!baseRelationRecord) {
+                    throw new Error(`Base relation ${baseRelationName} not found for filtered relation ${recordName}`)
+                }
+                
+                // 复制 attributes，保留函数引用
+                record.attributes = this.copyAttributes(baseRelationRecord.attributes)
+            }
+        })
+    }
+
+    /**
+     * 复制 attributes 对象，保留函数引用
+     */
+    private copyAttributes(attributes: RecordMapItem['attributes']): RecordMapItem['attributes'] {
+        const result: RecordMapItem['attributes'] = {}
+        
+        Object.entries(attributes).forEach(([attrName, attrData]) => {
+            if ((attrData as RecordAttribute).isRecord) {
+                // RecordAttribute - 浅拷贝对象（这些是引用类型数据）
+                result[attrName] = { ...(attrData as RecordAttribute) }
+            } else {
+                // ValueAttribute - 保留函数引用
+                const valueAttr = attrData as ValueAttribute
+                result[attrName] = {
+                    ...valueAttr,
+                    // 保留函数引用（不深拷贝）
+                    computed: valueAttr.computed,
+                    defaultValue: valueAttr.defaultValue
+                }
+            }
+        })
+        
+        return result
+    }
+
     buildMap() {
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();
@@ -536,6 +599,9 @@ export class DBSetup {
 
         // 4. 根据 Link 补充 record attributes
         this.populateRecordAttributes();
+
+        // 4.5. 复制 base entity 的 attributes 到 filtered entity
+        this.copyAttributesToFilteredEntities();
 
         // 5. 验证所有 filtered entity 的路径
         this.validateAllFilteredEntityPaths();

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from "@storage";
-import { Entity, Property } from '@shared';
+import { Entity, Property, Relation } from '@shared';
 import TestLogger from "./testLogger.js";
 import { PGLiteDB } from '@dbclients';
 
@@ -21,6 +21,24 @@ describe('cascade filtered entity test', () => {
                 Property.create({ name: 'department', type: 'string' }),
                 Property.create({ name: 'role', type: 'string' })
             ]
+        });
+
+        // 创建 Project 实体用于测试 relation
+        const projectEntity = Entity.create({
+            name: 'Project',
+            properties: [
+                Property.create({ name: 'title', type: 'string' }),
+                Property.create({ name: 'status', type: 'string' })
+            ]
+        });
+
+        // 创建 User-Project 关系
+        const userProjectRelation = Relation.create({
+            source: userEntity,
+            sourceProperty: 'projects',
+            target: projectEntity,
+            targetProperty: 'owner',
+            type: '1:n'
         });
 
         // 第一层 filtered entity - ActiveUsers
@@ -65,12 +83,13 @@ describe('cascade filtered entity test', () => {
 
         const entities = [
             userEntity,
+            projectEntity,
             activeUsersEntity,
             techActiveUsersEntity,
             seniorTechActiveUsersEntity,
             youngActiveUsersEntity
         ];
-        const relations: any[] = [];
+        const relations = [userProjectRelation];
 
         logger = new TestLogger('', true);
         
@@ -463,5 +482,151 @@ describe('cascade filtered entity test', () => {
                 name: 'DeleteEventTest'
             })
         });
+    });
+
+    test('cascade filtered entities can access relations from base entity', async () => {
+        // 创建一个满足所有条件的用户
+        const user = await entityQueryHandle.create('User', {
+            name: 'Bob',
+            age: 35,
+            isActive: true,
+            department: 'Tech',
+            role: 'senior'
+        });
+
+        // 创建几个项目
+        const project1 = await entityQueryHandle.create('Project', {
+            title: 'Project Alpha',
+            status: 'active'
+        });
+
+        const project2 = await entityQueryHandle.create('Project', {
+            title: 'Project Beta',
+            status: 'completed'
+        });
+
+        const project3 = await entityQueryHandle.create('Project', {
+            title: 'Project Gamma',
+            status: 'active'
+        });
+
+        // 建立 User-Project 关系
+        await entityQueryHandle.addRelationByNameById(
+            'User_projects_owner_Project',
+            user.id,
+            project1.id
+        );
+
+        await entityQueryHandle.addRelationByNameById(
+            'User_projects_owner_Project',
+            user.id,
+            project2.id
+        );
+
+        await entityQueryHandle.addRelationByNameById(
+            'User_projects_owner_Project',
+            user.id,
+            project3.id
+        );
+
+        // 测试第一层 filtered entity - ActiveUsers 能访问 projects
+        const activeUsersWithProjects = await entityQueryHandle.find('ActiveUsers',
+            MatchExp.atom({ key: 'name', value: ['=', 'Bob'] }),
+            undefined,
+            ['name', 'age', ['projects', { attributeQuery: ['title', 'status'] }]]
+        );
+
+        expect(activeUsersWithProjects).toHaveLength(1);
+        expect(activeUsersWithProjects[0].name).toBe('Bob');
+        expect(activeUsersWithProjects[0].projects).toHaveLength(3);
+        expect(activeUsersWithProjects[0].projects.map((p: any) => p.title).sort()).toEqual([
+            'Project Alpha',
+            'Project Beta',
+            'Project Gamma'
+        ]);
+
+        // 测试第二层 filtered entity - TechActiveUsers 能访问 projects
+        const techActiveUsersWithProjects = await entityQueryHandle.find('TechActiveUsers',
+            MatchExp.atom({ key: 'name', value: ['=', 'Bob'] }),
+            undefined,
+            ['name', 'department', ['projects', { attributeQuery: ['title', 'status'] }]]
+        );
+
+        expect(techActiveUsersWithProjects).toHaveLength(1);
+        expect(techActiveUsersWithProjects[0].name).toBe('Bob');
+        expect(techActiveUsersWithProjects[0].department).toBe('Tech');
+        expect(techActiveUsersWithProjects[0].projects).toHaveLength(3);
+
+        // 测试第三层 filtered entity - SeniorTechActiveUsers 能访问 projects
+        const seniorTechActiveUsersWithProjects = await entityQueryHandle.find('SeniorTechActiveUsers',
+            MatchExp.atom({ key: 'name', value: ['=', 'Bob'] }),
+            undefined,
+            ['name', 'role', ['projects', { attributeQuery: ['title', 'status'] }]]
+        );
+
+        expect(seniorTechActiveUsersWithProjects).toHaveLength(1);
+        expect(seniorTechActiveUsersWithProjects[0].name).toBe('Bob');
+        expect(seniorTechActiveUsersWithProjects[0].role).toBe('senior');
+        expect(seniorTechActiveUsersWithProjects[0].projects).toHaveLength(3);
+        
+        // 验证项目内容
+        const projectTitles = seniorTechActiveUsersWithProjects[0].projects.map((p: any) => p.title).sort();
+        expect(projectTitles).toEqual(['Project Alpha', 'Project Beta', 'Project Gamma']);
+    });
+
+    test('cascade filtered entities can filter through relations', async () => {
+        // 创建多个用户和项目
+        const user1 = await entityQueryHandle.create('User', {
+            name: 'Alice',
+            age: 30,
+            isActive: true,
+            department: 'Tech',
+            role: 'senior'
+        });
+
+        const user2 = await entityQueryHandle.create('User', {
+            name: 'Bob',
+            age: 35,
+            isActive: true,
+            department: 'Tech',
+            role: 'senior'
+        });
+
+        const activeProject = await entityQueryHandle.create('Project', {
+            title: 'Active Project',
+            status: 'active'
+        });
+
+        const completedProject = await entityQueryHandle.create('Project', {
+            title: 'Completed Project',
+            status: 'completed'
+        });
+
+        // Alice 有一个 active 项目
+        await entityQueryHandle.addRelationByNameById(
+            'User_projects_owner_Project',
+            user1.id,
+            activeProject.id
+        );
+
+        // Bob 有一个 completed 项目
+        await entityQueryHandle.addRelationByNameById(
+            'User_projects_owner_Project',
+            user2.id,
+            completedProject.id
+        );
+
+        // 查询 SeniorTechActiveUsers，只查找有 active 项目的用户
+        const seniorUsersWithActiveProjects = await entityQueryHandle.find('SeniorTechActiveUsers',
+            MatchExp.atom({ key: 'projects.status', value: ['=', 'active'] }),
+            undefined,
+            ['name', 'role', ['projects', { attributeQuery: ['title', 'status'] }]]
+        );
+
+        expect(seniorUsersWithActiveProjects).toHaveLength(1);
+        expect(seniorUsersWithActiveProjects[0].name).toBe('Alice');
+        expect(seniorUsersWithActiveProjects[0].projects).toHaveLength(1);
+        expect(seniorUsersWithActiveProjects[0].projects[0].title).toBe('Active Project');
+        expect(seniorUsersWithActiveProjects[0].projects[0].status).toBe('active');
     });
 }); 
