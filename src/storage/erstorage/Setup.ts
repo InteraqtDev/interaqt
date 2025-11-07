@@ -1011,13 +1011,11 @@ ${Object.values(this.tables[tableName].columns).map(column => {
             
             const targetRecord = recordAttr.recordName
             
-            // 防止循环引用
-            if (visited.has(targetRecord)) return
-            
             // 生成新路径
             const newPath = `${currentPath}_${attrName}`
             
             // 注册这个路径（包括可能的 _SOURCE 或 _TARGET 后缀用于对称关系）
+            // 即使遇到循环引用，也要为当前路径注册别名
             this.aliasManager.registerTablePath(newPath)
             this.aliasManager.registerTablePath(`${newPath}_SOURCE`)
             this.aliasManager.registerTablePath(`${newPath}_TARGET`)
@@ -1026,6 +1024,9 @@ ${Object.values(this.tables[tableName].columns).map(column => {
             this.aliasManager.registerTablePath(`REL_${newPath}`)
             this.aliasManager.registerTablePath(`REL_${newPath}_SOURCE`)
             this.aliasManager.registerTablePath(`REL_${newPath}_TARGET`)
+            
+            // 防止循环引用：在注册完别名后才检查，避免无限递归
+            if (visited.has(targetRecord)) return
             
             // 递归处理目标 record
             const newVisited = new Set(visited)

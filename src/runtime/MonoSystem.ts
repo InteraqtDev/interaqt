@@ -95,7 +95,7 @@ class MonoStorage implements Storage{
             this.db
         )
         if (createTables) await dbSetup.createTables()
-        this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map), this.db)
+        this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), this.db)
 
         this.map = dbSetup.map
     }
