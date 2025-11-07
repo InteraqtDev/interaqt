@@ -29,14 +29,8 @@ export class RecordQuery {
         alias?: string
     ) {
         const recordInfo = map.getRecordInfo(recordName)
-        const isFiltered = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation
-        
-        // 使用预计算的值
-        let baseRecordName = recordName;
-        if (isFiltered ) {
-            baseRecordName = recordInfo.data.resolvedBaseRecordName!;
-        } 
-
+        // 统一使用 resolvedBaseRecordName（普通 entity 指向自己，filtered entity 指向 base）
+        const baseRecordName = recordInfo.resolvedBaseRecordName!;
         
         // CAUTION 因为合表后可能用关联数据匹配到行。
         const inputMatch = new MatchExp(baseRecordName, map, data.matchExpression, contextRootEntity)
@@ -45,10 +39,10 @@ export class RecordQuery {
             value: ['not', null]
         })
 
-        // 使用预计算的合并后的 matchExpression
+        // 如果有 resolvedMatchExpression，说明是 filtered entity，需要合并过滤条件
         let resolvedMatchExpression = matchExpression;
-        if (isFiltered) {
-            resolvedMatchExpression = matchExpression.and(new MatchExp(baseRecordName, map, recordInfo.data.resolvedMatchExpression));
+        if (recordInfo.resolvedMatchExpression) {
+            resolvedMatchExpression = matchExpression.and(new MatchExp(baseRecordName, map, recordInfo.resolvedMatchExpression));
         }
 
         return new RecordQuery(

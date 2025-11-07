@@ -67,7 +67,7 @@ describe('merged entity test', () => {
 
         setup = new DBSetup(entities, relations, db);
         await setup.createTables();
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
     });
 
     afterEach(async () => {
@@ -238,6 +238,179 @@ describe('merged entity test', () => {
             expect(error).toBeTruthy();
         }
     });
+
+    test('merged entity with plain input entities should not create virtual base entity', async () => {
+        // 本测试明确验证：当所有 input entities 都是普通 entity 时，
+        // 不会创建虚拟的 base entity（如 Contact_base）
+        
+        // 重要发现：虽然不创建 virtual base entity，但 input entities 本身会被转换成 filtered entities！
+        // Customer 被替换成: baseEntity = Contact, matchExpression = __Contact_input_entity contains 'Customer'
+        // 这就是为什么我们能通过 input entity 名字正确读取的原因
+        
+        // 1. 验证不存在 Contact_base entity
+        try {
+            await entityQueryHandle.find('Contact_base', undefined, undefined, ['id']);
+            expect.fail('Contact_base should not exist when all input entities are plain entities');
+        } catch (error) {
+            // 预期会抛出错误，因为 Contact_base 不应该存在
+            expect(error).toBeTruthy();
+        }
+
+        // 2. 创建一个 Customer 记录
+        const customer = await entityQueryHandle.create('Customer', {
+            name: 'Test Customer',
+            email: 'test@customer.com'
+        });
+
+        // 3. 验证可以直接用 Customer 名字读取
+        const foundByCustomer = await entityQueryHandle.findOne('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id', 'name', 'email', 'customerLevel', '__Contact_input_entity']
+        );
+
+        expect(foundByCustomer).toBeTruthy();
+        expect(foundByCustomer.name).toBe('Test Customer');
+        expect(foundByCustomer.email).toBe('test@customer.com');
+        expect(foundByCustomer.customerLevel).toBe('bronze');
+        expect(foundByCustomer.__Contact_input_entity).toEqual(['Customer']);
+
+        // 4. 验证也可以通过 Contact (merged entity) 读取
+        const foundByContact = await entityQueryHandle.findOne('Contact',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id', 'name', 'email', '__Contact_input_entity']
+        );
+
+        expect(foundByContact).toBeTruthy();
+        expect(foundByContact.name).toBe('Test Customer');
+        expect(foundByContact.__Contact_input_entity).toEqual(['Customer']);
+
+        // 5. 验证可以直接更新 Customer
+        await entityQueryHandle.update('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            { name: 'Updated Customer' }
+        );
+
+        const afterUpdate = await entityQueryHandle.findOne('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id', 'name']
+        );
+
+        expect(afterUpdate.name).toBe('Updated Customer');
+
+        // 6. 验证可以直接删除 Customer
+        await entityQueryHandle.delete('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] })
+        );
+
+        const afterDelete = await entityQueryHandle.findOne('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id']
+        );
+
+        expect(afterDelete).toBeUndefined();
+    });
+
+    test('verify input entities are converted to filtered entities pointing to merged entity', async () => {
+        // 本测试验证核心机制：普通 input entities 被转换成 filtered entities
+        // 它们的 baseEntity 指向 merged entity，通过 matchExpression 区分
+        
+        // 创建三种不同类型的记录
+        const customer = await entityQueryHandle.create('Customer', {
+            name: 'Customer Record',
+            email: 'customer@test.com',
+            customerLevel: 'gold'
+        });
+
+        const vendor = await entityQueryHandle.create('Vendor', {
+            name: 'Vendor Record',
+            email: 'vendor@test.com',
+            vendorCode: 'V123'
+        });
+
+        const employee = await entityQueryHandle.create('Employee', {
+            name: 'Employee Record',
+            email: 'employee@test.com',
+            employeeId: 'E456',
+            department: 'IT'
+        });
+
+        // 关键验证 1: 所有记录都能通过 Contact (merged entity) 查询到
+        // 这证明它们实际上都存储在 Contact 表中
+        const allContacts = await entityQueryHandle.find('Contact',
+            undefined,
+            undefined,
+            ['id', 'name', '__Contact_input_entity']
+        );
+
+        expect(allContacts.length).toBeGreaterThanOrEqual(3);
+        const createdIds = [customer.id, vendor.id, employee.id];
+        const foundContacts = allContacts.filter(c => createdIds.includes(c.id));
+        expect(foundContacts).toHaveLength(3);
+
+        // 关键验证 2: 每个记录通过 input entity 名字查询时，
+        // 会自动应用 matchExpression 过滤，只返回对应类型的记录
+        const customerQuery = await entityQueryHandle.find('Customer',
+            undefined,
+            undefined,
+            ['id', 'name', '__Contact_input_entity', 'customerLevel']
+        );
+        
+        // Customer 查询应该只返回 __Contact_input_entity 包含 'Customer' 的记录
+        expect(customerQuery.length).toBeGreaterThanOrEqual(1);
+        for (const record of customerQuery) {
+            expect(record.__Contact_input_entity).toContain('Customer');
+            expect(record.customerLevel).toBeTruthy(); // Customer 特有字段
+        }
+
+        const vendorQuery = await entityQueryHandle.find('Vendor',
+            undefined,
+            undefined,
+            ['id', 'name', '__Contact_input_entity', 'vendorCode']
+        );
+        
+        expect(vendorQuery.length).toBeGreaterThanOrEqual(1);
+        for (const record of vendorQuery) {
+            expect(record.__Contact_input_entity).toContain('Vendor');
+            expect(record.vendorCode).toBeTruthy(); // Vendor 特有字段
+        }
+
+        // 关键验证 3: 同一条记录，通过不同的名字查询，返回的是同一条记录
+        const customerById = await entityQueryHandle.findOne('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id', 'name', 'email', '__Contact_input_entity']
+        );
+
+        const contactById = await entityQueryHandle.findOne('Contact',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id', 'name', 'email', '__Contact_input_entity']
+        );
+
+        // 这两个查询返回的是同一条物理记录，只是查询路径不同
+        expect(customerById.id).toBe(contactById.id);
+        expect(customerById.name).toBe(contactById.name);
+        expect(customerById.email).toBe(contactById.email);
+        expect(customerById.__Contact_input_entity).toEqual(contactById.__Contact_input_entity);
+
+        // 关键验证 4: 通过 Contact 更新记录，通过 Customer 名字也能看到更新
+        await entityQueryHandle.update('Contact',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            { name: 'Updated via Contact' }
+        );
+
+        const updatedCustomer = await entityQueryHandle.findOne('Customer',
+            MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
+            undefined,
+            ['id', 'name']
+        );
+
+        expect(updatedCustomer.name).toBe('Updated via Contact');
+    });
 })
 
 
@@ -304,7 +477,7 @@ describe('more complex merged entity test', () => {
 
         const setup2 = new DBSetup(entities2, [], db2);
         await setup2.createTables();
-        const entityQueryHandle2 = new EntityQueryHandle(new EntityToTableMap(setup2.map), db2);
+        const entityQueryHandle2 = new EntityQueryHandle(new EntityToTableMap(setup2.map, setup2.aliasManager), db2);
 
         // 创建测试数据
         await entityQueryHandle2.create('ActiveCustomer', {
@@ -418,7 +591,7 @@ describe('more complex merged entity test', () => {
 
         const setup3 = new DBSetup(entities3, [], db3);
         await setup3.createTables();
-        const entityQueryHandle3 = new EntityQueryHandle(new EntityToTableMap(setup3.map), db3);
+        const entityQueryHandle3 = new EntityQueryHandle(new EntityToTableMap(setup3.map, setup3.aliasManager), db3);
 
         // 通过 Entity1 创建记录，应该使用 Entity1 的默认值
         const record1 = await entityQueryHandle3.create('Entity1', {
@@ -492,7 +665,7 @@ describe('more complex merged entity test', () => {
         // 应该成功创建，因为所有 input entities 都有 name 和 email 属性
         const setup = new DBSetup(entities, [], db);
         await setup.createTables();
-        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
         // 验证可以正常创建和查询
         await entityQueryHandle.create('Person', {
@@ -675,7 +848,7 @@ describe('more complex merged entity test', () => {
 
         const setupNested = new DBSetup(nestedEntities, [], dbNested);
         await setupNested.createTables();
-        const queryHandleNested = new EntityQueryHandle(new EntityToTableMap(setupNested.map), dbNested);
+        const queryHandleNested = new EntityQueryHandle(new EntityToTableMap(setupNested.map, setupNested.aliasManager), dbNested);
 
         // ========== CREATE 操作测试 ==========
         

@@ -50,7 +50,7 @@ describe('Default Value - Program Control', () => {
 
         setup = new DBSetup([User], [], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // 创建用户，只提供 name，其他字段应使用默认值
         const userId = await handle.create('User', { 
@@ -101,7 +101,7 @@ describe('Default Value - Program Control', () => {
 
         setup = new DBSetup([Product], [], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // 创建产品，明确提供一些值，覆盖默认值
         const productId = await handle.create('Product', { 
@@ -149,7 +149,7 @@ describe('Default Value - Program Control', () => {
 
         setup = new DBSetup([Task], [], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // 创建任务，明确提供 null 值
         const taskId = await handle.create('Task', { 
@@ -199,7 +199,7 @@ describe('Default Value - Program Control', () => {
 
         setup = new DBSetup([Document], [], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         const docId = await handle.create('Document', { 
             title: 'My Document'
@@ -259,7 +259,7 @@ describe('Default Value - Program Control', () => {
 
         setup = new DBSetup([Author, Book], [AuthorBookRelation], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // 创建作者
         const authorId = await handle.create('Author', { 

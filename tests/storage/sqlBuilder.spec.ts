@@ -4,6 +4,7 @@ import { EntityToTableMap, MapData } from '../../src/storage/erstorage/EntityToT
 import { RecordQuery } from '../../src/storage/erstorage/RecordQuery.js'
 import { MatchExp } from '../../src/storage/erstorage/MatchExp.js'
 import { AttributeQuery, AttributeQueryData } from '../../src/storage/erstorage/AttributeQuery.js'
+import { AliasManager } from '../../src/storage/erstorage/util/AliasManager.js'
 import { PGLiteDB } from '../../src/dbclients/PGLite.js'
 
 describe('SQLBuilder', () => {
@@ -17,6 +18,8 @@ describe('SQLBuilder', () => {
             records: {
                 User: {
                     table: 'users',
+                    resolvedBaseRecordName: 'User',
+                    baseRecordName: 'User',
                     attributes: {
                         id: {
                             name: 'id',
@@ -42,7 +45,7 @@ describe('SQLBuilder', () => {
             links: {}
         }
 
-        map = new EntityToTableMap(mapData)
+        map = new EntityToTableMap(mapData, new AliasManager())
         database = new PGLiteDB(':memory:')
         await database.open(true) // forceDrop = true
         

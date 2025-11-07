@@ -19,7 +19,7 @@ describe('one to one', () => {
         await db.open()
         setup = new DBSetup(entities, relations, db, ['Profile.owner'])
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {

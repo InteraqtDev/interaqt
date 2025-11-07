@@ -5,8 +5,9 @@ import { MatchExp } from '@storage';
 import { PGLiteDB } from '@dbclients';
 
 describe('Filtered Entity Relation Validation', () => {
-    it('should throw error when filtered entity is used as relation source', () => {
+    it('should allow filtered entity as relation source', async () => {
         const db = new PGLiteDB()
+        await db.open()
 
         // Define base entity
         const User = Entity.create({
@@ -34,9 +35,9 @@ describe('Filtered Entity Relation Validation', () => {
             })
         })
 
-        // Try to create relation with filtered entity as source
-        const InvalidRelation = Relation.create({
-            source: ActiveUser, // This should trigger error
+        // Create relation with filtered entity as source - now allowed
+        const ActiveUserPostRelation = Relation.create({
+            source: ActiveUser, // Now allowed
             sourceProperty: 'posts',
             target: Post,
             targetProperty: 'author',
@@ -44,19 +45,18 @@ describe('Filtered Entity Relation Validation', () => {
         })
 
         const entities = [User, Post, ActiveUser]
-        const relations = [InvalidRelation]
+        const relations = [ActiveUserPostRelation]
 
-        // This should throw an error
-        expect(() => {
-            new DBSetup(entities, relations, db)
-        }).toThrow(/Cannot create Relation with filtered entity 'ActiveUser' as source/)
-        expect(() => {
-            new DBSetup(entities, relations, db)
-        }).toThrow(/Please define the relation on the base entity 'User' instead/)
+        // This should work fine now
+        const setup = new DBSetup(entities, relations, db)
+        await setup.createTables()
+
+        await db.close()
     })
 
-    it('should throw error when filtered entity is used as relation target', () => {
+    it('should allow filtered entity as relation target', async () => {
         const db = new PGLiteDB()
+        await db.open()
 
         // Define base entity
         const User = Entity.create({
@@ -84,25 +84,23 @@ describe('Filtered Entity Relation Validation', () => {
             })
         })
 
-        // Try to create relation with filtered entity as target
-        const InvalidRelation = Relation.create({
+        // Create relation with filtered entity as target - now allowed
+        const PostActiveUserRelation = Relation.create({
             source: Post,
             sourceProperty: 'author',
-            target: ActiveUser, // This should trigger error
+            target: ActiveUser, // Now allowed
             targetProperty: 'posts',
             type: '1:n'
         })
 
         const entities = [User, Post, ActiveUser]
-        const relations = [InvalidRelation]
+        const relations = [PostActiveUserRelation]
 
-        // This should throw an error
-        expect(() => {
-            new DBSetup(entities, relations, db)
-        }).toThrow(/Cannot create Relation with filtered entity 'ActiveUser' as target/)
-        expect(() => {
-            new DBSetup(entities, relations, db)
-        }).toThrow(/Please define the relation on the base entity 'User' instead/)
+        // This should work fine now
+        const setup = new DBSetup(entities, relations, db)
+        await setup.createTables()
+
+        await db.close()
     })
 
     it('should allow relation with base entity', async () => {

@@ -51,8 +51,9 @@ export class NewRecordData {
         
         // 保存原始传入的 recordName
         
-        // 如果是 filtered entity，使用 base record name 作为实际的 recordName
-        this.recordName = (originalRecordInfo.isFilteredEntity || originalRecordInfo.isFilteredRelation) ? originalRecordInfo.resolvedBaseRecordName! : originalRecordName
+        // 统一使用 resolvedBaseRecordName 作为实际的 recordName
+        // 普通 entity 的 resolvedBaseRecordName 指向自己，filtered entity 指向 base
+        this.recordName = originalRecordInfo.resolvedBaseRecordName!
         
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(this.recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>

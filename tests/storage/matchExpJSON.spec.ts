@@ -1,9 +1,9 @@
-import {describe, expect, test} from "vitest";
-import {EntityToTableMap, MatchExp} from "@storage";
+import { describe, expect, test} from "vitest";
+import { AliasManager, EntityToTableMap, MatchExp} from "@storage";
 import {entityToTableMapData} from "./data/mapData";
 
 
-const entityToTableMap = new EntityToTableMap(entityToTableMapData)
+const entityToTableMap = new EntityToTableMap(entityToTableMapData, new AliasManager())
 
 describe('MatchExp JSON serialization test', () => {
     test("serialize and deserialize simple match expression", () => {

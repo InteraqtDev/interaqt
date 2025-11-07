@@ -1,5 +1,5 @@
-import {describe, expect, test} from "vitest";
-import {EntityToTableMap, MatchExp} from "@storage";
+import { describe, expect, test} from "vitest";
+import { AliasManager, EntityToTableMap, MatchExp} from "@storage";
 import {entityToTableMapData} from "./data/mapData";
 
 const entityToTableMap = new EntityToTableMap(entityToTableMapData);

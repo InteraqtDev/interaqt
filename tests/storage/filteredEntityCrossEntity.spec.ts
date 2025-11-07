@@ -210,7 +210,7 @@ describe('filtered entity with cross-entity queries', () => {
 
         setup = new DBSetup(entities, relations, db);
         await setup.createTables();
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
     });
 
     afterEach(async () => {

@@ -39,7 +39,7 @@ describe('json field test', () => {
 
         setup = new DBSetup([userEntity], [], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {

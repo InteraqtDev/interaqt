@@ -225,7 +225,7 @@ describe('Long column name tests', () => {
         const setup = new DBSetup([UserEntity], [], db)
         await setup.createTables()
         
-        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // CREATE - Test creating entity with long property names
         const userData = {
@@ -355,7 +355,7 @@ describe('Long column name tests', () => {
         const setup = new DBSetup([UserEntity, TeamEntity], [MembershipRelation], db)
         await setup.createTables()
         
-        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // CREATE - Create user with related teams
         const userWithTeams = await entityQueryHandle.create('UserWithExtremelyLongEntityNameForRelationCRUDTesting', {

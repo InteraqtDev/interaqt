@@ -62,7 +62,7 @@ describe('merged entity in relation test', () => {
         try {
             const setup = new DBSetup(entities, relations, db);
             await setup.createTables();
-            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
             // 4. 通过 Customer 创建数据并关联 Order
             const customer1 = await entityQueryHandle.create('Customer', {
@@ -208,7 +208,7 @@ describe('merged entity in relation test', () => {
         try {
             const setup = new DBSetup(entities, relations, db);
             await setup.createTables();
-            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
             // 4. 创建 Customer 和 Order
             const customer1 = await entityQueryHandle.create('Customer', {
@@ -324,7 +324,7 @@ describe('merged entity in relation test', () => {
         try {
             const setup = new DBSetup(entities, relations, db);
             await setup.createTables();
-            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
             // 4. 创建 Person 和相关数据
             const person1 = await entityQueryHandle.create('Person', {
@@ -441,7 +441,7 @@ describe('merged entity in relation test', () => {
         try {
             const setup = new DBSetup(entities, relations, db);
             await setup.createTables();
-            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
             // 4. 创建一个 Order（没有关联 contact）
             const order1 = await entityQueryHandle.create('Order', {

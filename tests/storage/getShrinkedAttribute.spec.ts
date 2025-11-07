@@ -1,5 +1,5 @@
 import { expect, test, describe } from 'vitest';
-import { EntityToTableMap } from '../../src/storage/erstorage/EntityToTableMap.js';
+import { AliasManager, EntityToTableMap } from '@storage';
 import { entityToTableMapData } from './data/mapData.js';
 
 describe("getShrinkedAttribute test", () => {

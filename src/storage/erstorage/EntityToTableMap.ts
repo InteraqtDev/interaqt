@@ -4,6 +4,7 @@ import { RecordInfo } from "./RecordInfo.js";
 import { LinkInfo } from "./LinkInfo.js";
 import { LINK_SYMBOL } from "./RecordQuery.js";
 import { MatchExpressionData } from "./MatchExp.js";
+import { AliasManager } from "./util/AliasManager.js";
 
 
 export type ValueAttribute = {
@@ -117,7 +118,8 @@ type TableAndAliasStack = {
 }[]
 
 export class EntityToTableMap {
-    constructor(public data: MapData) {}
+    constructor(public data: MapData, public aliasManager?: AliasManager) {}
+    
     getRecord(recordName:string) {
         return this.data.records[recordName]
     }
@@ -241,7 +243,9 @@ export class EntityToTableMap {
                 const currentEntityData = this.data.records[currentEntityAttribute.recordName] as RecordMapItem
 
                 // 处理 symmetric 中的:
-                const currentTableAlias = `${lastTableAlias}_${currentAttributeName}${symmetricDirection ? `_${symmetricDirection.toUpperCase()}` : ''}`
+                const rawCurrentTableAlias = `${lastTableAlias}_${currentAttributeName}${symmetricDirection ? `_${symmetricDirection.toUpperCase()}` : ''}`
+                // 使用预生成的别名或原始名称（如果没有 aliasManager）
+                const currentTableAlias = this.aliasManager?.getTableAlias(rawCurrentTableAlias) || rawCurrentTableAlias
 
                 // CAUTION 一定要先处理 linkAlias，因为依赖于上一次 tableAlias。
                 if (info.isMergedWithParent() || info.isLinkMergedWithParent()) {
@@ -251,7 +255,8 @@ export class EntityToTableMap {
                 } else if (info.isLinkIsolated()){
                     // link 表独立，给个新名字
                     // CAUTION symmetric 路径要手动指定关系
-                    relationTableAlias = `REL_${currentTableAlias}`
+                    const rawRelAlias = `REL_${rawCurrentTableAlias}`
+                    relationTableAlias = this.aliasManager?.getTableAlias(rawRelAlias) || rawRelAlias
                 } else {
                     // link 表合并了，名字和当前一样。
                     relationTableAlias = currentTableAlias

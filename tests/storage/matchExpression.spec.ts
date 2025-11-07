@@ -1,9 +1,9 @@
-import {describe, expect, test} from "vitest";
-import {EntityToTableMap,MatchExp, MatchExpressionData,RecordQueryTree} from "@storage";
+import { describe, expect, test} from "vitest";
+import { AliasManager, EntityToTableMap,MatchExp, MatchExpressionData,RecordQueryTree} from "@storage";
 import {entityToTableMapData} from "./data/mapData";
 
 
-const entityToTableMap = new EntityToTableMap(entityToTableMapData)
+const entityToTableMap = new EntityToTableMap(entityToTableMapData, new AliasManager())
 
 describe('match expression test', () => {
     test("basic match query", () => {

@@ -114,7 +114,7 @@ describe('Filtered Entity with Relation as Source', () => {
         
         const setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        map = new EntityToTableMap(setup.map)
+        map = new EntityToTableMap(setup.map, setup.aliasManager)
 
         recordQueryAgent = new RecordQueryAgent(map, db)
         entityQueryHandle = new EntityQueryHandle(map, db)

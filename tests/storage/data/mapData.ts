@@ -13,7 +13,9 @@ export const entityToTableMapData: MapData = {
             "targetRecord": "User",
             "targetProperty": "file",
             "recordName": "File_owner_file_User",
-            "mergedTo": "source"
+            "mergedTo": "source",
+            "resolvedBaseRecordName": "File_owner_file_User",
+            "resolvedMatchExpression": undefined
         },
         "File_owner_file_User_source": {
             "table": "File_owner_file_User_source",
@@ -25,7 +27,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "File_owner_file_User_source",
+            "resolvedMatchExpression": undefined
         },
         "File_owner_file_User_target": {
             "table": "File_owner_file_User_target",
@@ -37,7 +41,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "source"
+            "mergedTo": "source",
+            "resolvedBaseRecordName": "File_owner_file_User_target",
+            "resolvedMatchExpression": undefined
         },
         "Profile_owner_profile_User": {
             "table": "Profile_owner_profile_User",
@@ -50,7 +56,9 @@ export const entityToTableMapData: MapData = {
             "targetRecord": "User",
             "targetProperty": "profile",
             "recordName": "Profile_owner_profile_User",
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "Profile_owner_profile_User",
+            "resolvedMatchExpression": undefined
         },
         "Profile_owner_profile_User_source": {
             "table": "Profile_owner_profile_User_source",
@@ -62,7 +70,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "Profile_owner_profile_User_source",
+            "resolvedMatchExpression": undefined
         },
         "Profile_owner_profile_User_target": {
             "table": "Profile_owner_profile_User_target",
@@ -74,7 +84,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "Profile_owner_profile_User_target",
+            "resolvedMatchExpression": undefined
         },
         "User_leader_member_User": {
             "table": "User_leader_member_User",
@@ -87,7 +99,9 @@ export const entityToTableMapData: MapData = {
             "targetRecord": "User",
             "targetProperty": "member",
             "recordName": "User_leader_member_User",
-            "mergedTo": "source"
+            "mergedTo": "source",
+            "resolvedBaseRecordName": "User_leader_member_User",
+            "resolvedMatchExpression": undefined
         },
         "User_leader_member_User_source": {
             "table": "User_leader_member_User_source",
@@ -99,7 +113,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "User_leader_member_User_source",
+            "resolvedMatchExpression": undefined
         },
         "User_leader_member_User_target": {
             "table": "User_leader_member_User_target",
@@ -111,7 +127,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "source"
+            "mergedTo": "source",
+            "resolvedBaseRecordName": "User_leader_member_User_target",
+            "resolvedMatchExpression": undefined
         },
         "User_friends_friends_User": {
             "table": "User_friends_friends_User",
@@ -123,7 +141,9 @@ export const entityToTableMapData: MapData = {
             "sourceProperty": "friends",
             "targetRecord": "User",
             "targetProperty": "friends",
-            "recordName": "User_friends_friends_User"
+            "recordName": "User_friends_friends_User",
+            "resolvedBaseRecordName": "User_friends_friends_User",
+            "resolvedMatchExpression": undefined
         },
         "User_friends_friends_User_source": {
             "table": "User_friends_friends_User_source",
@@ -135,7 +155,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "source"
+            "mergedTo": "source",
+            "resolvedBaseRecordName": "User_friends_friends_User_source",
+            "resolvedMatchExpression": undefined
         },
         "User_friends_friends_User_target": {
             "table": "User_friends_friends_User_target",
@@ -147,7 +169,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "source"
+            "mergedTo": "source",
+            "resolvedBaseRecordName": "User_friends_friends_User_target",
+            "resolvedMatchExpression": undefined
         },
         "User_item_owner_Item": {
             "table": "User_item_owner_Item",
@@ -160,7 +184,9 @@ export const entityToTableMapData: MapData = {
             "targetRecord": "Item",
             "targetProperty": "owner",
             "recordName": "User_item_owner_Item",
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "User_item_owner_Item",
+            "resolvedMatchExpression": undefined
         },
         "User_item_owner_Item_source": {
             "table": "User_item_owner_Item_source",
@@ -172,7 +198,9 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "User_item_owner_Item_source",
+            "resolvedMatchExpression": undefined
         },
         "User_item_owner_Item_target": {
             "table": "User_item_owner_Item_target",
@@ -184,12 +212,18 @@ export const entityToTableMapData: MapData = {
                 "1"
             ],
             "isSourceRelation": true,
-            "mergedTo": "combined"
+            "mergedTo": "combined",
+            "resolvedBaseRecordName": "User_item_owner_Item_target",
+            "resolvedMatchExpression": undefined
         }
     },
     "records": {
         "User": {
             "table": "Profile_User_Item",
+            "baseRecordName": "User",
+            "resolvedBaseRecordName": "User",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "name": {
                     "type": "string",
@@ -274,6 +308,10 @@ export const entityToTableMapData: MapData = {
         },
         "Profile": {
             "table": "Profile_User_Item",
+            "baseRecordName": "Profile",
+            "resolvedBaseRecordName": "Profile",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "title": {
                     "type": "string",
@@ -298,6 +336,10 @@ export const entityToTableMapData: MapData = {
         },
         "File": {
             "table": "File",
+            "baseRecordName": "File",
+            "resolvedBaseRecordName": "File",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "fileName": {
                     "type": "string",
@@ -323,6 +365,10 @@ export const entityToTableMapData: MapData = {
         },
         "Item": {
             "table": "Profile_User_Item",
+            "baseRecordName": "Item",
+            "resolvedBaseRecordName": "Item",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "itemName": {
                     "type": "string",
@@ -347,6 +393,10 @@ export const entityToTableMapData: MapData = {
         },
         "File_owner_file_User": {
             "table": "File",
+            "baseRecordName": "File_owner_file_User",
+            "resolvedBaseRecordName": "File_owner_file_User",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "id": {
                     "type": "id",
@@ -381,6 +431,10 @@ export const entityToTableMapData: MapData = {
         },
         "Profile_owner_profile_User": {
             "table": "Profile_User_Item",
+            "baseRecordName": "Profile_owner_profile_User",
+            "resolvedBaseRecordName": "Profile_owner_profile_User",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "id": {
                     "type": "id",
@@ -415,6 +469,10 @@ export const entityToTableMapData: MapData = {
         },
         "User_leader_member_User": {
             "table": "Profile_User_Item",
+            "baseRecordName": "User_leader_member_User",
+            "resolvedBaseRecordName": "User_leader_member_User",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "id": {
                     "type": "id",
@@ -449,6 +507,10 @@ export const entityToTableMapData: MapData = {
         },
         "User_friends_friends_User": {
             "table": "User_friends_friends_User",
+            "baseRecordName": "User_friends_friends_User",
+            "resolvedBaseRecordName": "User_friends_friends_User",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "id": {
                     "type": "id",
@@ -483,6 +545,10 @@ export const entityToTableMapData: MapData = {
         },
         "User_item_owner_Item": {
             "table": "Profile_User_Item",
+            "baseRecordName": "User_item_owner_Item",
+            "resolvedBaseRecordName": "User_item_owner_Item",
+            "matchExpression": undefined,
+            "resolvedMatchExpression": undefined,
             "attributes": {
                 "id": {
                     "type": "id",

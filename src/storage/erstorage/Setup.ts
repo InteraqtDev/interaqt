@@ -7,6 +7,7 @@ import { MatchExpressionData, MatchExp } from "./MatchExp.js";
 import { Entity, Property, Relation } from "@shared";
 import { BoolExp } from "@shared";
 import { processMergedItems } from "./MergedItemProcessor.js";
+import { AliasManager } from "./util/AliasManager.js";
 
 // Define the types we need
 
@@ -40,6 +41,7 @@ export class DBSetup {
     public mergeLog: any[] = []
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
+    public aliasManager: AliasManager = new AliasManager()
     constructor(
         public entities: EntityInstance[],
         public relations: RelationInstance[],
@@ -51,8 +53,13 @@ export class DBSetup {
     }
     createRecordToTable(item:string, table:string) {
         this.recordToTableMap.set(item, table)
-        assert(!this.tableToRecordsMap.get(table), `create table for ${item} ${table} failed, ${table} already exist.`)
-        this.tableToRecordsMap.set(table, new Set([item]))
+        // 支持多个 records 共享同一个表（如 filtered entity 与其 base entity 共享表）
+        const existingRecords = this.tableToRecordsMap.get(table)
+        if (existingRecords) {
+            existingRecords.add(item)
+        } else {
+            this.tableToRecordsMap.set(table, new Set([item]))
+        }
     }
     // CAUTION 把一个 item 拉过来，等于把它所有同表的 item 拉过来
     joinTables(joinTargetRecord:string, record:string, link: string): string[]| undefined {
@@ -246,6 +253,11 @@ export class DBSetup {
             attributes,
             isRelation,
             filteredBy: filteredBy.length ? filteredBy.map(e => e.name) : undefined,
+            // 统一化字段：普通 entity 的 base 和 resolved 都指向自己
+            baseRecordName: entity.name,
+            resolvedBaseRecordName: entity.name,
+            matchExpression: undefined,
+            resolvedMatchExpression: undefined,
         } as RecordMapItem
     }
     createFilteredEntityRecord(entity: EntityInstance) {
@@ -354,6 +366,9 @@ export class DBSetup {
             recordName: relationName,
             isTargetReliance: relation.isTargetReliance,
             matchExpression: relation.matchExpression,
+            // 统一化字段：普通 link 的 resolved 指向自己
+            resolvedBaseRecordName: relationName,
+            resolvedMatchExpression: undefined,
         } as LinkMapItem
     }
     createFilteredLink(relationName: string, relation: RelationInstance) {
@@ -397,22 +412,97 @@ export class DBSetup {
     }
 
     /**
-     * 验证 relations：不允许 filtered entity 作为 relation 的 source 或 target
+     * 获取 entity 的所有 base entity 链（从直接 base 到最顶层）
+     */
+    private getBaseEntityChain(entity: EntityInstance): EntityInstance[] {
+        const chain: EntityInstance[] = []
+        let current: EntityInstance | RelationInstance | undefined = entity.baseEntity
+        while (current) {
+            // baseEntity 应该总是 EntityInstance，但类型系统允许 RelationInstance
+            // 这里我们只处理 EntityInstance 的情况
+            if ('baseEntity' in current && !('sourceProperty' in current)) {
+                chain.push(current as EntityInstance)
+                current = (current as EntityInstance).baseEntity
+            } else {
+                break
+            }
+        }
+        return chain
+    }
+
+    /**
+     * 获取 entity 上已定义的所有关系属性名
+     */
+    private getRelationPropertyNames(entityName: string): Set<string> {
+        const propertyNames = new Set<string>()
+        
+        // 遍历所有 relations，找出涉及此 entity 的属性名
+        this.relations.forEach(relation => {
+            if (relation.source.name === entityName) {
+                propertyNames.add(relation.sourceProperty)
+            }
+            if (relation.target.name === entityName) {
+                if (relation.targetProperty) {
+                    propertyNames.add(relation.targetProperty)
+                }
+            }
+        })
+        
+        return propertyNames
+    }
+
+    /**
+     * 验证 relations
+     * 
+     * 检查 filtered entity 上的关系属性名是否与其 base entity 的关系属性名冲突。
+     * 因为 filtered entity 会继承 base entity 的所有关系，如果定义了同名属性会产生歧义。
      */
     private validateRelations() {
         this.relations.forEach(relation => {
-            if (relation.baseRelation) return // filtered relation 本身是允许的
-            
-            const checks = [
-                { entity: relation.source as any, name: relation.source.name, role: 'source' },
-                { entity: relation.target as any, name: relation.target.name, role: 'target' }
-            ]
-            
-            for (const { entity, name, role } of checks) {
-                if (entity.baseEntity) {
+            // 检查 source entity
+            if ((relation.source as any).baseEntity) {
+                const sourceChain = this.getBaseEntityChain(relation.source as EntityInstance)
+                const conflictingProperties: string[] = []
+                
+                for (const baseEntity of sourceChain) {
+                    const basePropertyNames = this.getRelationPropertyNames(baseEntity.name)
+                    if (basePropertyNames.has(relation.sourceProperty)) {
+                        conflictingProperties.push(baseEntity.name)
+                    }
+                }
+                
+                if (conflictingProperties.length > 0) {
                     throw new Error(
-                        `Cannot create Relation with filtered entity '${name}' as ${role}. ` +
-                        `Please define the relation on the base entity '${entity.baseEntity.name}' instead.`
+                        `Relation property name conflict: filtered entity '${relation.source.name}' ` +
+                        `uses sourceProperty '${relation.sourceProperty}', but this property name is already ` +
+                        `defined on base entity '${conflictingProperties[0]}'. ` +
+                        `Filtered entities inherit all relation properties from their base entities, ` +
+                        `so you cannot redefine the same property name. ` +
+                        `Please use a different property name for this relation.`
+                    )
+                }
+            }
+            
+            // 检查 target entity
+            if ((relation.target as any).baseEntity && relation.targetProperty) {
+                const targetChain = this.getBaseEntityChain(relation.target as EntityInstance)
+                const conflictingProperties: string[] = []
+                
+                for (const baseEntity of targetChain) {
+                    const basePropertyNames = this.getRelationPropertyNames(baseEntity.name)
+                    if (basePropertyNames.has(relation.targetProperty)) {
+                        conflictingProperties.push(baseEntity.name)
+                    }
+                }
+                
+                if (conflictingProperties.length > 0) {
+                    throw new Error(
+                        `Relation property name conflict: filtered entity '${relation.target.name}' ` +
+                        `uses targetProperty '${relation.targetProperty}', but this property name is already ` +
+                        `defined on base entity '${conflictingProperties[0]}'. ` +
+                        `Filtered entities inherit all relation properties from their base entities, ` +
+                        `so you cannot redefine the same property name. ` +
+                        `Please use a different property name for this relation.`
                     )
                 }
             }
@@ -426,10 +516,9 @@ export class DBSetup {
         this.entities.forEach(entity => {
             assert(!this.map.records[entity.name], `entity name ${entity.name} is duplicated`)
             this.map.records[entity.name] = entity.baseEntity ? this.createFilteredEntityRecord(entity) : this.createRecord(entity)
-            // 记录一下 entity 和 表的关系。后面用于合并的时候做计算。
-            if(!entity.baseEntity) {
-                this.createRecordToTable(entity.name, this.map.records[entity.name].table)
-            }
+            // 记录 entity 和表的关系，用于后续表合并计算
+            // 注意：filtered entity 也需要建立映射，它们使用 resolved base entity 的表
+            this.createRecordToTable(entity.name, this.map.records[entity.name].table)
         })
     }
 
@@ -450,9 +539,9 @@ export class DBSetup {
             this.map.links[virtualSourceRelationName] = this.createLinkOfRelationAndEntity(relationName, virtualSourceRelationName, relation, true)
             const virtualTargetRelationName = this.getRelationNameOfRelationAndEntity(relationName, false)
             this.map.links[virtualTargetRelationName] = this.createLinkOfRelationAndEntity(relationName, virtualTargetRelationName, relation, false)
-            if(!relation.baseRelation) {
-                this.createRecordToTable(relationName, this.map.records[relationName].table)
-            }
+            // 记录 relation 和表的映射关系
+            // 注意：filtered relation 也需要建立映射，它们使用 resolved base relation 的表
+            this.createRecordToTable(relationName, this.map.records[relationName].table)
         })
     }
 
@@ -527,34 +616,16 @@ export class DBSetup {
      */
     private copyAttributesToFilteredEntities() {
         Object.entries(this.map.records).forEach(([recordName, record]) => {
-            // 处理 filtered entity
-            if (record.isFilteredEntity) {
-                // 使用 resolvedBaseRecordName 确保找到最底层的 base entity
-                const baseRecordName = record.resolvedBaseRecordName || record.baseRecordName
-                if (!baseRecordName) return
-                
-                const baseRecord = this.map.records[baseRecordName]
+            // 统一处理：如果 resolvedBaseRecordName 不指向自己，说明是 filtered entity/relation
+            // 普通 entity 的 resolvedBaseRecordName 指向自己，所以会跳过
+            if (record.resolvedBaseRecordName && record.resolvedBaseRecordName !== recordName) {
+                const baseRecord = this.map.records[record.resolvedBaseRecordName]
                 if (!baseRecord) {
-                    throw new Error(`Base record ${baseRecordName} not found for filtered entity ${recordName}`)
+                    throw new Error(`Base record ${record.resolvedBaseRecordName} not found for filtered entity/relation ${recordName}`)
                 }
                 
                 // 复制 attributes，保留函数引用
                 record.attributes = this.copyAttributes(baseRecord.attributes)
-            }
-            
-            // 处理 filtered relation
-            if (record.isFilteredRelation) {
-                // 使用 resolvedBaseRecordName 确保找到最底层的 base relation
-                const baseRelationName = record.resolvedBaseRecordName || record.baseRelationName
-                if (!baseRelationName) return
-                
-                const baseRelationRecord = this.map.records[baseRelationName]
-                if (!baseRelationRecord) {
-                    throw new Error(`Base relation ${baseRelationName} not found for filtered relation ${recordName}`)
-                }
-                
-                // 复制 attributes，保留函数引用
-                record.attributes = this.copyAttributes(baseRelationRecord.attributes)
             }
         })
     }
@@ -611,6 +682,9 @@ export class DBSetup {
         
         // 7. 分配表名和字段名
         this.assignTableAndField();
+        
+        // 8. 预生成所有可能的表别名
+        this.pregenerateTableAliases();
     }
     /**
      * 统一处理 merged entities 和 merged relations
@@ -892,6 +966,72 @@ ${Object.values(this.tables[tableName].columns).map(column => {
         this.usedFieldNames.add(shortName)
         
         return shortName
+    }
+    
+    /**
+     * 预生成所有可能的表别名
+     * 递归遍历所有可能的关系路径，生成表别名
+     */
+    private pregenerateTableAliases() {
+        // 为每个 entity 生成所有可能的查询路径
+        Object.keys(this.map.records).forEach(recordName => {
+            // 从每个 record 开始，递归生成路径
+            this.generateAliasesForRecord(recordName, recordName, new Set([recordName]), 0, 5) // 最大深度5
+        })
+    }
+    
+    /**
+     * 递归生成从某个 record 开始的所有可能查询路径的别名
+     * @param rootRecord 根 record 名称
+     * @param currentPath 当前路径（用 _ 连接）
+     * @param visited 已访问的 record（防止循环）
+     * @param depth 当前深度
+     * @param maxDepth 最大深度
+     */
+    private generateAliasesForRecord(
+        rootRecord: string,
+        currentPath: string,
+        visited: Set<string>,
+        depth: number,
+        maxDepth: number
+    ) {
+        // 注册当前路径的别名
+        this.aliasManager.registerTablePath(currentPath)
+        
+        // 如果达到最大深度，停止递归
+        if (depth >= maxDepth) return
+        
+        // 获取当前 record 的所有关系属性
+        const currentRecord = this.map.records[rootRecord]
+        if (!currentRecord) return
+        
+        Object.entries(currentRecord.attributes).forEach(([attrName, attrData]) => {
+            const recordAttr = attrData as RecordAttribute
+            if (!recordAttr.isRecord) return
+            
+            const targetRecord = recordAttr.recordName
+            
+            // 防止循环引用
+            if (visited.has(targetRecord)) return
+            
+            // 生成新路径
+            const newPath = `${currentPath}_${attrName}`
+            
+            // 注册这个路径（包括可能的 _SOURCE 或 _TARGET 后缀用于对称关系）
+            this.aliasManager.registerTablePath(newPath)
+            this.aliasManager.registerTablePath(`${newPath}_SOURCE`)
+            this.aliasManager.registerTablePath(`${newPath}_TARGET`)
+            
+            // 如果这是一个关系表的别名，也注册 REL_ 前缀版本
+            this.aliasManager.registerTablePath(`REL_${newPath}`)
+            this.aliasManager.registerTablePath(`REL_${newPath}_SOURCE`)
+            this.aliasManager.registerTablePath(`REL_${newPath}_TARGET`)
+            
+            // 递归处理目标 record
+            const newVisited = new Set(visited)
+            newVisited.add(targetRecord)
+            this.generateAliasesForRecord(targetRecord, newPath, newVisited, depth + 1, maxDepth)
+        })
     }
 }
 

@@ -82,7 +82,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const alice = await handle.create('User', { name: 'Alice', department: 'Engineering' })
@@ -237,7 +237,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const emp1 = await handle.create('Employee', { name: 'Senior Dev', level: 4 })
@@ -363,7 +363,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const engineering = await handle.create('Department', { name: 'Engineering' })
@@ -537,7 +537,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const techCorp = await handle.create('Company', { name: 'TechCorp', industry: 'tech' })
@@ -668,7 +668,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create entities
         const user = await handle.create('User', { name: 'Alice', status: 'active' })
@@ -771,7 +771,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create data
         const dept = await handle.create('Department', { name: 'Engineering' })
@@ -888,7 +888,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create data
         const company = await handle.create('Company', { name: 'TechCorp' })
@@ -1021,7 +1021,7 @@ describe('cascade filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create data
         const org = await handle.create('Organization', { name: 'TechOrg', type: 'technology' })

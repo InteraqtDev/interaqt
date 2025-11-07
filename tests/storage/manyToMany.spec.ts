@@ -24,7 +24,7 @@ describe('many to many', () => {
 
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {

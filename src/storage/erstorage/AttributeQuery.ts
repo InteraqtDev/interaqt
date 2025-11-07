@@ -53,7 +53,9 @@ export class AttributeQuery {
         includeNotRelianceCombined?: boolean
     ): AttributeQueryData{
         const inputRecordInfo = map.getRecordInfo(recordName)
-        const recordInfo = inputRecordInfo.resolvedBaseRecordName ? map.getRecordInfo(inputRecordInfo.resolvedBaseRecordName) : inputRecordInfo
+        // 统一使用 resolvedBaseRecordName 获取实际的 recordInfo
+        // 普通 entity 的 resolvedBaseRecordName 指向自己，所以这里始终获取正确的 recordInfo
+        const recordInfo = map.getRecordInfo(inputRecordInfo.resolvedBaseRecordName!)
         let result: AttributeQueryData = recordInfo.valueAttributes.map(info => info.attributeName)
 
         // FIXME 再想想以下几个参数的递归查询，特别是关系上的数据。

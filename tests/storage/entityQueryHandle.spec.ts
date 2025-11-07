@@ -19,7 +19,7 @@ describe('create data', () => {
 
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {
@@ -139,7 +139,7 @@ describe('update data', () => {
         await db.open()
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {
@@ -397,7 +397,7 @@ describe('query data', () => {
         await db.open()
         setup = new DBSetup(entities, relations, db)
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {

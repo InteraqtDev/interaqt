@@ -35,7 +35,7 @@ describe('EXIST Query - Proof of Support', () => {
 
         setup = new DBSetup([User], [userMemberRelation], db)
         await setup.createTables()
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
     })
 
     afterEach(async () => {

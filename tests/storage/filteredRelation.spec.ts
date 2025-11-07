@@ -62,7 +62,7 @@ describe('filtered relation', () => {
         // Setup database
         setup = new DBSetup([User, Post], [UserPostRelation, ActiveUserPostRelation], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const user1 = await handle.create('User', { name: 'User 1' })
@@ -253,7 +253,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const company = await handle.create('Company', { name: 'Test Company' })
@@ -482,7 +482,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const product1 = await handle.create('Product', { name: 'Product 1', category: 'Electronics' })
@@ -693,7 +693,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const verifiedAuthor = await handle.create('Author', {
@@ -946,7 +946,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const usa = await handle.create('Country', { name: 'USA', isActive: true })
@@ -1243,7 +1243,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const project1 = await handle.create('Project', { name: 'Project Alpha', budget: 1000000 })
@@ -1555,7 +1555,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data - Organizations
         const premiumOrg = await handle.create('Organization', { 
@@ -1888,7 +1888,7 @@ describe('filtered relation', () => {
         // Setup database
         setup = new DBSetup([User, Post], [UserPostRelation, PublishedPostRelation], db)
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const user1 = await handle.create('User', { name: 'Alice', isActive: true })
@@ -2133,7 +2133,7 @@ describe('filtered relation', () => {
             db
         )
         await setup.createTables()
-        handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+        handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
 
         // Create test data
         const company = await handle.create('Company', { name: 'Tech Corp', type: 'technology' })

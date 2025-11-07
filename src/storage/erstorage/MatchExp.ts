@@ -85,14 +85,13 @@ export class MatchExp {
     constructor(entityName: string, public map: EntityToTableMap, data?: MatchExpressionData, public contextRootEntity?: string, public fromRelation?: boolean) {
         assert(!data || data instanceof BoolExp, `match data is not a BoolExpression instance, you passed: ${this.data}`)
         const recordInfo = this.map.getRecordInfo(entityName)
-        // 使用 resolvedBaseRecordName 以支持级联 filtered entity
-        this.entityName = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation ? recordInfo.resolvedBaseRecordName! : entityName
-        const isFiltered = recordInfo.isFilteredEntity || recordInfo.isFilteredRelation
+        // 统一使用 resolvedBaseRecordName（普通 entity 指向自己，filtered entity 指向 base）
+        this.entityName = recordInfo.resolvedBaseRecordName!
         this.xToOneQueryTree = new RecordQueryTree(this.entityName, this.map)
         let combinedData = data
-        if (isFiltered) {
-            // 使用 resolvedMatchExpression 获取合并后的过滤条件
-            combinedData = data ? recordInfo.resolvedMatchExpression!.and(data) : recordInfo.resolvedMatchExpression
+        // 如果有 resolvedMatchExpression，说明是 filtered entity，需要合并过滤条件
+        if (recordInfo.resolvedMatchExpression) {
+            combinedData = data ? recordInfo.resolvedMatchExpression.and(data) : recordInfo.resolvedMatchExpression
         }
         if (combinedData) {
             this.data = this.convertFilteredRelation(combinedData)

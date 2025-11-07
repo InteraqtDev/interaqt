@@ -95,7 +95,7 @@ describe('merged relation test', () => {
 
         setup = new DBSetup(entities, relations, db);
         await setup.createTables();
-        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+        entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
     });
 
     afterEach(async () => {
@@ -384,7 +384,7 @@ describe('complex merged relation test', () => {
 
         const setup2 = new DBSetup(entities2, relations2, db2);
         await setup2.createTables();
-        const entityQueryHandle2 = new EntityQueryHandle(new EntityToTableMap(setup2.map), db2);
+        const entityQueryHandle2 = new EntityQueryHandle(new EntityToTableMap(setup2.map, setup2.aliasManager), db2);
 
         // 创建测试数据
         const user1 = await entityQueryHandle2.create('User', {
@@ -505,7 +505,7 @@ describe('complex merged relation test', () => {
 
         const setup3 = new DBSetup(entities3, relations3, db3);
         await setup3.createTables();
-        const entityQueryHandle3 = new EntityQueryHandle(new EntityToTableMap(setup3.map), db3);
+        const entityQueryHandle3 = new EntityQueryHandle(new EntityToTableMap(setup3.map, setup3.aliasManager), db3);
 
         const author1 = await entityQueryHandle3.create('Author', {
             name: 'John Smith'
@@ -614,7 +614,7 @@ describe('complex merged relation test', () => {
         // 应该成功创建，因为所有 input relations 都有 timestamp 和 quantity 属性
         const setup = new DBSetup(entities, relations, db);
         await setup.createTables();
-        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
         // 验证可以正常创建和查询
         const user = await entityQueryHandle.create('User', { username: 'testuser' });

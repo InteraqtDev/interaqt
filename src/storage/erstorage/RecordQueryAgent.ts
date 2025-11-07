@@ -46,15 +46,13 @@ export class RecordQueryAgent {
         const records = this.map.data.records
         
         for (const [recordName, recordData] of Object.entries(records)) {
-            if (recordData.baseRecordName && recordData.matchExpression) {
-                // 使用预计算的值
-                const rootEntityName = recordData.resolvedBaseRecordName || recordData.baseRecordName;
-                const combinedExpression = recordData.resolvedMatchExpression || recordData.matchExpression;
-                
+            // 统一判断：如果有 matchExpression 且 resolvedBaseRecordName 不指向自己，说明是 filtered entity
+            // 普通 entity 没有 matchExpression 或 resolvedBaseRecordName 指向自己
+            if (recordData.matchExpression && recordData.resolvedBaseRecordName && recordData.resolvedBaseRecordName !== recordName) {
                 this.filteredEntityManager.analyzeDependencies(
                     recordName,
-                    rootEntityName,
-                    combinedExpression
+                    recordData.resolvedBaseRecordName,
+                    recordData.resolvedMatchExpression || recordData.matchExpression
                 )
             }
         }

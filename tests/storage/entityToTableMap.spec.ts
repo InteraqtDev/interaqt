@@ -1,9 +1,9 @@
 import { expect, test, describe } from 'vitest';
-import { EntityToTableMap } from '../../src/storage/erstorage/EntityToTableMap.js';
+import { AliasManager, EntityToTableMap } from '@storage';
 import { entityToTableMapData } from './data/mapData.js';
 
 describe("EntityToTableMap comprehensive tests", () => {
-    const entityToTableMap = new EntityToTableMap(entityToTableMapData);
+    const entityToTableMap = new EntityToTableMap(entityToTableMapData, new AliasManager());
 
     describe("Basic getters", () => {
         test("getRecord should return correct record data", () => {

@@ -1,9 +1,9 @@
-import {describe, expect, test} from "vitest";
-import {EntityToTableMap, AttributeQuery, AttributeQueryData, RecordQueryTree} from "@storage";
+import { describe, expect, test} from "vitest";
+import { AliasManager, EntityToTableMap, AttributeQuery, AttributeQueryData, RecordQueryTree} from "@storage";
 import {entityToTableMapData} from './data/mapData'
 
 
-const entityToTableMap = new EntityToTableMap(entityToTableMapData)
+const entityToTableMap = new EntityToTableMap(entityToTableMapData, new AliasManager())
 
 describe('attribute query test', () => {
     test("basic attribute query", () => {
