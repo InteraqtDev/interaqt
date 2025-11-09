@@ -39,7 +39,7 @@
     "sync:agent": "tsx scripts/sync-agent-files.ts",
     "release": "release-it"
   },
-  "version": "0.8.8",
+  "version": "0.8.9",
   "main": "dist/index.js",
   "files": [
     "dist",
@@ -60,20 +60,27 @@
     "ci": true,
     "plugins": {
       "@release-it/conventional-changelog": {
-        "preset": "conventionalcommits"
+        "preset": "conventionalcommits",
+        "infile": "CHANGELOG.md"
       }
     },
     "git": {
       "commitMessage": "chore(release): v${version}",
       "tagName": "v${version}",
       "push": true,
-      "requireCleanWorkingDir": true
+      "commit": true,
+      "tag": true,
+      "requireCleanWorkingDir": true,
+      "requireBranch": "main"
     },
     "npm": {
       "publish": true
     },
     "hooks": {
       "before:init": "npm test && npm run build"
+    },
+    "github": {
+      "release": false
     }
   }
 }
