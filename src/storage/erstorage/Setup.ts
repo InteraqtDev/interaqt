@@ -830,18 +830,44 @@ export class DBSetup {
         }
 
         // 2. 给所有 record 分配 table，给 value 字段分配 field
+        // First pass: generate field names for base entities/relations only
         Object.entries(this.map.records).forEach(([recordName, record]) => {
             // 对于 filtered entities，不要覆盖它们的 table
             // 因为它们不在 recordToTableMap 中
             if (!record.isFilteredEntity && !record.isFilteredRelation) {
                 record.table = this.recordToTableMap.get(recordName)!
             }
-            Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
-                if ((attributeData as RecordAttribute).isRecord) return
-                const valueAttributeData = attributeData as ValueAttribute
-                valueAttributeData.field = this.generateShortFieldName(`${recordName}_${attributeName}`)
-                valueAttributeData.fieldType = this.database!.mapToDBFieldType(valueAttributeData.type, valueAttributeData.collection)
-            })
+            
+            // Only generate field names for base entities/relations
+            const isBaseRecord = !record.isFilteredEntity && !record.isFilteredRelation
+            if (isBaseRecord) {
+                Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
+                    if ((attributeData as RecordAttribute).isRecord) return
+                    const valueAttributeData = attributeData as ValueAttribute
+                    valueAttributeData.field = this.generateShortFieldName(`${recordName}_${attributeName}`)
+                    valueAttributeData.fieldType = this.database!.mapToDBFieldType(valueAttributeData.type, valueAttributeData.collection)
+                })
+            }
+        })
+        
+        // Second pass: copy field names from base to filtered entities/relations
+        Object.entries(this.map.records).forEach(([recordName, record]) => {
+            const isFilteredRecord = record.isFilteredEntity || record.isFilteredRelation
+            if (isFilteredRecord && record.resolvedBaseRecordName) {
+                const baseRecord = this.map.records[record.resolvedBaseRecordName]
+                if (baseRecord) {
+                    // Copy field names from base record to filtered record
+                    Object.entries(record.attributes).forEach(([attributeName, attributeData]) => {
+                        if ((attributeData as RecordAttribute).isRecord) return
+                        const valueAttributeData = attributeData as ValueAttribute
+                        const baseAttributeData = baseRecord.attributes[attributeName] as ValueAttribute
+                        if (baseAttributeData && baseAttributeData.field) {
+                            valueAttributeData.field = baseAttributeData.field
+                            valueAttributeData.fieldType = baseAttributeData.fieldType
+                        }
+                    })
+                }
+            }
         })
 
         // 2.1 给所有 relation record 的 table 信息同步到 map.link 上
