@@ -1,5 +1,7 @@
 
 
+## [0.8.11](https://github.com/InteraqtDev/interaqt/compare/v0.8.10...v0.8.11) (2025-11-16)
+
 ## [0.8.10](https://github.com/InteraqtDev/interaqt/compare/v0.8.8...v0.8.10) (2025-11-09)
 
 
