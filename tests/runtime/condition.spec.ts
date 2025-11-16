@@ -256,6 +256,113 @@ describe('condition checks', () => {
             expect((result.error as ConditionError).error.data.name).toBe('buggyCondition')
         })
 
+        test('should capture detailed exception message when condition throws', async () => {
+            const User = Entity.create({
+                name: 'User',
+                properties: [
+                    Property.create({ name: 'name', type: 'string' })
+                ]
+            })
+
+            // Create condition that throws error with specific message
+            const detailedErrorCondition = Condition.create({
+                name: 'detailedErrorCondition',
+                content: async function(this: Controller, event: any) {
+                    throw new Error('Database connection timeout after 30 seconds')
+                }
+            })
+
+            const DetailedErrorInteraction = Interaction.create({
+                name: 'detailedErrorInteraction',
+                action: Action.create({ name: 'detailed' }),
+                conditions: detailedErrorCondition
+            })
+
+            controller = new Controller({
+                system: system,
+                entities: [User],
+                relations: [],
+                activities: [],
+                interactions: [DetailedErrorInteraction]
+            })
+            await controller.setup(true)
+
+            const user = await system.storage.create('User', { name: 'TestUser' })
+
+            const result = await controller.callInteraction(DetailedErrorInteraction.name, {
+                user: user
+            })
+            
+            expect(result.error).toBeDefined()
+            const conditionError = result.error as ConditionError
+            expect(conditionError.type).toBe('condition check failed')
+            expect(conditionError.error.data.name).toBe('detailedErrorCondition')
+            
+            // Verify that the detailed exception message is captured
+            expect(conditionError.error.error).toContain('detailedErrorCondition')
+            expect(conditionError.error.error).toContain('threw exception')
+            expect(conditionError.error.error).toContain('Database connection timeout after 30 seconds')
+        })
+
+        test('should capture exception details in complex BoolExp conditions', async () => {
+            const User = Entity.create({
+                name: 'User',
+                properties: [
+                    Property.create({ name: 'name', type: 'string' })
+                ]
+            })
+
+            // Create conditions - one passes, one throws
+            const passingCondition = Condition.create({
+                name: 'passingCondition',
+                content: async function(this: Controller, event: any) {
+                    return true
+                }
+            })
+
+            const throwingCondition = Condition.create({
+                name: 'throwingCondition',
+                content: async function(this: Controller, event: any) {
+                    throw new Error('Network error: Failed to fetch user permissions')
+                }
+            })
+
+            // Use AND - should fail at throwingCondition
+            const ComplexInteraction = Interaction.create({
+                name: 'complexInteraction',
+                action: Action.create({ name: 'complex' }),
+                conditions: Conditions.create({
+                    content: BoolExp.atom(passingCondition).and(BoolExp.atom(throwingCondition))
+                })
+            })
+
+            controller = new Controller({
+                system: system,
+                entities: [User],
+                relations: [],
+                activities: [],
+                interactions: [ComplexInteraction]
+            })
+            await controller.setup(true)
+
+            const user = await system.storage.create('User', { name: 'TestUser' })
+
+            const result = await controller.callInteraction(ComplexInteraction.name, {
+                user: user
+            })
+            
+            expect(result.error).toBeDefined()
+            const conditionError = result.error as ConditionError
+            expect(conditionError.type).toBe('condition check failed')
+            
+            // Should identify which condition failed
+            expect(conditionError.error.data.name).toBe('throwingCondition')
+            
+            // Should contain detailed exception message
+            expect(conditionError.error.error).toContain('throwingCondition')
+            expect(conditionError.error.error).toContain('Network error: Failed to fetch user permissions')
+        })
+
         test('should handle undefined return from condition', async () => {
             const User = Entity.create({
                 name: 'User',

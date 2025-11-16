@@ -23,26 +23,26 @@ import { asyncEffectsContext } from "./asyncEffectsContext.js";
 export const USER_ENTITY = 'User'
 
 // Define RecordMutationSideEffect since it's not exported from shared
-export interface IRecordMutationSideEffect {
+export interface IRecordMutationSideEffect<T extends any> {
     name: string;
     record: { name: string };
-    content: (this: Controller, event: RecordMutationEvent) => Promise<any>;
+    content: (this: Controller, event: RecordMutationEvent) => Promise<T>;
 }
 
 // Create a class to use as a type and value
-export class RecordMutationSideEffect implements IRecordMutationSideEffect {
+export class RecordMutationSideEffect<T extends any> implements IRecordMutationSideEffect<T> {
     name: string;
     record: { name: string };
     content: (this: Controller, event: RecordMutationEvent) => Promise<any>;
 
-    constructor(data: IRecordMutationSideEffect) {
+    constructor(data: IRecordMutationSideEffect<T>) {
         this.name = data.name;
         this.record = data.record;
         this.content = data.content;
     }
 
-    static create(data: IRecordMutationSideEffect): RecordMutationSideEffect {
-        return new RecordMutationSideEffect(data);
+    static create<T>(data: IRecordMutationSideEffect<T>): RecordMutationSideEffect<T> {
+        return new RecordMutationSideEffect<T>(data);
     }
 }
 
@@ -60,7 +60,7 @@ export interface ControllerOptions {
     activities?: ActivityInstance[]
     interactions?: InteractionInstance[]
     dict?: DictionaryInstance[]
-    recordMutationSideEffects?: RecordMutationSideEffect[]
+    recordMutationSideEffects?: RecordMutationSideEffect<any>[]
     computations?: (new (...args: any[]) => Computation)[]
     ignorePermission?: boolean
     forceThrowInteractionError?: boolean
@@ -79,7 +79,7 @@ export const HardDeletionProperty = {
 
 export class Controller {
     // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
-    public recordNameToSideEffects = new Map<string, Set<RecordMutationSideEffect>>()
+    public recordNameToSideEffects = new Map<string, Set<RecordMutationSideEffect<any>>>()
     public globals = {
         BoolExp,
         MatchExp
@@ -92,7 +92,7 @@ export class Controller {
     public activities: ActivityInstance[]
     public interactions: InteractionInstance[]
     public dict: DictionaryInstance[] = []
-    public recordMutationSideEffects: RecordMutationSideEffect[] = []
+    public recordMutationSideEffects: RecordMutationSideEffect<any>[] = []
     public ignorePermission: boolean
     public forceThrowInteractionError: boolean
     constructor(options: ControllerOptions) {

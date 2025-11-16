@@ -367,7 +367,9 @@ export class InteractionCall {
                         result = await testFn.call(this.controller, interactionEvent)
                     } catch(e) {
                         console.warn(`check function throw`, e)
-                        result = false
+                        // Return error message as string to be captured in EvaluateError
+                        const errorMessage = e instanceof Error ? e.message : String(e)
+                        return `Condition '${condition.name}' threw exception: ${errorMessage}`
                     }
 
                     if ( result === undefined ) {

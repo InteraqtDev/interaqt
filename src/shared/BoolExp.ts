@@ -418,7 +418,14 @@ export class BoolExp<T> {
 
     if (this.isAtom()) {
       const data = (this.raw as AtomData<T>).data
-      const result = await atomHandle(data)
+      const resultOrErrorMessage = await atomHandle(data)
+      
+      // If atomHandle returns a string, treat it as an error message
+      if (typeof resultOrErrorMessage === 'string') {
+        return { data, inverse, stack, error: resultOrErrorMessage }
+      }
+      
+      const result = resultOrErrorMessage
       const error: EvaluateError<T> = { data, inverse, stack, error: 'atom evaluate error' }
       return (result && !inverse || !result && inverse) ? true : error
     }
