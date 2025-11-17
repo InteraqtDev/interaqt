@@ -551,4 +551,344 @@ describe('Long column name tests', () => {
         expect(remainingTeams).toHaveLength(1)
         expect(remainingTeams[0].teamName).toBe('Team B')
     })
+
+    it('should handle orderBy with very long property names', async () => {
+        // Test ordering by long property names
+        const UserEntity = Entity.create({
+            name: 'UserForOrderByTest',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({
+                    name: 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
+                    type: 'number'
+                })
+            ]
+        })
+
+        const setup = new DBSetup([UserEntity], [], db)
+        await setup.createTables()
+        
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
+
+        // Create test users with different values for the long property
+        await entityQueryHandle.create('UserForOrderByTest', {
+            name: 'Alice',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 30
+        })
+        
+        await entityQueryHandle.create('UserForOrderByTest', {
+            name: 'Bob',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 10
+        })
+        
+        await entityQueryHandle.create('UserForOrderByTest', {
+            name: 'Charlie',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 20
+        })
+
+        // Test ordering by the long property name in ascending order
+        const usersAsc = await entityQueryHandle.find(
+            'UserForOrderByTest',
+            undefined,
+            {
+                orderBy: {
+                    thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 'ASC'
+                }
+            },
+            [
+                'name',
+                'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters'
+            ]
+        )
+        
+        expect(usersAsc).toHaveLength(3)
+        expect(usersAsc[0].name).toBe('Bob')
+        expect(usersAsc[0].thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(10)
+        expect(usersAsc[1].name).toBe('Charlie')
+        expect(usersAsc[1].thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(20)
+        expect(usersAsc[2].name).toBe('Alice')
+        expect(usersAsc[2].thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(30)
+
+        // Test ordering by the long property name in descending order
+        const usersDesc = await entityQueryHandle.find(
+            'UserForOrderByTest',
+            undefined,
+            {
+                orderBy: {
+                    thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 'DESC'
+                }
+            },
+            [
+                'name',
+                'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters'
+            ]
+        )
+        
+        expect(usersDesc).toHaveLength(3)
+        expect(usersDesc[0].name).toBe('Alice')
+        expect(usersDesc[0].thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(30)
+        expect(usersDesc[1].name).toBe('Charlie')
+        expect(usersDesc[1].thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(20)
+        expect(usersDesc[2].name).toBe('Bob')
+        expect(usersDesc[2].thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(10)
+    })
+
+    it('should handle orderBy with long property name not in attributeQuery', async () => {
+        // This test verifies the bug: orderBy uses a long property name that is NOT in attributeQuery
+        const UserEntity = Entity.create({
+            name: 'UserForOrderByBugTest',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({
+                    name: 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
+                    type: 'number'
+                })
+            ]
+        })
+
+        const setup = new DBSetup([UserEntity], [], db)
+        await setup.createTables()
+        
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
+
+        // Create test users
+        await entityQueryHandle.create('UserForOrderByBugTest', {
+            name: 'Alice',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 30
+        })
+        
+        await entityQueryHandle.create('UserForOrderByBugTest', {
+            name: 'Bob',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 10
+        })
+        
+        await entityQueryHandle.create('UserForOrderByBugTest', {
+            name: 'Charlie',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 20
+        })
+
+        // BUG TEST: Order by the long property, but DON'T include it in attributeQuery
+        // This should fail if the bug exists, because the framework will try to use 
+        // the original long field name instead of the shortened one
+        const users = await entityQueryHandle.find(
+            'UserForOrderByBugTest',
+            undefined,
+            {
+                orderBy: {
+                    thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 'ASC'
+                }
+            },
+            ['name'] // Note: NOT including the long property in attributeQuery
+        )
+        
+        expect(users).toHaveLength(3)
+        // If the bug exists, this test will fail with a database error about unknown column
+        expect(users[0].name).toBe('Bob')
+        expect(users[1].name).toBe('Charlie')
+        expect(users[2].name).toBe('Alice')
+    })
+
+    it('should handle orderBy with relation path (n:1) on long property names', async () => {
+        // Test ordering by related entity's long property name
+        const UserEntity = Entity.create({
+            name: 'UserForRelationOrderByTest',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({
+                    name: 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
+                    type: 'number'
+                })
+            ]
+        })
+
+        // Create n:1 self-referencing relation
+        const LeaderRelation = Relation.create({
+            name: 'UserLeaderRelation',
+            type: 'n:1',
+            source: UserEntity,
+            sourceProperty: 'leader',
+            target: UserEntity,
+            targetProperty: 'members'
+        })
+
+        const setup = new DBSetup([UserEntity], [LeaderRelation], db)
+        await setup.createTables()
+        
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
+
+        // Create leaders first
+        const leader1 = await entityQueryHandle.create('UserForRelationOrderByTest', {
+            name: 'Leader1',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 100
+        })
+        
+        const leader2 = await entityQueryHandle.create('UserForRelationOrderByTest', {
+            name: 'Leader2',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 50
+        })
+        
+        const leader3 = await entityQueryHandle.create('UserForRelationOrderByTest', {
+            name: 'Leader3',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 200
+        })
+
+        // Create members with leaders
+        await entityQueryHandle.create('UserForRelationOrderByTest', {
+            name: 'Member1',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 10,
+            leader: { id: leader2.id }
+        })
+        
+        await entityQueryHandle.create('UserForRelationOrderByTest', {
+            name: 'Member2',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 20,
+            leader: { id: leader1.id }
+        })
+        
+        await entityQueryHandle.create('UserForRelationOrderByTest', {
+            name: 'Member3',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 30,
+            leader: { id: leader3.id }
+        })
+
+        // Test: Order by leader's long property name (ascending)
+        const membersOrderedByLeaderScore = await entityQueryHandle.find(
+            'UserForRelationOrderByTest',
+            MatchExp.atom({
+                key: 'leader.id',
+                value: ['not', null]
+            }),
+            {
+                orderBy: {
+                    'leader.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters': 'ASC'
+                }
+            },
+            [
+                'name',
+                'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
+                ['leader', {
+                    attributeQuery: [
+                        'name',
+                        'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters'
+                    ]
+                }]
+            ]
+        )
+        
+        // Members should be ordered by their leader's score: Leader2(50), Leader1(100), Leader3(200)
+        expect(membersOrderedByLeaderScore).toHaveLength(3)
+        expect(membersOrderedByLeaderScore[0].name).toBe('Member1')
+        expect(membersOrderedByLeaderScore[0].leader.name).toBe('Leader2')
+        expect(membersOrderedByLeaderScore[0].leader.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(50)
+        
+        expect(membersOrderedByLeaderScore[1].name).toBe('Member2')
+        expect(membersOrderedByLeaderScore[1].leader.name).toBe('Leader1')
+        expect(membersOrderedByLeaderScore[1].leader.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(100)
+        
+        expect(membersOrderedByLeaderScore[2].name).toBe('Member3')
+        expect(membersOrderedByLeaderScore[2].leader.name).toBe('Leader3')
+        expect(membersOrderedByLeaderScore[2].leader.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe(200)
+
+        // Test: Order by leader's long property name (descending)
+        const membersOrderedByLeaderScoreDesc = await entityQueryHandle.find(
+            'UserForRelationOrderByTest',
+            MatchExp.atom({
+                key: 'leader.id',
+                value: ['not', null]
+            }),
+            {
+                orderBy: {
+                    'leader.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters': 'DESC'
+                }
+            },
+            ['name']
+        )
+        
+        expect(membersOrderedByLeaderScoreDesc).toHaveLength(3)
+        expect(membersOrderedByLeaderScoreDesc[0].name).toBe('Member3')
+        expect(membersOrderedByLeaderScoreDesc[1].name).toBe('Member2')
+        expect(membersOrderedByLeaderScoreDesc[2].name).toBe('Member1')
+    })
+
+    it('should handle orderBy with multi-level relation path on long property names', async () => {
+        // Test ordering by related entity's related entity's long property name
+        const UserEntity = Entity.create({
+            name: 'UserForMultiLevelOrderByTest',
+            properties: [
+                Property.create({ name: 'name', type: 'string' }),
+                Property.create({
+                    name: 'thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters',
+                    type: 'number'
+                })
+            ]
+        })
+
+        // Create n:1 self-referencing relation
+        const LeaderRelation = Relation.create({
+            name: 'UserMultiLevelLeaderRelation',
+            type: 'n:1',
+            source: UserEntity,
+            sourceProperty: 'leader',
+            target: UserEntity,
+            targetProperty: 'members'
+        })
+
+        const setup = new DBSetup([UserEntity], [LeaderRelation], db)
+        await setup.createTables()
+        
+        const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db)
+
+        // Create top leader
+        const topLeader = await entityQueryHandle.create('UserForMultiLevelOrderByTest', {
+            name: 'TopLeader',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 1000
+        })
+        
+        // Create mid-level leaders
+        const midLeader1 = await entityQueryHandle.create('UserForMultiLevelOrderByTest', {
+            name: 'MidLeader1',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 300,
+            leader: { id: topLeader.id }
+        })
+        
+        const midLeader2 = await entityQueryHandle.create('UserForMultiLevelOrderByTest', {
+            name: 'MidLeader2',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 500,
+            leader: { id: topLeader.id }
+        })
+
+        // Create bottom-level members
+        await entityQueryHandle.create('UserForMultiLevelOrderByTest', {
+            name: 'Member1',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 10,
+            leader: { id: midLeader2.id }
+        })
+        
+        await entityQueryHandle.create('UserForMultiLevelOrderByTest', {
+            name: 'Member2',
+            thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters: 20,
+            leader: { id: midLeader1.id }
+        })
+
+        // Test: Order by leader's leader's long property name
+        // Both members have the same top leader (score 1000), so we order by direct leader's score
+        const membersOrderedByLeaderLeaderScore = await entityQueryHandle.find(
+            'UserForMultiLevelOrderByTest',
+            MatchExp.atom({
+                key: 'leader.leader.id',
+                value: ['not', null]
+            }),
+            {
+                orderBy: {
+                    'leader.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters': 'ASC'
+                }
+            },
+            ['name']
+        )
+        
+        // Members should be ordered by their direct leader's score: MidLeader1(300), MidLeader2(500)
+        expect(membersOrderedByLeaderLeaderScore).toHaveLength(2)
+        expect(membersOrderedByLeaderLeaderScore[0].name).toBe('Member2')
+        expect(membersOrderedByLeaderLeaderScore[1].name).toBe('Member1')
+    })
 }) 

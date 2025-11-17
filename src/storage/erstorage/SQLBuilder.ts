@@ -65,7 +65,8 @@ export class SQLBuilder {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
         const matchQueryTree = recordQuery.matchExpression.xToOneQueryTree
-        const finalQueryTree = fieldQueryTree.merge(matchQueryTree)
+        const modifierQueryTree = recordQuery.modifier.xToOneQueryTree
+        const finalQueryTree = fieldQueryTree.merge(matchQueryTree).merge(modifierQueryTree)
         const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
 
         const p = parentP || this.getPlaceholder()
@@ -201,12 +202,34 @@ ${modifierClause}
         
         if (orderBy.length) {
             clauses.push(`ORDER BY ${orderBy.map(({ attribute, recordName, order }) => {
-                const fieldPath = [
-                    `${this.withPrefix(prefix)}${recordName}`,
-                    attribute
-                ]
-                const field = fieldAliasMap.getAlias(fieldPath) || fieldPath.join('.')
-                return `"${field}" ${order}`
+                // 解析 attribute，支持路径（如 'leader.age'）
+                const pathParts = attribute.split('.')
+                
+                let namePath: string[]
+                let finalAttribute: string
+                
+                if (pathParts.length === 1) {
+                    // 简单字段：{ age: 'ASC' }
+                    namePath = [recordName]
+                    finalAttribute = attribute
+                } else {
+                    // 路径字段：{ 'leader.age': 'ASC' }
+                    namePath = [recordName, ...pathParts.slice(0, -1)]
+                    finalAttribute = pathParts[pathParts.length - 1]
+                }
+                
+                // 直接从 EntityToTableMap 获取真实的表别名和字段名
+                // 这样可以正确处理：
+                // 1. 长字段名（已在 Setup 阶段缩短）
+                // 2. 关联实体字段（通过多级路径）
+                // 3. Self-join 场景（每级关系有唯一表别名）
+                const [tableAlias, fieldName] = this.map.getTableAliasAndFieldName(
+                    namePath,
+                    finalAttribute
+                )
+                
+                const fullFieldRef = `${this.withPrefix(prefix)}${tableAlias}`
+                return `"${fullFieldRef}"."${fieldName}" ${order}`
             }).join(',')}`)
         }
 
