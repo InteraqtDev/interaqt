@@ -2212,6 +2212,153 @@ describe('StateMachineRunner', () => {
         expect(afterDelete2[0].name).toBe('admin')
     })
 
+    test('state machine should not trigger multiple transfers with same trigger in one event cycle', async () => {
+        // BUG 复现测试: 当定义了多个具有相同 trigger 但不同 current state 的 transfers 时，
+        // 同一个 record 不应该在同一个事件周期内被多次处理。
+        // 
+        // 场景：
+        // - initialState → incrementedState (on 'completed')
+        // - incrementedState → incrementedState (on 'completed') ← 自循环
+        // 
+        // Bug：当一个 'completed' 事件发生时，record 可能会被处理两次：
+        // 1. Transfer #1 触发：initial → incremented，值变为 1
+        // 2. Transfer #2 也匹配了（因为实体已经在 incrementedState）：值变为 2
+        
+        // 创建 API Call 实体，用于追踪外部 API 调用
+        const APICall = Entity.create({
+            name: 'APICall',
+            properties: [
+                Property.create({
+                    name: 'callType',
+                    type: 'string',
+                }),
+                Property.create({
+                    name: 'retryCount',
+                    type: 'number',
+                })
+            ]
+        })
+
+        // 创建触发 API 完成的交互
+        const CompleteAPICallInteraction = Interaction.create({
+            name: 'completeAPICall',
+            action: Action.create({ name: 'completeAPICall' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({
+                        type: 'Entity',
+                        name: 'apiCall',
+                        isRef: true,
+                        base: APICall
+                    })
+                ]
+            })
+        })
+
+        // 定义状态节点
+        const InitialState = StateNode.create({
+            name: 'initial',
+            computeValue: (lastValue: any) => typeof lastValue === 'number' ? lastValue : 0
+        })
+
+        const IncrementedState = StateNode.create({
+            name: 'incremented',
+            computeValue: (lastValue: any) => {
+                const current = typeof lastValue === 'number' ? lastValue : 0
+                return current + 1
+            }
+        })
+
+        // 创建状态机：两个 transfers 有相同的 trigger
+        const RetryCountStateMachine = StateMachine.create({
+            states: [InitialState, IncrementedState],
+            transfers: [
+                // Transfer 1: initial → incremented (on 'completed')
+                StateTransfer.create({
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        type: 'create',
+                        record: {
+                            interactionName: CompleteAPICallInteraction.name
+                        }
+                    },
+                    current: InitialState,
+                    next: IncrementedState,
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.apiCall.id })
+                }),
+                // Transfer 2: incremented → incremented (on 'completed') - 自循环
+                StateTransfer.create({
+                    trigger: {
+                        recordName: InteractionEventEntity.name,
+                        type: 'create',
+                        record: {
+                            interactionName: CompleteAPICallInteraction.name
+                        }
+                    },
+                    current: IncrementedState,
+                    next: IncrementedState,
+                    computeTarget: (mutationEvent: any) => ({ id: mutationEvent.record.payload!.apiCall.id })
+                })
+            ],
+            initialState: InitialState
+        })
+
+        // 将状态机绑定到 retryCount 属性
+        const retryCountProperty = APICall.properties.find(p => p.name === 'retryCount')!
+        retryCountProperty.computation = RetryCountStateMachine
+
+        // 设置测试环境
+        const system = new MonoSystem(new PGLiteDB())
+        const controller = new Controller({
+            system,
+            entities: [APICall],
+            relations: [],
+            activities: [],
+            interactions: [CompleteAPICallInteraction]
+        })
+        await controller.setup(true)
+
+        // 创建 API 调用记录
+        const apiCall = await controller.system.storage.create('APICall', {
+            callType: 'external'
+        })
+
+        // 验证初始状态
+        let apiCallData = await controller.system.storage.findOne('APICall', undefined, undefined, ['*'])
+        expect(apiCallData.retryCount).toBe(0)
+
+        // 第一次完成调用 - 应该只增加一次，从 0 变为 1
+        await controller.callInteraction('completeAPICall', {
+            user: { id: 'system' },
+            payload: { apiCall: { id: apiCall.id } }
+        })
+
+        apiCallData = await controller.system.storage.findOne('APICall', undefined, undefined, ['*'])
+        // BUG: 如果 bug 存在，这里会是 2（因为两个 transfer 都被触发了）
+        // 正确行为：应该是 1（只有一个 transfer 被触发）
+        expect(apiCallData.retryCount).toBe(1)
+
+        // 第二次完成调用 - 应该再增加一次，从 1 变为 2
+        await controller.callInteraction('completeAPICall', {
+            user: { id: 'system' },
+            payload: { apiCall: { id: apiCall.id } }
+        })
+
+        apiCallData = await controller.system.storage.findOne('APICall', undefined, undefined, ['*'])
+        // BUG: 如果 bug 存在，这里会是 4（1→2, 然后 2→3, 再 3→4）或其他错误值
+        // 正确行为：应该是 2
+        expect(apiCallData.retryCount).toBe(2)
+
+        // 第三次完成调用 - 验证一致性
+        await controller.callInteraction('completeAPICall', {
+            user: { id: 'system' },
+            payload: { apiCall: { id: apiCall.id } }
+        })
+
+        apiCallData = await controller.system.storage.findOne('APICall', undefined, undefined, ['*'])
+        expect(apiCallData.retryCount).toBe(3)
+    })
+
     test('hard delete with complex state transitions', async () => {
         // 测试带有复杂状态转换的硬删除场景
         const { HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE, BoolExp } = await import('interaqt')

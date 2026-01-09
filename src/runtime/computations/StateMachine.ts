@@ -109,9 +109,21 @@ Or if you want to use state name as value, you should not set ${this.dataContext
         // Now directly use mutationEvent for matching
         const transfers = this.transitionFinder.findTransfers(mutationEvent)
         // CAUTION 不能返回有 null 的节点，所以加上 filter。
-        return (await Promise.all(transfers.map(transfer => {
+        const allRecords = (await Promise.all(transfers.map(transfer => {
             return transfer.computeTarget!.call(this.controller, mutationEvent)
         }))).flat().filter(Boolean)
+        
+        // 按 id 去重，确保每个 record 在同一个事件周期内只被处理一次。
+        // 这是为了防止当多个 transfers 有相同的 trigger 但不同的 current state 时，
+        // 同一个 record 被多次返回导致 incrementalCompute 被多次调用的问题。
+        // incrementalCompute 会根据 record 的当前状态来判断是否需要处理，
+        // 如果当前状态不匹配则会 skip，所以去重后的行为是正确的。
+        const seen = new Set<string>()
+        return allRecords.filter((record: any) => {
+            if (seen.has(record.id)) return false
+            seen.add(record.id)
+            return true
+        })
     }
     
     async incrementalCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any) {
