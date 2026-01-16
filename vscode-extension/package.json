@@ -1,0 +1,96 @@
+{
+  "name": "interaqt-visualizer",
+  "displayName": "interaqt Visualizer",
+  "description": "Visualize interaqt data design documents with interactive ER diagrams",
+  "version": "0.0.1",
+  "publisher": "interaqt",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "interaqt.dataDesignViewer",
+        "displayName": "Data Design Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.data-design.json"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "interaqt.requirementsAnalysisViewer",
+        "displayName": "Requirements Analysis Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.requirements-analysis.json"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "interaqt.interactionsDesignViewer",
+        "displayName": "Interactions Design Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.interactions-design.json"
+          }
+        ],
+        "priority": "default"
+      },
+      {
+        "viewType": "interaqt.computationAnalysisViewer",
+        "displayName": "Computation Analysis Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.computation-analysis.json"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "interaqt.openDataDesignViewer",
+        "title": "Open Data Design Viewer",
+        "category": "interaqt"
+      },
+      {
+        "command": "interaqt.openRequirementsAnalysisViewer",
+        "title": "Open Requirements Analysis Viewer",
+        "category": "interaqt"
+      },
+      {
+        "command": "interaqt.openInteractionsDesignViewer",
+        "title": "Open Interactions Design Viewer",
+        "category": "interaqt"
+      },
+      {
+        "command": "interaqt.openComputationAnalysisViewer",
+        "title": "Open Computation Analysis Viewer",
+        "category": "interaqt"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  }
+}
+
