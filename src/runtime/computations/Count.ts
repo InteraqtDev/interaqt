@@ -219,12 +219,11 @@ export class PropertyCountHandle implements DataBasedComputation {
                 relatedRecord['&'] = relationRecord
                 
                 const itemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps);
-                if (itemMatch) {
-                    await (this.state as StateWithCallback).isItemMatchCount!.set(relationRecord, true)
+                const previousMatch = await (this.state as StateWithCallback).isItemMatchCount!.get(relationRecord)
+                if (itemMatch && !previousMatch) {
                     count = count + 1;
-                } else {
-                    await (this.state as StateWithCallback).isItemMatchCount!.set(relationRecord, false)
                 }
+                await (this.state as StateWithCallback).isItemMatchCount!.set(relationRecord, itemMatch)
             } else {
                 count = count + 1;
             }

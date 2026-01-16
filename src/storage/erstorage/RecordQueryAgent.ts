@@ -97,10 +97,19 @@ export class RecordQueryAgent {
 
         // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
         if (newEntityData.valueAttributes.length) {
+            const updatedFieldValues = newEntityData.getSameRowFieldAndValue(oldRecord)
+            const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
+            const valueAttributeNames = new Set(recordInfo.valueAttributes.map(attr => attr.attributeName))
+            const updateRecord = { ...newEntityData.getData() } as Record
+            updatedFieldValues.forEach(field => {
+                if (valueAttributeNames.has(field.name)) {
+                    updateRecord[field.name] = field.value
+                }
+            })
             events?.push({
                 type: 'update',
                 recordName: newEntityData.recordName,
-                record: {...newEntityData.getData()!, id: oldRecord!.id},
+                record: { ...updateRecord, id: oldRecord!.id },
                 oldRecord: oldRecord
             })
         }
