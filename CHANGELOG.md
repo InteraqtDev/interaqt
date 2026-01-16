@@ -1,5 +1,12 @@
 
 
+## [0.8.14](https://github.com/InteraqtDev/interaqt/compare/v0.8.13...v0.8.14) (2026-01-16)
+
+
+### Bug Fixes
+
+* propagate computed updates to count callbacks ([0875658](https://github.com/InteraqtDev/interaqt/commit/08756583e217d43f50f5fe928f25d8e0ad16a4b9))
+
 ## [0.8.12](https://github.com/InteraqtDev/interaqt/compare/v0.8.11...v0.8.12) (2025-11-17)
 
 ## [0.8.11](https://github.com/InteraqtDev/interaqt/compare/v0.8.10...v0.8.11) (2025-11-16)
