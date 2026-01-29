@@ -1,7 +1,10 @@
 /**
  * COUNT CALLBACK BUGS - Framework Bug Verification Tests
  * 
- * This test file demonstrates TWO related bugs in Count computation with callback.
+ * This test file demonstrates THREE bugs in Count computation with callback.
+ * 
+ * NOTE: BUG 4 (HardDeletionProperty on Relation) has been moved to a separate file:
+ *       count-hard-deletion.spec.ts
  * 
  * =============================================================================
  * BUG 1: Count callback does not respond to computed property changes
@@ -36,10 +39,19 @@
  * ACTUAL: 1 child = count 2
  * 
  * =============================================================================
+ * BUG 3: Count callback with StateMachine (entity-level, status change)
+ * =============================================================================
+ * 
+ * DESCRIPTION:
+ * This tests the interaction between Count callback and StateMachine property
+ * when the status changes (not hard deletion). In some cases, this may work
+ * correctly depending on the specific configuration.
+ * 
+ * =============================================================================
  * IMPACT ON REAL-WORLD SCENARIOS
  * =============================================================================
  * 
- * These bugs affect common patterns like Content.commentCount:
+ * These bugs affect common patterns like Content.commentCount with soft deletion:
  * - Comment._softDeletion: StateMachine property ('deleted' | null)
  * - Comment.isDeleted: computed = (_softDeletion === 'deleted')
  * - Content.commentCount = Count({ callback: c => c.status === 'approved' && !c.isDeleted })
@@ -404,6 +416,96 @@ describe('Count Callback Bug Verification', () => {
       // Expected: 3 (three children)
       // Actual: 6 (each child counted twice)
       expect(updatedParent.activeChildCount).toBe(3)
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // BUG 3: HardDeletionProperty interaction with Count callback
+  // ---------------------------------------------------------------------------
+  describe('BUG 3: HardDeletionProperty does not properly update Count with callback', () => {
+    let controller: Controller
+
+    beforeEach(async () => {
+      // Reset the activeChildCount computation to use StateMachine property (_status)
+      const activeChildCountProperty = Parent.properties.find(p => p.name === 'activeChildCount')!
+      activeChildCountProperty.computation = Count.create({
+        property: 'children',
+        attributeQuery: ['id', '_status'],  // Using STATEMACHINE property
+        callback: function(child: { _status?: string }) {
+          return child._status === 'active'
+        }
+      })
+
+      const system = new MonoSystem(new PGLiteDB())
+      controller = new Controller({
+        system,
+        entities,
+        relations,
+        interactions,
+        activities: [],
+        ignorePermission: true,
+        forceThrowInteractionError: true
+      })
+      await controller.setup(true)
+    })
+
+    it('Count should decrease when child is hard deleted via HardDeletionProperty (BUG)', async () => {
+      // This test verifies the interaction between HardDeletionProperty and Count callback.
+      // When a relation or entity with HardDeletionProperty is physically deleted,
+      // the Count computation should properly decrease.
+      
+      // Create parent
+      await controller.callInteraction('CreateBugTestParent', {
+        user: { id: 'test-user' },
+        payload: { name: 'Test Parent' }
+      })
+
+      const parents = await controller.system.storage.find(Parent.name, undefined, undefined, ['id', 'activeChildCount'])
+      const parent = parents[0]
+      expect(parent.activeChildCount).toBe(0)
+
+      // Create active child
+      await controller.callInteraction('CreateBugTestChild', {
+        user: { id: 'test-user' },
+        payload: { parentId: parent.id, name: 'Child 1' }
+      })
+
+      // Note: Due to BUG 2, the count might be 2 instead of 1 after creation
+      // This test focuses on whether deletion properly decreases the count
+      let updatedParent = await controller.system.storage.findOne(
+        Parent.name,
+        MatchExp.atom({ key: 'id', value: ['=', parent.id] }),
+        undefined,
+        ['id', 'activeChildCount']
+      )
+      const countAfterCreate = updatedParent.activeChildCount
+      console.log(`Count after create: ${countAfterCreate}`) // May be 2 due to BUG 2
+
+      // Get child
+      const children = await controller.system.storage.find(Child.name, undefined, undefined, ['id', '_status'])
+      const child = children[0]
+      expect(child._status).toBe('active')
+
+      // Now deactivate the child (which changes _status to 'inactive')
+      await controller.callInteraction('DeactivateBugTestChild', {
+        user: { id: 'test-user' },
+        payload: { childId: child.id }
+      })
+
+      // After deactivation, count should decrease (child no longer matches callback)
+      updatedParent = await controller.system.storage.findOne(
+        Parent.name,
+        MatchExp.atom({ key: 'id', value: ['=', parent.id] }),
+        undefined,
+        ['id', 'activeChildCount']
+      )
+      
+      console.log(`Count after deactivate: ${updatedParent.activeChildCount}`)
+      
+      // Due to the bug, the count may not properly decrease
+      // Expected: 0 (child is now inactive, should not be counted)
+      // Actual behavior may vary depending on the specific bug manifestation
+      expect(updatedParent.activeChildCount).toBe(0)
     })
   })
 

@@ -229,8 +229,10 @@ export class PropertyCountHandle implements DataBasedComputation {
             }
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除。
+            // 注意：删除事件中只有 record（被删除的记录），没有 oldRecord
+            // 这与 Every 和 Summation 的实现保持一致
             if (this.callback) {
-                if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.oldRecord))) {
+                if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.record))) {
                     count = count - 1
                 }
             } else {
