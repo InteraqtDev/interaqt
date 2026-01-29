@@ -1,5 +1,12 @@
 
 
+## [0.8.15](https://github.com/InteraqtDev/interaqt/compare/v0.8.14...v0.8.15) (2026-01-29)
+
+
+### Bug Fixes
+
+* use record instead of oldRecord in Count delete event handling ([06375f0](https://github.com/InteraqtDev/interaqt/commit/06375f0aecf43f7bc1abced4362bea15421abb5f))
+
 ## [0.8.14](https://github.com/InteraqtDev/interaqt/compare/v0.8.13...v0.8.14) (2026-01-16)
 
 
