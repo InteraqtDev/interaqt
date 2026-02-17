@@ -100,7 +100,6 @@ describe("Interaction System Refactored - compatibility test", () => {
       
       expect(interaction.name).toBe("CreatePost");
       expect(interaction.action).toBe(action);
-      expect(interaction.sideEffects).toEqual([]);
       expect(interaction._type).toBe("Interaction");
     });
 
@@ -113,23 +112,17 @@ describe("Interaction System Refactored - compatibility test", () => {
       const payload = Payload.create({
         items: [PayloadItem.create({ name: "data", type: 'string' })]
       });
-      const sideEffect = SideEffect.create({
-        name: "log",
-        handle: () => {}
-      });
       
       const interaction = Interaction.create({
         name: "UpdatePost",
         action: action,
         conditions: condition,
         payload: payload,
-        sideEffects: [sideEffect]
       });
       
       expect(interaction.name).toBe("UpdatePost");
       expect(interaction.conditions).toBe(condition);
       expect(interaction.payload).toBe(payload);
-      expect(interaction.sideEffects).toHaveLength(1);
     });
   });
 

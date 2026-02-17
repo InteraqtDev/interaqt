@@ -389,27 +389,6 @@ export class InteractionCall {
             }
         }
     }
-    // CAUTION sideEffect 是并行的。如果要串行，用户应该自己写在一个里面
-    async runEffects(eventArgs: InteractionEventArgs, activityId: string|undefined, response: InteractionCallResponse) {
-        const sideEffects = this.interaction.sideEffects || []
-
-        const sideEffectsPromise = sideEffects.map(sideEffect => (async () => {
-            let result
-            let error
-            try {
-                result  = await sideEffect.handle.call(this.controller, eventArgs, activityId)
-            } catch (e) {
-                error = e
-            }
-            return [sideEffect.name, {result, error}] as [string, SideEffectResult]
-        })())
-
-        const results = await Promise.all(sideEffectsPromise)
-        for (let [name, {result, error}] of results) {
-            assert(!response.sideEffects![name], `sideEffect ${name} already exists`)
-            response.sideEffects![name] = {result, error}
-        }
-    }
     isGetInteraction() {
         return this.interaction.action === GetAction
     }
@@ -477,8 +456,6 @@ export class InteractionCall {
 
             await this.saveEvent(event)
             response.event = event
-            // effect
-            await this.runEffects(interactionEventArgs, activityId, response)
             if (this.isGetInteraction()) {
                 response.data = await this.retrieveData(interactionEventArgs)
             }

@@ -394,23 +394,15 @@ describe("Interaction System - createClass functionality", () => {
       
       const payload = Payload.create({ items: payloadItems });
       
-      const sideEffect = SideEffect.create({
-        name: "notifyWarehouse",
-        handle: () => console.log("Notifying warehouse")
-      });
-      
       const interaction = Interaction.create({
         name: "SubmitOrder",
         action: action,
         payload: payload,
-        sideEffects: [sideEffect]
       });
 
       expect(interaction.name).toBe("SubmitOrder");
       expect(interaction.action.name).toBe("submitOrder");
       expect(interaction.payload?.items).toHaveLength(2);
-      expect(interaction.sideEffects).toHaveLength(1);
-      expect(interaction.sideEffects![0].name).toBe("notifyWarehouse");
     });
 
     test("should stringify and parse complex structures", () => {

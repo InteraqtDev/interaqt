@@ -4,7 +4,6 @@ import { ConditionInstance } from './Condition.js';
 import { ConditionsInstance } from './Conditions.js';
 import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
 import { PayloadInstance } from './Payload.js';
-import { SideEffectInstance } from './SideEffect.js';
 import { EntityInstance } from './Entity.js';
 import { RelationInstance } from './Relation.js';
 import { DataPolicyInstance } from './Data.js';
@@ -16,7 +15,6 @@ export interface InteractionInstance extends IInstance {
   userRef?: AttributiveInstance;
   action: ActionInstance;
   payload?: PayloadInstance;
-  sideEffects?: SideEffectInstance[];
   data?: EntityInstance | RelationInstance;
   dataPolicy?: DataPolicyInstance;
 }
@@ -28,7 +26,6 @@ export interface InteractionCreateArgs {
   userRef?: AttributiveInstance;
   action: ActionInstance;
   payload?: PayloadInstance;
-  sideEffects?: SideEffectInstance[];
   data?: EntityInstance | RelationInstance;
   dataPolicy?: DataPolicyInstance;
 }
@@ -43,7 +40,6 @@ export class Interaction implements InteractionInstance {
   public userRef?: AttributiveInstance;
   public action: ActionInstance;
   public payload?: PayloadInstance;
-  public sideEffects: SideEffectInstance[];
   public data?: EntityInstance | RelationInstance;
   public dataPolicy?: DataPolicyInstance;
   
@@ -56,7 +52,6 @@ export class Interaction implements InteractionInstance {
     this.userRef = args.userRef;
     this.action = args.action;
     this.payload = args.payload;
-    this.sideEffects = args.sideEffects || [];
     this.data = args.data;
     this.dataPolicy = args.dataPolicy;
   }
@@ -95,11 +90,6 @@ export class Interaction implements InteractionInstance {
       type: 'Payload' as const,
       collection: false as const,
     },
-    sideEffects: {
-      type: 'SideEffect' as const,
-      collection: true as const,
-      defaultValue: () => []
-    },
     data: {
       type: ['Entity', 'Relation'] as const,
       required: false as const,
@@ -134,7 +124,6 @@ export class Interaction implements InteractionInstance {
     if (instance.userAttributives !== undefined) args.userAttributives = instance.userAttributives;
     if (instance.userRef !== undefined) args.userRef = instance.userRef;
     if (instance.payload !== undefined) args.payload = instance.payload;
-    if (instance.sideEffects && instance.sideEffects.length > 0) args.sideEffects = instance.sideEffects;
 
     if (instance.data !== undefined) args.data = instance.data;
     if (instance.dataPolicy !== undefined) args.dataPolicy = instance.dataPolicy;
@@ -157,7 +146,6 @@ export class Interaction implements InteractionInstance {
     if (instance.userAttributives !== undefined) args.userAttributives = instance.userAttributives;
     if (instance.userRef !== undefined) args.userRef = instance.userRef;
     if (instance.payload !== undefined) args.payload = instance.payload;
-    if (instance.sideEffects && instance.sideEffects.length > 0) args.sideEffects = instance.sideEffects;
 
     if (instance.data !== undefined) args.data = instance.data;
     if (instance.dataPolicy !== undefined) args.dataPolicy = instance.dataPolicy;

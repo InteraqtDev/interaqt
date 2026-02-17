@@ -1,15 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, Entity, Property, RecordMutationSideEffect, Interaction, Action, Payload, PayloadItem, SideEffect } from 'interaqt';
+import { Controller, MonoSystem, Entity, Property, RecordMutationSideEffect } from 'interaqt';
 import { PGLiteDB } from '@dbclients';
 import { MatchExp } from '@storage';
 
 describe('RecordMutationSideEffect', () => {
-    // Note: RecordMutationSideEffect is only triggered within interaction execution context.
-    // Direct storage operations (e.g., controller.system.storage.create) do not trigger RecordMutationSideEffect.
-    // Therefore, we create a minimal interaction that performs storage operations to test the side effects.
-    
     test('basic record mutation side effects trigger correctly', async () => {
-        // Define entities
         const userEntity = Entity.create({
             name: 'User',
             properties: [
@@ -48,54 +43,8 @@ describe('RecordMutationSideEffect', () => {
             ]
         });
 
-        // Define a minimal interaction that performs storage operations
-        // This is needed because RecordMutationSideEffect only works within interaction context
-        const storageTestInteraction = Interaction.create({
-            name: 'storageTest',
-            action: Action.create({ name: 'storageTest' }),
-            payload: Payload.create({
-                items: [
-                    PayloadItem.create({
-                        name: 'operation',
-                        type: 'string',
-                    }),
-                    PayloadItem.create({
-                        name: 'data',
-                        type: 'object',
-                    })
-                ]
-            }),
-            sideEffects: [
-                SideEffect.create({
-                    name: 'performStorageOperation',
-                    handle: async function (this: Controller, event: any) {
-                        const { operation, data } = event.payload;
-                        switch (operation) {
-                            case 'createUser':
-                                return await this.system.storage.create('User', data);
-                            case 'updateUser':
-                                return await this.system.storage.update('User',
-                                    MatchExp.atom({ key: 'id', value: ['=', data.id] }),
-                                    { name: data.name }
-                                );
-                            case 'deleteUser':
-                                return await this.system.storage.delete('User',
-                                    MatchExp.atom({ key: 'id', value: ['=', data.id] })
-                                );
-                            case 'createPost':
-                                return await this.system.storage.create('Post', data);
-                            default:
-                                throw new Error('Unknown operation');
-                        }
-                    }
-                })
-            ]
-        });
-
-        // Track side effect calls
         const sideEffectCalls: any[] = [];
 
-        // Define RecordMutationSideEffects
         const userCreatedSideEffect = RecordMutationSideEffect.create({
             name: 'userCreatedNotification',
             record: { name: 'User' },
@@ -153,111 +102,100 @@ describe('RecordMutationSideEffect', () => {
             }
         });
 
-        // Create system and controller
         const system = new MonoSystem(new PGLiteDB());
         const controller = new Controller({
             system: system,
             entities: [userEntity, postEntity],
             relations: [],
             activities: [],
-            interactions: [storageTestInteraction],
+            interactions: [],
             recordMutationSideEffects: [userCreatedSideEffect, userUpdatedSideEffect, userDeletedSideEffect, postCreatedSideEffect]
         });
 
         await controller.setup(true);
 
         // Test 1: Create user triggers side effect
-        const createResult = await controller.callInteraction('storageTest', {
-            user: { id: 'test-user' } as any,
-            payload: {
-                operation: 'createUser',
-                data: {
-                    name: 'John Doe',
-                    email: 'john@example.com'
-                }
-            }
+        const createdUser = await controller.system.storage.create('User', {
+            name: 'John Doe',
+            email: 'john@example.com'
         });
-        
-        expect(createResult.error).toBeUndefined();
-        const createdUser = createResult.sideEffects?.performStorageOperation?.result! as any;
 
-        // Verify side effect was called with correct event
-        // Only userCreatedNotification should be called for create events
+        let mockResult: any = {
+            effects: [
+                { recordName: 'User', type: 'create', record: createdUser }
+            ],
+            sideEffects: {}
+        };
+        await controller.runRecordChangeSideEffects(mockResult, controller.system.logger);
+
         expect(sideEffectCalls.length).toBe(1);
         expect(sideEffectCalls[0].sideEffect).toBe('userCreatedNotification');
         expect(sideEffectCalls[0].event.type).toBe('create');
         expect(sideEffectCalls[0].event.recordName).toBe('User');
         expect(sideEffectCalls[0].event.record?.name).toBe('John Doe');
         expect(sideEffectCalls[0].event.record?.email).toBe('john@example.com');
+        expect(mockResult.sideEffects.userCreatedNotification.result).toEqual({ notified: true, userId: createdUser.id });
 
-        // Clear side effect calls
         sideEffectCalls.length = 0;
 
         // Test 2: Update user triggers side effect
-        const updateResult = await controller.callInteraction('storageTest', {
-            user: { id: 'test-user' } as any,
-            payload: {
-                operation: 'updateUser',
-                data: {
-                    id: createdUser.id,
-                    name: 'Jane Doe'
-                }
-            }
-        });
-        
-        expect(updateResult.error).toBeUndefined();
+        await controller.system.storage.update('User',
+            MatchExp.atom({ key: 'id', value: ['=', createdUser.id] }),
+            { name: 'Jane Doe' }
+        );
 
-        // Verify side effect was called with correct event
-        // Only userUpdatedAudit should be called for update events
+        mockResult = {
+            effects: [
+                { recordName: 'User', type: 'update', record: { ...createdUser, name: 'Jane Doe' }, oldRecord: createdUser }
+            ],
+            sideEffects: {}
+        };
+        await controller.runRecordChangeSideEffects(mockResult, controller.system.logger);
+
         expect(sideEffectCalls.length).toBe(1);
         expect(sideEffectCalls[0].sideEffect).toBe('userUpdatedAudit');
         expect(sideEffectCalls[0].event.type).toBe('update');
         expect(sideEffectCalls[0].event.recordName).toBe('User');
-        // Note: keys and oldRecord are not populated in the basic implementation
         expect(sideEffectCalls[0].event.record?.name).toBe('Jane Doe');
 
-        // Clear side effect calls
         sideEffectCalls.length = 0;
 
         // Test 3: Delete user triggers side effect
-        const deleteResult = await controller.callInteraction('storageTest', {
-            user: { id: 'test-user' } as any,
-            payload: {
-                operation: 'deleteUser',
-                data: {
-                    id: createdUser.id
-                }
-            }
-        });
-        
-        expect(deleteResult.error).toBeUndefined();
-        
-        // Verify delete side effect was called
+        await controller.system.storage.delete('User',
+            MatchExp.atom({ key: 'id', value: ['=', createdUser.id] })
+        );
+
+        mockResult = {
+            effects: [
+                { recordName: 'User', type: 'delete', record: { id: createdUser.id } }
+            ],
+            sideEffects: {}
+        };
+        await controller.runRecordChangeSideEffects(mockResult, controller.system.logger);
+
         expect(sideEffectCalls.length).toBe(1);
         expect(sideEffectCalls[0].sideEffect).toBe('userDeletedCleanup');
         expect(sideEffectCalls[0].event.type).toBe('delete');
         expect(sideEffectCalls[0].event.recordName).toBe('User');
         expect(sideEffectCalls[0].event.record?.id).toBe(createdUser.id);
 
-        // Clear side effect calls
         sideEffectCalls.length = 0;
 
         // Test 4: Create post triggers different side effect
-        const createPostResult = await controller.callInteraction('storageTest', {
-            user: { id: 'test-user' } as any,
-            payload: {
-                operation: 'createPost',
-                data: {
-                    title: 'Test Post',
-                    content: 'This is a test post'
-                }
-            }
+        const createdPost = await controller.system.storage.create('Post', {
+            title: 'Test Post',
+            content: 'This is a test post',
+            status: 'draft'
         });
-        
-        expect(createPostResult.error).toBeUndefined();
-        const createdPost = createPostResult.sideEffects?.performStorageOperation?.result;
 
-        // Verify only post side effect was called, not user side effects
+        mockResult = {
+            effects: [
+                { recordName: 'Post', type: 'create', record: createdPost }
+            ],
+            sideEffects: {}
+        };
+        await controller.runRecordChangeSideEffects(mockResult, controller.system.logger);
+
         expect(sideEffectCalls.length).toBe(1);
         expect(sideEffectCalls[0].sideEffect).toBe('postCreatedIndex');
         expect(sideEffectCalls[0].event.type).toBe('create');
@@ -281,8 +219,6 @@ describe('RecordMutationSideEffect', () => {
             ]
         });
 
-
-        // Define a side effect that throws an error
         const errorSideEffect = RecordMutationSideEffect.create({
             name: 'errorSideEffect',
             record: { name: 'User' },
@@ -291,7 +227,6 @@ describe('RecordMutationSideEffect', () => {
             }
         });
 
-        // Define a successful side effect
         const successSideEffect = RecordMutationSideEffect.create({
             name: 'successSideEffect',
             record: { name: 'User' },
@@ -312,17 +247,26 @@ describe('RecordMutationSideEffect', () => {
 
         await controller.setup(true);
 
-        // Create user - side effects should be triggered
         const createdUser = await controller.system.storage.create('User', {
             name: 'Test User'
         });
 
-        // Verify the user was created successfully
         expect(createdUser).toBeDefined();
         expect(createdUser.name).toBe('Test User');
 
-        // Note: In this implementation, RecordMutationSideEffect errors are logged but don't fail the operation
-        // The side effects run asynchronously after the storage operation completes
+        // Test that errors in one side effect don't prevent others from running
+        const mockResult: any = {
+            effects: [
+                { recordName: 'User', type: 'create', record: createdUser }
+            ],
+            sideEffects: {}
+        };
+        await controller.runRecordChangeSideEffects(mockResult, controller.system.logger);
+
+        // errorSideEffect should have an error
+        expect(mockResult.sideEffects.errorSideEffect.error).toBeDefined();
+        // successSideEffect should have succeeded
+        expect(mockResult.sideEffects.successSideEffect.result).toEqual({ success: true });
 
         await system.destroy();
     });

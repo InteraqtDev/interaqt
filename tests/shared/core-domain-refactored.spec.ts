@@ -203,7 +203,6 @@ describe("Core Domain Classes Refactored", () => {
 
       expect(interaction.name).toBe("SubmitForm");
       expect(interaction.action).toBe(action);
-      expect(interaction.sideEffects).toEqual([]);
       expect(interaction._type).toBe("Interaction");
     });
 
