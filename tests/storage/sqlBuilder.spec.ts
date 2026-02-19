@@ -5,7 +5,7 @@ import { RecordQuery } from '../../src/storage/erstorage/RecordQuery.js'
 import { MatchExp } from '../../src/storage/erstorage/MatchExp.js'
 import { AttributeQuery, AttributeQueryData } from '../../src/storage/erstorage/AttributeQuery.js'
 import { AliasManager } from '../../src/storage/erstorage/util/AliasManager.js'
-import { PGLiteDB } from '../../src/dbclients/PGLite.js'
+import { PGLiteDB } from '../../src/drivers/PGLite.js'
 
 describe('SQLBuilder', () => {
     let map: EntityToTableMap

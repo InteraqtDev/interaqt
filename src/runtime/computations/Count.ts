@@ -1,7 +1,7 @@
 import { DataContext, PropertyDataContext } from "./Computation.js";
-import { Count } from "@shared";
+import { Count } from "@core";
 import { Controller } from "../Controller.js";
-import { CountInstance, EntityInstance, RelationInstance } from "@shared";
+import { CountInstance, EntityInstance, RelationInstance } from "@core";
 import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";

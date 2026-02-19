@@ -1,8 +1,8 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@storage";
-import {SQLiteDB} from '@dbclients';
-import {removeAllInstance} from '@shared'
+import {SQLiteDB} from '@drivers';
+import {removeAllInstance} from '@core'
 import TestLogger from "./testLogger.js";
 
 

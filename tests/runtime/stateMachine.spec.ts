@@ -3,7 +3,7 @@ import { Controller, MonoSystem, DICTIONARY_RECORD, Entity, Property, StateMachi
 import { createData as createPropertyStateMachineData } from "./data/propertyStateMachine.js";
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
-import { PGLiteDB, SQLiteDB } from '@dbclients';
+import { PGLiteDB, SQLiteDB } from '@drivers';
 describe('StateMachineRunner', () => {
 
     test('property state machine', async () => {

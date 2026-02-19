@@ -1,6 +1,6 @@
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from "@storage";
-import { Entity, Property, Relation } from '@shared';
-import { PGLiteDB } from '@dbclients';
+import { Entity, Property, Relation } from '@core';
+import { PGLiteDB } from '@drivers';
 import { beforeEach, describe, expect, test, afterEach } from "vitest";
 
 /**

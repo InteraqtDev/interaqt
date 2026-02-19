@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { Entity, Property } from 'interaqt';
-import { PGLiteDB, SQLiteDB } from '@dbclients';
+import { PGLiteDB, SQLiteDB } from '@drivers';
 import {
     Controller,
     MonoSystem,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Controller, MonoSystem, Entity, Property, RecordMutationSideEffect } from 'interaqt';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 import { MatchExp } from '@storage';
 
 describe('RecordMutationSideEffect', () => {

@@ -1,5 +1,5 @@
 import { DataContext, EntityDataContext, EventDep } from "./Computation.js";
-import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@shared";
+import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { MatchExp } from "@storage";
 import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";

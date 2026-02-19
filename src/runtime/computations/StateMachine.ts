@@ -1,7 +1,6 @@
-import { StateMachine, StateMachineInstance, StateNode, StateNodeInstance } from "@shared";
+import { StateMachine, StateMachineInstance, StateNode, StateNodeInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
-import { INTERACTION_RECORD } from "../activity/ActivityManager.js";
 import { DataContext, PropertyDataContext } from "./Computation.js";
 import { ComputationResult, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";

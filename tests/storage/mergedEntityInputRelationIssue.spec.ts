@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Entity, Relation, Property } from '@shared';
+import { Entity, Relation, Property } from '@core';
 import { DBSetup } from '@storage';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 
 describe('Merged Entity Input Relation Issue', () => {
     it('should fail when creating relation with merged entity input - both as source and target', () => {

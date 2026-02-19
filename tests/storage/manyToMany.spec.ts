@@ -1,7 +1,7 @@
 
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle,LINK_SYMBOL} from "@storage";
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 import {RecordMutationEvent} from '@runtime';
 import { beforeEach, describe, expect, test, afterEach } from "vitest";
 import TestLogger from "./testLogger.js";

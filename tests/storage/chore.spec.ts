@@ -1,7 +1,7 @@
 import { describe, test, beforeEach, afterEach, expect } from 'vitest';
 import { DBSetup, EntityToTableMap, EntityQueryHandle, MatchExp, AttributeQueryData } from "@storage";
-import { PGLiteDB } from '@dbclients';
-import { Entity, Property, Relation } from '@shared';
+import { PGLiteDB } from '@drivers';
+import { Entity, Property, Relation } from '@core';
 import TestLogger from './testLogger';
 
 // Define entities directly in test file

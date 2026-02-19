@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@storage";
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 describe('relation attributes', () => {
     let db: SQLiteDB
     let setup: DBSetup

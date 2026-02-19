@@ -1,4 +1,4 @@
-import { StateMachineInstance } from "@shared";
+import { StateMachineInstance } from "@core";
 
 // Deep partial matching function for RecordMutationEvent patterns
 function deepPartialMatch(event: any, pattern: any): boolean {

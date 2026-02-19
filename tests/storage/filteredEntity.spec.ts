@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from "@storage";
-import { Entity, Property } from '@shared';
+import { Entity, Property } from '@core';
 import TestLogger from "./testLogger.js";
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 
 describe('filtered entity test', () => {
     let db: PGLiteDB;

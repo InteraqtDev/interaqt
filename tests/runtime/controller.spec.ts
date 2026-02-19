@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Entity, Property, Relation, Transform, BoolExp, Controller, MonoSystem } from 'interaqt';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 
 describe('Controller stateless deployment', () => {
   test('should preserve existing data when calling setup() multiple times', async () => {

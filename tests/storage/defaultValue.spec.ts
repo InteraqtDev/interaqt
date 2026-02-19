@@ -1,7 +1,7 @@
 import { describe, test, beforeEach, afterEach, expect } from 'vitest';
 import { DBSetup, EntityToTableMap, EntityQueryHandle, MatchExp } from "@storage";
-import { Entity, Property, Relation } from '@shared';
-import { PGLiteDB } from '@dbclients';
+import { Entity, Property, Relation } from '@core';
+import { PGLiteDB } from '@drivers';
 describe('Default Value - Program Control', () => {
     let db: PGLiteDB
     let setup: DBSetup

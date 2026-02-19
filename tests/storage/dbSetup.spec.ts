@@ -1,7 +1,7 @@
 import {expect, test, describe} from "vitest";
 import {existsSync, unlinkSync} from 'fs'
 import {DBSetup,RecordQueryAgent,EntityToTableMap,MatchExp,RecordQuery} from "@storage";
-import { PGLiteDB, SQLiteDB } from '@dbclients'
+import { PGLiteDB, SQLiteDB } from '@drivers'
 import {createCommonData} from "./data/common";
 
 const { entities, relations } = createCommonData()

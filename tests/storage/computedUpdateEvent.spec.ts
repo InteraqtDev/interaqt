@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { DBSetup, EntityQueryHandle, EntityToTableMap, MatchExp } from '@storage'
-import { Entity, Property } from '@shared'
-import { PGLiteDB } from '@dbclients'
+import { Entity, Property } from '@core'
+import { PGLiteDB } from '@drivers'
 import { RecordMutationEvent } from '@runtime'
 
 describe('Computed field update events', () => {

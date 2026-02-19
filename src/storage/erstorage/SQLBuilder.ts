@@ -1,5 +1,5 @@
 import { Database } from "@runtime";
-import { BoolExp } from "@shared";
+import { BoolExp } from "@core";
 import { EntityToTableMap } from "./EntityToTableMap.js";
 import { FieldMatchAtom, MatchExp } from "./MatchExp.js";
 import { AttributeQuery } from "./AttributeQuery.js";

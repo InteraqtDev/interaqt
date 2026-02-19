@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { Entity, Relation, Property } from '@shared'
+import { Entity, Relation, Property } from '@core'
 import TestLogger from './testLogger.js'
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 import { DBSetup } from '@storage';
 import { EntityQueryHandle } from '@storage';
 import { EntityToTableMap } from '@storage';

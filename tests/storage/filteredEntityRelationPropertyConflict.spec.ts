@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { Entity, Relation, Property } from '@shared';
+import { Entity, Relation, Property } from '@core';
 import { DBSetup } from '@storage';
 import { MatchExp } from '@storage';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 
 describe('Filtered Entity Relation Property Name Conflict', () => {
     it('should throw error when filtered entity uses same sourceProperty as base entity', () => {

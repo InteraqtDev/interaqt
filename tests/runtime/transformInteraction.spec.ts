@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 import {
     Controller, MonoSystem,
-    BoolExp, KlassByName, ConditionError,
+    BoolExp, KlassByName, InteractionGuardError,
     ACTIVITY_RECORD
 } from 'interaqt';
 import { createData } from './data/leaveRequest.js';
@@ -115,7 +115,7 @@ describe('map interaction', () => {
 
         // should throw
         const _res2 = await controller.callInteraction(approveRequestName,  {user: userC, payload: _payload2})
-        expect(_res2.error).toBeInstanceOf(ConditionError)
+        expect(_res2.error).toBeInstanceOf(InteractionGuardError)
         // FIXME 获取 userAttribute error 信息
 
         // 4. b 接受

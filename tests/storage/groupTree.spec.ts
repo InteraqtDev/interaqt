@@ -1,6 +1,6 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
-import {SQLiteDB} from '@dbclients';
+import {SQLiteDB} from '@drivers';
 import {EntityToTableMap,MatchExp,EntityQueryHandle,RecursiveContext,DBSetup} from "@storage";
 import TestLogger from "./testLogger.js";
 

@@ -1,5 +1,5 @@
 import { MatchExpressionData, MatchAtom, MatchExp } from "./MatchExp.js"
-import { BoolExp } from "@shared"
+import { BoolExp } from "@core"
 import { EntityToTableMap } from "./EntityToTableMap.js"
 import { RecordQueryAgent } from "./RecordQueryAgent.js"
 import { RecordQuery } from "./RecordQuery.js"

@@ -23,11 +23,11 @@
   },
   "scripts": {
     "check": "tsc --noEmit --skipLibCheck",
-    "check:all": "npm run check:shared && npm run check:runtime && npm run check:storage && npm run check:dbclients",
-    "check:shared": "tsc --project tsconfig.shared.json",
+    "check:all": "npm run check:core && npm run check:runtime && npm run check:storage && npm run check:drivers",
+    "check:core": "tsc --project tsconfig.core.json",
     "check:runtime": "tsc --project tsconfig.runtime.json",
     "check:storage": "tsc --project tsconfig.storage.json",
-    "check:dbclients": "tsc --project tsconfig.dbclients.json",
+    "check:drivers": "tsc --project tsconfig.drivers.json",
     "prebuild": "rimraf dist",
     "build": "vite build --config vite.prod.config.ts",
     "postbuild": "npm run check:build",
@@ -35,7 +35,7 @@
     "test": "vitest run",
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",
-    "test:shared": "vitest run tests/shared",
+    "test:core": "vitest run tests/core",
     "sync:agent": "tsx scripts/sync-agent-files.ts",
     "release": "release-it"
   },

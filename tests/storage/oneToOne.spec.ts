@@ -2,7 +2,7 @@ import {expect, test, describe, afterEach, beforeAll, beforeEach} from "vitest";
 import { createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle,LINK_SYMBOL} from "@storage";
 import { RecordMutationEvent } from '@runtime';
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 import TestLogger from "./testLogger.js";
 
 

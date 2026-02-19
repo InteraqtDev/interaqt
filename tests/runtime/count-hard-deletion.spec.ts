@@ -58,7 +58,7 @@ import {
   NON_DELETED_STATE,
   HARD_DELETION_PROPERTY_NAME
 } from 'interaqt'
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 
 // =============================================================================
 // DATA MODEL
@@ -189,7 +189,7 @@ hardDeletionProp.computation = StateMachine.create({
       computeTarget: async function(this: Controller, mutationEvent: any) {
         const MatchExp = this.globals.MatchExp
         const relation = await this.system.storage.findOne(
-          TestRelation.name,
+          TestRelation.name!,
           MatchExp.atom({
             key: 'source.id',
             value: ['=', mutationEvent.record.payload.childId]
@@ -283,7 +283,7 @@ describe('Count with HardDeletionProperty on Relation', () => {
     })
 
     // Verify relation is deleted
-    const relations = await controller.system.storage.find(TestRelation.name, undefined, undefined, ['id'])
+    const relations = await controller.system.storage.find(TestRelation.name!, undefined, undefined, ['id'])
     expect(relations.length).toBe(0)
 
     // Check count after deletion - should be 0

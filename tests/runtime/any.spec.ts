@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Controller, MonoSystem, Property, Entity, Dictionary, BoolExp, Any, Relation, MatchExp, DICTIONARY_RECORD,  } from 'interaqt';
-import { PGLiteDB, SQLiteDB } from '@dbclients';
+import { PGLiteDB, SQLiteDB } from '@drivers';
 describe('Any computed handle', () => {
   test('should be true when any request is handled', async () => {
     const requestEntity = Entity.create({

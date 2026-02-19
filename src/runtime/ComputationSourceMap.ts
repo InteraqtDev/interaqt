@@ -1,8 +1,7 @@
 import { AttributeQueryData, RecordQueryData } from "../storage/index.js";
-import { DataDep, Computation, DataBasedComputation, RecordsDataDep, EventBasedComputation, EventDep } from "./computations/Computation.js";
+import { DataDep, Computation, RecordsDataDep, EventBasedComputation, EventDep } from "./computations/Computation.js";
 import { PropertyDataContext } from "./computations/Computation.js";
 import { Controller } from "./Controller.js";
-import { InteractionEventEntity  } from "./activity/ActivityManager.js";
 import { DICTIONARY_RECORD, RecordMutationEvent } from "./System.js";
 import { Scheduler } from "./Scheduler.js";
 

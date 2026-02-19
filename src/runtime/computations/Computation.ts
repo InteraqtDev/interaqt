@@ -2,7 +2,7 @@ import {
     EntityInstance, RelationInstance, PropertyInstance,
     ActivityInstance, InteractionInstance,
     DictionaryInstance
-} from "@shared";
+} from "@core";
 import { Controller } from "../Controller";
 import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { type ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";

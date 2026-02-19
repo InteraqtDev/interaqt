@@ -70,7 +70,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@runtime': path.resolve(__dirname, './src/runtime'),
-      '@shared': path.resolve(__dirname, './src/shared'),
+      '@core': path.resolve(__dirname, './src/core'),
       '@storage': path.resolve(__dirname, './src/storage'),
     }
   },
@@ -86,7 +86,7 @@ export default defineConfig({
       beforeWriteFile: (filePath, content) => {
         // 替换路径别名为相对路径
         content = content.replace(/@runtime/g, './runtime');
-        content = content.replace(/@shared/g, './shared');
+        content = content.replace(/@core/g, './core');
         content = content.replace(/@storage/g, './storage');
         // 确保 .js 扩展名保持不变（对于 ES modules）
         return {

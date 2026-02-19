@@ -4,7 +4,7 @@ import {
     ActivityCall, MonoSystem,
     RelationInstance
 } from 'interaqt';
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {

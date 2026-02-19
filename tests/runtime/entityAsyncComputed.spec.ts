@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Entity, Property } from 'interaqt';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 import {
   Controller, MonoSystem, MatchExp,
   DataDep,

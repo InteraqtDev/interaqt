@@ -1,7 +1,7 @@
 import { DataContext, PropertyDataContext } from "./Computation.js";
-import { Any } from "@shared";
+import { Any } from "@core";
 import { Controller } from "../Controller.js";
-import { AnyInstance, RelationInstance } from "@shared";
+import { AnyInstance, RelationInstance } from "@core";
 import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";

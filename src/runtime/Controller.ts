@@ -1,11 +1,12 @@
-import { BoolExp, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance, Property } from "@shared";
+import { BoolExp, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
 import { MatchExp } from "@storage";
 import { RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
 import './computations/index.js';
-import { InteractionCallResponse, InteractionEventArgs } from "./activity/InteractionCall.js";
+import { InteractionCallResponse } from "../builtins/interaction/activity/InteractionCall.js";
+import { InteractionEventArgs } from "@core";
 import { Computation, ComputationResult, ComputationResultSkip, ComputationResultPatch, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
-import { ActivityManager } from "./activity/ActivityManager.js";
+import { ActivityManager } from "../builtins/interaction/activity/ActivityManager.js";
 import { CountHandles } from "./computations/Count.js";
 import { TransformHandles } from "./computations/Transform.js";
 import { AnyHandles } from "./computations/Any.js";
@@ -16,20 +17,18 @@ import { AverageHandles } from "./computations/Average.js";
 import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
-import { InteractionExecutionError,SideEffectError } from "./errors/index.js";
+import { InteractionExecutionError, SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 
 export const USER_ENTITY = 'User'
 
-// Define RecordMutationSideEffect since it's not exported from shared
 export interface IRecordMutationSideEffect<T extends any> {
     name: string;
     record: { name: string };
     content: (this: Controller, event: RecordMutationEvent) => Promise<T>;
 }
 
-// Create a class to use as a type and value
 export class RecordMutationSideEffect<T extends any> implements IRecordMutationSideEffect<T> {
     name: string;
     record: { name: string };
@@ -53,17 +52,37 @@ export type InteractionContext = {
 
 export type ComputationType = 'global' | 'entity' | 'relation' | 'property'
 
+type SideEffectResult = {
+    result?: unknown,
+    error?: unknown
+}
+
+export type DispatchResponse = {
+    error?: unknown
+    data?: unknown
+    effects?: RecordMutationEvent[]
+    sideEffects?: { [k: string]: SideEffectResult }
+    context?: { [k: string]: unknown }
+}
+
 export interface ControllerOptions {
     system: System
     entities?: EntityInstance[]
     relations?: RelationInstance[]
+    /** @deprecated Pass Interaction instances via eventSources instead */
     activities?: ActivityInstance[]
+    /** @deprecated Pass Interaction instances via eventSources instead */
     interactions?: InteractionInstance[]
+    eventSources?: EventSourceInstance<any, any>[]
     dict?: DictionaryInstance[]
     recordMutationSideEffects?: RecordMutationSideEffect<any>[]
     computations?: (new (...args: any[]) => Computation)[]
+    /** @deprecated Use ignoreGuard instead */
     ignorePermission?: boolean
+    ignoreGuard?: boolean
+    /** @deprecated Use forceThrowDispatchError instead */
     forceThrowInteractionError?: boolean
+    forceThrowDispatchError?: boolean
 }
 
 export const HARD_DELETION_PROPERTY_NAME = '_isDeleted_'
@@ -78,7 +97,6 @@ export const HardDeletionProperty = {
 }
 
 export class Controller {
-    // 因为很多 function 都会bind controller 作为 this，所以我们也把 controller 的 globals 作为注入全局工具的入口。
     public recordNameToSideEffects = new Map<string, Set<RecordMutationSideEffect<any>>>()
     public globals = {
         BoolExp,
@@ -89,12 +107,17 @@ export class Controller {
     public system: System
     public entities: EntityInstance[]
     public relations: RelationInstance[]
-    public activities: ActivityInstance[]
-    public interactions: InteractionInstance[]
+    public eventSources: EventSourceInstance<any, any>[]
     public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect<any>[] = []
     public ignorePermission: boolean
+    public ignoreGuard: boolean
     public forceThrowInteractionError: boolean
+    public forceThrowDispatchError: boolean
+
+    private eventSourcesByName = new Map<string, EventSourceInstance<any, any>>()
+    private eventSourcesByUUID = new Map<string, EventSourceInstance<any, any>>()
+
     constructor(options: ControllerOptions) {
         const {
             system,
@@ -102,29 +125,49 @@ export class Controller {
             relations = [],
             activities = [],
             interactions = [],
+            eventSources = [],
             dict = [],
             recordMutationSideEffects = [],
             computations = [],
             ignorePermission = false,
-            forceThrowInteractionError = false // 会 catch 住 error，并在 result 中返回。
+            ignoreGuard,
+            forceThrowInteractionError = false,
+            forceThrowDispatchError,
         } = options
         
-        // 首先初始化 system
         this.system = system
         this.ignorePermission = ignorePermission
+        this.ignoreGuard = ignoreGuard ?? ignorePermission
         this.forceThrowInteractionError = forceThrowInteractionError
-        // 因为我们会对 entities 数组进行补充。如果外部复用了传入的数组对象，就会发生混乱，例如在测试用例中复用。
+        this.forceThrowDispatchError = forceThrowDispatchError ?? forceThrowInteractionError
         this.entities = [...entities]
         this.relations = [...relations]
-        this.activities = [...activities]
-        this.interactions = [...interactions]
         this.dict = [...dict]
         this.recordMutationSideEffects = [...recordMutationSideEffects]
 
-        // Initialize ActivityManager
+        // Initialize ActivityManager (produces activity-wrapped event sources)
         this.activityManager = new ActivityManager(this, activities, interactions)
 
-        // Import default computation handles
+        // Merge all event sources: explicit eventSources + interactions + activity-wrapped interactions
+        this.eventSources = [...eventSources, ...interactions, ...this.activityManager.getActivityEventSources()]
+
+        // Register event sources by name/uuid for dispatch lookup
+        for (const es of this.eventSources) {
+            if (es.name) {
+                this.eventSourcesByName.set(es.name, es)
+            }
+            this.eventSourcesByUUID.set(es.uuid, es)
+        }
+
+        // Register entities from all event sources (deduplicated)
+        const registeredRecordNames = new Set(this.entities.map(e => e.name))
+        for (const es of this.eventSources) {
+            if (es.entity && es.entity.name && !registeredRecordNames.has(es.entity.name)) {
+                this.entities.push(es.entity)
+                registeredRecordNames.add(es.entity.name)
+            }
+        }
+
         const allComputationHandles = [
             ...CountHandles,
             ...TransformHandles,
@@ -155,8 +198,6 @@ export class Controller {
         const states = this.scheduler.createStates()
         await this.system.setup(this.entities, this.relations, states, install)
         await this.scheduler.setup(install)
-
-        // TODO 如果是恢复模式，还要从 event stack 中开始恢复数据。
     }
     
     async retrieveLastValue(dataContext: DataContext, record?: any) {
@@ -179,22 +220,16 @@ export class Controller {
             return this.system.storage.dict.set(dataContext.id.name, result)
         } else if (dataContext.type === 'entity') {
             if (result === undefined || result === null) return
-            // Entity 级别的计算结果完全替换实体表中的所有记录
             const entityContext = dataContext as EntityDataContext
-            // 先删除所有记录
             await this.system.storage.delete(entityContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
-            // 然后插入新记录，result 必须是数组
             const items = Array.isArray(result) ? result : [result]
             for (const item of items) {
                 await this.system.storage.create(entityContext.id.name!, item)
             }
         } else if (dataContext.type === 'relation') {
             if (result === undefined || result === null) return
-            // Relation 级别的计算结果完全替换关系表中的所有记录
             const relationContext = dataContext as RelationDataContext
-            // 先删除所有记录
             await this.system.storage.delete(relationContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
-            // 然后插入新记录，result 必须是数组
             const items = Array.isArray(result) ? result : [result]
             for (const item of items) {
                 await this.system.storage.create(relationContext.id.name!, item)
@@ -229,7 +264,6 @@ export class Controller {
             } else {
                 const propertyDataContext = dataContext as PropertyDataContext
 
-                // 系统级别的软删除应该 storage 中去做。
                 if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && patch.data) {
                     assert(patch.type !== 'delete', 'Hard deletion property cannot be deleted')
                     await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))
@@ -249,43 +283,85 @@ export class Controller {
     }
     callbacks: Map<any, Set<SystemCallback>> = new Map()
 
-    async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs, activityName?: string, activityId?: string) {
-        try {
-            // Run the interaction call within the effects context
-            const effectsContext = { effects: [] as RecordMutationEvent[] }
-            const result = await asyncEffectsContext.run(effectsContext, async () => {
-                if (activityName) {
-                    // Call activity interaction
-                    return await this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
-                } else {
-                    // Call regular interaction
-                    return await this.activityManager.callInteraction(interactionName, interactionEventArgs)
+    /**
+     * Unified dispatch API for all event source types.
+     * First parameter is an object reference to the event source, second is the event args.
+     */
+    async dispatch<TArgs = any, TResult = any>(
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        args: TArgs
+    ): Promise<DispatchResponse> {
+        const effectsContext = { effects: [] as RecordMutationEvent[] }
+        
+        return asyncEffectsContext.run(effectsContext, async () => {
+            await this.system.storage.beginTransaction(eventSource.name)
+            
+            let result: DispatchResponse
+            try {
+                if (!(this.ignoreGuard || this.ignorePermission) && eventSource.guard) {
+                    await eventSource.guard.call(this, args)
                 }
-            })
+                
+                const eventData = eventSource.mapEventData
+                    ? eventSource.mapEventData(args)
+                    : {}
+                    
+                await this.system.storage.create(eventSource.entity.name!, eventData)
+                
+                let data: unknown = undefined
+                if (eventSource.resolve) {
+                    data = await eventSource.resolve.call(this, args)
+                }
+                
+                let context: Record<string, unknown> | undefined = undefined
+                if (eventSource.afterDispatch) {
+                    const afterResult = await (eventSource.afterDispatch as Function).call(this, args, { data })
+                    if (afterResult) {
+                        context = afterResult
+                    }
+                }
+                
+                result = { data, effects: effectsContext.effects, sideEffects: {}, context }
+                
+                await this.system.storage.commitTransaction(eventSource.name)
+            } catch (e) {
+                await this.system.storage.rollbackTransaction(eventSource.name)
+                
+                if (this.forceThrowDispatchError || this.forceThrowInteractionError) throw e
+                result = {
+                    error: e,
+                    effects: [],
+                    sideEffects: {}
+                }
+            }
             
             result.effects = effectsContext.effects
             
-            if (result.error && this.forceThrowInteractionError) {
-                throw result.error
-            } else {
-                await this.runRecordChangeSideEffects(result, this.system.logger)
-                return result
+            if (!result.error) {
+                await this.runRecordChangeSideEffects(result as InteractionCallResponse, this.system.logger)
             }
-        } catch (e) {
-            const isActivityInteraction = !!activityName
-            const error = new InteractionExecutionError(
-                isActivityInteraction ? 'Failed to call activity interaction' : 'Failed to call interaction', 
-                {
-                    interactionName,
-                    userId: interactionEventArgs.user?.id,
-                    payload: interactionEventArgs.payload,
-                    executionPhase: isActivityInteraction ? 'callActivityInteraction' : 'callInteraction',
-                    ...(isActivityInteraction ? { context: { activityName, activityId } } : {}),
-                    causedBy: e instanceof Error ? e : new Error(String(e))
-                }
-            )
-            throw error
+            
+            return result
+        })
+    }
+
+    /** @deprecated Use dispatch() instead */
+    async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs, activityName?: string, activityId?: string) {
+        if (activityName) {
+            return this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
         }
+
+        const eventSource = this.findEventSourceByName(interactionName)
+        if (!eventSource) {
+            throw new InteractionExecutionError(`Cannot find interaction for ${interactionName}`, {
+                interactionName,
+                userId: interactionEventArgs.user?.id,
+                payload: interactionEventArgs.payload,
+                executionPhase: 'interaction-lookup',
+            })
+        }
+
+        return this.dispatch(eventSource, interactionEventArgs)
     }
     async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]
@@ -325,13 +401,14 @@ export class Controller {
             }
         }
     }
-    // Add addEventListener method to Controller class
     addEventListener(eventName: string, callback: (...args: any[]) => any) {
-        // Implementation of addEventListener
         if (!this.callbacks.has(eventName)) {
             this.callbacks.set(eventName, new Set());
         }
         this.callbacks.get(eventName)!.add(callback);
     }
-}
 
+    findEventSourceByName(name: string): EventSourceInstance<any, any> | undefined {
+        return this.eventSourcesByName.get(name)
+    }
+}

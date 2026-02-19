@@ -79,7 +79,7 @@ import {
   Controller,
   MonoSystem
 } from 'interaqt'
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 
 // =============================================================================
 // SHARED DATA MODEL

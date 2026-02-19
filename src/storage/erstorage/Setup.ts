@@ -1,11 +1,11 @@
 import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
-import { EntityInstance, RelationInstance, PropertyInstance, RefContainer } from "@shared";
+import { EntityInstance, RelationInstance, PropertyInstance, RefContainer } from "@core";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
 import { MatchExpressionData, MatchExp } from "./MatchExp.js";
-import { Entity, Property, Relation } from "@shared";
-import { BoolExp } from "@shared";
+import { Entity, Property, Relation } from "@core";
+import { BoolExp } from "@core";
 import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
 

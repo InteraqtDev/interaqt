@@ -14,7 +14,7 @@ import {
     DictionaryEntity
 } from "./System.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
-import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@shared";
+import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -23,7 +23,7 @@ import {
     MatchExpressionData,
     RawEntityData
 } from '@storage';
-// SQLiteDB is now imported from @dbclients when needed
+// SQLiteDB is now imported from @drivers when needed
 import { RecordBoundState } from "./computations/Computation.js";
 
 function JSONStringify(value:any) {

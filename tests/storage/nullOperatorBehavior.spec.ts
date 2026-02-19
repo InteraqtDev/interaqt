@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle} from "@storage";
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 describe('NULL value behavior with different operators', () => {
     let db: SQLiteDB
     let setup

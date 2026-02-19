@@ -1,4 +1,4 @@
-import {BoolExp, BoolExpressionRawData, ExpressionData} from "@shared";
+import {BoolExp, BoolExpressionRawData, ExpressionData} from "@core";
 import {EntityToTableMap, RecordAttribute} from "./EntityToTableMap.js";
 import {assert} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";

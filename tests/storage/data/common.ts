@@ -1,4 +1,4 @@
-import { Entity, EntityInstance, Property, Relation, RelationInstance } from '@shared';
+import { Entity, EntityInstance, Property, Relation, RelationInstance } from '@core';
 
 
 export function createCommonData(): { entities: EntityInstance[], relations: RelationInstance[] } {

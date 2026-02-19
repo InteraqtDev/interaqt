@@ -1,5 +1,5 @@
 import { DataContext, PropertyDataContext } from "./Computation.js";
-import { Custom, CustomInstance } from "@shared";
+import { Custom, CustomInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { 
   ComputationResult,

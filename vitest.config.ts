@@ -19,9 +19,9 @@ export default defineConfig({
     resolve: {
         alias: {
             '@runtime': path.resolve(__dirname, './src/runtime/index.ts'),
-            '@shared': path.resolve(__dirname, './src/shared/index.ts'),
+            '@core': path.resolve(__dirname, './src/core/index.ts'),
             '@storage': path.resolve(__dirname, './src/storage/index.ts'),
-            '@dbclients': path.resolve(__dirname, './src/dbclients/index.ts'),
+            '@drivers': path.resolve(__dirname, './src/drivers/index.ts'),
             'interaqt': path.resolve(__dirname, './src'),
         }
     }

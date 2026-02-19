@@ -2,7 +2,7 @@ import { describe, expect, test, beforeAll } from "vitest";
 import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp, DICTIONARY_RECORD, GlobalDataContext } from 'interaqt';
 import { Expression } from 'interaqt';
 
-import { PGLiteDB, SQLiteDB } from '@dbclients';
+import { PGLiteDB, SQLiteDB } from '@drivers';
 describe('RealTime computed handle', () => {
   
   test('should calculate global real-time value with Expression', async () => {

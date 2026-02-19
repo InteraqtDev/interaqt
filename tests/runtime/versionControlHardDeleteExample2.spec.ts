@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Entity, Property } from 'interaqt';
-import { SQLiteDB } from '@dbclients';
+import { SQLiteDB } from '@drivers';
 import {
   Controller,
   MonoSystem, StateMachine,

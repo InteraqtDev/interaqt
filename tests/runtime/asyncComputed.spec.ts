@@ -1,5 +1,5 @@
 import { Controller, Entity, MonoSystem, Property, MatchExp, DataDep, PropertyDataContext,  DataBasedComputation, ComputationResult } from "interaqt";
-import { PGLiteDB, SQLiteDB } from '@dbclients';
+import { PGLiteDB, SQLiteDB } from '@drivers';
 import { describe, expect, test } from "vitest";
 // TestCrawlerComputed as a standard ES6 class
 interface TestCrawlerComputedInstance {

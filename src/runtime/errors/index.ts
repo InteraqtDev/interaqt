@@ -2,16 +2,16 @@
 export { FrameworkError, ErrorSeverity, ErrorCategory } from './FrameworkError.js'
 import { FrameworkError, ErrorSeverity, ErrorCategory } from './FrameworkError.js'
 
-// Interaction errors
+// Interaction errors (canonical location: src/builtins/interaction/errors/)
 export {
     InteractionExecutionError
-} from './InteractionErrors.js'
+} from '../../builtins/interaction/errors/InteractionErrors.js'
 
-// Activity errors
+// Activity errors (canonical location: src/builtins/interaction/errors/)
 export {
     ActivityError,
     ActivityStateError
-} from './ActivityErrors.js'
+} from '../../builtins/interaction/errors/ActivityErrors.js'
 
 // Computation errors
 export {

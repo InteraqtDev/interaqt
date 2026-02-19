@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { DBSetup, EntityToTableMap, MatchExp, EntityQueryHandle } from '@storage'
-import { SQLiteDB } from '@dbclients';
-import { Entity, Property, Relation } from '@shared'
+import { SQLiteDB } from '@drivers';
+import { Entity, Property, Relation } from '@core'
 describe('cascade filtered relation', () => {
     let db: SQLiteDB
     let setup: DBSetup

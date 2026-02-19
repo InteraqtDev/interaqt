@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Controller, MonoSystem, Property, Entity, Every, Dictionary, BoolExp, Relation, MatchExp, DICTIONARY_RECORD, KlassByName,  } from 'interaqt';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 // 创建简单测试环境，直接测试 EveryHandle 的具体方法
 describe('Every computed handle', () => {
   

@@ -21,9 +21,9 @@
     "paths": {
         "interaqt": ["src"],
         "@runtime": ["src/runtime/index.ts"],
-        "@shared": ["src/shared/index.ts"],
+        "@core": ["src/core/index.ts"],
         "@storage": ["src/storage/index.ts"],
-        "@dbclients": ["src/dbclients/index.ts"]
+        "@drivers": ["src/drivers/index.ts"]
     },
     "jsx": "react",
     "jsxFactory": "createElement",

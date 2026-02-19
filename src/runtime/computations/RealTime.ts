@@ -1,7 +1,7 @@
-import { RealTime } from "@shared";
+import { RealTime } from "@core";
 import { Controller } from "../Controller";
 import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
-import { RealTimeInstance, PropertyInstance } from "@shared";
+import { RealTimeInstance, PropertyInstance } from "@core";
 import { DataContext } from "./Computation.js";
 import { Equation, Expression, Inequality } from "./MathResolver";
 

@@ -1,5 +1,5 @@
 import { FrameworkError, ErrorSeverity, ErrorCategory } from './FrameworkError.js'
-import { EvaluateError, ConditionInstance } from '@shared'
+import { EvaluateError, ConditionInstance } from '@core'
 
 /**
  * Base class for all condition and permission related errors

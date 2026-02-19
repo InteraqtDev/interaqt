@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { Entity, Property, Relation } from 'interaqt';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 import {
     Controller,
     MonoSystem,
@@ -599,7 +599,7 @@ describe('Get Data Interaction', () => {
                 controller.callInteraction('nonExistentInteraction', {
                     user: { id: 'test-user' }
                 })
-            ).rejects.toThrow('Failed to call interaction')
+            ).rejects.toThrow('Cannot find interaction for nonExistentInteraction')
         })
 
         test('should return error when action is not GetAction', async () => {

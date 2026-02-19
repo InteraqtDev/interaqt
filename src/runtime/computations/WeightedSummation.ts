@@ -1,7 +1,7 @@
 import { DataContext, PropertyDataContext } from "./Computation.js";
-import { WeightedSummation } from "@shared";
+import { WeightedSummation } from "@core";
 import { Controller } from "../Controller.js";
-import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@shared";
+import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@core";
 import { ComputationResult, DataDep, RecordsDataDep, RecordBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";

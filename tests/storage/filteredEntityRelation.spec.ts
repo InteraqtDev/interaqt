@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Entity, Relation, Property } from '@shared';
+import { Entity, Relation, Property } from '@core';
 import { DBSetup, EntityToTableMap } from '@storage';
 import { RecordQueryAgent } from '@storage';
 import { EntityQueryHandle } from '@storage';
 import { MatchExp } from '@storage';
-import { PGLiteDB } from '@dbclients';
+import { PGLiteDB } from '@drivers';
 describe('Filtered Entity with Relation as Source', () => {
     let db: PGLiteDB
     let map: EntityToTableMap
