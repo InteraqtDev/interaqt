@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Action, GetAction } from "../../src/builtins/interaction/Action";
+import { Action, GetAction } from "@core";
 
 describe("Action Refactored - compatibility test", () => {
   beforeEach(() => {

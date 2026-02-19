@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { SQLBuilder } from '../../src/storage/erstorage/SQLBuilder.js'
-import { EntityToTableMap, MapData } from '../../src/storage/erstorage/EntityToTableMap.js'
-import { RecordQuery } from '../../src/storage/erstorage/RecordQuery.js'
-import { MatchExp } from '../../src/storage/erstorage/MatchExp.js'
-import { AttributeQuery, AttributeQueryData } from '../../src/storage/erstorage/AttributeQuery.js'
-import { AliasManager } from '../../src/storage/erstorage/util/AliasManager.js'
-import { PGLiteDB } from '../../src/drivers/PGLite.js'
+import { SQLBuilder, EntityToTableMap, MapData, RecordQuery, MatchExp, AttributeQuery, AttributeQueryData, AliasManager } from '@storage'
+import { PGLiteDB } from '@drivers'
 
 describe('SQLBuilder', () => {
     let map: EntityToTableMap

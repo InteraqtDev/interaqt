@@ -1,9 +1,8 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { BoolAtomData, BoolExpressionData } from "../../src/core/BoolExp";
-import { Attributive, Attributives } from "../../src/builtins/interaction/Attributive";
-import { Conditions } from "../../src/builtins/interaction/Conditions";
-import { DataAttributives } from "../../src/builtins/interaction/DataAttributives";
-import { clearAllInstances } from "../../src/core/utils";
+import {
+  BoolAtomData, BoolExpressionData, Attributive, Attributives,
+  Conditions, DataAttributives, clearAllInstances
+} from "@core";
 
 describe("Bool and Attributive Classes Refactored", () => {
   beforeEach(() => {

@@ -1,10 +1,7 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Entity } from "../../src/core/Entity";
-import { Property } from "../../src/core/Property";
-import { Relation } from "../../src/core/Relation";
-import { Interaction } from "../../src/builtins/interaction/Interaction";
-import { Action } from "../../src/builtins/interaction/Action";
-import { clearAllInstances } from "../../src/core/utils";
+import {
+  Entity, Property, Relation, Interaction, Action, clearAllInstances
+} from "@core";
 
 describe("Core Domain Classes Refactored", () => {
   beforeEach(() => {

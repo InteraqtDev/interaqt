@@ -1,11 +1,8 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { DataAttributive, DataPolicy } from "../../src/builtins/interaction/Data";
-import { Activity, ActivityGroup, Transfer } from "../../src/builtins/interaction/Activity";
-import { Interaction } from "../../src/builtins/interaction/Interaction";
-import { Gateway } from "../../src/builtins/interaction/Gateway";
-import { Event } from "../../src/builtins/interaction/Event";
-import { Action } from "../../src/builtins/interaction/Action";
-import { clearAllInstances } from "../../src/core/utils";
+import {
+  DataAttributive, DataPolicy, Activity, ActivityGroup, Transfer,
+  Interaction, Gateway, Event, Action, clearAllInstances
+} from "@core";
 
 describe("Data and Activity Classes Refactored", () => {
   let testInteraction: any;

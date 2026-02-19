@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { BoolExp, type AtomData, type BoolExpressionRawData, type ExpressionData, type EvaluateError, BoolAtomData, BoolExpressionData } from "../../src/core/BoolExp";
-import { clearAllInstances } from "../../src/core/utils";
+import { BoolExp, type AtomData, type BoolExpressionRawData, type ExpressionData, type EvaluateError, BoolAtomData, BoolExpressionData } from "@core";
+import { clearAllInstances } from "@core";
 
 describe("BoolExp Complete Test Suite", () => {
   beforeEach(() => {

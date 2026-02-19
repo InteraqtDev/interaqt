@@ -1,10 +1,7 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Condition } from "../../src/builtins/interaction/Condition";
-import { SideEffect } from "../../src/core/SideEffect";
-import { PayloadItem } from "../../src/builtins/interaction/PayloadItem";
-import { Payload } from "../../src/builtins/interaction/Payload";
-import { Entity } from "../../src/core/Entity";
-import { clearAllInstances } from "../../src/core/utils";
+import {
+  Condition, SideEffect, PayloadItem, Payload, Entity, clearAllInstances
+} from "@core";
 
 describe("Support Classes Refactored", () => {
   let userEntity: any;

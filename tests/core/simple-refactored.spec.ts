@@ -1,13 +1,8 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Gateway } from "../../src/builtins/interaction/Gateway";
-import { Event } from "../../src/builtins/interaction/Event";
-import { Dictionary } from "../../src/core/RealDictionary";
-import { StateNode } from "../../src/core/StateNode";
-import { StateTransfer } from "../../src/core/StateTransfer";
-import { StateMachine } from "../../src/core/StateMachine";
-import { Interaction } from "../../src/builtins/interaction/Interaction";
-import { Action } from "../../src/builtins/interaction/Action";
-import { clearAllInstances } from "../../src/core/utils";
+import {
+  Gateway, Event, Dictionary, StateNode, StateTransfer,
+  StateMachine, Interaction, Action, clearAllInstances
+} from "@core";
 
 describe("Simple Objects Refactored - compatibility test", () => {
   beforeEach(() => {

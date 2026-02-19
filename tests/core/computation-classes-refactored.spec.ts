@@ -1,15 +1,8 @@
 import { describe, test, expect, beforeEach } from "vitest";
-import { Count } from "../../src/core/Count";
-import { Summation } from "../../src/core/Summation";
-import { Average } from "../../src/core/Average";
-import { WeightedSummation } from "../../src/core/WeightedSummation";
-import { Transform } from "../../src/core/Transform";
-import { Any } from "../../src/core/Any";
-import { Every } from "../../src/core/Every";
-import { RealTime } from "../../src/core/RealTime";
-import { Entity } from "../../src/core/Entity";
-import { Relation } from "../../src/core/Relation";
-import { clearAllInstances } from "../../src/core/utils";
+import {
+  Count, Summation, Average, WeightedSummation, Transform,
+  Any, Every, RealTime, Entity, Relation, clearAllInstances
+} from "@core";
 
 describe("Computation Classes Refactored", () => {
   let userEntity: any;

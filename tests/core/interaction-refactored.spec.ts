@@ -5,7 +5,7 @@ import {
   Gateway, Event, Property, Entity,
   forEachInteraction, getInteractions,
   clearAllInstances
-} from "../../src/core";
+} from "@core";
 
 describe("Interaction System Refactored - compatibility test", () => {
   beforeEach(() => {

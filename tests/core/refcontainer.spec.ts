@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Entity, Relation, Property, RefContainer } from '../../src/core/index.js';
-import type { EntityInstance, RelationInstance, PropertyInstance } from '../../src/core/index.js';
+import { Entity, Relation, Property, RefContainer } from '@core';
+import type { EntityInstance, RelationInstance, PropertyInstance } from '@core';
 
 describe('RefContainer', () => {
   // Helper function to create test entities
