@@ -1,5 +1,12 @@
 
 
+## [1.0.0](https://github.com/InteraqtDev/interaqt/compare/v0.9.0...v1.0.0) (2026-02-20)
+
+
+### Bug Fixes
+
+* use import type for type-only imports in InteractionCall ([2952e4d](https://github.com/InteraqtDev/interaqt/commit/2952e4d4db098b9b2da9a1d09845ff03e83cd480))
+
 ## [0.8.15](https://github.com/InteraqtDev/interaqt/compare/v0.8.14...v0.8.15) (2026-01-29)
 
 
