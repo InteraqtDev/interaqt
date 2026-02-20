@@ -1,8 +1,11 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import {
-  BoolAtomData, BoolExpressionData, Attributive, Attributives,
-  Conditions, DataAttributives, clearAllInstances
+  BoolAtomData, BoolExpressionData, clearAllInstances
 } from "@core";
+import {
+  Attributive, Attributives,
+  Conditions, DataAttributives
+} from "interaqt";
 
 describe("Bool and Attributive Classes Refactored", () => {
   beforeEach(() => {

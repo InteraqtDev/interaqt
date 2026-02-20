@@ -184,8 +184,6 @@ describe('Relation async computed', () => {
         system: system,
         entities: entities,
         relations: relations,
-        activities: [],
-        interactions: [],
         computations: RelationScoreHandles
     });
     await controller.setup(true);

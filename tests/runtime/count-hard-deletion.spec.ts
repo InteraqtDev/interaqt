@@ -220,10 +220,9 @@ describe('Count with HardDeletionProperty on Relation', () => {
       system,
       entities: testEntities,
       relations: testRelations,
-      interactions: testInteractions,
-      activities: [],
-      ignorePermission: true,
-      forceThrowInteractionError: true
+      eventSources: testInteractions,
+      ignoreGuard: true,
+      forceThrowDispatchError: true
     })
     await controller.setup(true)
   })
@@ -245,7 +244,7 @@ describe('Count with HardDeletionProperty on Relation', () => {
      */
 
     // Create parent
-    await controller.callInteraction('CreateHardDeleteTestParent', {
+    await controller.dispatch(CreateTestParent, {
       user: { id: 'test-user' },
       payload: { name: 'Test Parent' }
     })
@@ -255,7 +254,7 @@ describe('Count with HardDeletionProperty on Relation', () => {
     expect(parent.activeChildCount).toBe(0)
 
     // Create child (this creates both child and relation)
-    await controller.callInteraction('CreateHardDeleteTestChild', {
+    await controller.dispatch(CreateTestChild, {
       user: { id: 'test-user' },
       payload: { parentId: parent.id, name: 'Child 1' }
     })
@@ -277,7 +276,7 @@ describe('Count with HardDeletionProperty on Relation', () => {
     // Delete the relation via HardDeletionProperty
     // Expected: Count should decrease to 0
     // Actual: Framework throws TypeError about RecordBoundState
-    await controller.callInteraction('DeleteHardDeleteTestRelation', {
+    await controller.dispatch(DeleteRelation, {
       user: { id: 'test-user' },
       payload: { childId: child.id }
     })

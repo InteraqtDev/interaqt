@@ -1,9 +1,10 @@
-import { ActivityInstance, AttributeQueryData, DictionaryInstance, EntityInstance, InteractionInstance, RelationInstance } from "./types"
+import { AttributeQueryData, DictionaryInstance } from "./types"
+import type { ComputationRecord } from "./types"
 
 
 export type RecordsDataDep = {
     type: 'records',
-    source: EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
+    source: ComputationRecord,
     match?: any,
     modifier?: any,
     attributeQuery?: AttributeQueryData

@@ -155,8 +155,6 @@ describe('Cascade Filtered Entity Computations', () => {
         system,
         entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
       });
       await controller.setup(true);
@@ -300,8 +298,6 @@ describe('Cascade Filtered Entity Computations', () => {
         system,
         entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
       });
       await controller.setup(true);
@@ -445,8 +441,6 @@ describe('Cascade Filtered Entity Computations', () => {
         system,
         entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
       });
       await controller.setup(true);
@@ -600,8 +594,6 @@ describe('Cascade Filtered Entity Computations', () => {
         system,
         entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
       });
       await controller.setup(true);
@@ -750,8 +742,6 @@ describe('Cascade Filtered Entity Computations', () => {
         system,
         entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
       });
       await controller.setup(true);
@@ -915,8 +905,6 @@ describe('Cascade Filtered Entity Computations', () => {
         system,
         entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
       });
       await controller.setup(true);

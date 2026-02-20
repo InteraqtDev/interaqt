@@ -1,7 +1,8 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import {
-  Entity, Property, Relation, Interaction, Action, clearAllInstances
+  Entity, Property, Relation, clearAllInstances
 } from "@core";
+import { Interaction, Action } from "interaqt";
 
 describe("Core Domain Classes Refactored", () => {
   beforeEach(() => {

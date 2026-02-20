@@ -158,8 +158,6 @@ describe('Global data dependency', () => {
         entities: entities,
         dict: dictionary,
         relations: [],
-        activities: [],
-        interactions: [],
         computations: GlobalDependentHandles
     });
     await controller.setup(true);
@@ -344,8 +342,6 @@ describe('Global data dependency', () => {
         entities: entities,
         dict: dictionary,
         relations: [],
-        activities: [],
-        interactions: [],
         computations: MultiGlobalHandles
     });
     await controller.setup(true);

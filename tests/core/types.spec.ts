@@ -1,9 +1,11 @@
 import {describe, test, expect} from "vitest";
 import { 
     Entity, Property, PropertyTypes, Relation,
-    Action, Interaction, Payload, PayloadItem,
     clearAllInstances
 } from "@core";
+import {
+    Action, Interaction, Payload, PayloadItem
+} from "interaqt";
 
 describe("refactored types", () => {
     test('relation types', () => {

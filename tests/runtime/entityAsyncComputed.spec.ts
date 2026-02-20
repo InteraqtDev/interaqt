@@ -163,8 +163,6 @@ describe('Entity async computed', () => {
         system: system,
         entities: entities,
         relations: relations,
-        activities: [],
-        interactions: [],
         computations: EntityRecommendationHandles
     });
     await controller.setup(true);

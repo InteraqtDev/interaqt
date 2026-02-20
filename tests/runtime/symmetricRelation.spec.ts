@@ -53,9 +53,7 @@ describe('Symmetric relation computation', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -140,9 +138,7 @@ describe('Symmetric relation computation', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -242,9 +238,7 @@ describe('Symmetric relation computation', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     

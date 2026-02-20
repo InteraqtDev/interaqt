@@ -1,16 +1,16 @@
 import { FrameworkError, ErrorSeverity, ErrorCategory } from './FrameworkError.js'
-import { EvaluateError, ConditionInstance } from '@core'
+import { EvaluateError } from '@core'
 
 /**
  * Base class for all condition and permission related errors
  */
 export class ConditionError extends FrameworkError {
     public readonly type: string  // For backward compatibility with existing tests
-    public readonly error?: EvaluateError<ConditionInstance> | any  // For backward compatibility
+    public readonly error?: EvaluateError<any> | any  // For backward compatibility
     public readonly checkType: 'user' | 'payload' | 'condition' | 'attributive' | 'concept'
     public readonly fieldName?: string
     public readonly payload?: any
-    public readonly evaluationError?: EvaluateError<ConditionInstance> | any
+    public readonly evaluationError?: EvaluateError<any> | any
     public readonly severity: ErrorSeverity
 
     constructor(
@@ -19,7 +19,7 @@ export class ConditionError extends FrameworkError {
             checkType: 'user' | 'payload' | 'condition' | 'attributive' | 'concept'
             fieldName?: string
             payload?: any
-            evaluationError?: EvaluateError<ConditionInstance> | any
+            evaluationError?: EvaluateError<any> | any
             severity?: ErrorSeverity
             context?: Record<string, any>
             causedBy?: Error
@@ -73,7 +73,7 @@ export class ConditionError extends FrameworkError {
         })
     }
 
-    static conditionCheckFailed(error: EvaluateError<ConditionInstance>, context?: Record<string, any>): ConditionError {
+    static conditionCheckFailed(error: EvaluateError<any>, context?: Record<string, any>): ConditionError {
         return new ConditionError(`Condition check failed: ${error.data.name}`, {
             checkType: 'condition',
             evaluationError: error,

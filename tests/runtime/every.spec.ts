@@ -32,8 +32,6 @@ describe('Every computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
     })
     await controller.setup(true)
@@ -120,9 +118,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     })
     await controller.setup(true)
 
@@ -221,9 +217,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
     
@@ -393,9 +387,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
     
@@ -586,9 +578,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     })
     await controller.setup(true)
 
@@ -658,8 +648,6 @@ describe('Every computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: [ageLimit, ageLimitComputed]
     })
     await controller.setup(true)
@@ -776,9 +764,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -1051,9 +1037,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -1283,9 +1267,7 @@ describe('Every computed handle', () => {
       system: system,
       entities: entities,
       dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
 
@@ -1461,9 +1443,7 @@ describe('Every computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
 

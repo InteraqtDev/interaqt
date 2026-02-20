@@ -3,8 +3,9 @@ import {
   StateNode, StateTransfer, StateMachine,
   Count, Summation, Average, Every, Any,
   WeightedSummation, Transform, RealTime,
-  Entity, Relation, Interaction, Action 
+  Entity, Relation
 } from "@core";
+import { Interaction, Action } from "interaqt";
 
 describe("Computation System - createClass functionality", () => {
   describe("StateMachine", () => {

@@ -93,12 +93,3 @@ export type ConceptInstance = unknown;
 export type EntityInstanceType = import('./Entity.js').EntityInstance;
 export type RelationInstanceType = import('./Relation.js').RelationInstance;
 export type PropertyInstanceType = import('./Property.js').PropertyInstance;
-
-// Interaction builtin type aliases
-export type InteractionInstanceType = import('../builtins/interaction/Interaction.js').InteractionInstance;
-export type ActivityInstanceType = import('../builtins/interaction/Activity.js').ActivityInstance;
-export type ActivityGroupInstanceType = import('../builtins/interaction/Activity.js').ActivityGroupInstance;
-export type GatewayInstanceType = import('../builtins/interaction/Gateway.js').GatewayInstance;
-export type TransferInstanceType = import('../builtins/interaction/Activity.js').TransferInstance;
-export type AttributiveInstanceType = import('../builtins/interaction/Attributive.js').AttributiveInstance;
-export type ConditionInstanceType = import('../builtins/interaction/Condition.js').ConditionInstance; 

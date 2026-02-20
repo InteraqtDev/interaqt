@@ -77,8 +77,7 @@ describe('condition checks', () => {
             system: system,
             entities: [User, Post],
             relations: [],
-            activities: [],
-            interactions: [ViewPost]
+            eventSources: [ViewPost]
         })
         await controller.setup(true)
 
@@ -89,13 +88,13 @@ describe('condition checks', () => {
         // Test viewing regular post - should pass for both users
         const regularPost = { title: 'Regular Post', isPremium: false }
         
-        const richRegularResult = await controller.callInteraction(ViewPost.name, {
+        const richRegularResult = await controller.dispatch(ViewPost, {
             user: richUser,
             payload: { post: regularPost }
         })
         expect(richRegularResult.error).toBeUndefined()
 
-        const poorRegularResult = await controller.callInteraction(ViewPost.name, {
+        const poorRegularResult = await controller.dispatch(ViewPost, {
             user: poorUser,
             payload: { post: regularPost }
         })
@@ -105,14 +104,14 @@ describe('condition checks', () => {
         const premiumPost = { title: 'Premium Post', isPremium: true }
 
         // Rich user should pass
-        const richPremiumResult = await controller.callInteraction(ViewPost.name, {
+        const richPremiumResult = await controller.dispatch(ViewPost, {
             user: richUser,
             payload: { post: premiumPost }
         })
         expect(richPremiumResult.error).toBeUndefined()
 
         // Poor user should fail
-        const poorPremiumResult = await controller.callInteraction(ViewPost.name, {
+        const poorPremiumResult = await controller.dispatch(ViewPost, {
             user: poorUser,
             payload: { post: premiumPost }
         })
@@ -173,8 +172,7 @@ describe('condition checks', () => {
             system: system,
             entities: [User, System],
             relations: [],
-            activities: [],
-            interactions: [PublishContent]
+            eventSources: [PublishContent]
         })
         await controller.setup(true)
 
@@ -186,13 +184,13 @@ describe('condition checks', () => {
         const unverifiedUser = await system.storage.create('User', { name: 'Unverified', isVerified: false })
 
         // Test verified user when system is not in maintenance - should pass
-        const verifiedResult = await controller.callInteraction(PublishContent.name, {
+        const verifiedResult = await controller.dispatch(PublishContent, {
             user: verifiedUser
         })
         expect(verifiedResult.error).toBeUndefined()
 
         // Test unverified user - should fail
-        const unverifiedResult = await controller.callInteraction(PublishContent.name, {
+        const unverifiedResult = await controller.dispatch(PublishContent, {
             user: unverifiedUser
         })
         expect(unverifiedResult.error).toBeDefined()
@@ -204,7 +202,7 @@ describe('condition checks', () => {
         await system.storage.update('System', undefined, { maintenanceMode: true })
 
         // Test verified user when system is in maintenance - should fail
-        const maintenanceResult = await controller.callInteraction(PublishContent.name, {
+        const maintenanceResult = await controller.dispatch(PublishContent, {
             user: verifiedUser
         })
         expect(maintenanceResult.error).toBeDefined()
@@ -240,15 +238,14 @@ describe('condition checks', () => {
                 system: system,
                 entities: [User],
                 relations: [],
-                activities: [],
-                interactions: [BuggyInteraction]
+                eventSources: [BuggyInteraction]
             })
             await controller.setup(true)
 
             const user = await system.storage.create('User', { name: 'TestUser' })
 
             // Should catch error and treat as failed condition
-            const result = await controller.callInteraction(BuggyInteraction.name, {
+            const result = await controller.dispatch(BuggyInteraction, {
                 user: user
             })
             expect(result.error).toBeDefined()
@@ -282,14 +279,13 @@ describe('condition checks', () => {
                 system: system,
                 entities: [User],
                 relations: [],
-                activities: [],
-                interactions: [DetailedErrorInteraction]
+                eventSources: [DetailedErrorInteraction]
             })
             await controller.setup(true)
 
             const user = await system.storage.create('User', { name: 'TestUser' })
 
-            const result = await controller.callInteraction(DetailedErrorInteraction.name, {
+            const result = await controller.dispatch(DetailedErrorInteraction, {
                 user: user
             })
             
@@ -340,14 +336,13 @@ describe('condition checks', () => {
                 system: system,
                 entities: [User],
                 relations: [],
-                activities: [],
-                interactions: [ComplexInteraction]
+                eventSources: [ComplexInteraction]
             })
             await controller.setup(true)
 
             const user = await system.storage.create('User', { name: 'TestUser' })
 
-            const result = await controller.callInteraction(ComplexInteraction.name, {
+            const result = await controller.dispatch(ComplexInteraction, {
                 user: user
             })
             
@@ -390,15 +385,14 @@ describe('condition checks', () => {
                 system: system,
                 entities: [User],
                 relations: [],
-                activities: [],
-                interactions: [IncompleteInteraction]
+                eventSources: [IncompleteInteraction]
             })
             await controller.setup(true)
 
             const user = await system.storage.create('User', { name: 'TestUser' })
 
             // Framework treats undefined as true (condition passes)
-            const result = await controller.callInteraction(IncompleteInteraction.name, {
+            const result = await controller.dispatch(IncompleteInteraction, {
                 user: user
             })
             expect(result.error).toBeUndefined()

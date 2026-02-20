@@ -2,13 +2,10 @@
  * Core type definitions
  */
 
-// Import and re-export instance types
 import type { EntityInstance } from './Entity';
 import type { RelationInstance } from './Relation';
 import type { PropertyInstance } from './Property';
-import type { InteractionInstance } from '../builtins/interaction/Interaction';
 import type { EventSourceInstance } from './EventSource';
-import type { ActivityInstance } from '../builtins/interaction/Activity';
 import type { CountInstance } from './Count';
 import type { SummationInstance } from './Summation';
 import type { AverageInstance } from './Average';
@@ -25,9 +22,7 @@ export type {
   EntityInstance,
   RelationInstance,
   PropertyInstance,
-  InteractionInstance,
   EventSourceInstance,
-  ActivityInstance,
   CountInstance,
   SummationInstance,
   AverageInstance,
@@ -65,13 +60,12 @@ export type ComputationInstance =
   | CustomInstance;
 
 /**
- * Record type that can be used in computations
+ * Record type that can be used in computations.
+ * Any named record source: Entity or Relation.
  */
 export type ComputationRecord = 
   | EntityInstance 
-  | RelationInstance 
-  | ActivityInstance 
-  | InteractionInstance;
+  | RelationInstance;
 
 /**
  * Attribute query data structure

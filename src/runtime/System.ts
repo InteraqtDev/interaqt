@@ -3,7 +3,6 @@ import { GlobalBoundState } from "./computations/Computation.js";
 import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
-import { InteractionEvent } from "../builtins/interaction/activity/InteractionCall.js";
 export type SystemCallback =  (...arg: any[]) => any
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
@@ -164,4 +163,3 @@ type InferType<T> = T extends { type: 'string' } ? string :
         // 添加更多类型映射
         unknown;
 
-export type InteractionEventRecord = InteractionEvent & EntityIdRef

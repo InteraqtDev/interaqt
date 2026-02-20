@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeEach } from "vitest";
+import { clearAllInstances } from "@core";
 import {
   DataAttributive, DataPolicy, Activity, ActivityGroup, Transfer,
-  Interaction, Gateway, Event, Action, clearAllInstances
-} from "@core";
+  Interaction, Gateway, Event, Action
+} from "interaqt";
 
 describe("Data and Activity Classes Refactored", () => {
   let testInteraction: any;

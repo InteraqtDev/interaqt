@@ -1,8 +1,11 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import {
-  Gateway, Event, Dictionary, StateNode, StateTransfer,
-  StateMachine, Interaction, Action, clearAllInstances
+  Dictionary, StateNode, StateTransfer,
+  StateMachine, clearAllInstances
 } from "@core";
+import {
+  Gateway, Event, Interaction, Action
+} from "interaqt";
 
 describe("Simple Objects Refactored - compatibility test", () => {
   beforeEach(() => {

@@ -57,8 +57,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -159,8 +157,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: relations,
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -281,8 +277,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -494,8 +488,6 @@ describe('Transform computed handle', () => {
       system: system,
       entities: entities,
       relations: [],
-      activities: [],
-      interactions: []
     });
     await controller.setup(true);
 
@@ -696,8 +688,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -799,8 +789,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -910,8 +898,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -1016,7 +1002,6 @@ describe('Transform computed handle', () => {
     });
     
     const entities = [userEntity, interactionAuditEntity];
-    const interactions = [testInteraction];
     
     // Setup system and controller
     const system = new MonoSystem(new PGLiteDB());
@@ -1025,8 +1010,7 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: interactions
+        eventSources: [testInteraction]
     });
     await controller.setup(true);
     
@@ -1035,7 +1019,7 @@ describe('Transform computed handle', () => {
     expect(initialAudits).toEqual([]);
     
     // Call interaction
-    const result = await controller.callInteraction('testAction', {
+    const result = await controller.dispatch(testInteraction, {
       user: { id: 'test-user-123' },
       payload: {
         message: 'Hello from test'
@@ -1156,8 +1140,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     
@@ -1303,8 +1285,6 @@ describe('Transform computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: []
     });
     await controller.setup(true);
     

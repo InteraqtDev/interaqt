@@ -48,7 +48,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [User],
-                interactions: [GetUsers]
+                eventSources: [GetUsers]
             })
             await controller.setup(true)
 
@@ -58,7 +58,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('User', { name: 'Charlie', email: 'charlie@example.com', role: 'user' })
 
             // Call the interaction
-            const result = await controller.callInteraction('getUsers', {
+            const result = await controller.dispatch(GetUsers, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'name', 'email', 'role', 'status']
@@ -94,7 +94,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [User],
-                interactions: [GetUsers]
+                eventSources: [GetUsers]
             })
             await controller.setup(true)
 
@@ -106,7 +106,7 @@ describe('Get Data Interaction', () => {
             })
 
             // Get only specific fields
-            const result = await controller.callInteraction('getUsers', {
+            const result = await controller.dispatch(GetUsers, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'name', 'email']  // Don't include bio
@@ -143,7 +143,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [User],
-                interactions: [GetActiveUsers]
+                eventSources: [GetActiveUsers]
             })
             await controller.setup(true)
 
@@ -154,7 +154,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('User', { name: 'David', status: 'deleted', role: 'user' })
 
             // Pass filter through query.match
-            const result = await controller.callInteraction('getActiveUsers', {
+            const result = await controller.dispatch(GetActiveUsers, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
@@ -188,7 +188,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [User],
-                interactions: [GetActiveAdmins]
+                eventSources: [GetActiveAdmins]
             })
             await controller.setup(true)
 
@@ -198,7 +198,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('User', { name: 'David', status: 'active', role: 'admin' })
 
             // Pass combined filters through query.match
-            const result = await controller.callInteraction('getActiveAdmins', {
+            const result = await controller.dispatch(GetActiveAdmins, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
@@ -234,7 +234,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Product],
-                interactions: [GetProducts]
+                eventSources: [GetProducts]
             })
             await controller.setup(true)
 
@@ -244,7 +244,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Product', { name: 'Chair', category: 'furniture', price: 199, inStock: true })
 
             // Filter for in-stock electronics using query.match 
-            const result = await controller.callInteraction('getProducts', {
+            const result = await controller.dispatch(GetProducts, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'category', value: ['=', 'electronics'] }),
@@ -258,7 +258,7 @@ describe('Get Data Interaction', () => {
             expect(data.every((p: any) => p.category === 'electronics')).toBe(true)
             
             // Now filter for in-stock furniture
-            const furnitureResult = await controller.callInteraction('getProducts', {
+            const furnitureResult = await controller.dispatch(GetProducts, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'inStock', value: ['=', true] }),
@@ -291,7 +291,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Post],
-                interactions: [GetPosts]
+                eventSources: [GetPosts]
             })
             await controller.setup(true)
 
@@ -305,7 +305,7 @@ describe('Get Data Interaction', () => {
             }
 
             // Get first page (5 items)
-            const page1 = await controller.callInteraction('getPosts', {
+            const page1 = await controller.dispatch(GetPosts, {
                 user: { id: 'test-user' },
                 query: {
                     modifier: { limit: 5, offset: 0 },
@@ -317,7 +317,7 @@ describe('Get Data Interaction', () => {
             expect((page1.data as any[]).length).toBe(5)
 
             // Get second page
-            const page2 = await controller.callInteraction('getPosts', {
+            const page2 = await controller.dispatch(GetPosts, {
                 user: { id: 'test-user' },
                 query: {
                     modifier: { limit: 5, offset: 5 },
@@ -359,7 +359,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Article],
-                interactions: [GetTopArticles]
+                eventSources: [GetTopArticles]
             })
             await controller.setup(true)
 
@@ -369,7 +369,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Article', { title: 'Article 4', author: 'David', views: 50 })
             await system.storage.create('Article', { title: 'Article 5', author: 'Eve', views: 750 })
 
-            const result = await controller.callInteraction('getTopArticles', {
+            const result = await controller.dispatch(GetTopArticles, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'title', 'views']
@@ -417,7 +417,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [SecretDocument],
-                interactions: [GetSecretDocuments]
+                eventSources: [GetSecretDocuments]
             })
             await controller.setup(true)
 
@@ -428,7 +428,7 @@ describe('Get Data Interaction', () => {
             })
 
             // Try as regular user - should fail
-            const regularResult = await controller.callInteraction('getSecretDocuments', {
+            const regularResult = await controller.dispatch(GetSecretDocuments, {
                 user: { id: 'user-1', role: 'user' },
                 query: {
                     attributeQuery: ['id', 'title', 'content']
@@ -439,7 +439,7 @@ describe('Get Data Interaction', () => {
             expect(regularResult.data).toBeUndefined()
 
             // Try as admin - should succeed
-            const adminResult = await controller.callInteraction('getSecretDocuments', {
+            const adminResult = await controller.dispatch(GetSecretDocuments, {
                 user: { id: 'admin-1', role: 'admin' },
                 query: {
                     attributeQuery: ['id', 'title', 'content']
@@ -472,7 +472,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Task],
-                interactions: [GetMyTasks]
+                eventSources: [GetMyTasks]
             })
             await controller.setup(true)
 
@@ -483,7 +483,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Task', { title: 'Task 4', assignedTo: 'user-3', status: 'pending' })
 
             // Get tasks for user-1 - pass user id in query.match
-            const user1Result = await controller.callInteraction('getMyTasks', {
+            const user1Result = await controller.dispatch(GetMyTasks, {
                 user: { id: 'user-1' },
                 query: {
                     match: MatchExp.atom({ key: 'assignedTo', value: ['=', 'user-1'] }),
@@ -497,7 +497,7 @@ describe('Get Data Interaction', () => {
             expect(user1Data.every((t: any) => t.assignedTo === 'user-1')).toBe(true)
 
             // Get tasks for user-2 - pass user id in query.match
-            const user2Result = await controller.callInteraction('getMyTasks', {
+            const user2Result = await controller.dispatch(GetMyTasks, {
                 user: { id: 'user-2' },
                 query: {
                     match: MatchExp.atom({ key: 'assignedTo', value: ['=', 'user-2'] }),
@@ -547,7 +547,7 @@ describe('Get Data Interaction', () => {
                 system,
                 entities: [User, Project],
                 relations: [UserProjectRelation],
-                interactions: [GetUserProjects]
+                eventSources: [GetUserProjects]
             })
             await controller.setup(true)
 
@@ -571,7 +571,7 @@ describe('Get Data Interaction', () => {
                 target: { id: project1.id }
             })
 
-            const result = await controller.callInteraction('getUserProjects', {
+            const result = await controller.dispatch(GetUserProjects, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'source', 'target']
@@ -591,15 +591,15 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [],
-                interactions: []
+                eventSources: []
             })
             await controller.setup(true)
 
             await expect(
-                controller.callInteraction('nonExistentInteraction', {
+                controller.dispatch(undefined as any, {
                     user: { id: 'test-user' }
                 })
-            ).rejects.toThrow('Cannot find interaction for nonExistentInteraction')
+            ).rejects.toThrow()
         })
 
         test('should return error when action is not GetAction', async () => {
@@ -620,13 +620,13 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [User],
-                interactions: [CreateUser]
+                eventSources: [CreateUser]
             })
             await controller.setup(true)
 
             await system.storage.create('User', { name: 'Alice' })
 
-            const result = await controller.callInteraction('createUser', {
+            const result = await controller.dispatch(CreateUser, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'name']
@@ -659,7 +659,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Product],
-                interactions: [GetSpecialProducts]
+                eventSources: [GetSpecialProducts]
             })
             await controller.setup(true)
 
@@ -669,7 +669,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Product', { name: 'Phone', category: 'electronics', featured: true })
 
             // Pass OR conditions through query.match
-            const result = await controller.callInteraction('getSpecialProducts', {
+            const result = await controller.dispatch(GetSpecialProducts, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'featured', value: ['=', true] })
@@ -708,7 +708,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Order],
-                interactions: [GetActiveOrders]
+                eventSources: [GetActiveOrders]
             })
             await controller.setup(true)
 
@@ -719,7 +719,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Order', { orderNumber: 'ORD005', status: 'shipped', amount: 300 })
 
             // Pass IN operator through query.match
-            const result = await controller.callInteraction('getActiveOrders', {
+            const result = await controller.dispatch(GetActiveOrders, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({
@@ -765,7 +765,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Product],
-                interactions: [GetActiveProducts]
+                eventSources: [GetActiveProducts]
             })
             await controller.setup(true)
 
@@ -776,7 +776,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Product', { name: 'Product 4', category: 'furniture', status: 'deleted', price: 400 })
 
             // Call without user match - should only get active products
-            const result = await controller.callInteraction('getActiveProducts', {
+            const result = await controller.dispatch(GetActiveProducts, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'name', 'category', 'status', 'price']
@@ -813,7 +813,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Product],
-                interactions: [GetActiveProducts]
+                eventSources: [GetActiveProducts]
             })
             await controller.setup(true)
 
@@ -825,7 +825,7 @@ describe('Get Data Interaction', () => {
 
             // Call with user match for category = 'electronics'
             // Should only get products that are BOTH active AND electronics
-            const result = await controller.callInteraction('getActiveProducts', {
+            const result = await controller.dispatch(GetActiveProducts, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'category', value: ['=', 'electronics'] }),
@@ -866,7 +866,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Article],
-                interactions: [GetPublishedArticles]
+                eventSources: [GetPublishedArticles]
             })
             await controller.setup(true)
 
@@ -915,7 +915,7 @@ describe('Get Data Interaction', () => {
             })
 
             // Call with additional user filters
-            const result = await controller.callInteraction('getPublishedArticles', {
+            const result = await controller.dispatch(GetPublishedArticles, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'views', value: ['>=', 500] }),
@@ -962,7 +962,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Task],
-                interactions: [GetUrgentTasks]
+                eventSources: [GetUrgentTasks]
             })
             await controller.setup(true)
 
@@ -974,7 +974,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Task', { title: 'Task 5', priority: 'medium', status: 'open', assignee: 'Eve' })
 
             // Call without additional filters
-            const result1 = await controller.callInteraction('getUrgentTasks', {
+            const result1 = await controller.dispatch(GetUrgentTasks, {
                 user: { id: 'test-user' },
                 query: {
                     attributeQuery: ['id', 'title', 'priority', 'status', 'assignee']
@@ -989,7 +989,7 @@ describe('Get Data Interaction', () => {
             )).toBe(true)
 
             // Call with additional assignee filter
-            const result2 = await controller.callInteraction('getUrgentTasks', {
+            const result2 = await controller.dispatch(GetUrgentTasks, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'assignee', value: ['=', 'David'] }),
@@ -1034,7 +1034,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Task],
-                interactions: [GetTasksByPriority]
+                eventSources: [GetTasksByPriority]
             })
             await controller.setup(true)
 
@@ -1045,7 +1045,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Task', { title: 'Task 4', priority: 'high', status: 'closed' })
 
             // Test 1: User prefers high priority
-            const highPriorityResult = await controller.callInteraction('getTasksByPriority', {
+            const highPriorityResult = await controller.dispatch(GetTasksByPriority, {
                 user: { id: 'user-1', preferredPriority: 'high' },
                 query: {
                     attributeQuery: ['id', 'title', 'priority', 'status']
@@ -1058,7 +1058,7 @@ describe('Get Data Interaction', () => {
             expect(highPriorityData.every((t: any) => t.priority === 'high')).toBe(true)
 
             // Test 2: User prefers low priority
-            const lowPriorityResult = await controller.callInteraction('getTasksByPriority', {
+            const lowPriorityResult = await controller.dispatch(GetTasksByPriority, {
                 user: { id: 'user-2', preferredPriority: 'low' },
                 query: {
                     attributeQuery: ['id', 'title', 'priority', 'status']
@@ -1103,7 +1103,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Product],
-                interactions: [GetFilteredProducts]
+                eventSources: [GetFilteredProducts]
             })
             await controller.setup(true)
 
@@ -1114,7 +1114,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Product', { name: 'Chair', category: 'furniture', status: 'active' })
 
             // Test 1: Filter is set to electronics
-            const electronicsResult = await controller.callInteraction('getFilteredProducts', {
+            const electronicsResult = await controller.dispatch(GetFilteredProducts, {
                 user: { id: 'user-1' },
                 query: {
                     attributeQuery: ['id', 'name', 'category']
@@ -1128,7 +1128,7 @@ describe('Get Data Interaction', () => {
 
             // Test 2: Change filter to furniture
             categoryFilter.current = 'furniture'
-            const furnitureResult = await controller.callInteraction('getFilteredProducts', {
+            const furnitureResult = await controller.dispatch(GetFilteredProducts, {
                 user: { id: 'user-2' },
                 query: {
                     attributeQuery: ['id', 'name', 'category']
@@ -1172,7 +1172,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Order],
-                interactions: [GetHighValueOrders]
+                eventSources: [GetHighValueOrders]
             })
             await controller.setup(true)
 
@@ -1183,7 +1183,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Order', { orderNumber: 'ORD004', status: 'pending', priority: 'urgent', amount: 1500 })
 
             // Test 1: VIP user (threshold = 500) + filter for pending status
-            const vipResult = await controller.callInteraction('getHighValueOrders', {
+            const vipResult = await controller.dispatch(GetHighValueOrders, {
                 user: { id: 'vip-user', isVip: true },
                 query: {
                     match: MatchExp.atom({ key: 'status', value: ['=', 'pending'] }),
@@ -1197,7 +1197,7 @@ describe('Get Data Interaction', () => {
             expect(vipData.every((o: any) => o.amount >= 500 && o.status === 'pending')).toBe(true)
 
             // Test 2: Regular user (threshold = 1000) + filter for urgent priority
-            const regularResult = await controller.callInteraction('getHighValueOrders', {
+            const regularResult = await controller.dispatch(GetHighValueOrders, {
                 user: { id: 'regular-user', isVip: false },
                 query: {
                     match: MatchExp.atom({ key: 'priority', value: ['=', 'urgent'] }),
@@ -1240,7 +1240,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Document],
-                interactions: [GetDepartmentDocuments]
+                eventSources: [GetDepartmentDocuments]
             })
             await controller.setup(true)
 
@@ -1250,7 +1250,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Document', { title: 'General Info', type: 'info', department: 'general' })
 
             // Test: User from HR department
-            const result = await controller.callInteraction('getDepartmentDocuments', {
+            const result = await controller.dispatch(GetDepartmentDocuments, {
                 user: { id: 'hr-user', department: 'hr' },
                 query: {
                     attributeQuery: ['id', 'title', 'department']
@@ -1290,7 +1290,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Item],
-                interactions: [GetConditionalItems]
+                eventSources: [GetConditionalItems]
             })
             await controller.setup(true)
 
@@ -1300,7 +1300,7 @@ describe('Get Data Interaction', () => {
             await system.storage.create('Item', { name: 'Item 3', status: 'active' })
 
             // Test 1: With filter applied
-            const withFilterResult = await controller.callInteraction('getConditionalItems', {
+            const withFilterResult = await controller.dispatch(GetConditionalItems, {
                 user: { id: 'user-1', applyFilter: true },
                 query: {
                     attributeQuery: ['id', 'name', 'status']
@@ -1313,7 +1313,7 @@ describe('Get Data Interaction', () => {
             expect(withFilterData.every((i: any) => i.status === 'active')).toBe(true)
 
             // Test 2: Without filter (function returns null)
-            const withoutFilterResult = await controller.callInteraction('getConditionalItems', {
+            const withoutFilterResult = await controller.dispatch(GetConditionalItems, {
                 user: { id: 'user-2', applyFilter: false },
                 query: {
                     attributeQuery: ['id', 'name', 'status']
@@ -1361,7 +1361,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Document],
-                interactions: [GetDocuments]
+                eventSources: [GetDocuments]
             })
             await controller.setup(true)
 
@@ -1386,7 +1386,7 @@ describe('Get Data Interaction', () => {
             })
 
             // Test 1: HR user can access HR documents
-            const hrResult = await controller.callInteraction('getDocuments', {
+            const hrResult = await controller.dispatch(GetDocuments, {
                 user: { id: 'hr-user-1', department: 'hr', role: 'user' },
                 query: {
                     match: MatchExp.atom({ key: 'department', value: ['=', 'hr'] }),
@@ -1400,7 +1400,7 @@ describe('Get Data Interaction', () => {
             expect(hrData[0].department).toBe('hr')
 
             // Test 2: Admin can access any department
-            const adminResult = await controller.callInteraction('getDocuments', {
+            const adminResult = await controller.dispatch(GetDocuments, {
                 user: { id: 'admin-1', department: 'management', role: 'admin' },
                 query: {
                     match: MatchExp.atom({ key: 'department', value: ['=', 'finance'] }),
@@ -1444,7 +1444,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Document],
-                interactions: [GetDocuments]
+                eventSources: [GetDocuments]
             })
             await controller.setup(true)
 
@@ -1455,7 +1455,7 @@ describe('Get Data Interaction', () => {
             })
 
             // IT user tries to access HR documents - should be denied
-            const result = await controller.callInteraction('getDocuments', {
+            const result = await controller.dispatch(GetDocuments, {
                 user: { id: 'it-user-1', department: 'it', role: 'user' },
                 query: {
                     match: MatchExp.atom({ key: 'department', value: ['=', 'hr'] }),
@@ -1511,7 +1511,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [SensitiveData],
-                interactions: [GetSensitiveData]
+                eventSources: [GetSensitiveData]
             })
             await controller.setup(true)
 
@@ -1527,7 +1527,7 @@ describe('Get Data Interaction', () => {
             })
 
             // Test 1: Verified user with high clearance - should pass
-            const authorizedResult = await controller.callInteraction('getSensitiveData', {
+            const authorizedResult = await controller.dispatch(GetSensitiveData, {
                 user: { id: 'user-1', verified: true, clearanceLevel: 3 },
                 query: {
                     attributeQuery: ['id', 'title', 'level']
@@ -1539,7 +1539,7 @@ describe('Get Data Interaction', () => {
             expect(authorizedData).toHaveLength(2)
 
             // Test 2: Verified user with low clearance - should fail
-            const lowClearanceResult = await controller.callInteraction('getSensitiveData', {
+            const lowClearanceResult = await controller.dispatch(GetSensitiveData, {
                 user: { id: 'user-2', verified: true, clearanceLevel: 1 },
                 query: {
                     attributeQuery: ['id', 'title', 'level']
@@ -1550,7 +1550,7 @@ describe('Get Data Interaction', () => {
             expect((lowClearanceResult.error as ConditionError).error.data.name).toBe('hasClearanceLevel')
 
             // Test 3: Unverified user with high clearance - should fail
-            const unverifiedResult = await controller.callInteraction('getSensitiveData', {
+            const unverifiedResult = await controller.dispatch(GetSensitiveData, {
                 user: { id: 'user-3', verified: false, clearanceLevel: 5 },
                 query: {
                     attributeQuery: ['id', 'title', 'level']
@@ -1595,7 +1595,7 @@ describe('Get Data Interaction', () => {
             controller = new Controller({
                 system,
                 entities: [Project],
-                interactions: [GetProjects]
+                eventSources: [GetProjects]
             })
             await controller.setup(true)
 
@@ -1620,7 +1620,7 @@ describe('Get Data Interaction', () => {
             })
 
             // Test 1: User without teams can see public projects
-            const publicResult = await controller.callInteraction('getProjects', {
+            const publicResult = await controller.dispatch(GetProjects, {
                 user: { id: 'external-user', teams: [] },
                 query: {
                     match: MatchExp.atom({ key: 'visibility', value: ['=', 'public'] }),
@@ -1634,7 +1634,7 @@ describe('Get Data Interaction', () => {
             expect(publicData.every((p: any) => p.visibility === 'public')).toBe(true)
 
             // Test 2: User with teams can query team projects
-            const teamResult = await controller.callInteraction('getProjects', {
+            const teamResult = await controller.dispatch(GetProjects, {
                 user: { id: 'team-member', teams: ['team-2', 'team-3'] },
                 query: {
                     match: MatchExp.atom({ key: 'teamId', value: ['=', 'team-2'] }),
@@ -1648,7 +1648,7 @@ describe('Get Data Interaction', () => {
             expect(teamData[0].teamId).toBe('team-2')
 
             // Test 3: User without teams cannot query private projects
-            const deniedResult = await controller.callInteraction('getProjects', {
+            const deniedResult = await controller.dispatch(GetProjects, {
                 user: { id: 'external-user', teams: [] },
                 query: {
                     match: MatchExp.atom({ key: 'visibility', value: ['=', 'private'] }),

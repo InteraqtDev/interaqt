@@ -114,7 +114,7 @@ const reviewerRelation = Relation.create({
     type: 'n:n',
     // TODO 改 interaction，没有 mapInteractionItem 了
     computation: Transform.create({
-        record: createInteraction,
+        record: InteractionEventEntity,
         callback: async function map(this: Controller, event: any) {
             const {BoolExp} = this.globals
 

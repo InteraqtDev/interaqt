@@ -18,8 +18,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: entities,
             relations: [],
-            activities: [],
-            interactions: Object.values(interactions)
+            eventSources: Object.values(interactions)
         });
         await controller.setup(true);
         const user1 = await controller.system.storage.create('User', {
@@ -37,7 +36,7 @@ describe('StateMachineRunner', () => {
         expect(post1[0].status).toBe('normal')
         expect(post1[1].status).toBe('normal')
         // 2. 针对一个 post 执行 interaction。查看 status 变化
-        await controller.callInteraction(draftInteraction.name, {
+        await controller.dispatch(draftInteraction, {
             user: user1,
             payload: {
                 content: {
@@ -51,7 +50,7 @@ describe('StateMachineRunner', () => {
         expect(post2[1].status).toBe('normal')
 
         // draft 不能直接 publish
-        await controller.callInteraction(publishInteraction.name, {
+        await controller.dispatch(publishInteraction, {
             user: user1,
             payload: {
                 content: {
@@ -64,7 +63,7 @@ describe('StateMachineRunner', () => {
         expect(post3[1].status).toBe('normal')
 
         // draft 可以 finalize
-        await controller.callInteraction(finalizeInteraction.name, {
+        await controller.dispatch(finalizeInteraction, {
             user: user1,
             payload: {
                 content: {
@@ -77,7 +76,7 @@ describe('StateMachineRunner', () => {
         expect(post4[1].status).toBe('normal')
         
         // normal 可以 publish
-        await controller.callInteraction(publishInteraction.name, {
+        await controller.dispatch(publishInteraction, {
             user: user1,
             payload: {
                 content: {
@@ -101,8 +100,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: entities,
             relations: [],
-            activities: [],
-            interactions: Object.values(interactions),
+            eventSources: Object.values(interactions),
             dict: dicts
         });
         await controller.setup(true);
@@ -114,7 +112,7 @@ describe('StateMachineRunner', () => {
         const globalState = await controller.system.storage.dict.get('globalState')
         expect(globalState).toBe('enabled')
 
-        await controller.callInteraction(disableInteraction.name, {
+        await controller.dispatch(disableInteraction, {
             user: user1,
         })
 
@@ -122,7 +120,7 @@ describe('StateMachineRunner', () => {
         const globalState2 = await controller.system.storage.dict.get('globalState')
         expect(globalState2).toBe('disabled')
 
-        await controller.callInteraction(enableInteraction.name, {
+        await controller.dispatch(enableInteraction, {
             user: user1,
         })
         const globalState3 = await controller.system.storage.dict.get('globalState')
@@ -140,8 +138,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: entities,
             relations: relations,
-            activities: [],
-            interactions: Object.values(interactions)
+            eventSources: Object.values(interactions)
         });
         await controller.setup(true);
 
@@ -155,7 +152,7 @@ describe('StateMachineRunner', () => {
             name: 'user3',
         })
 
-        const {error} =await controller.callInteraction(sendInteraction.name, {
+        const {error} =await controller.dispatch(sendInteraction, {
             user: user1,
             payload: {
                 to: user2,
@@ -169,7 +166,7 @@ describe('StateMachineRunner', () => {
         expect(request[0].title).toBe('request1')
         expect(request[0].to.id).toBe(user2.id)
 
-        const res2 = await controller.callInteraction(transferReviewersInteraction.name, {
+        const res2 = await controller.dispatch(transferReviewersInteraction, {
             user: user1,
             payload: {
                 reviewer: user3,
@@ -350,8 +347,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [User, Counter],
             relations: [],
-            activities: [],
-            interactions: [IncrementInteraction, ResetInteraction]
+            eventSources: [IncrementInteraction, ResetInteraction]
         })
         await controller.setup(true)
 
@@ -365,7 +361,7 @@ describe('StateMachineRunner', () => {
         expect(counterData.state).toBe('idle')
 
         // 第一次增加 - 应该切换到 incrementing 状态，count 增加 1
-        await controller.callInteraction('increment', {
+        await controller.dispatch(IncrementInteraction, {
             user,
             payload: { counter: { id: counter.id } }
         })
@@ -375,7 +371,7 @@ describe('StateMachineRunner', () => {
         expect(counterData.state).toBe('incrementing')
 
         // 重置 - 应该回到 idle 状态，但 count 保持不变
-        await controller.callInteraction('reset', {
+        await controller.dispatch(ResetInteraction, {
             user,
             payload: { counter: { id: counter.id } }
         })
@@ -385,7 +381,7 @@ describe('StateMachineRunner', () => {
         expect(counterData.state).toBe('idle')
 
         // 再次增加 - count 应该增加到 2
-        await controller.callInteraction('increment', {
+        await controller.dispatch(IncrementInteraction, {
             user,
             payload: { counter: { id: counter.id } }
         })
@@ -466,8 +462,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [TimeLogger],
             relations: [],
-            activities: [],
-            interactions: [LogTimeInteraction]
+            eventSources: [LogTimeInteraction]
         })
         await controller.setup(true)
 
@@ -483,7 +478,7 @@ describe('StateMachineRunner', () => {
 
         // 第一次触发 - 记录时间戳
         const beforeFirst = Date.now()
-        await controller.callInteraction('logTime', {
+        await controller.dispatch(LogTimeInteraction, {
             user: { id: 'system', name: 'system' },
             payload: { logger: { id: logger.id } }
         })
@@ -500,7 +495,7 @@ describe('StateMachineRunner', () => {
 
         // 第二次触发 - 记录新的时间戳
         const beforeSecond = Date.now()
-        await controller.callInteraction('logTime', {
+        await controller.dispatch(LogTimeInteraction, {
             user: { id: 'system', name: 'system' },
             payload: { logger: { id: logger.id } }
         })
@@ -516,7 +511,7 @@ describe('StateMachineRunner', () => {
         await new Promise(resolve => setTimeout(resolve, 10))
         
         const beforeThird = Date.now()
-        await controller.callInteraction('logTime', {
+        await controller.dispatch(LogTimeInteraction, {
             user: { id: 'system', name: 'system' },
             payload: { logger: { id: logger.id } }
         })
@@ -662,8 +657,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [User, Message],
             relations: [],
-            activities: [],
-            interactions: [UpdateMessageInteraction]
+            eventSources: [UpdateMessageInteraction]
         })
         await controller.setup(true)
 
@@ -678,7 +672,7 @@ describe('StateMachineRunner', () => {
         expect(messageData.updateCount).toBe(0)
 
         // Alice 更新消息 - computeValue 应该从 event 中获取用户名
-        await controller.callInteraction('updateMessage', {
+        await controller.dispatch(UpdateMessageInteraction, {
             user: alice,
             payload: { 
                 message: { id: message.id },
@@ -691,7 +685,7 @@ describe('StateMachineRunner', () => {
         expect(messageData.updateCount).toBe(12)  // 新内容的长度
 
         // Bob 更新消息 - 应该更新为 Bob
-        await controller.callInteraction('updateMessage', {
+        await controller.dispatch(UpdateMessageInteraction, {
             user: bob,
             payload: { 
                 message: { id: message.id },
@@ -704,7 +698,7 @@ describe('StateMachineRunner', () => {
         expect(messageData.updateCount).toBe(15)  // 12 + 3
 
         // 测试没有用户名的情况
-        await controller.callInteraction('updateMessage', {
+        await controller.dispatch(UpdateMessageInteraction, {
             user: { id: 'anonymous' } as any,
             payload: { 
                 message: { id: message.id },
@@ -846,8 +840,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [User, Document],
             relations: [DocumentOwnerRelation],
-            activities: [],
-            interactions: [AssignDocumentInteraction, UnassignDocumentInteraction]
+            eventSources: [AssignDocumentInteraction, UnassignDocumentInteraction]
         })
         await controller.setup(true)
 
@@ -862,7 +855,7 @@ describe('StateMachineRunner', () => {
         expect(relations.length).toBe(0)
 
         // 分配文档给 Alice
-        await controller.callInteraction('assignDocument', {
+        await controller.dispatch(AssignDocumentInteraction, {
             user: alice,
             payload: {
                 document: { id: doc1.id },
@@ -877,7 +870,7 @@ describe('StateMachineRunner', () => {
         expect(relations[0].target.id).toBe(alice.id)
 
         // 分配第二个文档给 Bob
-        await controller.callInteraction('assignDocument', {
+        await controller.dispatch(AssignDocumentInteraction, {
             user: bob,
             payload: {
                 document: { id: doc2.id },
@@ -889,7 +882,7 @@ describe('StateMachineRunner', () => {
         expect(relations.length).toBe(2)
 
         // 取消分配第一个文档 - 应该删除关系
-        await controller.callInteraction('unassignDocument', {
+        await controller.dispatch(UnassignDocumentInteraction, {
             user: alice,
             payload: {
                 document: { id: doc1.id }
@@ -903,7 +896,7 @@ describe('StateMachineRunner', () => {
         expect(relations[0].target.id).toBe(bob.id)
 
         // 取消分配第二个文档
-        await controller.callInteraction('unassignDocument', {
+        await controller.dispatch(UnassignDocumentInteraction, {
             user: bob,
             payload: {
                 document: { id: doc2.id }
@@ -1113,8 +1106,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [User, Project],
             relations: [ProjectMembershipRelation],
-            activities: [],
-            interactions: [JoinProjectInteraction, LeaveProjectInteraction, ClearProjectMembersInteraction]
+            eventSources: [JoinProjectInteraction, LeaveProjectInteraction, ClearProjectMembersInteraction]
         })
         await controller.setup(true)
 
@@ -1130,7 +1122,7 @@ describe('StateMachineRunner', () => {
         expect(memberships.length).toBe(0)
 
         // Alice 加入 project1 作为 developer
-        await controller.callInteraction('joinProject', {
+        await controller.dispatch(JoinProjectInteraction, {
             user: alice,
             payload: {
                 user: { id: alice.id },
@@ -1140,7 +1132,7 @@ describe('StateMachineRunner', () => {
         })
 
         // Bob 加入 project1 作为 manager
-        await controller.callInteraction('joinProject', {
+        await controller.dispatch(JoinProjectInteraction, {
             user: bob,
             payload: {
                 user: { id: bob.id },
@@ -1150,7 +1142,7 @@ describe('StateMachineRunner', () => {
         })
 
         // Charlie 加入两个项目
-        await controller.callInteraction('joinProject', {
+        await controller.dispatch(JoinProjectInteraction, {
             user: charlie,
             payload: {
                 user: { id: charlie.id },
@@ -1159,7 +1151,7 @@ describe('StateMachineRunner', () => {
             }
         })
         
-        await controller.callInteraction('joinProject', {
+        await controller.dispatch(JoinProjectInteraction, {
             user: charlie,
             payload: {
                 user: { id: charlie.id },
@@ -1180,7 +1172,7 @@ describe('StateMachineRunner', () => {
         expect(bobMembership?.role).toBe('manager')
 
         // Alice 离开 project1
-        await controller.callInteraction('leaveProject', {
+        await controller.dispatch(LeaveProjectInteraction, {
             user: alice,
             payload: {
                 user: { id: alice.id },
@@ -1197,7 +1189,7 @@ describe('StateMachineRunner', () => {
         // 继续测试清空功能
 
         // 清空 project1 的所有成员
-        await controller.callInteraction('clearProjectMembers', {
+        await controller.dispatch(ClearProjectMembersInteraction, {
             user: alice,
             payload: {
                 project: { id: project1.id }
@@ -1393,8 +1385,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [User, Task],
             relations: [],
-            activities: [],
-            interactions: [CreateTaskInteraction, DeleteTaskInteraction, UpdateTaskStatusInteraction]
+            eventSources: [CreateTaskInteraction, DeleteTaskInteraction, UpdateTaskStatusInteraction]
         })
         await controller.setup(true)
 
@@ -1406,7 +1397,7 @@ describe('StateMachineRunner', () => {
         expect(tasks.length).toBe(0)
 
         // 创建第一个任务
-        await controller.callInteraction('createTask', {
+        await controller.dispatch(CreateTaskInteraction, {
             user: user,
             payload: {
                 title: 'Task 1',
@@ -1423,7 +1414,7 @@ describe('StateMachineRunner', () => {
         expect(tasks[0]._isDeleted_ === false || tasks[0]._isDeleted_ === 0).toBe(true)
 
         // 更新任务状态
-        await controller.callInteraction('updateTaskStatus', {
+        await controller.dispatch(UpdateTaskStatusInteraction, {
             user: user,
             payload: {
                 task: { id: tasks[0].id },
@@ -1435,7 +1426,7 @@ describe('StateMachineRunner', () => {
         expect(tasks[0].status).toBe('active')
 
         // 创建第二个任务
-        await controller.callInteraction('createTask', {
+        await controller.dispatch(CreateTaskInteraction, {
             user: user,
             payload: {
                 title: 'Task 2',
@@ -1447,7 +1438,7 @@ describe('StateMachineRunner', () => {
         expect(tasks.length).toBe(2)
 
         // 删除第一个任务
-        await controller.callInteraction('deleteTask', {
+        await controller.dispatch(DeleteTaskInteraction, {
             user: user,
             payload: {
                 task: { id: tasks[0].id }
@@ -1461,7 +1452,7 @@ describe('StateMachineRunner', () => {
 
         // 删除第二个任务
         const task2 = tasks[0]
-        await controller.callInteraction('deleteTask', {
+        await controller.dispatch(DeleteTaskInteraction, {
             user: user,
             payload: {
                 task: { id: task2.id }
@@ -1657,8 +1648,7 @@ describe('StateMachineRunner', () => {
             system,
             entities: [Project, Task],
             relations: [],
-            activities: [],
-            interactions: [StartTaskInteraction, CompleteTaskInteraction, EscalateTaskInteraction]
+            eventSources: [StartTaskInteraction, CompleteTaskInteraction, EscalateTaskInteraction]
         })
         await controller.setup(true)
 
@@ -1697,7 +1687,7 @@ describe('StateMachineRunner', () => {
         // 测试状态机的后续转换是否正常工作
         // urgent 状态的任务需要使用 escalateTask 才能转换（而不是 startTask）
         // 先尝试错误的交互 - startTask 不应该对 urgent 状态的任务生效
-        await controller.callInteraction('startTask', {
+        await controller.dispatch(StartTaskInteraction, {
             user: { id: 'test-user' },
             payload: {
                 task: { id: urgentTask.id }
@@ -1709,7 +1699,7 @@ describe('StateMachineRunner', () => {
         expect(currentUrgentTask.status).toBe('urgent') // 应该仍然是 urgent，因为 startTask 不适用于 urgent 状态
 
         // 使用正确的交互 - escalateTask
-        await controller.callInteraction('escalateTask', {
+        await controller.dispatch(EscalateTaskInteraction, {
             user: { id: 'test-user' },
             payload: {
                 task: { id: urgentTask.id }
@@ -1722,7 +1712,7 @@ describe('StateMachineRunner', () => {
 
         // todo 状态的任务使用 startTask 可以转换
         const todoTask = tasks.find(t => t.title === 'Task for Normal Project')
-        await controller.callInteraction('startTask', {
+        await controller.dispatch(StartTaskInteraction, {
             user: { id: 'test-user' },
             payload: {
                 task: { id: todoTask.id }
@@ -1739,7 +1729,7 @@ describe('StateMachineRunner', () => {
             // 重置为 todo 状态进行测试
             await controller.system.storage.update('Task', BoolExp.atom({key: 'id', value: ['=', anotherTodoTask.id]}), {status: 'todo'})
             
-            await controller.callInteraction('escalateTask', {
+            await controller.dispatch(EscalateTaskInteraction, {
                 user: { id: 'test-user' },
                 payload: {
                     task: { id: anotherTodoTask.id }
@@ -1751,7 +1741,7 @@ describe('StateMachineRunner', () => {
         }
 
         // 完成任务 - 两种路径转换到 in_progress 的任务都可以被完成
-        await controller.callInteraction('completeTask', {
+        await controller.dispatch(CompleteTaskInteraction, {
             user: { id: 'test-user' },
             payload: {
                 task: { id: currentUrgentTask.id }
@@ -1762,7 +1752,7 @@ describe('StateMachineRunner', () => {
         const completedUrgentTask = tasks.find(t => t.id === urgentTask.id)
         expect(completedUrgentTask.status).toBe('done')
         
-        await controller.callInteraction('completeTask', {
+        await controller.dispatch(CompleteTaskInteraction, {
             user: { id: 'test-user' },
             payload: {
                 task: { id: todoTask.id }
@@ -2002,8 +1992,7 @@ describe('StateMachineRunner', () => {
             system: system,
             entities: [User, Order],
             relations: [OrderCustomerRelation],
-            activities: [],
-            interactions: [PlaceOrderInteraction, CancelOrderInteraction]
+            eventSources: [PlaceOrderInteraction, CancelOrderInteraction]
         })
         await controller.setup(true)
 
@@ -2016,7 +2005,7 @@ describe('StateMachineRunner', () => {
         expect(orders.length).toBe(0)
 
         // Alice 下订单
-        await controller.callInteraction('placeOrder', {
+        await controller.dispatch(PlaceOrderInteraction, {
             user: alice,
             payload: {
                 customer: { id: alice.id },
@@ -2033,7 +2022,7 @@ describe('StateMachineRunner', () => {
         expect(orders[0].customer.id).toBe(alice.id)
 
         // Bob 下订单
-        await controller.callInteraction('placeOrder', {
+        await controller.dispatch(PlaceOrderInteraction, {
             user: bob,
             payload: {
                 customer: { id: bob.id },
@@ -2051,7 +2040,7 @@ describe('StateMachineRunner', () => {
 
         // 取消 Alice 的订单
         const aliceOrder = orders.find(o => o.orderNumber === 'ORD-001')
-        await controller.callInteraction('cancelOrder', {
+        await controller.dispatch(CancelOrderInteraction, {
             user: alice,
             payload: {
                 order: { id: aliceOrder!.id }
@@ -2154,8 +2143,7 @@ describe('StateMachineRunner', () => {
             system,
             entities: [UserEntity],
             relations: [],
-            activities: [],
-            interactions: [DeleteUserInteraction, RestoreUserInteraction]
+            eventSources: [DeleteUserInteraction, RestoreUserInteraction]
         })
         await controller.setup(true)
 
@@ -2183,7 +2171,7 @@ describe('StateMachineRunner', () => {
         expect(initialUsers.every(u => u._isDeleted_ === false || u._isDeleted_ === 0 || u._isDeleted_ === undefined)).toBe(true)
 
         // 删除 user1
-        await controller.callInteraction('deleteUser', {
+        await controller.dispatch(DeleteUserInteraction, {
             user: adminUser,
             payload: {
                 targetUser: { id: userToDelete1.id }
@@ -2198,7 +2186,7 @@ describe('StateMachineRunner', () => {
         expect(afterDelete1.find(u => u.id === userToDelete2.id)).toBeDefined()
 
         // 删除 user2
-        await controller.callInteraction('deleteUser', {
+        await controller.dispatch(DeleteUserInteraction, {
             user: adminUser,
             payload: {
                 targetUser: { id: userToDelete2.id }
@@ -2313,8 +2301,7 @@ describe('StateMachineRunner', () => {
             system,
             entities: [APICall],
             relations: [],
-            activities: [],
-            interactions: [CompleteAPICallInteraction]
+            eventSources: [CompleteAPICallInteraction]
         })
         await controller.setup(true)
 
@@ -2328,7 +2315,7 @@ describe('StateMachineRunner', () => {
         expect(apiCallData.retryCount).toBe(0)
 
         // 第一次完成调用 - 应该只增加一次，从 0 变为 1
-        await controller.callInteraction('completeAPICall', {
+        await controller.dispatch(CompleteAPICallInteraction, {
             user: { id: 'system' },
             payload: { apiCall: { id: apiCall.id } }
         })
@@ -2339,7 +2326,7 @@ describe('StateMachineRunner', () => {
         expect(apiCallData.retryCount).toBe(1)
 
         // 第二次完成调用 - 应该再增加一次，从 1 变为 2
-        await controller.callInteraction('completeAPICall', {
+        await controller.dispatch(CompleteAPICallInteraction, {
             user: { id: 'system' },
             payload: { apiCall: { id: apiCall.id } }
         })
@@ -2350,7 +2337,7 @@ describe('StateMachineRunner', () => {
         expect(apiCallData.retryCount).toBe(2)
 
         // 第三次完成调用 - 验证一致性
-        await controller.callInteraction('completeAPICall', {
+        await controller.dispatch(CompleteAPICallInteraction, {
             user: { id: 'system' },
             payload: { apiCall: { id: apiCall.id } }
         })
@@ -2505,8 +2492,7 @@ describe('StateMachineRunner', () => {
             system,
             entities: [ArticleEntity],
             relations: [],
-            activities: [],
-            interactions: [PublishArticleInteraction, ArchiveArticleInteraction, DeleteArticleInteraction]
+            eventSources: [PublishArticleInteraction, ArchiveArticleInteraction, DeleteArticleInteraction]
         })
         await controller.setup(true)
 
@@ -2526,7 +2512,7 @@ describe('StateMachineRunner', () => {
         expect(initialArticles[1].status).toBe('draft')
 
         // 尝试直接删除 draft 状态的文章（应该失败）
-        await controller.callInteraction('deleteArticle', {
+        await controller.dispatch(DeleteArticleInteraction, {
             user: { id: 'admin' },
             payload: {
                 article: { id: article1.id }
@@ -2538,14 +2524,14 @@ describe('StateMachineRunner', () => {
         expect(afterFailedDelete.length).toBe(2)
 
         // 将 article1 发布并归档
-        await controller.callInteraction('publishArticle', {
+        await controller.dispatch(PublishArticleInteraction, {
             user: { id: 'admin' },
             payload: {
                 article: { id: article1.id }
             }
         })
 
-        await controller.callInteraction('archiveArticle', {
+        await controller.dispatch(ArchiveArticleInteraction, {
             user: { id: 'admin' },
             payload: {
                 article: { id: article1.id }
@@ -2562,7 +2548,7 @@ describe('StateMachineRunner', () => {
         expect(afterArchive!.status).toBe('archived')
 
         // 现在可以删除归档的文章
-        await controller.callInteraction('deleteArticle', {
+        await controller.dispatch(DeleteArticleInteraction, {
             user: { id: 'admin' },
             payload: {
                 article: { id: article1.id }

@@ -107,8 +107,6 @@ describe('RecordMutationSideEffect', () => {
             system: system,
             entities: [userEntity, postEntity],
             relations: [],
-            activities: [],
-            interactions: [],
             recordMutationSideEffects: [userCreatedSideEffect, userUpdatedSideEffect, userDeletedSideEffect, postCreatedSideEffect]
         });
 
@@ -240,8 +238,6 @@ describe('RecordMutationSideEffect', () => {
             system: system,
             entities: [userEntity],
             relations: [],
-            activities: [],
-            interactions: [],
             recordMutationSideEffects: [errorSideEffect, successSideEffect]
         });
 

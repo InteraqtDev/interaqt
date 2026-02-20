@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import {
     KlassByName, Controller, EntityIdRef, RecordMutationEvent,
-    ActivityCall, MonoSystem,
+    ActivityCall, ActivityManager, MonoSystem,
     RelationInstance
 } from 'interaqt';
 import { SQLiteDB } from '@drivers';
@@ -9,6 +9,7 @@ import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall
+    let activityManager: ActivityManager
     let system: MonoSystem
 
     let sendRequestName:string = 'sendRequest'
@@ -27,32 +28,23 @@ describe("activity state", () => {
 
     beforeEach(async () => {
         const { entities, relations, interactions, dicts, activities }  = createData()
-        /**
-         * 当前的格式为:
-         * New && Other Admin as A
-         * sendRequest
-         * to: Other Admin isRef
-         * message: Message
-         */
 
         system = new MonoSystem(new SQLiteDB())
         system.conceptClass = KlassByName
 
-        friendRelation = relations.find(r => (r as any).name === 'User_friends_friends_User')!
-
-
+        friendRelation = relations.find(r => r.name === 'User_friends_friends_User')!
 
         controller = new Controller({
             system,
             entities,
             relations,
-            activities,
-            interactions,
+            eventSources: [...interactions],
             dict: dicts
         })
+        activityManager = new ActivityManager(controller, activities, interactions);
+        controller.eventSources.push(...activityManager.getActivityEventSources())
         await controller.setup(true)
 
-        // CAUTION 这里 controller 没什么用，只是作为 globals 注入的点。interaction  的各种 check 里面需要 controller 的 globals。
         const mainActivity = activities.find(a => a.name === 'createFriendRelation')!
         createFriendRelationActivityCall = new ActivityCall(mainActivity, controller)
 
@@ -68,7 +60,7 @@ describe("activity state", () => {
         let activityId: string | undefined
 
         // 2. 交互顺序错误 approve
-        const res1 = await controller.callInteraction(approveName, {user: userA}, activityName, activityId)
+        const res1 = await activityManager.callActivityInteraction(activityName, approveName, activityId!, {user: userA})
         expect(res1.error).toBeDefined()
 
         // 3. sendFriendRequest payload 错误
@@ -77,20 +69,20 @@ describe("activity state", () => {
         // expect(res11.error).toBeDefined()
 
         // 3. a 发起 sendFriendRequest
-        const res2 = await controller.callInteraction(sendRequestName, {user: userA, payload: {to: userB}}, activityName, activityId)
+        const res2 = await activityManager.callActivityInteraction(activityName, sendRequestName, activityId!, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
         activityId = res2.context!.activityId as string
 
 
         // 4. 交互顺序错误 a sendFriendRequest
-        const res3 =await  controller.callInteraction(sendRequestName, {user: userA}, activityName, activityId)
+        const res3 =await  activityManager.callActivityInteraction(activityName, sendRequestName, activityId, {user: userA})
         expect(res3.error).toBeDefined()
 
         // 5. 角色错误 a approve
-        const res4 = await controller.callInteraction(approveName, {user: userA}, activityName, activityId)
+        const res4 = await activityManager.callActivityInteraction(activityName, approveName, activityId, {user: userA})
         expect(res4.error).toBeDefined()
         // 6. 正确 b approve
-        const res5 = await controller.callInteraction(approveName, {user: userB}, activityName, activityId)
+        const res5 = await activityManager.callActivityInteraction(activityName, approveName, activityId, {user: userB})
         // 查询关系是否正确建立
         const relations = await controller.system.storage.findRelationByName(friendRelation.name!, undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
         expect(relations.length).toBe(1)
@@ -100,11 +92,11 @@ describe("activity state", () => {
         expect(res5.error).toBeUndefined()
 
         // 7. 错误 b reject
-        const res6 = await controller.callInteraction(rejectName, {user: userB}, activityName, activityId)
+        const res6 = await activityManager.callActivityInteraction(activityName, rejectName, activityId, {user: userB})
         expect(res6.error).toBeDefined()
 
         // 8. 错误 a cancel
-        const res7 = await controller.callInteraction(cancelName, {user: userA}, activityName, activityId)
+        const res7 = await activityManager.callActivityInteraction(activityName, cancelName, activityId, {user: userA})
         expect(res7.error).toBeDefined()
         // 8. 获取 activity 状态是否 complete
         const currentState = await createFriendRelationActivityCall.getState(activityId!)
@@ -118,15 +110,15 @@ describe("activity state", () => {
         const { activityId} = await createFriendRelationActivityCall.create()
 
         // 3. a 发起 sendFriendRequest
-        const res2 = await controller.callInteraction(sendRequestName, {user: userA, payload: {to: userB}}, activityName, activityId)
+        const res2 = await activityManager.callActivityInteraction(activityName, sendRequestName, activityId, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
 
         // 6. 正确 a cancel
-        const res5 = await controller.callInteraction(cancelName, {user: userA}, activityName, activityId)
+        const res5 = await activityManager.callActivityInteraction(activityName, cancelName, activityId, {user: userA})
         expect(res5.error).toBeUndefined()
 
         // 7. 错误 b reject
-        const res6 = await controller.callInteraction(rejectName, {user: userB}, activityName, activityId)
+        const res6 = await activityManager.callActivityInteraction(activityName, rejectName, activityId, {user: userB})
         expect(res6.error).toBeDefined()
 
         // 8. 获取 activity 状态是否 complete

@@ -124,8 +124,6 @@ describe('async computed', () => {
             system: system,
             entities: [URLEntity],
             relations: [],
-            activities: [],
-            interactions: [],
             computations: TestCrawlerHandles
         })
         await controller.setup(true)

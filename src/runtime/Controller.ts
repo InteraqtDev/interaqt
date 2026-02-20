@@ -1,12 +1,9 @@
-import { BoolExp, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
+import { BoolExp, EntityInstance, RelationInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
 import { MatchExp } from "@storage";
 import { RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
 import './computations/index.js';
-import { InteractionCallResponse } from "../builtins/interaction/activity/InteractionCall.js";
-import { InteractionEventArgs } from "@core";
 import { Computation, ComputationResult, ComputationResultSkip, ComputationResultPatch, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
-import { ActivityManager } from "../builtins/interaction/activity/ActivityManager.js";
 import { CountHandles } from "./computations/Count.js";
 import { TransformHandles } from "./computations/Transform.js";
 import { AnyHandles } from "./computations/Any.js";
@@ -17,7 +14,7 @@ import { AverageHandles } from "./computations/Average.js";
 import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
-import { InteractionExecutionError, SideEffectError } from "./errors/index.js";
+import { SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 
@@ -69,19 +66,11 @@ export interface ControllerOptions {
     system: System
     entities?: EntityInstance[]
     relations?: RelationInstance[]
-    /** @deprecated Pass Interaction instances via eventSources instead */
-    activities?: ActivityInstance[]
-    /** @deprecated Pass Interaction instances via eventSources instead */
-    interactions?: InteractionInstance[]
     eventSources?: EventSourceInstance<any, any>[]
     dict?: DictionaryInstance[]
     recordMutationSideEffects?: RecordMutationSideEffect<any>[]
     computations?: (new (...args: any[]) => Computation)[]
-    /** @deprecated Use ignoreGuard instead */
-    ignorePermission?: boolean
     ignoreGuard?: boolean
-    /** @deprecated Use forceThrowDispatchError instead */
-    forceThrowInteractionError?: boolean
     forceThrowDispatchError?: boolean
 }
 
@@ -103,16 +92,13 @@ export class Controller {
         MatchExp
     }
     public scheduler: Scheduler
-    public activityManager: ActivityManager
     public system: System
     public entities: EntityInstance[]
     public relations: RelationInstance[]
     public eventSources: EventSourceInstance<any, any>[]
     public dict: DictionaryInstance[] = []
     public recordMutationSideEffects: RecordMutationSideEffect<any>[] = []
-    public ignorePermission: boolean
     public ignoreGuard: boolean
-    public forceThrowInteractionError: boolean
     public forceThrowDispatchError: boolean
 
     private eventSourcesByName = new Map<string, EventSourceInstance<any, any>>()
@@ -123,35 +109,24 @@ export class Controller {
             system,
             entities = [],
             relations = [],
-            activities = [],
-            interactions = [],
             eventSources = [],
             dict = [],
             recordMutationSideEffects = [],
             computations = [],
-            ignorePermission = false,
-            ignoreGuard,
-            forceThrowInteractionError = false,
-            forceThrowDispatchError,
+            ignoreGuard = false,
+            forceThrowDispatchError = false,
         } = options
         
         this.system = system
-        this.ignorePermission = ignorePermission
-        this.ignoreGuard = ignoreGuard ?? ignorePermission
-        this.forceThrowInteractionError = forceThrowInteractionError
-        this.forceThrowDispatchError = forceThrowDispatchError ?? forceThrowInteractionError
+        this.ignoreGuard = ignoreGuard
+        this.forceThrowDispatchError = forceThrowDispatchError
         this.entities = [...entities]
         this.relations = [...relations]
         this.dict = [...dict]
         this.recordMutationSideEffects = [...recordMutationSideEffects]
 
-        // Initialize ActivityManager (produces activity-wrapped event sources)
-        this.activityManager = new ActivityManager(this, activities, interactions)
+        this.eventSources = [...eventSources]
 
-        // Merge all event sources: explicit eventSources + interactions + activity-wrapped interactions
-        this.eventSources = [...eventSources, ...interactions, ...this.activityManager.getActivityEventSources()]
-
-        // Register event sources by name/uuid for dispatch lookup
         for (const es of this.eventSources) {
             if (es.name) {
                 this.eventSourcesByName.set(es.name, es)
@@ -159,7 +134,6 @@ export class Controller {
             this.eventSourcesByUUID.set(es.uuid, es)
         }
 
-        // Register entities from all event sources (deduplicated)
         const registeredRecordNames = new Set(this.entities.map(e => e.name))
         for (const es of this.eventSources) {
             if (es.entity && es.entity.name && !registeredRecordNames.has(es.entity.name)) {
@@ -298,7 +272,7 @@ export class Controller {
             
             let result: DispatchResponse
             try {
-                if (!(this.ignoreGuard || this.ignorePermission) && eventSource.guard) {
+                if (!this.ignoreGuard && eventSource.guard) {
                     await eventSource.guard.call(this, args)
                 }
                 
@@ -327,7 +301,7 @@ export class Controller {
             } catch (e) {
                 await this.system.storage.rollbackTransaction(eventSource.name)
                 
-                if (this.forceThrowDispatchError || this.forceThrowInteractionError) throw e
+                if (this.forceThrowDispatchError) throw e
                 result = {
                     error: e,
                     effects: [],
@@ -338,32 +312,14 @@ export class Controller {
             result.effects = effectsContext.effects
             
             if (!result.error) {
-                await this.runRecordChangeSideEffects(result as InteractionCallResponse, this.system.logger)
+                await this.runRecordChangeSideEffects(result, this.system.logger)
             }
             
             return result
         })
     }
 
-    /** @deprecated Use dispatch() instead */
-    async callInteraction(interactionName:string, interactionEventArgs: InteractionEventArgs, activityName?: string, activityId?: string) {
-        if (activityName) {
-            return this.activityManager.callActivityInteraction(activityName, interactionName, activityId, interactionEventArgs)
-        }
-
-        const eventSource = this.findEventSourceByName(interactionName)
-        if (!eventSource) {
-            throw new InteractionExecutionError(`Cannot find interaction for ${interactionName}`, {
-                interactionName,
-                userId: interactionEventArgs.user?.id,
-                payload: interactionEventArgs.payload,
-                executionPhase: 'interaction-lookup',
-            })
-        }
-
-        return this.dispatch(eventSource, interactionEventArgs)
-    }
-    async runRecordChangeSideEffects(result: InteractionCallResponse, logger: SystemLogger) {
+    async runRecordChangeSideEffects(result: DispatchResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]
         for(let event of mutationEvents || []) {
             const sideEffects = this.recordNameToSideEffects.get(event.recordName)

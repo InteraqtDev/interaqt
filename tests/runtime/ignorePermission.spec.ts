@@ -93,7 +93,7 @@ describe('Controller ignorePermission parameter', () => {
             system,
             entities: [User, Post],
             relations: [],
-            interactions: [CreatePostInteraction]
+            eventSources: [CreatePostInteraction]
         })
 
         await controller.setup(true)
@@ -106,7 +106,7 @@ describe('Controller ignorePermission parameter', () => {
         })
 
         // Try to call interaction - should fail due to condition
-        const result = await controller.callInteraction('CreatePost', {
+        const result = await controller.dispatch(CreatePostInteraction, {
             user: user,
             payload: {
                 title: 'Test Post',
@@ -125,8 +125,8 @@ describe('Controller ignorePermission parameter', () => {
             system,
             entities: [User, Post],
             relations: [],
-            interactions: [CreatePostInteraction],
-            ignorePermission: true  // Enable permission bypass
+            eventSources: [CreatePostInteraction],
+            ignoreGuard: true
         })
 
         await controller.setup(true)
@@ -139,7 +139,7 @@ describe('Controller ignorePermission parameter', () => {
         })
 
         // Try to call interaction - should succeed despite condition failure
-        const result = await controller.callInteraction('CreatePost', {
+        const result = await controller.dispatch(CreatePostInteraction, {
             user: user,
             payload: {
                 title: 'Test Post with Bypass',
@@ -164,8 +164,8 @@ describe('Controller ignorePermission parameter', () => {
             system,
             entities: [User, Post],
             relations: [],
-            interactions: [CreatePostInteraction],
-            ignorePermission: false
+            eventSources: [CreatePostInteraction],
+            ignoreGuard: false
         })
 
         await controller.setup(true)
@@ -177,7 +177,7 @@ describe('Controller ignorePermission parameter', () => {
         })
 
         // First call should fail
-        let result = await controller.callInteraction('CreatePost', {
+        let result = await controller.dispatch(CreatePostInteraction, {
             user: user,
             payload: {
                 title: 'First Post',
@@ -187,11 +187,11 @@ describe('Controller ignorePermission parameter', () => {
 
         expect(result.error).toBeDefined()
 
-        // Change ignorePermission to true at runtime
-        controller.ignorePermission = true
+        // Change ignoreGuard to true at runtime
+        controller.ignoreGuard = true
 
         // Second call should succeed
-        result = await controller.callInteraction('CreatePost', {
+        result = await controller.dispatch(CreatePostInteraction, {
             user: user,
             payload: {
                 title: 'Second Post',
@@ -207,10 +207,10 @@ describe('Controller ignorePermission parameter', () => {
         expect(posts[0].title).toBe('Second Post')
 
         // Change back to false
-        controller.ignorePermission = false
+        controller.ignoreGuard = false
 
         // Third call should fail again
-        result = await controller.callInteraction('CreatePost', {
+        result = await controller.dispatch(CreatePostInteraction, {
             user: user,
             payload: {
                 title: 'Third Post',

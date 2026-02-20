@@ -42,9 +42,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -121,9 +119,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -198,9 +194,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -270,9 +264,7 @@ describe('RealTime computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -361,9 +353,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -441,9 +431,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -528,9 +516,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -606,9 +592,7 @@ describe('RealTime computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -710,9 +694,7 @@ describe('RealTime computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     

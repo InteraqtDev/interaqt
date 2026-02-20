@@ -288,7 +288,7 @@ describe('Version Control Example', () => {
       system: system,
       entities: [User, VersionedStyle],
       relations: [],
-      interactions: [CreateStyle, PublishStyle, RollbackVersion, OfflineStyle],
+      eventSources: [CreateStyle, PublishStyle, RollbackVersion, OfflineStyle],
       dict: [currentVersionInfo]
     });
     await controller.setup(true);
@@ -297,12 +297,12 @@ describe('Version Control Example', () => {
     const user = await system.storage.create('User', { name: 'testUser' });
 
     // 1. Create initial styles
-    await controller.callInteraction('CreateStyle', {
+    await controller.dispatch(CreateStyle, {
       user,
       payload: { content: 'Style 1 content' }
     });
 
-    await controller.callInteraction('CreateStyle', {
+    await controller.dispatch(CreateStyle, {
       user,
       payload: { content: 'Style 2 content' }
     });
@@ -340,7 +340,7 @@ describe('Version Control Example', () => {
 
     // 2. Publish one style
     const styleToPublish = styles[0];
-    const publishResult = await controller.callInteraction('PublishStyle', {
+    const publishResult = await controller.dispatch(PublishStyle, {
       user,
       payload: { styleId: styleToPublish.id }
     });
@@ -374,18 +374,18 @@ describe('Version Control Example', () => {
     expect(otherStyle.status).toBe('draft');
 
     // 3. Create another style and publish again
-    await controller.callInteraction('CreateStyle', {
+    await controller.dispatch(CreateStyle, {
       user,
       payload: { content: 'Style 3 content' }
     });
 
-    await controller.callInteraction('PublishStyle', {
+    await controller.dispatch(PublishStyle, {
       user,
       payload: { styleId: styles[1].id }
     });
 
     // create another and rollback
-    await controller.callInteraction('CreateStyle', {
+    await controller.dispatch(CreateStyle, {
       user,
       payload: { content: 'Style 4 content' }
     });
@@ -395,7 +395,7 @@ describe('Version Control Example', () => {
     const version2 = versionInfo2?.version;
 
     // 4. Rollback to first version
-    await controller.callInteraction('RollbackVersion', {
+    await controller.dispatch(RollbackVersion, {
       user,
       payload: { version: versionInfo1.version }
     });

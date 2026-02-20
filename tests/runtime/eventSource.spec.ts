@@ -400,8 +400,7 @@ describe('EventSource', () => {
         system,
         entities: [],
         relations: [],
-        interactions: [testInteraction],
-        eventSources: [cronSource],
+        eventSources: [cronSource, testInteraction],
       });
       await controller.setup(true);
 
@@ -412,8 +411,8 @@ describe('EventSource', () => {
       const cronRecords = await system.storage.find('_MixedCron_', undefined, undefined, ['*']);
       expect(cronRecords).toHaveLength(1);
 
-      // callInteraction still works for interactions
-      const interactionResult = await controller.callInteraction('doSomething', {
+      // dispatch works for interactions too
+      const interactionResult = await controller.dispatch(testInteraction, {
         user: { id: 'user1' },
       });
       expect(interactionResult.error).toBeUndefined();

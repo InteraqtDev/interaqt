@@ -7,11 +7,16 @@ import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
 
+type GlobalCountState = {
+    count: GlobalBoundState<number>,
+    isItemMatch: RecordBoundState<boolean>
+}
+
 export class GlobalCountHandle implements DataBasedComputation {
     static computationType = Count
     static contextType = 'global' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
-    state!: ReturnType<typeof this.createState>
+    state!: GlobalCountState
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
     record: (EntityInstance|RelationInstance)
@@ -49,7 +54,7 @@ export class GlobalCountHandle implements DataBasedComputation {
             if (isMatch) {
                 count++
             }
-            await (this.state as any).isItemMatch.set(item, isMatch)
+            await this.state.isItemMatch.set(item, isMatch)
         }
         
         await this.state.count.set(count)
@@ -69,17 +74,17 @@ export class GlobalCountHandle implements DataBasedComputation {
             if (itemMatch) {
                 count = count + 1;
             }
-            await (this.state as any).isItemMatch.set(mutationEvent.record, itemMatch)
+            await this.state.isItemMatch.set(mutationEvent.record, itemMatch)
         } else if (mutationEvent.type === 'delete') {
             // Get the old match status from state instead of recalculating
-            const itemMatch = await (this.state as any).isItemMatch.get(mutationEvent.record)
+            const itemMatch = await this.state.isItemMatch.get(mutationEvent.record)
             // Convert to boolean because database may store false as 0 or true as 1
             if (!!itemMatch) {
                 count = count - 1;
             }
         } else if (mutationEvent.type === 'update') {
             // Get the old match status from state instead of recalculating
-            const oldItemMatch = await (this.state as any).isItemMatch.get(mutationEvent.oldRecord)
+            const oldItemMatch = await this.state.isItemMatch.get(mutationEvent.oldRecord)
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
             // Convert to boolean because database may store false as 0 or true as 1
             const oldItemMatchBool = !!oldItemMatch
@@ -89,7 +94,7 @@ export class GlobalCountHandle implements DataBasedComputation {
             } else if (!oldItemMatchBool && newItemMatch) {
                 count = count + 1;
             }
-            await (this.state as any).isItemMatch.set(mutationEvent.record, newItemMatch)
+            await this.state.isItemMatch.set(mutationEvent.record, newItemMatch)
         }
         
         // 防止计数为负数

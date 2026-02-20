@@ -1,11 +1,14 @@
 import { describe, test, expect } from "vitest";
 import { 
-  Action, PayloadItem, Payload, SideEffect,
-  Interaction, Gateway, Event, Activity, ActivityGroup, Transfer,
-  Condition, Conditions, DataAttributive, DataAttributives,
-  DataPolicy, Attributive, Attributives, Dictionary,
+  Dictionary, SideEffect,
   BoolAtomData, BoolExpressionData
 } from "@core";
+import { 
+  Action, PayloadItem, Payload,
+  Interaction, Gateway, Event, Activity, ActivityGroup, Transfer,
+  Condition, Conditions, DataAttributive, DataAttributives,
+  DataPolicy, Attributive, Attributives
+} from "interaqt";
 
 describe("Interaction System - createClass functionality", () => {
   describe("Action", () => {

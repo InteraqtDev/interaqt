@@ -1,14 +1,7 @@
-import {
-    ActivityGroup,
-    ActivityGroupInstance as ActivityGroupInstanceType,
-    ActivityInstance as ActivityInstanceType,
-    Attributive,
-    AttributiveInstance,
-    Gateway,
-    GatewayInstance as GatewayInstanceType,
-    InteractionInstance as InteractionInstanceType,
-    TransferInstance as TransferInstanceType
-} from "@core";
+import { ActivityGroup, ActivityGroupInstance, ActivityInstance, TransferInstance } from '../Activity.js';
+import { Attributive, AttributiveInstance } from '../Attributive.js';
+import { Gateway, GatewayInstance } from '../Gateway.js';
+import { InteractionInstance } from '../Interaction.js';
 import { assert } from "../../../runtime/util.js";
 import { System } from "../../../runtime/System.js";
 import { InteractionCall, InteractionCallResponse, EventUser, InteractionEventArgs } from "./InteractionCall.js";
@@ -29,13 +22,13 @@ export type InteractionLikeNodeBase = {
 }
 
 export type InteractionNode = {
-    content: InteractionInstanceType,
+    content: InteractionInstance,
     parentGroup?: ActivityGroupNode
 } & InteractionLikeNodeBase
 
 
 export type ActivityGroupNode = {
-    content: ActivityGroupInstanceType,
+    content: ActivityGroupInstance,
     parentGroup?: ActivityGroupNode
     childSeqs?: Seq[],
 } & InteractionLikeNodeBase
@@ -44,7 +37,7 @@ export type ActivityGroupNode = {
 
 export type GatewayNode = {
     uuid: string
-    content: GatewayInstanceType,
+    content: GatewayInstance,
     prev: GraphNode[],
     next: GraphNode[],
 }
@@ -181,8 +174,8 @@ class ActivityState{
 
 
 export class ActivityCall {
-    static cache = new Map<ActivityInstanceType, ActivityCall>()
-    static from = (activity: ActivityInstanceType, controller: Controller) => {
+    static cache = new Map<ActivityInstance, ActivityCall>()
+    static from = (activity: ActivityInstance, controller: Controller) => {
         let graph = ActivityCall.cache.get(activity)
         if (!graph) {
             graph = new ActivityCall(activity, controller)
@@ -194,14 +187,14 @@ export class ActivityCall {
     uuidToNode = new Map<string, GraphNode>()
     uuidToInteractionCall = new Map<string, InteractionCall>()
     interactionCallByName = new Map<string, InteractionCall>()
-    rawToNode = new Map<InteractionInstanceType|ActivityGroupInstanceType|GatewayInstanceType, GraphNode>()
+    rawToNode = new Map<InteractionInstance|ActivityGroupInstance|GatewayInstance, GraphNode>()
     system: System
-    constructor(public activity: ActivityInstanceType, public controller: Controller) {
+    constructor(public activity: ActivityInstance, public controller: Controller) {
         this.system = controller.system
         this.graph = this.buildGraph(activity)
     }
-    buildGraph(activity: ActivityInstanceType, parentGroup?: ActivityGroupNode) : Seq {
-        const rawGatewayToNode = new Map<GatewayInstanceType, GatewayNode>()
+    buildGraph(activity: ActivityInstance, parentGroup?: ActivityGroupNode) : Seq {
+        const rawGatewayToNode = new Map<GatewayInstance, GatewayNode>()
         const seq = {}
 
         for(let interaction of activity.interactions!) {
@@ -234,15 +227,15 @@ export class ActivityCall {
             this.rawToNode.set(group, node)
         }
 
-        const candidateStart = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
-        const candidateEnd = new Set<InteractionInstanceType|ActivityGroupInstanceType>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
+        const candidateStart = new Set<InteractionInstance|ActivityGroupInstance>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
+        const candidateEnd = new Set<InteractionInstance|ActivityGroupInstance>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
 
-        activity.transfers?.forEach((transfer:TransferInstanceType) => {
-            const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstanceType) || rawGatewayToNode.get(transfer.source as InteractionInstanceType))!
-            const targetNode = (this.rawToNode.get(transfer.target as InteractionInstanceType) || rawGatewayToNode.get(transfer.target as GatewayInstanceType))!
+        activity.transfers?.forEach((transfer:TransferInstance) => {
+            const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstance) || rawGatewayToNode.get(transfer.source as InteractionInstance))!
+            const targetNode = (this.rawToNode.get(transfer.target as InteractionInstance) || rawGatewayToNode.get(transfer.target as GatewayInstance))!
 
-            assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstanceType).name!}`)
-            assert(!!targetNode, `cannot find target ${(transfer.source as InteractionInstanceType).name!}`)
+            assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstance).name!}`)
+            assert(!!targetNode, `cannot find target ${(transfer.source as InteractionInstance).name!}`)
             if (Gateway.is(sourceNode)) {
                 (sourceNode as GatewayNode).next.push(targetNode)
             } else {
@@ -255,8 +248,8 @@ export class ActivityCall {
                 targetNode.prev = sourceNode
             }
 
-            candidateEnd.delete(transfer.source as InteractionInstanceType)
-            candidateStart.delete(transfer.target as InteractionInstanceType)
+            candidateEnd.delete(transfer.source as InteractionInstance)
+            candidateStart.delete(transfer.target as InteractionInstance)
         })
 
         if (candidateStart.size !== 1 ) throw new Error(`start node must one, current: ${candidateStart.size}`)
@@ -269,10 +262,12 @@ export class ActivityCall {
 
         return seq as Seq
     }
+    private static ACTIVITY_RECORD = '_Activity_'
+
     async create() {
         const initialStateData = ActivityState.createInitialState(this.graph.head)
 
-        const activity = await this.controller.activityManager.createActivity({
+        const activity = await this.system.storage.create(ActivityCall.ACTIVITY_RECORD, {
             name: this.activity.name,
             uuid: this.activity.uuid,
             state: initialStateData,
@@ -294,21 +289,23 @@ export class ActivityCall {
             key: 'id',
             value: ['=', activityId],
         })
-        return (await this.controller.activityManager.getActivity(match))[0]
+        const results = await this.system.storage.find(ActivityCall.ACTIVITY_RECORD, match, undefined, ['*'])
+        return results.map((a: any) => ({ ...a, state: a.state, refs: a.refs }))[0]
     }
     async setActivity(activityId: string, value: any) {
         const match = MatchExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
-        return await this.controller.activityManager.updateActivity(match, value)
+        const data = { ...value }
+        delete data.state
+        delete data.refs
+        if (value.state) data.state = value.state
+        if (value.refs) data.refs = value.refs
+        return await this.system.storage.update(ActivityCall.ACTIVITY_RECORD, match, data)
     }
     async setState(activityId: string, state: any) {
-        const match = MatchExp.atom({
-            key: 'id',
-            value: ['=', activityId],
-        })
-        return await this.controller.activityManager.updateActivity(match, {state: state})
+        return this.setActivity(activityId, { state })
     }
     isStartNode(uuid: string) {
         const node = this.uuidToNode.get(uuid) as InteractionLikeNodeBase
@@ -319,7 +316,7 @@ export class ActivityCall {
         return node.parentSeq.tail === node
     }
 
-    isActivityHead(interaction: InteractionInstanceType, head: InteractionLikeNodeBase = this.graph.head): boolean {
+    isActivityHead(interaction: InteractionInstance, head: InteractionLikeNodeBase = this.graph.head): boolean {
         if (ActivityGroup.is(this.graph.head.content)) {
             return !!(this.graph.head as ActivityGroupNode).childSeqs?.some(seq => this.isActivityHead(interaction, seq.head))
         } else {

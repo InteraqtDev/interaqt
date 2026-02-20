@@ -44,9 +44,7 @@ describe('Sum computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -119,9 +117,7 @@ describe('Sum computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -167,9 +163,7 @@ describe('Sum computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -208,9 +202,7 @@ describe('Sum computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -255,9 +247,7 @@ describe('Sum computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -327,9 +317,7 @@ describe('Sum computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -411,9 +399,7 @@ describe('Sum computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -609,9 +595,7 @@ describe('Sum computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -937,9 +921,7 @@ describe('Sum computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -1107,9 +1089,7 @@ describe('Sum computed handle', () => {
       system: system,
       entities: entities,
       dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
 
@@ -1272,9 +1252,7 @@ describe('Sum computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
 

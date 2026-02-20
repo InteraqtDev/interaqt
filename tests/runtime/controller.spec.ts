@@ -76,7 +76,6 @@ describe('Controller stateless deployment', () => {
       system: system,
       entities: entities,
       relations: relations,
-      interactions: []
     });
 
     // 1.1 Initial setup with install=true to create database tables

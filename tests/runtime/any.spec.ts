@@ -29,8 +29,6 @@ describe('Any computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: dictionary
     })
     await controller.setup(true)
@@ -111,9 +109,7 @@ describe('Any computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     })
     await controller.setup(true)
 
@@ -240,9 +236,7 @@ describe('Any computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: [departmentEntity, employeeEntity],
-      relations: [departmentEmployeeRelation],
-      activities: [],
-      interactions: []
+      relations: [departmentEmployeeRelation]
     });
     await controller.setup(true);
     
@@ -412,8 +406,6 @@ describe('Any computed handle', () => {
         system: system,
         entities: entities,
         relations: [],
-        activities: [],
-        interactions: [],
         dict: [ageLimit, ageLimitComputed]
     })
     await controller.setup(true)
@@ -537,9 +529,7 @@ describe('Any computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -734,9 +724,7 @@ describe('Any computed handle', () => {
       system: system,
       entities: entities,
       dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
 
@@ -888,9 +876,7 @@ describe('Any computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
 

@@ -249,17 +249,16 @@ describe('Count Callback Bug Verification', () => {
         system,
         entities,
         relations,
-        interactions,
-        activities: [],
-        ignorePermission: true,
-        forceThrowInteractionError: true
+        eventSources: interactions,
+        ignoreGuard: true,
+        forceThrowDispatchError: true
       })
       await controller.setup(true)
     })
 
     it('Count does NOT decrease when computed property changes (BUG)', async () => {
       // Create parent
-      await controller.callInteraction('CreateBugTestParent', {
+      await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
         payload: { name: 'Test Parent' }
       })
@@ -269,7 +268,7 @@ describe('Count Callback Bug Verification', () => {
       expect(parent.activeChildCount).toBe(0)
 
       // Create active child
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 1' }
       })
@@ -289,7 +288,7 @@ describe('Count Callback Bug Verification', () => {
       expect(child.isActive).toBe(true)
 
       // Deactivate child
-      await controller.callInteraction('DeactivateBugTestChild', {
+      await controller.dispatch(DeactivateChild, {
         user: { id: 'test-user' },
         payload: { childId: child.id }
       })
@@ -341,17 +340,16 @@ describe('Count Callback Bug Verification', () => {
         system,
         entities,
         relations,
-        interactions,
-        activities: [],
-        ignorePermission: true,
-        forceThrowInteractionError: true
+        eventSources: interactions,
+        ignoreGuard: true,
+        forceThrowDispatchError: true
       })
       await controller.setup(true)
     })
 
     it('Each child is counted TWICE when using StateMachine property (BUG)', async () => {
       // Create parent
-      await controller.callInteraction('CreateBugTestParent', {
+      await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
         payload: { name: 'Test Parent' }
       })
@@ -361,7 +359,7 @@ describe('Count Callback Bug Verification', () => {
       expect(parent.activeChildCount).toBe(0)
 
       // Create ONE active child
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 1' }
       })
@@ -382,7 +380,7 @@ describe('Count Callback Bug Verification', () => {
 
     it('Multiple children are all double-counted (BUG)', async () => {
       // Create parent
-      await controller.callInteraction('CreateBugTestParent', {
+      await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
         payload: { name: 'Test Parent' }
       })
@@ -391,15 +389,15 @@ describe('Count Callback Bug Verification', () => {
       const parent = parents[0]
 
       // Create THREE children
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 1' }
       })
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 2' }
       })
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 3' }
       })
@@ -441,10 +439,9 @@ describe('Count Callback Bug Verification', () => {
         system,
         entities,
         relations,
-        interactions,
-        activities: [],
-        ignorePermission: true,
-        forceThrowInteractionError: true
+        eventSources: interactions,
+        ignoreGuard: true,
+        forceThrowDispatchError: true
       })
       await controller.setup(true)
     })
@@ -455,7 +452,7 @@ describe('Count Callback Bug Verification', () => {
       // the Count computation should properly decrease.
       
       // Create parent
-      await controller.callInteraction('CreateBugTestParent', {
+      await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
         payload: { name: 'Test Parent' }
       })
@@ -465,7 +462,7 @@ describe('Count Callback Bug Verification', () => {
       expect(parent.activeChildCount).toBe(0)
 
       // Create active child
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 1' }
       })
@@ -487,7 +484,7 @@ describe('Count Callback Bug Verification', () => {
       expect(child._status).toBe('active')
 
       // Now deactivate the child (which changes _status to 'inactive')
-      await controller.callInteraction('DeactivateBugTestChild', {
+      await controller.dispatch(DeactivateChild, {
         user: { id: 'test-user' },
         payload: { childId: child.id }
       })
@@ -528,17 +525,16 @@ describe('Count Callback Bug Verification', () => {
         system,
         entities,
         relations,
-        interactions,
-        activities: [],
-        ignorePermission: true,
-        forceThrowInteractionError: true
+        eventSources: interactions,
+        ignoreGuard: true,
+        forceThrowDispatchError: true
       })
       await controller.setup(true)
     })
 
     it('Simple Count without callback works correctly', async () => {
       // Create parent
-      await controller.callInteraction('CreateBugTestParent', {
+      await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
         payload: { name: 'Test Parent' }
       })
@@ -548,7 +544,7 @@ describe('Count Callback Bug Verification', () => {
       expect(parent.activeChildCount).toBe(0)
 
       // Add children
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 1' }
       })
@@ -561,7 +557,7 @@ describe('Count Callback Bug Verification', () => {
       )
       expect(updatedParent.activeChildCount).toBe(1)  // Works correctly
 
-      await controller.callInteraction('CreateBugTestChild', {
+      await controller.dispatch(CreateChild, {
         user: { id: 'test-user' },
         payload: { parentId: parent.id, name: 'Child 2' }
       })

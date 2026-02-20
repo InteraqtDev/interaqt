@@ -2,7 +2,7 @@
 export * from "./utils.js";
 export * from "./interfaces.js";
 
-// Initialize and export KlassByName
+// Initialize core classes and export KlassByName
 import './init.js';
 export { KlassByName } from './utils.js';
 
@@ -34,6 +34,6 @@ export * from "./SideEffect.js";
 // Core event source
 export * from "./EventSource.js";
 
-// Interaction builtin (re-exported for backward compatibility)
-export * from "../builtins/interaction/index.js";
+// Core type aliases
+export type { ComputationRecord } from "./types.js";
 

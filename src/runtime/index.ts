@@ -2,10 +2,6 @@
 export * from './Controller.js'
 export * from './System.js'
 export * from './MonoSystem.js'
-// activity related (canonical location: src/builtins/interaction/activity/)
-export * from '../builtins/interaction/activity/ActivityCall.js'
-export * from '../builtins/interaction/activity/InteractionCall.js'
-export * from '../builtins/interaction/activity/ActivityManager.js'
 // computation related
 export * from './Scheduler.js'
 export * from './asyncInteractionContext.js'

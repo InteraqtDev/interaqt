@@ -43,9 +43,7 @@ describe('Average computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -118,9 +116,7 @@ describe('Average computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -168,9 +164,7 @@ describe('Average computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -221,9 +215,7 @@ describe('Average computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -309,9 +301,7 @@ describe('Average computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -419,9 +409,7 @@ describe('Average computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -531,9 +519,7 @@ describe('Average computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -792,9 +778,7 @@ describe('Average computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -957,9 +941,7 @@ describe('Average computed handle', () => {
       system: system,
       entities: entities,
       dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
 
@@ -1128,9 +1110,7 @@ describe('Average computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
 

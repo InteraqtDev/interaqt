@@ -1,7 +1,10 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import {
-  Condition, SideEffect, PayloadItem, Payload, Entity, clearAllInstances
+  Entity, SideEffect, clearAllInstances
 } from "@core";
+import {
+  Condition, PayloadItem, Payload
+} from "interaqt";
 
 describe("Support Classes Refactored", () => {
   let userEntity: any;

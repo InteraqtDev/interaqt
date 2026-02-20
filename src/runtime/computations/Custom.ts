@@ -127,10 +127,10 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   createState() {
     if (this.createStateCallback) {
       const states = this.createStateCallback.call(this.controller);
-      // 绑定 state 到 controller
       Object.entries(states).forEach(([key, state]) => {
-        (state as any).key = key;
-        (state as any).controller = this.controller;
+        const boundState = state as RecordBoundState<any> | GlobalBoundState<any>;
+        boundState.key = key;
+        boundState.controller = this.controller;
       });
       return states;
     }

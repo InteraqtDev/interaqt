@@ -1,20 +1,21 @@
 import {
-    AttributiveInstance, ConditionInstance, EntityInstance,
-    Attributive,
-    Attributives,
     BoolExp,
     BoolExpressionRawData,
     Concept,
     ConceptAlias,
-    ConceptInstance, Conditions,
+    ConceptInstance,
     DerivedConcept,
     Entity,
+    EntityInstance,
     Relation,
     ExpressionData,
-    GetAction,
-    InteractionInstanceType,
     EvaluateError
 } from "@core";
+import { AttributiveInstance, Attributive, Attributives } from '../Attributive.js';
+import { ConditionInstance } from '../Condition.js';
+import { Conditions } from '../Conditions.js';
+import { GetAction } from '../Action.js';
+import type { InteractionInstance } from '../Interaction.js';
 import { MatchAtom, MatchExp, MatchExpressionData } from "@storage";
 import { RecordMutationEvent, System } from "../../../runtime/System.js";
 import { assert, everyWithErrorAsync, someAsync } from "../../../runtime/util.js";
@@ -89,7 +90,7 @@ type CheckUserRef = (attributive: AttributiveInstance, eventUser: EventUser, act
 
 export class InteractionCall {
     system: System
-    constructor(public interaction: InteractionInstanceType, public controller: Controller, public activitySeqCall?: ActivityCall) {
+    constructor(public interaction: InteractionInstance, public controller: Controller, public activitySeqCall?: ActivityCall) {
         this.system = controller.system
     }
     async checkAttributive(inputAttributive: any, interactionEvent: InteractionEventArgs|undefined, attributiveTarget: any) {
@@ -347,8 +348,10 @@ export class InteractionCall {
     isGetInteraction() {
         return this.interaction.action === GetAction
     }
+    private static INTERACTION_RECORD = '_Interaction_'
+
     async saveEvent(interactionEvent: InteractionEvent) {
-        return await this.controller.activityManager.saveEvent(interactionEvent)
+        return await this.system.storage.create(InteractionCall.INTERACTION_RECORD, interactionEvent)
     }
     async retrieveData(interactionEvent: InteractionEventArgs) {
         let data: any
@@ -375,7 +378,7 @@ export class InteractionCall {
     async check(interactionEventArgs: InteractionEventArgs, activityId?: string, checkUserRef?: CheckUserRef, context?: InteractionContext): Promise<InteractionCallResponse["error"]> {
         let error
         try {
-            if (!this.controller.ignorePermission) {
+            if (!this.controller.ignoreGuard) {
                 await this.checkCondition(interactionEventArgs)
             }
             await this.checkUser(interactionEventArgs, activityId, checkUserRef)

@@ -1,11 +1,14 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import {
-  Action, Interaction, Activity, ActivityGroup, Transfer,
-  Condition, PayloadItem, Payload, SideEffect, DataPolicy,
-  Gateway, Event, Property, Entity,
-  forEachInteraction, getInteractions,
+  Property, Entity, SideEffect,
   clearAllInstances
 } from "@core";
+import {
+  Action, Interaction, Activity, ActivityGroup, Transfer,
+  Condition, PayloadItem, Payload, DataPolicy,
+  Gateway, Event,
+  forEachInteraction, getInteractions
+} from "interaqt";
 
 describe("Interaction System Refactored - compatibility test", () => {
   beforeEach(() => {

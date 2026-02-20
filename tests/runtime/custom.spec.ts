@@ -67,9 +67,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [Product],
       dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
     
@@ -169,9 +167,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [Counter],
       dict: [counterTotal],
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
     
@@ -270,9 +266,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [],
       dict: [trigger, stateManager],
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
     
@@ -335,9 +329,7 @@ describe('Custom computation', () => {
     controller = new Controller({
       system: system,
       entities: [AsyncEntity],
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
     
@@ -394,9 +386,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [],
       dict: [globalSettings],
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
     
@@ -491,9 +481,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [User, Post],
       relations: [AuthorRelation],
-      dict: [authorCountDict],
-      activities: [],
-      interactions: []
+      dict: [authorCountDict]
     });
     await controller.setup(true);
     
@@ -684,9 +672,7 @@ describe('Custom computation', () => {
       system: system,
       entities: entities,
       dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
 
@@ -864,9 +850,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [Product],
       dict: [],
-      relations: [],
-      activities: [],
-      interactions: []
+      relations: []
     });
     await controller.setup(true);
 
@@ -1034,9 +1018,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [Department, Employee],
       dict: [],
-      relations: [EmploymentRelation],
-      activities: [],
-      interactions: []
+      relations: [EmploymentRelation]
     });
     await controller.setup(true);
 
@@ -1252,9 +1234,7 @@ describe('Custom computation', () => {
       system: system,
       entities: [User, Profile, Item, Recharge],
       relations: [UserProfileRelation, UserRechargeRelation, DonationRelation],
-      dict: [],
-      activities: [],
-      interactions: []
+      dict: []
     });
     await controller.setup(true);
 

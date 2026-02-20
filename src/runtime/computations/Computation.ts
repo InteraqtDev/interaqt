@@ -1,7 +1,7 @@
 import {
     EntityInstance, RelationInstance, PropertyInstance,
-    ActivityInstance, InteractionInstance,
-    DictionaryInstance
+    DictionaryInstance,
+    type ComputationRecord
 } from "@core";
 import { Controller } from "../Controller";
 import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
@@ -123,7 +123,7 @@ export { ComputationPhase, PHASE_BEFORE_ALL, PHASE_NORMAL, PHASE_AFTER_ALL }
 
 export type RecordsDataDep = {
     type: 'records',
-source: EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
+    source: ComputationRecord,
     match?: MatchExpressionData,
     modifier?: ModifierData,
     attributeQuery?: AttributeQueryData

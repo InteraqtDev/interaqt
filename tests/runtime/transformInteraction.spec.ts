@@ -3,11 +3,10 @@ import { SQLiteDB } from '@drivers';
 import {
     Controller, MonoSystem,
     BoolExp, KlassByName, InteractionGuardError,
-    ACTIVITY_RECORD
+    ACTIVITY_RECORD, InteractionInstance
 } from 'interaqt';
 import { createData } from './data/leaveRequest.js';
 
-// 里面有所有必须的数据？
 type User = {
     id: string,
     roles: string[],
@@ -17,8 +16,8 @@ type User = {
 describe('map interaction', () => {
 
     let system: MonoSystem
-    let sendRequestName: string
-    let approveRequestName: string
+    let sendRequestInteraction: InteractionInstance
+    let approveRequestInteraction: InteractionInstance
     let controller: Controller
 
     let userAId: string
@@ -27,16 +26,6 @@ describe('map interaction', () => {
     beforeEach(async () => {
         const {entities, interactions, relations} = createData()
 
-        // createInstances(data)
-        /**
-         * 当前的格式为:
-         * New && Other Admin as A
-         * sendRequest
-         * to: Other Admin isRef
-         * message: Message
-         */
-
-        // const db = new SQLiteDB('test.db')
         const db = new SQLiteDB(':memory:')
         system = new MonoSystem(db)
         system.conceptClass = KlassByName
@@ -45,12 +34,11 @@ describe('map interaction', () => {
             system,
             entities,
             relations,
-            activities: [],
-            interactions
+            eventSources: interactions
         })
         await controller.setup(true)
-        sendRequestName = 'sendRequest'
-        approveRequestName = 'approve'
+        sendRequestInteraction = interactions.find(i => i.name === 'sendRequest')!
+        approveRequestInteraction = interactions.find(i => i.name === 'approve')!
 
         const userARef = await system.storage.create('User', {name: 'A', age: 10})
         userAId = userARef.id
@@ -93,7 +81,7 @@ describe('map interaction', () => {
             to: userB,
             reason: 'let use make friend'
         }
-        const res1 = await controller.callInteraction(sendRequestName,  {user: userA, payload})
+        const res1 = await controller.dispatch(sendRequestInteraction,  {user: userA, payload})
         expect(res1.error).toBeUndefined()
 
         expect(res1.effects?.filter(e => e.recordName === ACTIVITY_RECORD)).toHaveLength(0)
@@ -114,7 +102,7 @@ describe('map interaction', () => {
 
 
         // should throw
-        const _res2 = await controller.callInteraction(approveRequestName,  {user: userC, payload: _payload2})
+        const _res2 = await controller.dispatch(approveRequestInteraction,  {user: userC, payload: _payload2})
         expect(_res2.error).toBeInstanceOf(InteractionGuardError)
         // FIXME 获取 userAttribute error 信息
 
@@ -122,7 +110,7 @@ describe('map interaction', () => {
         const payload2 = {
             request: requests1[0]
         }
-        const res2 = await controller.callInteraction(approveRequestName,  {user: userB, payload: payload2})
+        const res2 = await controller.dispatch(approveRequestInteraction,  {user: userB, payload: payload2})
         const requests2 = await controller.system.storage.find(
             'Request',
             undefined,

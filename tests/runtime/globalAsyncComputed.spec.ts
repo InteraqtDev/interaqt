@@ -274,8 +274,6 @@ describe('Global async computed', () => {
         entities: entities,
         dict: dictionary,
         relations: [],
-        activities: [],
-        interactions: [],
         computations: GlobalStatsHandles
     });
     await controller.setup(true);

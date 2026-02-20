@@ -1,5 +1,5 @@
 import { DataContext, EntityDataContext, EventDep } from "./Computation.js";
-import { Transform, TransformInstance, EntityInstance, RelationInstance, ActivityInstance, InteractionInstance } from "@core";
+import { Transform, TransformInstance, type ComputationRecord } from "@core";
 import { Controller } from "../Controller.js";
 import { MatchExp } from "@storage";
 import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } from "./Computation.js";
@@ -28,7 +28,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
                 ...(this.args.dataDeps || {}),
                 _source: {
                     type: 'records',
-                    source: this.args.record as EntityInstance|RelationInstance|ActivityInstance|InteractionInstance,
+                    source: this.args.record as ComputationRecord,
                     attributeQuery: this.args.attributeQuery || ['*']
                 }
             }

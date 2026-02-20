@@ -42,9 +42,7 @@ describe('Count computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -131,9 +129,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -215,9 +211,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -321,9 +315,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -431,9 +423,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -502,9 +492,7 @@ describe('Count computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -600,9 +588,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -703,9 +689,7 @@ describe('Count computed handle', () => {
         system: system,
         entities: entities,
         relations: relations,
-        dict: dictionary,
-        activities: [],
-        interactions: []
+        dict: dictionary
     });
     await controller.setup(true);
     
@@ -767,9 +751,7 @@ describe('Count computed handle', () => {
         system: system,
         entities: entities,
         dict: dictionary,
-        relations: [],
-        activities: [],
-        interactions: []
+        relations: []
     });
     await controller.setup(true);
     
@@ -852,9 +834,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -976,9 +956,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -1212,9 +1190,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
         system: system,
         entities: entities,
-        relations: relations,
-        activities: [],
-        interactions: []
+        relations: relations
     });
     await controller.setup(true);
     
@@ -1374,12 +1350,10 @@ describe('Count computed handle', () => {
     const system = new MonoSystem(new PGLiteDB());
     system.conceptClass = KlassByName;
     const controller = new Controller({
-      system: system,
-      entities: entities,
-      dict: dictionary,
-      relations: [],
-      activities: [],
-      interactions: []
+        system: system,
+        entities: entities,
+        dict: dictionary,
+        relations: []
     });
     await controller.setup(true);
 
@@ -1520,9 +1494,7 @@ describe('Count computed handle', () => {
     const controller = new Controller({
       system: system,
       entities: entities,
-      relations: relations,
-      activities: [],
-      interactions: []
+      relations: relations
     });
     await controller.setup(true);
 
