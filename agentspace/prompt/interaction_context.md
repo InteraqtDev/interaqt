@@ -63,3 +63,6 @@ EventSource.create 中的 `record` 参数改成 entity 更合适。record 指的
 要求：
 1. 移除完之后 runtime 包中应该不再依赖任何 builtins 中的依赖。如果需要 Interaction，构造 controller 参数时，应该外部显式传递 Interaction Event Source。
 2. 你要同时修改 tests 下的受影响测试用例。最后确保 `npm run test:runtime` 全部通过才说明重构成功。
+
+## Task 8 更新文档
+我们已经完全完成了重构任务，接下来你来根据更新的内容，更新 `agent/agentspace/knowledge/generator/api-reference.md`。特别注意，我们已经删掉所有的 deprecated 的 api 等概念，在文档中也应该直接删除，完全不要再提到。

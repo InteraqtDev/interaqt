@@ -524,7 +524,151 @@ const UserProjectRelation = Relation.create({
 
 **Note**: Merged relations cannot define their own `properties` - only `commonProperties` that specify the shared attribute contract. The `source`, `target`, and `type` are inherited from input relations (which must all have the same source/target).
 
-## 13.2 Computation-Related APIs
+## 13.2 EventSource API
+
+### EventSource.create()
+
+Create a custom event source. EventSource is the core abstraction for all event-driven data flows in interaqt. Interactions are a built-in EventSource type; you can create custom event sources for scheduled tasks, external system callbacks, or any other trigger.
+
+**Syntax**
+```typescript
+EventSource.create<TArgs, TResult>(
+    config: EventSourceCreateArgs<TArgs, TResult>,
+    options?: { uuid?: string }
+): EventSourceInstance<TArgs, TResult>
+```
+
+**Parameters**
+- `config.name` (string, required): Event source name, used for identification and lookup
+- `config.entity` (EntityInstance, required): The entity used to persist event records. Each dispatch creates a record in this entity.
+- `config.guard` (function, optional): Validation function called before the event is processed. Throw an error to reject the event.
+  ```typescript
+  async function(this: Controller, args: TArgs): Promise<void>
+  ```
+- `config.mapEventData` (function, optional): Maps event args to the data stored in the event entity record.
+  ```typescript
+  function(args: TArgs): Record<string, any>
+  ```
+- `config.resolve` (function, optional): Resolves and returns data after the event is processed (e.g., for query events).
+  ```typescript
+  async function(this: Controller, args: TArgs): Promise<TResult>
+  ```
+- `config.afterDispatch` (function, optional): Hook called after dispatch completes. Can return additional context.
+  ```typescript
+  async function(this: Controller, args: TArgs, result: { data?: TResult }): Promise<Record<string, unknown> | void>
+  ```
+
+**EventSourceInstance Interface**
+```typescript
+interface EventSourceInstance<TArgs = any, TResult = void> {
+  uuid: string
+  _type: string
+  name: string
+  entity: EntityInstance
+  guard?: (this: Controller, args: TArgs) => Promise<void>
+  mapEventData?: (args: TArgs) => Record<string, any>
+  resolve?: (this: Controller, args: TArgs) => Promise<TResult>
+  afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+}
+```
+
+**Examples**
+
+```typescript
+// Define event entity for storing event records
+const ScheduledTaskEvent = Entity.create({
+    name: '_ScheduledTask_',
+    properties: [
+        Property.create({ name: 'taskName', type: 'string' }),
+        Property.create({ name: 'triggeredAt', type: 'number' }),
+        Property.create({ name: 'payload', type: 'object' })
+    ]
+})
+
+// Create custom event source for scheduled tasks
+const scheduledTaskSource = EventSource.create({
+    name: 'scheduledTask',
+    entity: ScheduledTaskEvent,
+    guard: async function(this: Controller, args: { taskName: string, payload: any }) {
+        if (!args.taskName) {
+            throw new Error('Task name is required')
+        }
+    },
+    mapEventData: (args) => ({
+        taskName: args.taskName,
+        triggeredAt: Math.floor(Date.now() / 1000),
+        payload: args.payload
+    })
+})
+
+// Register and dispatch
+const controller = new Controller({
+    system,
+    entities: [User, Post],
+    relations: [],
+    eventSources: [scheduledTaskSource],
+    dict: []
+})
+
+await controller.setup(true)
+
+// Dispatch the event
+const result = await controller.dispatch(scheduledTaskSource, {
+    taskName: 'cleanupExpiredSessions',
+    payload: { maxAge: 86400 }
+})
+```
+
+**Custom Event Source for External Callbacks**
+
+```typescript
+const WebhookEvent = Entity.create({
+    name: '_Webhook_',
+    properties: [
+        Property.create({ name: 'source', type: 'string' }),
+        Property.create({ name: 'eventType', type: 'string' }),
+        Property.create({ name: 'data', type: 'object' })
+    ]
+})
+
+const webhookSource = EventSource.create({
+    name: 'webhook',
+    entity: WebhookEvent,
+    guard: async function(this: Controller, args: { source: string, secret: string, eventType: string, data: any }) {
+        const validSecret = await this.system.storage.get('config', `webhook_secret_${args.source}`)
+        if (args.secret !== validSecret) {
+            throw new Error('Invalid webhook secret')
+        }
+    },
+    mapEventData: (args) => ({
+        source: args.source,
+        eventType: args.eventType,
+        data: args.data
+    }),
+    resolve: async function(this: Controller, args) {
+        return { received: true, timestamp: Date.now() }
+    }
+})
+
+// Dispatch when webhook is received
+const result = await controller.dispatch(webhookSource, {
+    source: 'stripe',
+    secret: 'whsec_xxx',
+    eventType: 'payment.completed',
+    data: { orderId: 'order_123', amount: 9900 }
+})
+```
+
+**Key Points**
+1. Every event source must have an `entity` to persist event records
+2. `guard` runs before event processing; throw to reject the event
+3. `mapEventData` converts dispatch args into the format stored in the entity
+4. `resolve` returns data to the caller (useful for query-type events)
+5. `afterDispatch` runs after successful processing and can return additional context
+6. The Controller automatically registers the event source's entity if not already in the entities list
+7. Interaction is a built-in EventSource type that provides pre-built `guard`, `mapEventData`, and `resolve` implementations
+
+## 13.3 Computation-Related APIs
 
 ### Count.create()
 
@@ -1891,17 +2035,16 @@ const activeUsers = Dictionary.create({
 
 **Usage in Controller**
 
-Dictionaries are passed as the 6th parameter to Controller:
+Dictionaries are passed via the `dict` parameter to Controller:
 
 ```typescript
 const controller = new Controller({
-  system: system,
-  entities: entities,
-  relations: relations,
-  activities: activities,
-  interactions: interactions,
-  dict: [userCountDict, systemConfig, currentTime, activeUsers],, // Dictionaries
-  recordMutationSideEffects: []
+    system: system,
+    entities: entities,
+    relations: relations,
+    eventSources: [...interactions],
+    dict: [userCountDict, systemConfig, currentTime, activeUsers],
+    recordMutationSideEffects: []
 });
 ```
 
@@ -2306,11 +2449,13 @@ const bulkApproveTransfer = StateTransfer.create({
 });
 ```
 
-## 13.3 Interaction-Related APIs
+## 13.4 Interaction-Related APIs
+
+Interaction is a built-in EventSource type provided by interaqt. It implements `EventSourceInstance<InteractionEventArgs>` and provides pre-built guard (condition checks, user validation, payload validation), event data mapping, and data retrieval logic.
 
 ### Interaction.create()
 
-Create user interaction definition.
+Create user interaction definition. Returns an `InteractionInstance` which implements `EventSourceInstance<InteractionEventArgs>` and can be directly passed to `controller.dispatch()`.
 
 **Syntax**
 ```typescript
@@ -2322,7 +2467,6 @@ Interaction.create(config: InteractionConfig): InteractionInstance
 - `config.action` (Action, required): Interaction action
 - `config.payload` (Payload, optional): Interaction parameters
 - `config.conditions` (Condition|Conditions, optional): Execution conditions
-- `config.sideEffects` (SideEffect[], optional): Side effect handlers
 - `config.data` (Entity|Relation, optional): Associated data entity
 - `config.dataPolicy` (DataPolicy, optional): Data access policy for data fetching interactions
 
@@ -2410,13 +2554,13 @@ const GetPostsPaginated = Interaction.create({
 
 ```typescript
 // Get all users
-const result = await controller.callInteraction('getAllUsers', {
+const result = await controller.dispatch(GetAllUsers, {
     user: { id: 'admin-user' }
 })
 // result.data contains array of users
 
 // Get filtered users with runtime query
-const activeUsersResult = await controller.callInteraction('getActiveUsers', {
+const activeUsersResult = await controller.dispatch(GetActiveUsers, {
     user: { id: 'admin-user' },
     query: {
         match: MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
@@ -2426,7 +2570,7 @@ const activeUsersResult = await controller.callInteraction('getActiveUsers', {
 // result.data contains filtered users with specified fields
 
 // Get user's posts
-const userPostsResult = await controller.callInteraction('getUserPosts', {
+const userPostsResult = await controller.dispatch(GetUserPosts, {
     user: { id: 'user123' },
     query: {
         match: MatchExp.atom({ key: 'author.id', value: ['=', 'user123'] }),
@@ -2436,7 +2580,7 @@ const userPostsResult = await controller.callInteraction('getUserPosts', {
 // result.data contains posts authored by user123
 
 // Get paginated posts
-const paginatedResult = await controller.callInteraction('getPostsPaginated', {
+const paginatedResult = await controller.dispatch(GetPostsPaginated, {
     user: { id: 'user123' },
     query: {
         match: MatchExp.atom({ key: 'status', value: ['=', 'published'] }),
@@ -2452,7 +2596,7 @@ const paginatedResult = await controller.callInteraction('getPostsPaginated', {
 1. **Required**: Must use `GetAction` as the action
 2. **Required**: Must specify `data` field with the Entity or Relation to query
 3. **Optional**: Use `dataPolicy` in Interaction definition to set fixed data access policies (match constraints, field restrictions, default sorting/pagination)
-4. **Runtime Query**: Pass `query` object in `callInteraction` to dynamically filter data at runtime (user-provided filters)
+4. **Runtime Query**: Pass `query` object in `controller.dispatch()` to dynamically filter data at runtime (user-provided filters)
 5. **Conditions**: Can use conditions to control access based on query parameters
 6. **Response**: Retrieved data is returned in `result.data` field
 
@@ -2659,7 +2803,7 @@ const GetProducts = Interaction.create({
 })
 
 // User calls with additional filters
-const result = await controller.callInteraction('getProducts', {
+const result = await controller.dispatch(GetProducts, {
     user: { id: 'user123' },
     query: {
         match: MatchExp.atom({ key: 'category', value: ['=', 'electronics'] }),
@@ -2747,7 +2891,7 @@ const activityItem = PayloadItem.create({
 })
 ```
 
-## 13.4 Activity-Related APIs
+## 13.5 Activity-Related APIs
 
 ### Activity.create()
 
@@ -2979,7 +3123,7 @@ conditions: Conditions.create({
 
 **Error Handling**
 
-When a condition fails or throws an error, the interaction call returns:
+When a condition fails or throws an error, the dispatch returns:
 ```typescript
 {
     error: {
@@ -2989,31 +3133,64 @@ When a condition fails or throws an error, the interaction call returns:
 }
 ```
 
-## 13.5 System-Related APIs
+## 13.6 System-Related APIs
 
 ### Controller
 
-System controller that coordinates the work of various components.
+System controller that coordinates the work of various components. All events flow through the Controller via the `dispatch()` API.
 
 **Constructor**
 ```typescript
 new Controller({
     system: System,
-    entities: EntityInstance[],
-    relations: RelationInstance[],
-    activities: ActivityInstance[],
-    interactions: InteractionInstance[],
-    dict?: DictionaryInstance[],  // Note: This is for global dictionaries, NOT computations
+    entities?: EntityInstance[],
+    relations?: RelationInstance[],
+    eventSources?: EventSourceInstance<any, any>[],
+    dict?: DictionaryInstance[],
     recordMutationSideEffects?: RecordMutationSideEffect[],
-    ignorePermission?: boolean  // Skip condition checks when true
+    computations?: (new (...args: any[]) => Computation)[],
+    ignoreGuard?: boolean,         // Skip guard checks when true
+    forceThrowDispatchError?: boolean  // Throw errors instead of returning them
 })
 ```
 
-⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter. All computations should be defined within the `computation` field of Entity/Relation/Property definitions. The 6th parameter `dict` is for global dictionary definitions (Dictionary.create), not for computation definitions.
+**Parameters**
+- `system` (System, required): System implementation providing storage and logging
+- `entities` (EntityInstance[], optional): Entity definitions
+- `relations` (RelationInstance[], optional): Relation definitions
+- `eventSources` (EventSourceInstance[], optional): All event sources (Interactions, custom EventSources, etc.)
+- `dict` (DictionaryInstance[], optional): Global dictionary definitions
+- `recordMutationSideEffects` (RecordMutationSideEffect[], optional): Side effects triggered on record mutations
+- `computations` ((new (...args: any[]) => Computation)[], optional): Additional computation handle classes
+- `ignoreGuard` (boolean, optional): When true, skips all guard checks on event sources
+- `forceThrowDispatchError` (boolean, optional): When true, throws errors instead of returning them in the response
+
+**Note**: The Controller automatically registers event source entities (e.g., `InteractionEventEntity`) if they are not already in the entities list. You do not need to manually add them.
+
+**Example**
+```typescript
+const controller = new Controller({
+    system,
+    entities: [User, Post],
+    relations: [UserPostRelation],
+    eventSources: [
+        CreatePostInteraction,
+        LikePostInteraction,
+        GetAllPostsInteraction,
+        scheduledCleanupSource   // Custom EventSource
+    ],
+    dict: [userCountDict, systemConfig],
+    recordMutationSideEffects: [auditLogger]
+})
+
+await controller.setup(true)
+```
+
+⚠️ **IMPORTANT**: Controller does NOT accept a computations parameter for defining reactive computations. All reactive computations should be defined within the `computation` field of Entity/Relation/Property/Dictionary definitions. The `computations` parameter is only for registering additional computation handle classes.
 
 ### RecordMutationSideEffect
 
-RecordMutationSideEffect allows you to execute custom logic when records are created, updated, or deleted within interaction contexts. It's useful for triggering external operations, logging, or custom business logic in response to data changes.
+RecordMutationSideEffect allows you to execute custom logic when records are created, updated, or deleted within dispatch contexts. It's useful for triggering external operations, logging, or custom business logic in response to data changes.
 
 **Syntax**
 ```typescript
@@ -3041,11 +3218,11 @@ type RecordMutationEvent = {
 ```
 
 **Important Notes**
-- RecordMutationSideEffect **only** triggers within interaction execution context
+- RecordMutationSideEffect **only** triggers within dispatch execution context
 - Direct storage operations (e.g., `controller.system.storage.create()`) do **NOT** trigger side effects
 - All side effects registered for an entity are called on any mutation of that entity
 - Side effects run after the storage operation completes
-- Side effect errors are captured but don't fail the interaction
+- Side effect errors are captured but don't fail the dispatch
 
 **Examples**
 
@@ -3105,7 +3282,7 @@ const controller = new Controller({
     system: system,
     entities: [User, Order, Product],
     relations: [],
-    interactions: [CreateUserInteraction, UpdateOrderInteraction],
+    eventSources: [CreateUserInteraction, UpdateOrderInteraction],
     recordMutationSideEffects: [
         userCreatedLogger,
         auditLogger,
@@ -3113,8 +3290,8 @@ const controller = new Controller({
     ]
 });
 
-// When interaction is called, side effects are triggered
-const result = await controller.callInteraction('createUser', {
+// When event is dispatched, side effects are triggered
+const result = await controller.dispatch(CreateUserInteraction, {
     user: { id: 'admin' },
     payload: { name: 'John', email: 'john@example.com' }
 });
@@ -3150,33 +3327,36 @@ Initialize system.
 await controller.setup(true) // Create database tables
 ```
 
-#### callInteraction(interactionName: string, args: InteractionEventArgs, activityName?: string, activityId?: string)
-Call interaction or activity interaction.
+#### dispatch(eventSource, args)
+Unified dispatch API for all event source types. This is the primary way to trigger events in the system.
 
-**Note about ignorePermission**: When `controller.ignorePermission` is set to `true`, this method will bypass all condition checks, user validation, and payload validation defined in the interaction.
+**Syntax**
+```typescript
+async dispatch<TArgs, TResult>(
+    eventSource: EventSourceInstance<TArgs, TResult>,
+    args: TArgs
+): Promise<DispatchResponse>
+```
 
 **Parameters**
-- `interactionName`: The name of the interaction to call
-- `args`: The interaction event arguments containing user and payload
-- `activityName` (optional): The name of the activity when calling an activity interaction
-- `activityId` (optional): The ID of the activity instance when calling an activity interaction
+- `eventSource` (EventSourceInstance, required): The event source instance to dispatch (object reference, not a name string)
+- `args` (TArgs, required): Event-specific arguments. For Interactions, this is `InteractionEventArgs` containing `user`, `payload`, and optional `query`.
+
+**Note about ignoreGuard**: When `controller.ignoreGuard` is set to `true`, dispatch will bypass all guard checks (conditions, user validation, payload validation) defined in the event source.
 
 **Return Type**
 ```typescript
-type InteractionCallResponse = {
-  // Contains error information if the interaction failed
+type DispatchResponse = {
+  // Contains error information if the dispatch failed
   error?: unknown
   
-  // For GET interactions: contains the retrieved data
+  // For events with resolve: contains the resolved data
   data?: unknown
-  
-  // The interaction event that was processed
-  event?: InteractionEvent
   
   // Record mutations (create/update/delete) that occurred
   effects?: RecordMutationEvent[]
   
-  // Results from side effects defined in the interaction
+  // Results from registered RecordMutationSideEffects
   sideEffects?: {
     [effectName: string]: {
       result?: unknown
@@ -3184,23 +3364,32 @@ type InteractionCallResponse = {
     }
   }
   
-  // Additional context (e.g., activityId for activity interactions)
+  // Additional context from afterDispatch hook
   context?: {
     [key: string]: unknown
   }
 }
 ```
 
-**Example - Regular Interaction**
+**Dispatch Flow**
+1. Begin transaction
+2. Execute `guard` (if provided and `ignoreGuard` is false)
+3. Map event data via `mapEventData` and create event record
+4. Execute `resolve` (if provided) - returns data
+5. Execute `afterDispatch` (if provided) - returns context
+6. Commit transaction
+7. Run RecordMutationSideEffects
+
+**Example - Dispatch Interaction**
 ```typescript
-const result = await controller.callInteraction('createPost', {
+const result = await controller.dispatch(CreatePostInteraction, {
     user: { id: 'user1' },
     payload: { postData: { title: 'Hello', content: 'World' } }
 })
 
 // Check for errors
 if (result.error) {
-    console.error('Interaction failed:', result.error)
+    console.error('Dispatch failed:', result.error)
     return
 }
 
@@ -3213,14 +3402,40 @@ if (result.sideEffects?.emailNotification?.error) {
 }
 ```
 
-**Example - Activity Interaction**
+**Example - Dispatch Custom EventSource**
 ```typescript
-const result = await controller.callInteraction(
-    'confirmOrder',
-    { user: { id: 'user1' }, payload: { orderData: {...} } },
-    'OrderProcess',
-    'activity-instance-1'
-)
+const result = await controller.dispatch(scheduledTaskSource, {
+    taskName: 'dailyReport',
+    payload: { date: '2024-01-15' }
+})
+```
+
+**Example - Dispatch Get Interaction**
+```typescript
+const result = await controller.dispatch(GetAllPostsInteraction, {
+    user: { id: 'user1' },
+    query: {
+        match: MatchExp.atom({ key: 'status', value: ['=', 'published'] }),
+        attributeQuery: ['id', 'title', 'content', 'createdAt']
+    }
+})
+// result.data contains the queried records
+```
+
+#### findEventSourceByName(name)
+Find a registered event source by its name.
+
+**Syntax**
+```typescript
+findEventSourceByName(name: string): EventSourceInstance | undefined
+```
+
+**Example**
+```typescript
+const source = controller.findEventSourceByName('createPost')
+if (source) {
+    await controller.dispatch(source, { user: { id: 'user1' }, payload: {...} })
+}
 ```
 
 ### System
@@ -3838,7 +4053,7 @@ type ModifierData = {
 }
 ```
 
-## 13.6 Utility Function APIs
+## 13.7 Utility Function APIs
 
 ### MatchExp
 
@@ -3924,7 +4139,7 @@ const expr2 = BoolExp.atom({ condition: 'isAdmin' })
 const combined = expr1.and(expr2).or({ condition: 'isOwner' })
 ```
 
-## 13.5 Query APIs
+## 13.8 Query APIs
 
 ### Conditions
 
@@ -3988,11 +4203,37 @@ const combined = expr1.and(expr2).or({ condition: 'isOwner' })
 ### Core Types
 
 ```typescript
-// Interaction event arguments
+// EventSource instance interface - the core abstraction for all event sources
+interface EventSourceInstance<TArgs = any, TResult = void> {
+    uuid: string
+    _type: string
+    name: string
+    entity: EntityInstance
+    guard?: (this: Controller, args: TArgs) => Promise<void>
+    mapEventData?: (args: TArgs) => Record<string, any>
+    resolve?: (this: Controller, args: TArgs) => Promise<TResult>
+    afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+}
+
+// Dispatch response - returned by controller.dispatch()
+type DispatchResponse = {
+    error?: unknown
+    data?: unknown
+    effects?: RecordMutationEvent[]
+    sideEffects?: { [k: string]: { result?: unknown, error?: unknown } }
+    context?: { [k: string]: unknown }
+}
+
+// Interaction event arguments (used when dispatching Interactions)
 type InteractionEventArgs = {
     user: { id: string, [key: string]: any }
     payload?: { [key: string]: any }
-    [key: string]: any
+    query?: {
+        match?: any
+        modifier?: Record<string, unknown>
+        attributeQuery?: string[]
+    }
+    activityId?: string
 }
 
 // Record mutation event
@@ -4048,7 +4289,12 @@ type ComputationResultPatch = {
 ### Complete Blog System Example
 
 ```typescript
-import { Entity, Property, Relation, Interaction, Activity, Controller } from 'interaqt'
+import {
+    Entity, Property, Relation, Controller,
+    EventSource, Count, Transform, InteractionEventEntity,
+    Action, Payload, PayloadItem, Condition, GetAction, MatchExp
+} from 'interaqt'
+import { Interaction } from 'interaqt/builtins'
 
 // 1. Define entities
 const User = Entity.create({
@@ -4059,7 +4305,7 @@ const User = Entity.create({
         Property.create({
             name: 'postCount',
             type: 'number',
-            computation: Count.create({ property: 'posts' })  // Use property name from relation
+            computation: Count.create({ property: 'posts' })
         })
     ]
 })
@@ -4072,9 +4318,27 @@ const Post = Entity.create({
         Property.create({
             name: 'likeCount',
             type: 'number',
-            computation: Count.create({ property: 'likes' })  // Use property name from relation
+            computation: Count.create({ property: 'likes' })
         })
-    ]
+    ],
+    computation: Transform.create({
+        eventDeps: {
+            PostInteraction: {
+                recordName: InteractionEventEntity.name,
+                type: 'create'
+            }
+        },
+        callback: async function(this: Controller, mutationEvent) {
+            const event = mutationEvent.record
+            if (event.interactionName === 'createPost') {
+                return {
+                    title: event.payload.postData.title,
+                    content: event.payload.postData.content
+                }
+            }
+            return null
+        }
+    })
 })
 
 // 2. Define relations
@@ -4083,7 +4347,25 @@ const UserPostRelation = Relation.create({
     sourceProperty: 'posts',
     target: Post,
     targetProperty: 'author',
-    type: '1:n'
+    type: '1:n',
+    computation: Transform.create({
+        eventDeps: {
+            PostInteraction: {
+                recordName: InteractionEventEntity.name,
+                type: 'create'
+            }
+        },
+        callback: async function(this: Controller, mutationEvent) {
+            const event = mutationEvent.record
+            if (event.interactionName === 'createPost') {
+                return {
+                    source: event.user,
+                    target: event.payload.postData
+                }
+            }
+            return null
+        }
+    })
 })
 
 const PostLikeRelation = Relation.create({
@@ -4094,7 +4376,7 @@ const PostLikeRelation = Relation.create({
     type: 'n:n'
 })
 
-// 3. Define interactions
+// 3. Define interactions (built-in EventSource type)
 const CreatePostInteraction = Interaction.create({
     name: 'createPost',
     action: Action.create({ name: 'create' }),
@@ -4128,20 +4410,25 @@ const LikePostInteraction = Interaction.create({
     })
 })
 
-// 4. Create controller and initialize system
+const GetAllPostsInteraction = Interaction.create({
+    name: 'getAllPosts',
+    action: GetAction,
+    data: Post
+})
+
+// 4. Create controller with eventSources and initialize
 const controller = new Controller({
-    system, // System implementation
-    entities: [User, Post], // Entities
-    relations: [UserPostRelation, PostLikeRelation], // Relations
-    activities: [], // Activities
-    interactions: [CreatePostInteraction, LikePostInteraction] // Interactions
+    system,
+    entities: [User, Post],
+    relations: [UserPostRelation, PostLikeRelation],
+    eventSources: [CreatePostInteraction, LikePostInteraction, GetAllPostsInteraction]
 })
 
 await controller.setup(true)
 
-// 5. Use APIs
+// 5. Use dispatch API
 // Create post
-const result = await controller.callInteraction('createPost', {
+const result = await controller.dispatch(CreatePostInteraction, {
     user: { id: 'user1' },
     payload: {
         postData: {
@@ -4152,12 +4439,21 @@ const result = await controller.callInteraction('createPost', {
 })
 
 // Like post
-await controller.callInteraction('likePost', {
+await controller.dispatch(LikePostInteraction, {
     user: { id: 'user2' },
     payload: {
-        post: { id: result.recordId }
+        post: { id: 'post1' }
     }
 })
+
+// Get all posts
+const postsResult = await controller.dispatch(GetAllPostsInteraction, {
+    user: { id: 'user1' },
+    query: {
+        attributeQuery: ['id', 'title', 'content', 'likeCount']
+    }
+})
+// postsResult.data contains the posts
 ```
 
 This API reference documentation covers all core APIs of the interaqt framework, providing complete parameter descriptions and practical usage examples. Developers can quickly get started and deeply use various framework features based on this documentation.
