@@ -22,7 +22,7 @@ import { assert, everyWithErrorAsync, someAsync } from "../../../runtime/util.js
 import { ActivityCall } from "./ActivityCall.js";
 import { Controller, InteractionContext } from "../../../runtime/Controller.js";
 import { ConditionError } from "../../../runtime/errors/index.js";
-import { InteractionEventArgs, EventQuery, EventPayload, EventUser } from "../Interaction.js";
+import type { InteractionEventArgs, EventQuery, EventPayload, EventUser } from "../Interaction.js";
 
 export type InteractionEvent  = {
     interactionName: string,
