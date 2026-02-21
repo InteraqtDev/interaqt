@@ -1,5 +1,12 @@
 
 
+## [1.1.0](https://github.com/InteraqtDev/interaqt/compare/v1.0.0...v1.1.0) (2026-02-21)
+
+
+### Features
+
+* implement interaction context and refactor activity ([1950dca](https://github.com/InteraqtDev/interaqt/commit/1950dcaf7cdb990d8f7ef9792c4c1bff67b84a1c))
+
 ## [1.0.0](https://github.com/InteraqtDev/interaqt/compare/v0.9.0...v1.0.0) (2026-02-20)
 
 
