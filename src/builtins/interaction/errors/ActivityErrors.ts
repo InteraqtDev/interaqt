@@ -1,4 +1,4 @@
-import { FrameworkError, ErrorSeverity, ErrorCategory } from '../../../runtime/errors/FrameworkError.js'
+import { FrameworkError, ErrorSeverity, ErrorCategory } from '@runtime'
 
 /**
  * Base class for all activity-related errors

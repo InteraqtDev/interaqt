@@ -1,12 +1,10 @@
 import { ActivityGroup, ActivityGroupInstance, ActivityInstance, TransferInstance } from '../Activity.js';
-import { Attributive, AttributiveInstance } from '../Attributive.js';
+import { Attributive, AttributiveInstance, Attributives } from '../Attributive.js';
 import { Gateway, GatewayInstance } from '../Gateway.js';
-import { InteractionInstance } from '../Interaction.js';
-import { assert } from "../../../runtime/util.js";
-import { System } from "../../../runtime/System.js";
-import { InteractionCall, InteractionCallResponse, EventUser, InteractionEventArgs } from "./InteractionCall.js";
+import { InteractionInstance, InteractionEventArgs, InteractionGuardError, EventUser, checkCondition as interactionCheckCondition, checkPayload as interactionCheckPayload } from '../Interaction.js';
+import { assert } from "@runtime";
 import { MatchExp } from "@storage";
-import { Controller } from "../../../runtime/Controller.js";
+import { BoolExp, ExpressionData } from "@core";
 
 
 export type Seq = {
@@ -54,6 +52,17 @@ export type InteractionStateData = {
     children?: ActivitySeqStateData[]
 }
 
+
+interface StorageAccess {
+    system: {
+        storage: {
+            create(name: string, data: any): Promise<any>
+            find(name: string, match?: any, modifier?: any, attributeQuery?: any): Promise<any[]>
+            update(name: string, match: any, data: any): Promise<any>
+        }
+    }
+    ignoreGuard: boolean
+}
 
 
 class ActivitySeqState {
@@ -174,23 +183,10 @@ class ActivityState{
 
 
 export class ActivityCall {
-    static cache = new Map<ActivityInstance, ActivityCall>()
-    static from = (activity: ActivityInstance, controller: Controller) => {
-        let graph = ActivityCall.cache.get(activity)
-        if (!graph) {
-            graph = new ActivityCall(activity, controller)
-            ActivityCall.cache.set(activity, graph)
-        }
-        return graph
-    }
     graph:Seq
     uuidToNode = new Map<string, GraphNode>()
-    uuidToInteractionCall = new Map<string, InteractionCall>()
-    interactionCallByName = new Map<string, InteractionCall>()
     rawToNode = new Map<InteractionInstance|ActivityGroupInstance|GatewayInstance, GraphNode>()
-    system: System
-    constructor(public activity: ActivityInstance, public controller: Controller) {
-        this.system = controller.system
+    constructor(public activity: ActivityInstance) {
         this.graph = this.buildGraph(activity)
     }
     buildGraph(activity: ActivityInstance, parentGroup?: ActivityGroupNode) : Seq {
@@ -201,11 +197,6 @@ export class ActivityCall {
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
             this.rawToNode.set(interaction, node)
-            const interactionCall = new InteractionCall(interaction, this.controller, this)
-            this.uuidToInteractionCall.set(interaction.uuid, interactionCall)
-            if (interaction.name!) {
-                this.interactionCallByName.set(interaction.name, interactionCall)
-            }
         }
 
         for(let gateway of activity.gateways!) {
@@ -264,10 +255,10 @@ export class ActivityCall {
     }
     private static ACTIVITY_RECORD = '_Activity_'
 
-    async create() {
+    async create(storage: StorageAccess) {
         const initialStateData = ActivityState.createInitialState(this.graph.head)
 
-        const activity = await this.system.storage.create(ActivityCall.ACTIVITY_RECORD, {
+        const activity = await storage.system.storage.create(ActivityCall.ACTIVITY_RECORD, {
             name: this.activity.name,
             uuid: this.activity.uuid,
             state: initialStateData,
@@ -281,18 +272,18 @@ export class ActivityCall {
     getNodeByUUID(uuid: string) {
         return this.uuidToNode.get(uuid)
     }
-    async getState(activityId: string) {
-        return (await this.getActivity(activityId))?.state
+    async getState(storage: StorageAccess, activityId: string) {
+        return (await this.getActivity(storage, activityId))?.state
     }
-    async getActivity(activityId: string) {
+    async getActivity(storage: StorageAccess, activityId: string) {
         const match = MatchExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
-        const results = await this.system.storage.find(ActivityCall.ACTIVITY_RECORD, match, undefined, ['*'])
+        const results = await storage.system.storage.find(ActivityCall.ACTIVITY_RECORD, match, undefined, ['*'])
         return results.map((a: any) => ({ ...a, state: a.state, refs: a.refs }))[0]
     }
-    async setActivity(activityId: string, value: any) {
+    async setActivity(storage: StorageAccess, activityId: string, value: any) {
         const match = MatchExp.atom({
             key: 'id',
             value: ['=', activityId],
@@ -302,10 +293,10 @@ export class ActivityCall {
         delete data.refs
         if (value.state) data.state = value.state
         if (value.refs) data.refs = value.refs
-        return await this.system.storage.update(ActivityCall.ACTIVITY_RECORD, match, data)
+        return await storage.system.storage.update(ActivityCall.ACTIVITY_RECORD, match, data)
     }
-    async setState(activityId: string, state: any) {
-        return this.setActivity(activityId, { state })
+    async setState(storage: StorageAccess, activityId: string, state: any) {
+        return this.setActivity(storage, activityId, { state })
     }
     isStartNode(uuid: string) {
         const node = this.uuidToNode.get(uuid) as InteractionLikeNodeBase
@@ -324,53 +315,65 @@ export class ActivityCall {
         }
     }
 
-    async callInteraction(inputActivityId: string|undefined, uuid: string, interactionEventArgs: InteractionEventArgs) : Promise<InteractionCallResponse>{
-        const interactionCall = this.uuidToInteractionCall.get(uuid)!
-
-        let activityId = inputActivityId
-
-        if (this.isActivityHead(interactionCall.interaction) ) {
-            if ( !activityId){
-                const error = await interactionCall.check(interactionEventArgs, inputActivityId, this.checkUserRef)
-                if (error) return { error }
-
-                activityId = (await this.create()).activityId
-            }
-        } else {
-            if(!inputActivityId) return { error: 'activityId must be provided for non-head interaction of an activity'}
-        }
-
-        const state = new ActivityState(await this.getState(activityId!), this)
-        if(!state.isInteractionAvailable(uuid)) return { error: `interaction ${uuid} not available`}
-
-        const result = await interactionCall.call(interactionEventArgs, activityId!, this.checkUserRef)
-        if (result.error) {
-            return result
-        }
-
-        await this.saveUserRefs(activityId!, interactionCall, interactionEventArgs)
-
-        const stateCompleteResult = state.completeInteraction(uuid)
-        assert(stateCompleteResult, 'change activity state failed')
-        const nextState = state.toJSON()
-        await this.setActivity( activityId!, {'state':nextState})
-
-
-        return {
-            ...result,
-            context: {
-                activityId,
-                nextState
-            }
+    async checkActivityState(storage: StorageAccess, activityId: string, interactionUuid: string) {
+        const state = new ActivityState(await this.getState(storage, activityId), this)
+        if (!state.isInteractionAvailable(interactionUuid)) {
+            throw new Error(`interaction ${interactionUuid} not available`)
         }
     }
-    async saveUserRefs(activityId: string, interactionCall: InteractionCall, interactionEventArgs: InteractionEventArgs) {
-        const refs = (await this.getActivity(activityId))?.refs! || {}
-        if (interactionCall.interaction.userRef?.name) {
-            refs[interactionCall.interaction.userRef?.name] = interactionEventArgs.user.id
+
+    async fullGuardWithUserRef(controller: StorageAccess, interaction: InteractionInstance, args: InteractionEventArgs) {
+        if (!controller.ignoreGuard && interaction.conditions) {
+            await interactionCheckCondition(controller, interaction, args)
         }
 
-        interactionCall.interaction.payload?.items!.forEach((payloadDef) => {
+        if (interaction.userAttributives) {
+            const userAttributiveCombined =
+                Attributives.is(interaction.userAttributives) ?
+                    BoolExp.fromValue<AttributiveInstance>(
+                        interaction.userAttributives!.content! as ExpressionData<AttributiveInstance>
+                    ) :
+                    BoolExp.atom<AttributiveInstance>(
+                        interaction.userAttributives as AttributiveInstance
+                    )
+
+            const checkHandle = (attributive: AttributiveInstance) => {
+                if (attributive.isRef) {
+                    return this.checkUserRef(controller, attributive, args.user, args.activityId!)
+                } else {
+                    return checkAttributiveContent(controller, attributive, args, args.user)
+                }
+            }
+            const result = await userAttributiveCombined.evaluateAsync(checkHandle)
+            if (result !== true) {
+                throw new InteractionGuardError('User check failed', {
+                    type: 'check user failed',
+                    checkType: 'user',
+                    error: result,
+                })
+            }
+        }
+
+        if (interaction.payload) {
+            await interactionCheckPayload(controller, interaction, args)
+        }
+    }
+
+    async completeInteractionState(storage: StorageAccess, activityId: string, interactionUuid: string) {
+        const state = new ActivityState(await this.getState(storage, activityId), this)
+        const stateCompleteResult = state.completeInteraction(interactionUuid)
+        assert(stateCompleteResult, 'change activity state failed')
+        const nextState = state.toJSON()
+        await this.setActivity(storage, activityId, { 'state': nextState })
+    }
+
+    async saveUserRefs(storage: StorageAccess, activityId: string, interaction: InteractionInstance, interactionEventArgs: InteractionEventArgs) {
+        const refs = (await this.getActivity(storage, activityId))?.refs! || {}
+        if (interaction.userRef?.name) {
+            refs[interaction.userRef?.name] = interactionEventArgs.user.id
+        }
+
+        interaction.payload?.items!.forEach((payloadDef) => {
             if (Attributive.is(payloadDef.itemRef) && payloadDef.itemRef?.name && interactionEventArgs.payload![payloadDef.name!]) {
                 const payloadItem = interactionEventArgs.payload![payloadDef.name!]
                 if (payloadDef.isCollection) {
@@ -383,14 +386,29 @@ export class ActivityCall {
             }
         })
 
-        await this.setActivity( activityId, {refs})
+        await this.setActivity(storage, activityId, {refs})
     }
 
-    checkUserRef = async (attributive: AttributiveInstance, eventUser: EventUser, activityId: string): Promise<boolean> => {
+    checkUserRef = async (storage: StorageAccess, attributive: AttributiveInstance, eventUser: EventUser, activityId: string): Promise<boolean> => {
         assert(attributive.isRef, 'attributive must be ref')
-        const refs = (await this.getActivity(activityId))?.refs
+        const refs = (await this.getActivity(storage, activityId))?.refs
         return refs[attributive.name!] === eventUser.id
     }
+}
+
+
+async function checkAttributiveContent(controller: StorageAccess, attributive: AttributiveInstance, eventArgs: InteractionEventArgs, target: any): Promise<boolean> {
+    if ((attributive as any).content) {
+        let result
+        try {
+            result = await (attributive as any).content.call(controller, target, eventArgs)
+        } catch (_e) {
+            result = false
+        }
+        if (result === undefined) return true
+        return result
+    }
+    return true
 }
 
 

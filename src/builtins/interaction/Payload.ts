@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
+import { IInstance, SerializedData, generateUUID } from '@core';
 import { PayloadItemInstance } from './PayloadItem.js';
 
 export interface PayloadInstance extends IInstance {

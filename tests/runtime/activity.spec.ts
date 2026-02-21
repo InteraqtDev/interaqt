@@ -1,30 +1,28 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import {
-    KlassByName, Controller, EntityIdRef, RecordMutationEvent,
+    KlassByName, Controller, EntityIdRef,
     ActivityCall, ActivityManager, MonoSystem,
-    RelationInstance
+    RelationInstance, EventSourceInstance
 } from 'interaqt';
 import { SQLiteDB } from '@drivers';
 import { createData } from './data/activity/index.js';
 
 describe("activity state", () => {
     let createFriendRelationActivityCall: ActivityCall
-    let activityManager: ActivityManager
     let system: MonoSystem
 
-    let sendRequestName:string = 'sendRequest'
-    let approveName:string = 'approve'
-    let rejectName:string = 'reject'
-    let cancelName:string = 'cancel'
     let activityName:string = 'createFriendRelation'
 
     let userA!: EntityIdRef
     let userB!: EntityIdRef
 
-    let relationCreateEvent: RecordMutationEvent|undefined
-    let relationDeleteEvent: RecordMutationEvent|undefined
     let controller!: Controller
     let friendRelation!: RelationInstance
+
+    let sendRequestES!: EventSourceInstance
+    let approveES!: EventSourceInstance
+    let rejectES!: EventSourceInstance
+    let cancelES!: EventSourceInstance
 
     beforeEach(async () => {
         const { entities, relations, interactions, dicts, activities }  = createData()
@@ -34,95 +32,90 @@ describe("activity state", () => {
 
         friendRelation = relations.find(r => r.name === 'User_friends_friends_User')!
 
+        const activityManager = new ActivityManager(activities)
+        const activityOutput = activityManager.getOutput()
+
         controller = new Controller({
             system,
-            entities,
-            relations,
-            eventSources: [...interactions],
+            entities: [...entities, ...activityOutput.entities],
+            relations: [...relations, ...activityOutput.relations],
+            eventSources: [...interactions, ...activityOutput.eventSources],
             dict: dicts
         })
-        activityManager = new ActivityManager(controller, activities, interactions);
-        controller.eventSources.push(...activityManager.getActivityEventSources())
         await controller.setup(true)
 
-        const mainActivity = activities.find(a => a.name === 'createFriendRelation')!
-        createFriendRelationActivityCall = new ActivityCall(mainActivity, controller)
+        createFriendRelationActivityCall = activityManager.getActivityCallByName('createFriendRelation')!
+
+        sendRequestES = controller.findEventSourceByName(`${activityName}:sendRequest`)!
+        approveES = controller.findEventSourceByName(`${activityName}:approve`)!
+        rejectES = controller.findEventSourceByName(`${activityName}:reject`)!
+        cancelES = controller.findEventSourceByName(`${activityName}:cancel`)!
 
         userA = await controller.system.storage.create('User', { roles: ['user']})
         userB = await controller.system.storage.create('User', { roles: ['user']})
     })
 
-    test("call friend request activity with approve response - needs fix for Activity integration", async () => {
-        // 1. 创建 activity
-        // const { activityId, state } = await  createFriendRelationActivityCall.create()
-        // expect(activityId).not.toBe(null)
-        // expect(state.current!.uuid).toBe(sendRequestName)
+    test("call friend request activity with approve response via dispatch", async () => {
         let activityId: string | undefined
 
-        // 2. 交互顺序错误 approve
-        const res1 = await activityManager.callActivityInteraction(activityName, approveName, activityId!, {user: userA})
+        // 1. approve without activityId - should fail (non-head interaction needs activityId)
+        const res1 = await controller.dispatch(approveES, {user: userA})
         expect(res1.error).toBeDefined()
 
-        // 3. sendFriendRequest payload 错误
-        // FIXME 由于现在 user 是 globalRole，并没有验证传入的东西是不是 user
-        // const res11 = await createFriendRelationActivityCall.callInteraction(activityId, sendRequestName, {user: userA, payload: {to: { wrongThing:true }}})
-        // expect(res11.error).toBeDefined()
-
-        // 3. a 发起 sendFriendRequest
-        const res2 = await activityManager.callActivityInteraction(activityName, sendRequestName, activityId!, {user: userA, payload: {to: userB}})
+        // 2. a sends friend request (head interaction, no activityId needed)
+        const res2 = await controller.dispatch(sendRequestES, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
         activityId = res2.context!.activityId as string
 
-
-        // 4. 交互顺序错误 a sendFriendRequest
-        const res3 =await  activityManager.callActivityInteraction(activityName, sendRequestName, activityId, {user: userA})
+        // 3. sendRequest again with same activityId - should fail (interaction not available)
+        const res3 = await controller.dispatch(sendRequestES, {user: userA, activityId})
         expect(res3.error).toBeDefined()
 
-        // 5. 角色错误 a approve
-        const res4 = await activityManager.callActivityInteraction(activityName, approveName, activityId, {user: userA})
+        // 4. wrong user: a tries to approve - should fail (userRef check)
+        const res4 = await controller.dispatch(approveES, {user: userA, activityId})
         expect(res4.error).toBeDefined()
-        // 6. 正确 b approve
-        const res5 = await activityManager.callActivityInteraction(activityName, approveName, activityId, {user: userB})
-        // 查询关系是否正确建立
+
+        // 5. correct user: b approves
+        const res5 = await controller.dispatch(approveES, {user: userB, activityId})
+        expect(res5.error).toBeUndefined()
+
+        // verify friend relation was created
         const relations = await controller.system.storage.findRelationByName(friendRelation.name!, undefined, undefined, ['*', ['source', {attributeQuery: ['*']}], ['target', {attributeQuery: ['*']}]])
         expect(relations.length).toBe(1)
         expect(relations[0].source.id).toBe(userA.id)
         expect(relations[0].target.id).toBe(userB.id)
 
-        expect(res5.error).toBeUndefined()
-
-        // 7. 错误 b reject
-        const res6 = await activityManager.callActivityInteraction(activityName, rejectName, activityId, {user: userB})
+        // 6. reject after approve - should fail (activity completed)
+        const res6 = await controller.dispatch(rejectES, {user: userB, activityId})
         expect(res6.error).toBeDefined()
 
-        // 8. 错误 a cancel
-        const res7 = await activityManager.callActivityInteraction(activityName, cancelName, activityId, {user: userA})
+        // 7. cancel after approve - should fail (activity completed)
+        const res7 = await controller.dispatch(cancelES, {user: userA, activityId})
         expect(res7.error).toBeDefined()
-        // 8. 获取 activity 状态是否 complete
-        const currentState = await createFriendRelationActivityCall.getState(activityId!)
+
+        // 8. verify activity state is complete
+        const currentState = await createFriendRelationActivityCall.getState(controller, activityId!)
         expect(currentState.current).toBeUndefined()
     })
 
 
 
-    test("call friend request activity with cancel response", async () => {
-        // 1. 创建 activity
-        const { activityId} = await createFriendRelationActivityCall.create()
-
-        // 3. a 发起 sendFriendRequest
-        const res2 = await activityManager.callActivityInteraction(activityName, sendRequestName, activityId, {user: userA, payload: {to: userB}})
+    test("call friend request activity with cancel response via dispatch", async () => {
+        // 1. a sends friend request (head interaction creates activity)
+        const res2 = await controller.dispatch(sendRequestES, {user: userA, payload: {to: userB}})
         expect(res2.error).toBeUndefined()
+        const activityId = res2.context!.activityId as string
 
-        // 6. 正确 a cancel
-        const res5 = await activityManager.callActivityInteraction(activityName, cancelName, activityId, {user: userA})
+        // 2. a cancels
+        const res5 = await controller.dispatch(cancelES, {user: userA, activityId})
         expect(res5.error).toBeUndefined()
 
-        // 7. 错误 b reject
-        const res6 = await activityManager.callActivityInteraction(activityName, rejectName, activityId, {user: userB})
+        // 3. b tries to reject after cancel - should fail
+        const res6 = await controller.dispatch(rejectES, {user: userB, activityId})
         expect(res6.error).toBeDefined()
 
-        // 8. 获取 activity 状态是否 complete
-        const currentState = await createFriendRelationActivityCall.getState(activityId)
+        // 4. verify activity state is complete
+        const currentState = await createFriendRelationActivityCall.getState(controller, activityId)
         expect(currentState.current).toBeUndefined()
     })
 

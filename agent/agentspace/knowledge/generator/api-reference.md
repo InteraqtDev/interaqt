@@ -3340,7 +3340,7 @@ async dispatch<TArgs, TResult>(
 
 **Parameters**
 - `eventSource` (EventSourceInstance, required): The event source instance to dispatch (object reference, not a name string)
-- `args` (TArgs, required): Event-specific arguments. For Interactions, this is `InteractionEventArgs` containing `user`, `payload`, and optional `query`.
+- `args` (TArgs, required): Event-specific arguments. For Interactions, this is `InteractionEventArgs` containing `user`, `payload`, `context`, and optional `query`.
 
 **Note about ignoreGuard**: When `controller.ignoreGuard` is set to `true`, dispatch will bypass all guard checks (conditions, user validation, payload validation) defined in the event source.
 
@@ -3384,7 +3384,9 @@ type DispatchResponse = {
 ```typescript
 const result = await controller.dispatch(CreatePostInteraction, {
     user: { id: 'user1' },
-    payload: { postData: { title: 'Hello', content: 'World' } }
+    payload: { postData: { title: 'Hello', content: 'World' } },
+    // Optional context (e.g. for agent tools)
+    context: { source: 'agent', tool: 'create_post', timestamp: Date.now() }
 })
 
 // Check for errors
@@ -4233,6 +4235,7 @@ type InteractionEventArgs = {
         modifier?: Record<string, unknown>
         attributeQuery?: string[]
     }
+    context?: Record<string, any>
     activityId?: string
 }
 

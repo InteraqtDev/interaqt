@@ -15,7 +15,6 @@ export * from './Activity.js'
 
 // Activity runtime
 export * from './activity/ActivityCall.js'
-export * from './activity/InteractionCall.js'
 export * from './activity/ActivityManager.js'
 
 // Errors

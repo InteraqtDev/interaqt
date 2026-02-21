@@ -1,5 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
-import { stringifyAttribute } from '../../core/utils.js';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute } from '@core';
 
 // DataAttributive
 export interface DataAttributiveInstance extends IInstance {

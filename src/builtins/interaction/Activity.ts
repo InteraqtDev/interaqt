@@ -1,5 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
-import { stringifyAttribute } from '../../core/utils.js';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute } from '@core';
 import { InteractionInstance } from './Interaction.js';
 import { GatewayInstance } from './Gateway.js';
 import { EventInstance } from './Event.js';

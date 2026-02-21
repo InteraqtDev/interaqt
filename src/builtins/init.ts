@@ -1,4 +1,4 @@
-import { registerKlass } from '../core/utils.js';
+import { registerKlass } from '@core';
 import { Interaction } from './interaction/Interaction.js';
 import { Activity } from './interaction/Activity.js';
 import { Attributive } from './interaction/Attributive.js';

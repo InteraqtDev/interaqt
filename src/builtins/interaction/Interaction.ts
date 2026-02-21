@@ -1,15 +1,14 @@
-import { IInstance, SerializedData, generateUUID, Concept, ConceptAlias, ConceptInstance, DerivedConcept } from '../../core/interfaces.js';
+import {
+    IInstance, SerializedData, generateUUID, Concept, ConceptAlias, ConceptInstance, DerivedConcept,
+    EntityInstance, Entity, RelationInstance, Relation, Property,
+    BoolExp, ExpressionData, BoolExpressionRawData, EventSourceInstance
+} from '@core';
 import { ActionInstance, GetAction } from './Action.js';
 import { ConditionInstance } from './Condition.js';
 import { ConditionsInstance, Conditions } from './Conditions.js';
 import { AttributiveInstance, AttributivesInstance, Attributive, Attributives } from './Attributive.js';
 import { PayloadInstance } from './Payload.js';
-import { EntityInstance, Entity } from '../../core/Entity.js';
-import { RelationInstance, Relation } from '../../core/Relation.js';
 import { DataPolicyInstance } from './Data.js';
-import { EventSourceInstance } from '../../core/EventSource.js';
-import { Property } from '../../core/Property.js';
-import { BoolExp, ExpressionData, BoolExpressionRawData } from '../../core/BoolExp.js';
 
 export interface InteractionInstance extends EventSourceInstance<InteractionEventArgs> {
   conditions?: ConditionsInstance | ConditionInstance;
@@ -26,6 +25,7 @@ export type InteractionEventArgs = {
   query?: EventQuery,
   payload?: EventPayload,
   activityId?: string,
+  context?: Record<string, any>,
 }
 
 export type EventQuery = {
@@ -53,6 +53,7 @@ export const InteractionEventEntity = Entity.create({
     Property.create({ name: 'payload', type: 'object', collection: false }),
     Property.create({ name: 'user', type: 'object', collection: false }),
     Property.create({ name: 'query', type: 'object', collection: false }),
+    Property.create({ name: 'context', type: 'object', collection: false }),
   ]
 })
 
@@ -245,6 +246,7 @@ function buildInteractionMapEventData(interaction: InteractionInstance): (args: 
     user: args.user,
     query: args.query || {},
     payload: args.payload || {},
+    context: args.context || {},
   });
 }
 
@@ -254,7 +256,7 @@ function buildInteractionResolve(interaction: InteractionInstance): (this: any, 
   };
 }
 
-async function checkCondition(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+export async function checkCondition(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (!interaction.conditions) return;
 
   const conditions = Conditions.is(interaction.conditions)
@@ -322,7 +324,7 @@ async function checkUser(controller: any, interaction: InteractionInstance, even
   }
 }
 
-async function checkPayload(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+export async function checkPayload(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   const payload = eventArgs.payload || {};
   const payloadDefs = interaction.payload?.items || [];
 

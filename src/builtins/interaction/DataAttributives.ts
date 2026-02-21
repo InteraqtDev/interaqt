@@ -1,6 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
-import { stringifyAttribute } from '../../core/utils.js';
-import { BoolAtomDataInstance, BoolExpressionDataInstance } from '../../core/BoolExp.js';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, BoolAtomDataInstance, BoolExpressionDataInstance } from '@core';
 
 export interface DataAttributivesInstance extends IInstance {
   content?: BoolExpressionDataInstance | BoolAtomDataInstance;

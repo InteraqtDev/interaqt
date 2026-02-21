@@ -1,6 +1,5 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
+import { IInstance, SerializedData, generateUUID, EntityInstance } from '@core';
 import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
-import { EntityInstance } from '../../core/Entity.js';
 
 export interface PayloadItemInstance extends IInstance {
   name: string;

@@ -65,4 +65,25 @@ EventSource.create 中的 `record` 参数改成 entity 更合适。record 指的
 2. 你要同时修改 tests 下的受影响测试用例。最后确保 `npm run test:runtime` 全部通过才说明重构成功。
 
 ## Task 8 更新文档
-我们已经完全完成了重构任务，接下来你来根据更新的内容，更新 `agent/agentspace/knowledge/generator/api-reference.md`。特别注意，我们已经删掉所有的 deprecated 的 api 等概念，在文档中也应该直接删除，完全不要再提到。
+我们已经完全完成了重构任务，接下来你来根据更新的内容，更新 `agent/agentspace/knowledge/generator/api-reference.md`。特别注意，我们已经删掉所有的 deprecated 的
+
+## Task 9 路径分析
+我们的 interaction 应该已经使用新的 dispatch 来执行了，你深入分析代码，看看整个调用链路是否都已经清理干净。我似乎仍然看到了新旧两个调用链路共存的情况。
+
+### 追加任务1
+根据`agentspace/output/dispatch-call-chain-analysis.md` 的分析：
+1. 完全清理掉旧的调用链路。我们的程序只有 Controller.dispatch 作为入口。ActivityManager 不会暴露出去作为入口。
+2. 按照新的链路修改测试用例。
+3. 最终确保 `npm run test:runtime` 全部通过才说明成功。
+最终确保我们全部使用新的调用链路。
+
+## Task 10 增加 Interaction Context 
+用户的 interaction 可能不是通过前端的 api 调用的，而是 agent 通过 tool 调用的。也可能是其他定时任务之类的效果用。在 Interaction event entity 中应该增加 context，来记录更多的上下文。
+你先深入分析整个项目，将需要修改的部分写成文档。
+
+### 追加任务1
+深刻理解当前任务，根据 `agentspace/output/interaction-context-design.md` 设计来执行。
+执行完之后，在 tests/runtime 下新增一个测试用例用来验证。
+最后要求：
+1. 使用 `npm run test:runtime` 确保所有测试用例都通过。
+2. 代码没有任何类型错误。并且能 npm build 编译通过。

@@ -1,6 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
-import { stringifyAttribute } from '../../core/utils.js';
-import { BoolAtomDataInstance, BoolExpressionDataInstance } from '../../core/BoolExp.js';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, BoolAtomDataInstance, BoolExpressionDataInstance } from '@core';
 
 // Attributive
 export interface AttributiveInstance extends IInstance {
@@ -201,7 +199,7 @@ export class Attributives implements AttributivesInstance {
 }
 
 // 兼容性函数
-import { BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from '../../core/BoolExp.js';
+import { BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from '@core';
 
 function toAttributives(obj?: BoolExp<AttributiveInstance>): BoolAtomData | BoolExpressionData | undefined {
   if (!obj) return undefined;

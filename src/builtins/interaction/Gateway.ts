@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
+import { IInstance, SerializedData, generateUUID } from '@core';
 
 // Gateway 实例接口
 export interface GatewayInstance extends IInstance {

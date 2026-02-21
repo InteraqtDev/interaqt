@@ -1,8 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '../../core/interfaces.js';
-import { stringifyAttribute } from '../../core/utils.js';
-
-// 兼容性函数
-import { BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from '../../core/BoolExp.js';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from '@core';
 import { Conditions } from './Conditions.js';
 
 export interface ConditionInstance extends IInstance {

@@ -35,5 +35,5 @@ export * from "./SideEffect.js";
 export * from "./EventSource.js";
 
 // Core type aliases
-export type { ComputationRecord } from "./types.js";
+export type { ComputationRecord, UserRoleType } from "./types.js";
 
