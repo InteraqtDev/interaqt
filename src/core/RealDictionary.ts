@@ -63,9 +63,6 @@ export class Dictionary implements DictionaryInstance {
       constraints: {
         format: ({name}: { name: string }) => {
           return validNameFormatExp.test(name);
-        },
-        length: ({name}: { name: string }) => {
-          return name.length > 1 && name.length < 5;
         }
       }
     },

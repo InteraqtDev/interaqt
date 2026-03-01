@@ -223,7 +223,7 @@ export class Controller {
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {
                 if (dataContext.type === 'global') {
-                    return this.system.storage.dict.set(dataContext.id.name, patch)
+                    await this.system.storage.dict.set(dataContext.id.name, patch)
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
                 if (patch.type === 'insert') {  
