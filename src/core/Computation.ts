@@ -22,12 +22,5 @@ export type PropertyDataDep = {
 }
 
 
-// 现在没用
-export type DictionaryDataDep = {
-    type: 'dict',
-    source: DictionaryInstance
-    keys: string[]
-}
-
-export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep|DictionaryDataDep
+export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep
 

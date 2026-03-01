@@ -36,15 +36,6 @@ export type {
 };
 
 /**
- * Base interface for all instances
- */
-export interface IInstance {
-  __type: string;
-  __uuid: string;
-  __isClass?: boolean;
-}
-
-/**
  * Union type of all computation instances
  */
 export type ComputationInstance = 
@@ -90,29 +81,6 @@ export interface UserRoleType {
 }
 
 /**
- * Class constructor type
- */
-export interface ClassConstructor<T extends IInstance> {
-  instances: T[];
-  instanceType: T;
-  is(obj: unknown): obj is T;
-  check(data: unknown): boolean;
-  public?: Record<string, unknown>;
-}
-
-/**
  * Data dependencies type
  */
 export type DataDependencies = Record<string, unknown>;
-
-/**
- * Property reference in entity/relation
- */
-export interface PropertyReference {
-  name: string;
-  type?: string;
-  collection?: boolean;
-  required?: boolean;
-  defaultValue?: () => unknown;
-  [key: string]: unknown;
-} 

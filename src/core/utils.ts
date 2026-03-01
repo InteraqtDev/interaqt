@@ -73,12 +73,6 @@ export function clearAllInstances(...klasses: Array<{ instances: IInstance[] }>)
   }
 }
 
-// 向后兼容性支持：提供一个空的 removeAllInstance 函数
-// 在重构后的代码中，我们不再使用全局实例管理，所以这个函数不做任何事情
-export function removeAllInstance() {
-  // No-op: 在重构后的版本中，实例管理是局部的，不需要全局清理
-}
-
 // KlassByName 兼容层
 // 全局的类注册表
 export const KlassByName = new Map<string, any>();
@@ -126,9 +120,3 @@ export function createInstances(objects: any[]) {
   
   return uuidToInstance;
 }
-
-// 导出 createClass 作为空操作
-export function createClass(meta: any): any {
-  console.warn('createClass is deprecated in refactored code');
-  return null;
-} 

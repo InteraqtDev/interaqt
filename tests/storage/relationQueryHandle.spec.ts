@@ -2,7 +2,7 @@ import {afterEach, beforeEach, describe, expect, test} from "vitest";
 import {createCommonData} from "./data/common";
 import {DBSetup,EntityToTableMap,MatchExp,EntityQueryHandle} from "@storage";
 import {SQLiteDB} from '@drivers';
-import {removeAllInstance} from '@core'
+
 import TestLogger from "./testLogger.js";
 
 
@@ -13,7 +13,6 @@ describe('find relation', () => {
     let logger
 
     beforeEach(async () => {
-        removeAllInstance()
         const { entities, relations } = createCommonData()
         logger = new TestLogger('', true)
 

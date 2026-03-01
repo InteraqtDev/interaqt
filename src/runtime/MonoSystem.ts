@@ -14,7 +14,7 @@ import {
     DictionaryEntity
 } from "./System.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
-import { createClass, Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
+import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
 import {
     DBSetup,
     EntityQueryHandle,
@@ -236,7 +236,7 @@ export const dbConsoleLogger = new DBConsoleLogger()
 export const systemConsoleLogger = new SystemConsoleLogger()
 
 export class MonoSystem implements System {
-    conceptClass: Map<string, ReturnType<typeof createClass>> = new Map()
+    conceptClass: Map<string, any> = new Map()
     storage: Storage
     constructor(db: Database, public logger: SystemLogger = systemConsoleLogger) {
         this.storage = new MonoStorage(db)

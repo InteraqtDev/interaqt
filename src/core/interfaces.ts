@@ -30,41 +30,6 @@ export interface SerializedData<T> {
   public: T;
 }
 
-// 基础类实现的抽象类
-export abstract class BaseKlass<TInstance extends IInstance, TCreateArgs> {
-  static isKlass = true as const;
-  static instances: IInstance[] = [];
-  
-  // 子类需要实现的抽象属性
-  static displayName: string;
-  static public: Record<string, unknown>;
-  
-  // 通用的 create 方法实现
-  static createBase<T extends IInstance>(
-    instance: T,
-    instances: T[]
-  ): T {
-    // 检查 uuid 是否重复
-    const existing = instances.find(i => i.uuid === instance.uuid);
-    if (existing) {
-      throw new Error(`duplicate uuid in options ${instance.uuid}, ${instance._type}`);
-    }
-    
-    instances.push(instance);
-    return instance;
-  }
-  
-  // 通用的 is 方法实现
-  static isBase<T extends IInstance>(obj: unknown, typeName: string): obj is T {
-    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === typeName;
-  }
-  
-  // 通用的 check 方法实现
-  static checkBase(data: unknown): boolean {
-    return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
-  }
-}
-
 // 生成静态累加 ID 的辅助函数
 let globalIdCounter = 0;
 export function generateUUID(options?: { uuid?: string }): string {

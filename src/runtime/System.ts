@@ -1,4 +1,4 @@
-import { createClass, Entity, Property } from "@core";
+import { Entity, Property } from "@core";
 import { GlobalBoundState } from "./computations/Computation.js";
 import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
@@ -70,7 +70,7 @@ export type SystemLogType = {
 export type ComputationState = {dataContext: DataContext, state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}}
 
 export interface System {
-    conceptClass: Map<string, ReturnType<typeof createClass>>
+    conceptClass: Map<string, any>
     storage: Storage
     logger: SystemLogger
     setup: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], install?: boolean) => Promise<any>

@@ -144,15 +144,7 @@ export type PropertyDataDep = {
 }
 
 
-// 现在没用
-export type DictionaryDataDep = {
-    type: 'dict',
-    source: DictionaryInstance
-    keys: string[]
-    phase?: ComputationPhase
-}
-
-export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep|DictionaryDataDep
+export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep
 
 
 

@@ -7,7 +7,6 @@ import {
     BoolExp,
     Interaction,
     KlassByName,
-    removeAllInstance,
     Action,
     Condition,
     Conditions,
@@ -20,7 +19,6 @@ describe('condition checks', () => {
     let controller: Controller
 
     beforeEach(async () => {
-        removeAllInstance()
         system = new MonoSystem(new SQLiteDB())
         system.conceptClass = KlassByName
     })

@@ -9,7 +9,6 @@ import {
     GetAction,
     Action,
     Attributive, DataPolicy,
-    removeAllInstance,
     MatchExp,
     Condition,
     Conditions,
@@ -21,7 +20,6 @@ describe('Get Data Interaction', () => {
     let controller: Controller
 
     beforeEach(async () => {
-        removeAllInstance()
         system = new MonoSystem(new PGLiteDB())
     })
 
