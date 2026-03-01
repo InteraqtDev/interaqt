@@ -104,7 +104,7 @@ export class RealTime implements RealTimeInstance {
   }
   
     static is(obj: unknown): obj is RealTimeInstance {
-    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'RealTime';
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'RealTimeValue';
   }
   
     static check(data: unknown): boolean {
