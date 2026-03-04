@@ -1,0 +1,69 @@
+---
+description: TypeScript source code conventions for interaqt
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+# TypeScript Source Conventions
+
+## Module System
+- ESM only (`"type": "module"` in package.json)
+- Always use `.js` extension in relative imports: `import { X } from './Entity.js'`
+- Use `import type` for type-only imports: `import type { ComputationInstance } from './types.js'`
+- Path aliases for cross-package imports: `@core`, `@runtime`, `@storage`, `@drivers`
+
+## Klass Factory Pattern
+All domain concepts follow this pattern:
+
+```typescript
+export interface FooInstance extends IInstance {
+  name: string;
+  // ...fields
+}
+
+export interface FooCreateArgs {
+  name: string;
+  // ...fields (without uuid, _type)
+}
+
+export class Foo implements FooInstance {
+  public uuid: string;
+  public _type = 'Foo';
+  public _options?: { uuid?: string };
+  // ...fields
+
+  constructor(args: FooCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = generateUUID(options);
+    // ...assign fields
+  }
+
+  static isKlass = true as const;
+  static displayName = 'Foo';
+  static instances: FooInstance[] = [];
+  static create(args: FooCreateArgs, options?: { uuid?: string }): FooInstance { /* ... */ }
+}
+```
+
+## Export Conventions
+- Named exports only — no default exports
+- Barrel re-exports via `index.ts`: `export * from './Entity.js'`
+- Main entry `src/index.ts` re-exports all sub-packages
+
+## Error Handling
+- Use `FrameworkError` (from `src/runtime/errors/`) as base for framework errors
+- Specialized errors: `ComputationError`, `SideEffectError`, `ConditionError`, etc.
+- Simple validation: `throw new Error('message')` with descriptive message
+- Use `assert(condition, message)` from `src/runtime/util.js` for invariants
+
+## Naming Conventions
+- Entity/Relation names: PascalCase, must match `/^[a-zA-Z0-9_]+$/`
+- Instance types: `*Instance` suffix (e.g., `EntityInstance`)
+- Create args: `*CreateArgs` suffix (e.g., `EntityCreateArgs`)
+- Constants: UPPER_SNAKE_CASE (e.g., `USER_ENTITY`, `HARD_DELETION_PROPERTY_NAME`)
+
+## TypeScript Config
+- Strict mode enabled
+- Target: ESNext
+- `experimentalDecorators: true`
+- `useDefineForClassFields: false`

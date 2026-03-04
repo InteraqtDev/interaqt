@@ -1,0 +1,82 @@
+---
+description: Testing conventions and patterns for interaqt
+globs: tests/**/*.spec.ts
+alwaysApply: false
+---
+
+# Testing Conventions
+
+## Framework & Commands
+- Vitest: `describe`, `test`, `expect`, `beforeEach`, `afterEach`
+- File naming: `*.spec.ts` (not `.test.ts`)
+- Run all: `npm test` | By layer: `npm run test:runtime`, `test:storage`, `test:core`
+
+## Test Structure
+
+```typescript
+import { describe, expect, test } from "vitest";
+import { Entity, Property, Relation } from 'interaqt';
+import { Controller, MonoSystem, Interaction, ... } from 'interaqt';
+import { PGLiteDB } from '@drivers';   // or SQLiteDB
+
+describe('Feature Name', () => {
+  test('should do something specific', async () => {
+    // 1. Define entities, relations, interactions
+    const MyEntity = Entity.create({ name: 'MyEntity', properties: [...] });
+
+    // 2. Create system and controller
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [MyEntity],
+      relations: [],
+      eventSources: [myInteraction],
+    });
+    await controller.setup(true); // true = install/create tables
+
+    // 3. Dispatch interactions and assert
+    const result = await controller.dispatch(myInteraction, { user, payload });
+    expect(result.error).toBeUndefined();
+
+    // 4. Verify storage state
+    const records = await system.storage.find('MyEntity', undefined, undefined, ['*']);
+    expect(records).toHaveLength(1);
+
+    // 5. Cleanup
+    await system.storage.close();
+  });
+});
+```
+
+## Key Rules
+- **Test through dispatch**, not direct storage mutations — validates the full pipeline
+- **Always specify attributeQuery** in `storage.find`/`findOne` — use `['*']` for all fields
+- **Clear instances** between tests in core tests: `clearAllInstances(Property, Entity, Relation)`
+- **Close DB** in cleanup: `await system.storage.close()` or `await db.close()`
+- **PGLiteDB** preferred for tests (in-memory, no external service needed)
+
+## Storage Query Patterns in Tests
+
+```typescript
+// Find with match expression
+const record = await system.storage.findOne(
+  'EntityName',
+  MatchExp.atom({ key: 'id', value: ['=', someId] }),
+  undefined,
+  ['*']
+);
+
+// Find with BoolExp
+await system.storage.find('EntityName',
+  BoolExp.atom({ key: 'status', value: ['=', 'active'] }),
+  undefined,
+  ['id', 'name', 'status']
+);
+```
+
+## Common Pitfalls
+- Don't manually set entity IDs — UUIDs are auto-generated
+- Transform creates new records, doesn't update existing ones — use StateMachine for updates
+- Always `await controller.setup(true)` before dispatching
+- Test data fixtures live in `tests/runtime/data/` and `tests/storage/data/`

@@ -1,0 +1,68 @@
+---
+description: Storage layer patterns for interaqt
+globs: src/storage/**/*.ts, tests/storage/**/*.spec.ts
+alwaysApply: false
+---
+
+# Storage Layer Patterns
+
+## Storage API
+
+```typescript
+// Find records
+storage.find(entityName, matchExp?, modifier?, attributeQuery?): Promise<any[]>
+storage.findOne(entityName, matchExp?, modifier?, attributeQuery?): Promise<any>
+
+// Mutate records
+storage.create(entityName, rawData, events?): Promise<any>
+storage.update(entityName, matchExp, rawData, events?): Promise<any>
+storage.delete(entityName, matchExp, events?): Promise<any>
+```
+
+## AttributeQuery — Always Required for find/findOne
+Specifies which fields to return. Never omit this parameter.
+
+```typescript
+['*']                           // all fields
+['id', 'name', 'status']       // specific fields
+['id', 'name',
+  ['target', {                  // nested relation traversal
+    attributeQuery: ['id', 'name'],
+    // optional: modifier, matchExpression
+  }, true]                      // true = is collection
+]
+```
+
+## Match Expressions
+
+```typescript
+// MatchExp for storage layer
+MatchExp.atom({ key: 'id', value: ['=', someId] })
+MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+
+// BoolExp for general boolean logic
+BoolExp.atom({ key: 'name', value: ['=', 'foo'] })
+  .and(BoolExp.atom({ key: 'age', value: ['>', 18] }))
+```
+
+Operators: `'='`, `'!='`, `'>'`, `'<'`, `'>='`, `'<='`, `'like'`, `'in'`, `'not in'`, `'is null'`, `'is not null'`
+
+## ERStorage Internals
+- `DBSetup` — creates tables from entity/relation definitions
+- `RecordQueryAgent` — builds and executes SQL queries
+- `EntityToTableMap` — maps entities/relations to database tables
+- `AliasManager` / `FieldAliasMap` — manages SQL aliases for complex joins
+
+## System Layer
+`System` wraps storage with transaction support:
+- `system.storage` — the underlying storage instance
+- `beginTransaction()`, `commitTransaction()`, `rollbackTransaction()`
+- `listen(callback)` — subscribe to `RecordMutationEvent`
+
+`MonoSystem` is the standard implementation wrapping a `Database` driver.
+
+## Database Drivers
+All implement the `Database` interface:
+- `open(forceDrop?)`, `close()`, `scheme()`, `query()`, `insert()`, `update()`, `delete()`
+- Optional: `beginTransaction()`, `commitTransaction()`, `rollbackTransaction()`
+- Drivers: `SQLiteDB`, `PostgreSQLDB`, `PGLiteDB`, `MysqlDB`

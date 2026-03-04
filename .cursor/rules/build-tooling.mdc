@@ -1,0 +1,43 @@
+---
+description: Build, tooling, and release conventions
+globs: vite.*.config.ts, package.json, tsconfig*.json
+alwaysApply: false
+---
+
+# Build & Tooling
+
+## Build System
+- **Vite** for library build: `vite build --config vite.prod.config.ts`
+- **vite-plugin-dts** generates `.d.ts` declaration files
+- **vite-tsconfig-paths** resolves path aliases in Vite
+- Output: `dist/` (ESM only, `dist/index.js` + `dist/index.d.ts`)
+
+## TypeScript Checking
+- Full check: `npm run check` (tsc --noEmit --skipLibCheck)
+- Per-layer: `npm run check:core`, `check:runtime`, `check:storage`, `check:drivers`
+- Each layer has its own `tsconfig.*.json` extending the base
+
+## Path Aliases (tsconfig.json)
+```
+interaqt  → src/
+@core     → src/core/index.ts
+@runtime  → src/runtime/index.ts
+@storage  → src/storage/index.ts
+@drivers  → src/drivers/index.ts
+```
+
+## Release Process
+- Uses `release-it` with `@release-it/conventional-changelog`
+- Conventional Commits format for changelog generation
+- Commit message: `chore(release): v${version}`
+- Pre-release hook: runs `npm test && npm run build`
+- Publishes to npm, pushes tags to git (branch: `main`)
+
+## Testing
+- Vitest: `npm test` (all), `npm run test:runtime`, `test:storage`, `test:core`
+- Setup: `scripts/vitest.setup.js` polyfills `globalThis.crypto` for UUID generation
+- Coverage: `@vitest/coverage-v8` available
+
+## External Dependencies
+DB drivers are dev dependencies only — consumers install their own:
+`better-sqlite3`, `pg`, `mysql2`, `@electric-sql/pglite`

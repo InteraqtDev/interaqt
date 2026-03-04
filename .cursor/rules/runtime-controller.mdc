@@ -1,0 +1,61 @@
+---
+description: Runtime layer and Controller patterns for interaqt
+globs: src/runtime/**/*.ts, tests/runtime/**/*.spec.ts
+alwaysApply: false
+---
+
+# Runtime & Controller Patterns
+
+## Controller — The Single Entry Point
+`Controller.dispatch(eventSource, args)` is the **only** entry for triggering any event source.
+
+```typescript
+const controller = new Controller({
+  system,
+  entities: [...],
+  relations: [...],
+  eventSources: [...],  // Interaction, custom EventSources, etc.
+  dict: [...],           // optional Dictionary instances
+  recordMutationSideEffects: [...],  // optional
+  computations: [...],   // optional custom computation types
+  ignoreGuard: false,    // skip guard checks (for testing)
+  forceThrowDispatchError: false,
+});
+```
+
+## Dispatch Flow
+1. **Guard** — event source validates preconditions (permissions, attributives, conditions)
+2. **Map Event Data** — transforms raw event args into internal event data
+3. **Resolve** — executes the action: creates/updates/deletes records
+4. **Computations** — reactive computations triggered by record mutations
+5. **Side Effects** — `RecordMutationSideEffect` callbacks
+
+Returns `DispatchResponse`: `{ error?, data?, effects?, sideEffects?, context? }`
+
+## EventSource Abstraction
+All event sources (Interaction, custom types) implement `EventSourceInstance`:
+- `entity` — the entity this event source operates on
+- `guard(args)` — validate and check permissions
+- `mapEventData(args)` — transform event args
+- `resolve(system, eventData)` — execute the action
+
+## Computation Registration
+Computations are classes extending `Computation` with static `handles`:
+- `CountHandles`, `TransformHandles`, `StateMachineHandles`, `SummationHandles`
+- `AverageHandles`, `AnyHandles`, `EveryHandles`, `CustomHandles`, `RealTimeHandles`
+
+## Interaction Context
+Dispatch supports `context` in event args for tracking invocation source (API call, agent tool, cron job, etc.):
+
+```typescript
+await controller.dispatch(interaction, {
+  user,
+  payload: { ... },
+  context: { source: 'agent', agentId: '...' }
+});
+```
+
+## Key Constants
+- `USER_ENTITY = 'User'`
+- `HARD_DELETION_PROPERTY_NAME = '_isDeleted_'`
+- `PHASE_AFTER_ALL` — computation phase constant

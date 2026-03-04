@@ -1,0 +1,57 @@
+---
+description: Core interaqt project conventions, naming, and architecture overview
+alwaysApply: true
+---
+
+# interaqt Project Conventions
+
+## Framework-Grade Quality Standard
+interaqt is a **framework**, not an application. Every change carries amplified impact — framework code is consumed, extended, and relied upon by downstream users. Hold all implementations and designs to a higher bar:
+- **Elegance over expedience** — Prefer clean abstractions and minimal surface area. Avoid ad-hoc solutions; if a pattern appears twice, it deserves a first-class design.
+- **Consistency** — New APIs, patterns, and naming must align with existing conventions (Klass pattern, explicit control, etc.). A framework that contradicts itself erodes trust.
+- **Consider all consumers** — Every public type, method signature, and behavioral contract is a commitment. Think through edge cases, composability, and how the design scales before implementing.
+- **Minimal footprint** — Add no more surface area than necessary. Every export, parameter, and concept a user must learn is a cost.
+- **Robustness** — Framework code must handle unexpected inputs gracefully with clear error messages. Silent failures and obscure stack traces are unacceptable.
+
+## Naming
+- Project name is always **interaqt** (all lowercase). Never InterAQT, interAQT, etc.
+- Import from `'interaqt'` (resolves to `src/`), or use path aliases: `@core`, `@runtime`, `@storage`, `@drivers`
+
+## Architecture Layers
+
+```
+src/
+├── core/       # Domain model: Entity, Relation, Property, computations (pure definitions)
+├── runtime/    # Execution engine: Controller, System, Scheduler, computation handles
+├── storage/    # Persistence: ERStorage, SQL builder, query executors
+├── builtins/   # Built-in EventSource types: Interaction, Activity, User
+└── drivers/    # DB adapters: SQLite, PostgreSQL, PGLite, MySQL
+```
+
+Dependency direction: `builtins → runtime → storage → core`. Never import upward.
+
+## Key Domain Concepts
+- **Entity** / **Relation** / **Property** — Data model definitions (core)
+- **EventSource** — Base abstraction for all event-driven triggers (core)
+- **Interaction** — Built-in EventSource for user-triggered actions (builtins)
+- **Controller.dispatch()** — The single entry point for triggering any EventSource
+- **Computation** — Reactive data derivation: Transform, StateMachine, Count, Summation, Average, etc.
+
+## Klass Pattern (core entities)
+All core concepts use a consistent pattern:
+1. Interface (`EntityInstance`, `RelationInstance`, etc.)
+2. CreateArgs interface (`EntityCreateArgs`, etc.)
+3. Class with static factory: `Entity.create(args, options?)`
+4. Static registry: `static instances`, `static isKlass = true`, `static displayName`
+5. Serialization: `toData()` / `fromData()` when applicable
+
+## Explicit Control Principle
+This project follows "explicit control" — never add implicit behavior, auto-completion, or magic defaults. All behavior must be explicitly declared by the user.
+
+## Knowledge Base
+- `agentspace/knowledge/` — Technical docs on filtered entities, cascade, storage, etc.
+- `agent/agentspace/knowledge/usage/` — Usage guides (00–19)
+- `agent/agentspace/knowledge/generator/` — Code generation guides
+
+## Agent Output
+Research documents, design proposals, analysis reports, and other agent-produced artifacts should be placed in `agentspace/output/` by default.
