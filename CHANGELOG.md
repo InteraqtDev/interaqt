@@ -1,5 +1,13 @@
 
 
+## [1.1.1](https://github.com/InteraqtDev/interaqt/compare/v1.1.0...v1.1.1) (2026-03-04)
+
+
+### Bug Fixes
+
+* correct RealTime.is() type check to match actual _type value ([ab1f329](https://github.com/InteraqtDev/interaqt/commit/ab1f329143a263613ff000dc8725ac3ae2fa71d0))
+* patch loop early-exit in applyResultPatch and remove incorrect name length constraint ([8eaa422](https://github.com/InteraqtDev/interaqt/commit/8eaa4226025fe13faad07ab41e5f51d0233c8c5b))
+
 ## [1.1.0](https://github.com/InteraqtDev/interaqt/compare/v1.0.0...v1.1.0) (2026-02-21)
 
 
