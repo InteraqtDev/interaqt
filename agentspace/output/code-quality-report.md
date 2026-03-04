@@ -118,7 +118,7 @@ if (existing) {
 this.instances.push(instance);
 ```
 
-所有 Klass 类（Entity、Relation、Property、Condition 等）都有这段几乎相同的代码。`interfaces.ts` 中已定义了 `BaseKlass` 和 `createBase()` 但未被使用。
+所有 Klass 类（Entity、Relation、Property、Condition 等）都有这段几乎相同的代码。
 
 **2. 函数反序列化（8+ 个文件中重复）**
 
@@ -135,7 +135,7 @@ if (typeof args.callback === 'string' && (args.callback as any).startsWith('func
 **4. Scheduler 构造函数中的 AsyncTaskEntity 创建**：四段结构相似的代码（property / global / entity / relation），仅字段名不同。
 
 **建议：**
-- 使用 `BaseKlass.createBase()` 或提取注册辅助函数
+- 提取注册辅助函数统一 UUID 检查
 - 提取 `deserializeFunction(value: unknown)` 到 `utils.ts`
 - 将 `is()` / `check()` 生成为模式或使用 mixin
 
@@ -264,18 +264,6 @@ Driver 层的 `IDSystem` 实现使用字符串插值构建 SQL：
 
 ---
 
-### 3.10 死代码与未使用定义
-
-| 位置 | 内容 | 说明 |
-|------|------|------|
-| `types.ts:40-44` | `IInstance` with `__type`/`__uuid` | 与 `interfaces.ts` 中的 `IInstance`(`_type`/`uuid`) 冲突 |
-| `Computation.ts:26-30` | `DictionaryDataDep` | 注释标记"现在没用" |
-| `utils.ts:78-80` | `removeAllInstance()` | 空函数（no-op） |
-| `utils.ts:130-134` | `createClass()` | 已弃用，仅打印 warning |
-| `interfaces.ts:42-54` | `BaseKlass`、`createBase`、`isBase`、`checkBase` | 已定义但未被使用 |
-
----
-
 ## 四、优先改进建议
 
 ### P1（中优先级）
@@ -284,7 +272,7 @@ Driver 层的 `IDSystem` 实现使用字符串插值构建 SQL：
 
 2. **消除代码重复**：
    - 提取 `deserializeFunction()` 工具函数
-   - 使用 `BaseKlass` 或 mixin 统一 UUID 检查和 `is()`/`check()` 实现
+   - 提取注册辅助函数或使用 mixin 统一 UUID 检查和 `is()`/`check()` 实现
    - 重构 Scheduler 构造函数中的重复创建逻辑
 
 3. **修复 SQL 插值**：Driver 层 IDSystem 改用参数化查询。
@@ -300,13 +288,11 @@ Driver 层的 `IDSystem` 实现使用字符串插值构建 SQL：
 
 6. **拆分大文件**：`Setup.ts`（1,065 行）、`Scheduler.ts`（854 行）、`MergedItemProcessor.ts`（554 行）。
 
-7. **清理死代码**：移除 `DictionaryDataDep`、`removeAllInstance()`、`createClass()`，统一 `IInstance` 定义。
+7. **统一注释语言**：选择中文或英文之一作为注释标准，逐步迁移。
 
-8. **统一注释语言**：选择中文或英文之一作为注释标准，逐步迁移。
+8. **处理 TODO/FIXME 积压**：清点 39 处 TODO/FIXME，分类为"仍需处理"和"已不再适用"。
 
-9. **处理 TODO/FIXME 积压**：清点 39 处 TODO/FIXME，分类为"仍需处理"和"已不再适用"。
-
-10. **提升测试覆盖率**：函数覆盖率（41.2%）和语句覆盖率（54.3%）有较大提升空间。
+9. **提升测试覆盖率**：函数覆盖率（41.2%）和语句覆盖率（54.3%）有较大提升空间。
 
 ---
 

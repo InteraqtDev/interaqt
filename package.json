@@ -36,6 +36,8 @@
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",
     "test:core": "vitest run tests/core",
+    "test:builtins": "vitest run tests/builtins",
+    "test:coverage": "vitest run --coverage",
     "sync:agent": "tsx scripts/sync-agent-files.ts",
     "release": "release-it"
   },

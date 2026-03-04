@@ -9,7 +9,27 @@ export default defineConfig({
             'tests/**/*.test.ts', 
             'tests/**/*.spec.ts', 
             // 'examples/**/*.test.ts'
-        ]
+        ],
+        coverage: {
+            provider: 'v8',
+            include: ['src/**/*.ts'],
+            exclude: [
+                'src/**/index.ts',
+                'src/**/types.ts',
+                'src/core/Computation.ts',
+                'src/runtime/types/**',
+                'src/runtime/global.d.ts',
+                'src/runtime/ExternalSynchronizer.ts',
+                'src/drivers/Mysql.ts',
+                'src/drivers/PostgreSQL.ts',
+            ],
+            thresholds: {
+                statements: 85,
+                branches: 80,
+                functions: 75,
+                lines: 85,
+            }
+        }
     },
     plugins: [
         tsconfigPaths({
