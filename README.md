@@ -8,6 +8,7 @@
     <a href="https://www.npmjs.com/package/interaqt"><img src="https://img.shields.io/npm/dm/interaqt.svg" alt="npm downloads"></a>
     <a href="https://github.com/InteraqtDev/interaqt/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/interaqt.svg" alt="license"></a>
     <a href="https://github.com/InteraqtDev/interaqt"><img src="https://img.shields.io/badge/TypeScript-strict-blue.svg" alt="TypeScript"></a>
+    <a href="#"><img src="https://img.shields.io/badge/coverage-92.41%25-brightgreen.svg" alt="coverage"></a>
   </p>
 </p>
 

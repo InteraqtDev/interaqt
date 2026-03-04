@@ -38,6 +38,7 @@
     "test:core": "vitest run tests/core",
     "test:builtins": "vitest run tests/builtins",
     "test:coverage": "vitest run --coverage",
+    "coverage:badge": "vitest run --coverage && tsx scripts/update-coverage-badge.ts",
     "sync:agent": "tsx scripts/sync-agent-files.ts",
     "release": "release-it"
   },
