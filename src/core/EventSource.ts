@@ -1,34 +1,37 @@
 import { IInstance, generateUUID, SerializedData } from './interfaces.js';
 import { EntityInstance } from './Entity.js';
 
-export interface EventSourceInstance<TArgs = any, TResult = void> extends IInstance {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- `this` is bound at runtime by Controller; core layer cannot reference it
+type CallbackThis = any
+
+export interface EventSourceInstance<TArgs = unknown, TResult = void> extends IInstance {
   name: string
   entity: EntityInstance
-  guard?: (this: any, args: TArgs) => Promise<void>
-  mapEventData?: (args: TArgs) => Record<string, any>
-  resolve?: (this: any, args: TArgs) => Promise<TResult>
-  afterDispatch?: (this: any, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+  guard?: (this: CallbackThis, args: TArgs) => Promise<void>
+  mapEventData?: (args: TArgs) => Record<string, unknown>
+  resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>
+  afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
 }
 
-export interface EventSourceCreateArgs<TArgs = any, TResult = void> {
+export interface EventSourceCreateArgs<TArgs = unknown, TResult = void> {
   name: string
   entity: EntityInstance
-  guard?: (this: any, args: TArgs) => Promise<void>
-  mapEventData?: (args: TArgs) => Record<string, any>
-  resolve?: (this: any, args: TArgs) => Promise<TResult>
-  afterDispatch?: (this: any, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+  guard?: (this: CallbackThis, args: TArgs) => Promise<void>
+  mapEventData?: (args: TArgs) => Record<string, unknown>
+  resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>
+  afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
 }
 
-export class EventSource<TArgs = any, TResult = void> implements EventSourceInstance<TArgs, TResult> {
+export class EventSource<TArgs = unknown, TResult = void> implements EventSourceInstance<TArgs, TResult> {
   public uuid: string;
   public _type = 'EventSource';
   public _options?: { uuid?: string };
   public name: string;
   public entity: EntityInstance;
-  public guard?: (this: any, args: TArgs) => Promise<void>;
-  public mapEventData?: (args: TArgs) => Record<string, any>;
-  public resolve?: (this: any, args: TArgs) => Promise<TResult>;
-  public afterDispatch?: (this: any, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>;
+  public guard?: (this: CallbackThis, args: TArgs) => Promise<void>;
+  public mapEventData?: (args: TArgs) => Record<string, unknown>;
+  public resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>;
+  public afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>;
 
   constructor(args: EventSourceCreateArgs<TArgs, TResult>, options?: { uuid?: string }) {
     this._options = options;
@@ -43,9 +46,10 @@ export class EventSource<TArgs = any, TResult = void> implements EventSourceInst
 
   static isKlass = true as const;
   static displayName = 'EventSource';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous collection
   static instances: EventSourceInstance<any, any>[] = [];
 
-  static create<TArgs = any, TResult = void>(
+  static create<TArgs = unknown, TResult = void>(
     args: EventSourceCreateArgs<TArgs, TResult>,
     options?: { uuid?: string }
   ): EventSourceInstance<TArgs, TResult> {

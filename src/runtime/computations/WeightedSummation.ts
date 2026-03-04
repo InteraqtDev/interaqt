@@ -86,7 +86,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
 export class PropertyWeightedSummationHandle implements DataBasedComputation {
     static computationType = WeightedSummation
     static contextType = 'property' as const
-    matchRecordToWeight: (this: Controller, item: any, dataDeps: {[key: string]: any}) => { weight: number; value: number }
+    matchRecordToWeight: (this: Controller, item: any, dataDeps: {[key: string]: unknown}) => { weight: number; value: number }
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -153,7 +153,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         return summation;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
         // 只能支持通过 args.record 指定的关联关系或者关联实体的增量更新。
         if (
             mutationEvent.recordName !== this.dataContext.host.name ||

@@ -20,7 +20,7 @@ describe('MatchExp JSON serialization test', () => {
         expect(json).toHaveProperty('entityName', 'User');
         expect(json).toHaveProperty('data');
         expect(json.data).toHaveProperty('type', 'atom');
-        expect(json.data.data).toEqual({
+        expect((json.data as Record<string, unknown>).data).toEqual({
             key: 'name',
             value: ['=', 'John']
         });
@@ -168,7 +168,7 @@ describe('MatchExp JSON serialization test', () => {
         const json = matchExp.toJSON();
         
         // Verify reference value is preserved
-        expect(json.data.data.isReferenceValue).toBe(true);
+        expect((json.data as Record<string, unknown> as { data: { isReferenceValue: boolean } }).data.isReferenceValue).toBe(true);
 
         // Deserialize from JSON
         const restored = MatchExp.fromJSON(json, entityToTableMap);

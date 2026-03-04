@@ -30,7 +30,7 @@ export class ErrorUtils {
     /**
      * Wrap a native error with a FrameworkError
      */
-    static wrapError(error: Error, ErrorClass: new (...args: any[]) => FrameworkError, context?: Record<string, any>): FrameworkError {
+    static wrapError(error: Error, ErrorClass: new (...args: any[]) => FrameworkError, context?: Record<string, unknown>): FrameworkError {
         if (error instanceof FrameworkError) {
             return error
         }
@@ -44,14 +44,14 @@ export class ErrorUtils {
     /**
      * Check if error is of specific type or category
      */
-    static isErrorType(error: any, errorType: string): boolean {
+    static isErrorType(error: unknown, errorType: string): boolean {
         return error instanceof FrameworkError && error.errorType === errorType
     }
 
     /**
      * Check if error is of specific category
      */
-    static isErrorCategory(error: any, category: ErrorCategory): boolean {
+    static isErrorCategory(error: unknown, category: ErrorCategory): boolean {
         return error instanceof FrameworkError && error.context?.category === category
     }
 
@@ -68,7 +68,7 @@ export class ErrorUtils {
     /**
      * Format error for logging
      */
-    static formatForLogging(error: Error): Record<string, any> {
+    static formatForLogging(error: Error): Record<string, unknown> {
         if (error instanceof FrameworkError) {
             return {
                 ...error.toJSON(),
@@ -86,14 +86,14 @@ export class ErrorUtils {
     /**
      * Create error summary for client response
      */
-    static createErrorSummary(error: Error): Record<string, any> {
+    static createErrorSummary(error: Error): Record<string, unknown> {
         if (error instanceof FrameworkError) {
             return {
                 errorId: error.errorId,
                 errorType: error.errorType,
                 message: error.message,
                 timestamp: error.timestamp.toISOString(),
-                severity: (error as any).severity || 'UNKNOWN',
+                severity: 'severity' in error ? (error as { severity: string }).severity : 'UNKNOWN',
                 category: error.context?.category
             }
         }

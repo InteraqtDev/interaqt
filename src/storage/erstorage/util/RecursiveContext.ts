@@ -11,20 +11,14 @@ export class RecursiveContext {
     constructor(
         public label: string, 
         public parent?: RecursiveContext, 
-        public stack: any[] = []
+        public stack: unknown[] = []
     ) {}
     
-    /**
-     * 添加一个值到栈中，返回新的上下文
-     */
-    concat(value: any): RecursiveContext {
+    concat(value: unknown): RecursiveContext {
         return new RecursiveContext(this.label, this.parent, [...this.stack, value])
     }
 
-    /**
-     * 获取栈数据
-     */
-    getStack(key: string): any[] {
+    getStack(key: string): unknown[] {
         return [...this.stack]
     }
 

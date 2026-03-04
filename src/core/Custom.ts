@@ -4,13 +4,13 @@ import { DataDep } from './Computation.js';
 
 export interface CustomInstance extends IInstance {
   name: string;
-  dataDeps?: { [key: string]: any };
-  compute?: Function; // (dataDeps: any, record?: any) => any
-  incrementalCompute?: Function; // (lastValue: any, mutationEvent: any, record: any, dataDeps: any) => any
-  incrementalPatchCompute?: Function; // (lastValue: any, mutationEvent: any, record: any, dataDeps: any) => any
-  createState?: Function; // () => { [key: string]: BoundState }
-  getInitialValue?: Function; // () => any
-  asyncReturn?: Function; // (asyncResult: any, dataDeps: any, record?: any) => any
+  dataDeps?: { [key: string]: DataDep };
+  compute?: Function;
+  incrementalCompute?: Function;
+  incrementalPatchCompute?: Function;
+  createState?: Function;
+  getInitialValue?: Function;
+  asyncReturn?: Function;
   useLastValue?: boolean;
 }
 
@@ -31,7 +31,7 @@ export class Custom implements CustomInstance {
   public _type = 'Custom';
   public _options?: { uuid?: string };
   public name: string;
-  public dataDeps?: { [key: string]: any };
+  public dataDeps?: { [key: string]: DataDep };
   public compute?: Function;
   public incrementalCompute?: Function;
   public incrementalPatchCompute?: Function;
@@ -121,19 +121,19 @@ export class Custom implements CustomInstance {
   }
   
   static stringify(instance: CustomInstance): string {
-    const args: any = {
+    const args: Record<string, unknown> = {
       name: instance.name
     };
     if (instance.dataDeps !== undefined) args.dataDeps = stringifyAttribute(instance.dataDeps);
-    if (instance.compute !== undefined) args.compute = stringifyAttribute(instance.compute) as Function;
-    if (instance.incrementalCompute !== undefined) args.incrementalCompute = stringifyAttribute(instance.incrementalCompute) as Function;
-    if (instance.incrementalPatchCompute !== undefined) args.incrementalPatchCompute = stringifyAttribute(instance.incrementalPatchCompute) as Function;
-    if (instance.createState !== undefined) args.createState = stringifyAttribute(instance.createState) as Function;
-    if (instance.getInitialValue !== undefined) args.getInitialValue = stringifyAttribute(instance.getInitialValue) as Function;
-    if (instance.asyncReturn !== undefined) args.asyncReturn = stringifyAttribute(instance.asyncReturn) as Function;
+    if (instance.compute !== undefined) args.compute = stringifyAttribute(instance.compute);
+    if (instance.incrementalCompute !== undefined) args.incrementalCompute = stringifyAttribute(instance.incrementalCompute);
+    if (instance.incrementalPatchCompute !== undefined) args.incrementalPatchCompute = stringifyAttribute(instance.incrementalPatchCompute);
+    if (instance.createState !== undefined) args.createState = stringifyAttribute(instance.createState);
+    if (instance.getInitialValue !== undefined) args.getInitialValue = stringifyAttribute(instance.getInitialValue);
+    if (instance.asyncReturn !== undefined) args.asyncReturn = stringifyAttribute(instance.asyncReturn);
     if (instance.useLastValue !== undefined) args.useLastValue = instance.useLastValue;
     
-    const data: SerializedData<any> = {
+    const data: SerializedData<Record<string, unknown>> = {
       type: 'Custom',
       options: instance._options,
       uuid: instance.uuid,
@@ -165,8 +165,8 @@ export class Custom implements CustomInstance {
   }
   
   static parse(json: string): CustomInstance {
-    const data = JSON.parse(json) as SerializedData<any>;
-    const args = { ...data.public };
+    const data = JSON.parse(json) as SerializedData<Record<string, unknown>>;
+    const args = { ...data.public } as Record<string, unknown>;
     
     // 反序列化函数
     const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'asyncReturn'];
@@ -176,6 +176,6 @@ export class Custom implements CustomInstance {
       }
     });
     
-    return this.create(args as CustomCreateArgs, data.options);
+    return this.create(args as unknown as CustomCreateArgs, data.options);
   }
 } 

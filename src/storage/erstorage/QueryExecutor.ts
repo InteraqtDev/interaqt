@@ -1,7 +1,7 @@
 import { Database } from "@runtime"
 import { EntityToTableMap } from "./EntityToTableMap.js"
 import { SQLBuilder } from "./SQLBuilder.js"
-import { RecordQuery, LINK_SYMBOL } from "./RecordQuery.js"
+import { RecordQuery, RecordQueryTree, LINK_SYMBOL } from "./RecordQuery.js"
 import { FieldAliasMap } from "./util/FieldAliasMap.js"
 import { RecursiveContext, ROOT_LABEL } from "./util/RecursiveContext.js"
 import { setByPath, assert } from "../utils.js"
@@ -34,7 +34,7 @@ export class RecordQueryRef {
         })
     }
 
-    set(key: string, value: any) {
+    set(key: string, value: RecordQuery) {
         this.recordQueryByName.set(key, value)
     }
 
@@ -72,7 +72,7 @@ export class QueryExecutor {
      * @returns 结构化的 Record 数组
      */
     private structureRawReturns(
-        rawReturns: { [k: string]: any }[],
+        rawReturns: { [k: string]: unknown }[],
         JSONFields: string[],
         fieldAliasMap: FieldAliasMap
     ): Record[] {
@@ -127,7 +127,7 @@ export class QueryExecutor {
 
         // 检查一下是否已经产生了循环。因为所有的子查询都会以这个函数为入口，所以可以再这里判断。
         if (entityQuery.label && context.label === entityQuery.label && context.stack.length > 1) {
-            if (context.stack[0].id === context.stack.at(-1).id) {
+            if ((context.stack[0] as Record).id === (context.stack.at(-1) as Record).id) {
                 return []
             }
         }
@@ -137,8 +137,8 @@ export class QueryExecutor {
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
         const [querySQL, params, fieldAliasMap] = this.sqlBuilder.buildXToOneFindQuery(entityQuery, '')
-        const rawReturns: { [k: string]: any }[] = await this.database.query(querySQL, params, queryName)
-        const records = this.structureRawReturns(rawReturns, this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap) as any[]
+        const rawReturns: { [k: string]: unknown }[] = await this.database.query(querySQL, params, queryName)
+        const records = this.structureRawReturns(rawReturns, this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap)
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context
@@ -417,8 +417,8 @@ export class QueryExecutor {
         const exit = async (context: RecursiveContext) => {
             if (foundPath) return true
 
-            if (context.stack.at(-1)?.id === endRecordId) {
-                foundPath = [...context.stack]
+            if ((context.stack.at(-1) as Record | undefined)?.id === endRecordId) {
+                foundPath = [...context.stack] as Record[]
                 return true
             }
         }

@@ -12,8 +12,8 @@ type ComputationPhase = typeof PHASE_BEFORE_ALL|typeof PHASE_NORMAL|typeof PHASE
 type EventDep = {
   recordName: string;
   type: 'create'|'delete'|'update';
-  record?:any
-  oldRecord?:any
+  record?: Record<string, unknown>
+  oldRecord?: Record<string, unknown>
   phase?: ComputationPhase
 };
 

@@ -3,6 +3,7 @@ import {
     EntityInstance, Entity, RelationInstance, Relation, Property,
     BoolExp, ExpressionData, BoolExpressionRawData, EventSourceInstance
 } from '@core';
+import type { Controller } from '@runtime';
 import { ActionInstance, GetAction } from './Action.js';
 import { ConditionInstance } from './Condition.js';
 import { ConditionsInstance, Conditions } from './Conditions.js';
@@ -10,7 +11,7 @@ import { AttributiveInstance, AttributivesInstance, Attributive, Attributives } 
 import { PayloadInstance } from './Payload.js';
 import { DataPolicyInstance } from './Data.js';
 
-export interface InteractionInstance extends EventSourceInstance<InteractionEventArgs> {
+export interface InteractionInstance extends EventSourceInstance<InteractionEventArgs, unknown> {
   conditions?: ConditionsInstance | ConditionInstance;
   userAttributives?: AttributivesInstance | AttributiveInstance;
   userRef?: AttributiveInstance;
@@ -25,11 +26,11 @@ export type InteractionEventArgs = {
   query?: EventQuery,
   payload?: EventPayload,
   activityId?: string,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
 }
 
 export type EventQuery = {
-  match?: any,
+  match?: unknown,
   modifier?: Record<string, unknown>,
   attributeQuery?: string[],
 }
@@ -82,9 +83,9 @@ export class Interaction implements InteractionInstance {
   public dataPolicy?: DataPolicyInstance;
 
   public entity!: EntityInstance;
-  public guard?: (this: any, args: InteractionEventArgs) => Promise<void>;
-  public mapEventData?: (args: InteractionEventArgs) => Record<string, any>;
-  public resolve?: (this: any, args: InteractionEventArgs) => Promise<any>;
+  public guard?: (this: Controller, args: InteractionEventArgs) => Promise<void>;
+  public mapEventData?: (args: InteractionEventArgs) => Record<string, unknown>;
+  public resolve?: (this: Controller, args: InteractionEventArgs) => Promise<unknown>;
   
   constructor(args: InteractionCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -219,10 +220,10 @@ export class Interaction implements InteractionInstance {
 
 export class InteractionGuardError extends Error {
   public readonly type: string
-  public readonly error: any
+  public readonly error: unknown
   public readonly checkType: string
 
-  constructor(message: string, options: { type: string, checkType: string, error?: any }) {
+  constructor(message: string, options: { type: string, checkType: string, error?: unknown }) {
     super(message)
     this.name = 'InteractionGuardError'
     this.type = options.type
@@ -231,15 +232,15 @@ export class InteractionGuardError extends Error {
   }
 }
 
-function buildInteractionGuard(interaction: InteractionInstance): (this: any, args: InteractionEventArgs) => Promise<void> {
-  return async function(this: any, args: InteractionEventArgs) {
+function buildInteractionGuard(interaction: InteractionInstance): (this: Controller, args: InteractionEventArgs) => Promise<void> {
+  return async function(this: Controller, args: InteractionEventArgs) {
     await checkCondition(this, interaction, args);
     await checkUser(this, interaction, args);
     await checkPayload(this, interaction, args);
   };
 }
 
-function buildInteractionMapEventData(interaction: InteractionInstance): (args: InteractionEventArgs) => Record<string, any> {
+function buildInteractionMapEventData(interaction: InteractionInstance): (args: InteractionEventArgs) => Record<string, unknown> {
   return (args: InteractionEventArgs) => ({
     interactionName: interaction.name,
     interactionId: interaction.uuid,
@@ -250,13 +251,13 @@ function buildInteractionMapEventData(interaction: InteractionInstance): (args: 
   });
 }
 
-function buildInteractionResolve(interaction: InteractionInstance): (this: any, args: InteractionEventArgs) => Promise<any> {
-  return async function(this: any, args: InteractionEventArgs) {
+function buildInteractionResolve(interaction: InteractionInstance): (this: Controller, args: InteractionEventArgs) => Promise<unknown> {
+  return async function(this: Controller, args: InteractionEventArgs) {
     return retrieveData(this, interaction, args);
   };
 }
 
-export async function checkCondition(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+export async function checkCondition(controller: { system: { storage: any }, ignoreGuard: boolean }, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (!interaction.conditions) return;
 
   const conditions = Conditions.is(interaction.conditions)
@@ -289,7 +290,7 @@ export async function checkCondition(controller: any, interaction: InteractionIn
   }
 }
 
-async function checkAttributive(controller: any, attributive: any, eventArgs: InteractionEventArgs | undefined, target: any): Promise<boolean> {
+async function checkAttributive(controller: Controller, attributive: AttributiveInstance, eventArgs: InteractionEventArgs | undefined, target: unknown): Promise<boolean> {
   if (attributive.content) {
     let result;
     try {
@@ -303,7 +304,7 @@ async function checkAttributive(controller: any, attributive: any, eventArgs: In
   return true;
 }
 
-async function checkUser(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+async function checkUser(controller: Controller, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (!interaction.userAttributives) return;
 
   const userAttributiveCombined = Attributives.is(interaction.userAttributives)
@@ -324,7 +325,7 @@ async function checkUser(controller: any, interaction: InteractionInstance, even
   }
 }
 
-export async function checkPayload(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+export async function checkPayload(_controller: unknown, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   const payload = eventArgs.payload || {};
   const payloadDefs = interaction.payload?.items || [];
 
@@ -396,7 +397,7 @@ export async function checkPayload(controller: any, interaction: InteractionInst
   }
 }
 
-async function checkConcept(instance: ConceptInstance, concept: Concept): Promise<any> {
+async function checkConcept(instance: ConceptInstance, concept: Concept): Promise<true | { name: string, type: string, error: string }> {
   if ((concept as DerivedConcept).base) {
     const derived = concept as DerivedConcept;
     if (derived.attributive) {
@@ -410,23 +411,23 @@ async function checkConcept(instance: ConceptInstance, concept: Concept): Promis
       const result = await checkConcept(instance, c);
       if (result === true) return true;
     }
-    return { name: (concept as any).name, type: 'conceptAlias', error: 'no match' };
+    return { name: (concept as { name?: string }).name || '', type: 'conceptAlias', error: 'no match' };
   }
 
-  if (Attributive.is(concept as any)) {
+  if (Attributive.is(concept as unknown)) {
     return true;
   }
 
-  if (Entity.is(concept as any)) {
+  if (Entity.is(concept as unknown)) {
     if (instance && typeof instance === 'object') return true;
-    return { name: (concept as any).name || '', type: 'conceptCheck', error: 'invalid entity data' };
+    return { name: (concept as { name?: string }).name || '', type: 'conceptCheck', error: 'invalid entity data' };
   }
 
   if (instance && typeof instance === 'object') return true;
   return true;
 }
 
-async function retrieveData(controller: any, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+async function retrieveData(controller: Controller, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (Entity.is(interaction.data) || Relation.is(interaction.data)) {
     const recordName = (interaction.data as EntityInstance).name!;
 

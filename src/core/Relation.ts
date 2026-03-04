@@ -278,8 +278,7 @@ export class Relation implements RelationInstance {
       args.target = instance.target;
     }
     
-    // Use the private _name field if the instance is a Relation class instance
-    const name = (instance as any)._name ?? instance.name;
+    const name = instance instanceof Relation ? instance.name : instance.name;
     if (name !== undefined) args.name = name;
     
     if (instance.computation !== undefined) args.computation = instance.computation;
@@ -312,8 +311,7 @@ export class Relation implements RelationInstance {
       args.target = instance.target;
     }
     
-    // Use the private _name field if the instance is a Relation class instance
-    const name = (instance as any)._name ?? instance.name;
+    const name = instance instanceof Relation ? instance.name : instance.name;
     if (name !== undefined) args.name = name;
     
     if (instance.computation !== undefined) args.computation = instance.computation; // Note: This is a reference, not a deep clone

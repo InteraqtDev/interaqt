@@ -31,7 +31,11 @@ export type PropertyDataContext = {
 
 export type DataContext = GlobalDataContext|EntityDataContext|RelationDataContext|PropertyDataContext
 
-export type ComputedEffect = any
+export type ComputedEffect = {
+    type: 'create' | 'update' | 'delete';
+    recordName: string;
+    data: Record<string, unknown>;
+} | null
 
 export type ComputeEffectResult= ComputedEffect|ComputedEffect[]|undefined
 
@@ -45,17 +49,17 @@ type HandlesForType = {
 
 export type ComputationResultPatch = {
     type: 'insert' | 'update' | 'delete'
-    data?: any
-    affectedId?: any
+    data?: unknown
+    affectedId?: unknown
 }
 
 
 
 export class ComputationResult{
     static skip = () => new ComputationResultSkip()
-    static resolved = (result: any, args?:any) => new ComputationResultResolved(result, args)
-    static async = (args?:any) => new ComputationResultAsync(args)
-    static fullRecompute = (reason?:any) => new ComputationResultFullRecompute(reason)
+    static resolved = (result: unknown, args?: unknown) => new ComputationResultResolved(result, args)
+    static async = (args?: unknown) => new ComputationResultAsync(args)
+    static fullRecompute = (reason?: unknown) => new ComputationResultFullRecompute(reason)
 }
 
 export class ComputationResultSkip extends ComputationResult{
@@ -63,19 +67,19 @@ export class ComputationResultSkip extends ComputationResult{
 }
 
 export class ComputationResultFullRecompute extends ComputationResult{
-    constructor(public reason?:any) {
+    constructor(public reason?: unknown) {
         super()
     }
 }
 
 export class ComputationResultAsync extends ComputationResult{
-    constructor(public args?:any) {
+    constructor(public args?: unknown) {
         super()
     }
 }
 
 export class ComputationResultResolved extends ComputationResult{
-    constructor(public result: any, public args?:any) {
+    constructor(public result: unknown, public args?: unknown) {
         super()
     }
 }
@@ -84,19 +88,18 @@ export class ComputationResultResolved extends ComputationResult{
 export class RecordBoundState<T> {
     key!: string
     controller!: Controller
-    constructor(public defaultValue:any, public record?:string) { 
+    constructor(public defaultValue: T | null, public record?:string) { 
 
     }
-    async set(record:any, value: any): Promise<T> {
-        await this.controller.system.storage.update(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), {[this.key]: value})
+    async set(record: Record<string, unknown> | undefined, value: T): Promise<T> {
+        await this.controller.system.storage.update(this.record!, MatchExp.atom({key: 'id', value: ['=', record!.id]}), {[this.key]: value})
         return value
     }
-    async get(record:any):Promise<T> {
-        // TODO 如果 record 上不存在就重新查询
-        if (record[this.key] === undefined) {
-            const fullRecord = await this.controller.system.storage.findOne(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key])
+    async get(record: Record<string, unknown> | undefined):Promise<T> {
+        if (!record || record[this.key] === undefined) {
+            const fullRecord = record ? await this.controller.system.storage.findOne(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key]) : undefined
             const value = fullRecord?.[this.key]
-            return value !== undefined ? value as T : this.defaultValue as T
+            return (value !== undefined ? value : this.defaultValue) as T
         }
         return record[this.key] as T
     }
@@ -106,15 +109,15 @@ export class RecordBoundState<T> {
 export class GlobalBoundState<T> {
     key!:string
     controller!: Controller
-    constructor(public defaultValue?: any) {
+    constructor(public defaultValue?: T | null) {
 
     }
-    async set(value: any):Promise<T> {
+    async set(value: T):Promise<T> {
         await this.controller.system.storage.dict.set(this.key, value)
         return value
     }
     async get():Promise<T> {
-        return await this.controller.system.storage.dict.get(this.key)
+        return await this.controller.system.storage.dict.get(this.key) as T
     }
 }
 
@@ -150,21 +153,25 @@ export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep
 
 export interface DataBasedComputation {
     dataContext: DataContext
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each computation type has different args (Count, Every, Transform, etc.)
     args: any
-    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    // 全量计算
-    compute: (...args: any[]) => Promise<ComputationResult|any>
-    // 增量计算
-    incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
-    // 增量计算，返回的是基于上一次结果的寄过增量
+    state: {[key: string]: RecordBoundState<unknown>|GlobalBoundState<unknown>}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    compute: (...args: any[]) => Promise<ComputationResult|unknown>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    incrementalCompute?: (...args: any[]) => Promise<ComputationResult|unknown>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
-    createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createState?: (...args: any[]) => {[key: string]: RecordBoundState<unknown>|GlobalBoundState<unknown>}
     dataDeps: {[key: string]: DataDep}
-    getInitialValue?: (...args: any[]) => any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getInitialValue?: (...args: any[]) => unknown
     useLastValue?: boolean
-    // 异步计算，就会声明这个函数
-    asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
-    createStateData?: (...args: any[]) => Promise<{[key: string]: any}>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|unknown>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createStateData?: (...args: any[]) => Promise<Record<string, unknown>>
 }
 
 
@@ -172,26 +179,35 @@ export type EventDep = {
     recordName:string,
     type: 'create'|'delete'|'update',
     phase?: ComputationPhase,
-    record?: any,
-    oldRecord?: any
+    record?: Record<string, unknown>,
+    oldRecord?: Record<string, unknown>
 }
 
 export interface EventBasedComputation {
     dataContext: DataContext
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each computation type has different args
     args: any
     useMutationEvent: boolean
-    state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
+    state: {[key: string]: RecordBoundState<unknown>|GlobalBoundState<unknown>}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    incrementalCompute?: (...args: any[]) => Promise<ComputationResult|unknown>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
-    createState?: (...args: any[]) => {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createState?: (...args: any[]) => {[key: string]: RecordBoundState<unknown>|GlobalBoundState<unknown>}
     eventDeps?: {[key: string]: EventDep}
     useLastValue?: boolean
-    getInitialValue?: (...args: any[]) => any
-    computeDirtyRecords?: (...args: any[]) => Promise<any[]|undefined>
-    asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|any>
-    createStateData?: (...args: any[]) => Promise<{[key: string]: any}>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getInitialValue?: (...args: any[]) => unknown
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    computeDirtyRecords?: (...args: any[]) => Promise<Record<string, unknown>[]|undefined>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|unknown>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createStateData?: (...args: any[]) => Promise<Record<string, unknown>>
 }
 
 export type Computation = DataBasedComputation|EventBasedComputation
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ComputationClass = new(...args: any[]) => Computation

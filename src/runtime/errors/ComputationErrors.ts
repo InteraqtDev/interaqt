@@ -18,12 +18,12 @@ export class ComputationError extends FrameworkError {
             dataContext?: any
             computationPhase?: string
             severity?: ErrorSeverity
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {
         super(message, {
-            errorType: options.context?.errorType || 'ComputationError',
+            errorType: (options.context?.errorType as string) || 'ComputationError',
             context: {
                 category: ErrorCategory.COMPUTATION,
                 handleName: options.handleName,
@@ -62,7 +62,7 @@ export class ComputationStateError extends ComputationError {
             handleName?: string
             computationName?: string
             dataContext?: any
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {
@@ -104,7 +104,7 @@ export class ComputationDataDepError extends ComputationError {
             handleName?: string
             computationName?: string
             dataContext?: any
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {

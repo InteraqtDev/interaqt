@@ -11,7 +11,8 @@ import {
     SystemEntity,
     SystemLogger,
     SystemLogType,
-    DictionaryEntity
+    DictionaryEntity,
+    EntityIdRef
 } from "./System.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
@@ -26,7 +27,7 @@ import {
 // SQLiteDB is now imported from @drivers when needed
 import { RecordBoundState } from "./computations/Computation.js";
 
-function JSONStringify(value:any) {
+function JSONStringify(value: unknown) {
     return encodeURI(JSON.stringify(value))
 }
 
@@ -38,7 +39,7 @@ function JSONParse(value: string) {
 class MonoStorage implements Storage{
     public map!: DBSetup["map"]
     public queryHandle?: EntityQueryHandle
-    public dict: { get: (key: string) => Promise<any>, set: (key: string, value: any) => Promise<void> }
+    public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void> }
     
     constructor(public db: Database) {
         // Initialize dict property with get/set methods
@@ -48,37 +49,36 @@ class MonoStorage implements Storage{
                 const value = (await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value']))?.value
                 return value?.raw
             },
-            set: async (key: string, value: any) => {
+            set: async (key: string, value: unknown): Promise<void> => {
                 const match = MatchExp.atom({key: 'key', value: ['=', key]})
                 const origin = await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value'])
                 if (origin) {
-                    // FIXME 现在的数据库json返回值对字符串、数组没有区分。所以只好再包装一层。
-                    return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [DICTIONARY_RECORD, MatchExp.atom({key: 'id', value: ['=', origin.id]}), {key, value: {raw:value}}], [])
+                    await this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [DICTIONARY_RECORD, MatchExp.atom({key: 'id', value: ['=', origin.id]}), {key, value: {raw:value}}], [])
                 } else {
-                    return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [DICTIONARY_RECORD, { key, value: {raw:value}}], [])
+                    await this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [DICTIONARY_RECORD, { key, value: {raw:value}}], [])
                 }
             }
         }
     }
     public callbacks: Set<RecordMutationCallback> = new Set()
-    beginTransaction(name='') {
-        return this.db.beginTransaction ? this.db.beginTransaction(name) : this.db.scheme('BEGIN', name)
+    async beginTransaction(name='') {
+        await (this.db.beginTransaction ? this.db.beginTransaction(name) : this.db.scheme('BEGIN', name))
     }
-    commitTransaction(name='') {
-        return this.db.commitTransaction ? this.db.commitTransaction(name) : this.db.scheme('COMMIT', name)
+    async commitTransaction(name='') {
+        await (this.db.commitTransaction ? this.db.commitTransaction(name) : this.db.scheme('COMMIT', name))
     }
-    rollbackTransaction(name='') {
-        return this.db.rollbackTransaction ? this.db.rollbackTransaction(name) : this.db.scheme('ROLLBACK', name)
+    async rollbackTransaction(name='') {
+        await (this.db.rollbackTransaction ? this.db.rollbackTransaction(name) : this.db.scheme('ROLLBACK', name))
     }
     // CAUTION kv 结构数据的实现也用 er。这是系统约定，因为也需要  Record 事件！
-    async get(concept: string, key: string, initialValue?: any) {
+    async get(concept: string, key: string, initialValue?: unknown) {
         const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
         const value = (await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value']))?.value
         if (value === undefined) return initialValue
 
         return JSONParse(value)
     }
-    async set(concept: string, key: string, value:any, events?: RecordMutationEvent[]) {
+    async set(concept: string, key: string, value: unknown, events?: RecordMutationEvent[]) {
         const match = MatchExp.atom({key: 'key', value: ['=', key]}).and({  key: 'concept', value: ['=', concept] })
         const origin = await this.queryHandle!.findOne(SYSTEM_RECORD, match, undefined, ['value'])
         if (origin) {
@@ -90,8 +90,8 @@ class MonoStorage implements Storage{
     async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false) {
         await this.db.open(createTables)
         const dbSetup = new DBSetup(
-            entities as any, 
-            relations as any, 
+            entities, 
+            relations, 
             this.db
         )
         if (createTables) await dbSetup.createTables()
@@ -105,16 +105,16 @@ class MonoStorage implements Storage{
     find(...arg:Parameters<EntityQueryHandle["find"]>) {
         return this.queryHandle!.find(...arg)
     }
-    create(entityName: string, rawData: RawEntityData, events?: RecordMutationEvent[]) {
-        return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [entityName, rawData], events)
+    create(entityName: string, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [entityName, rawData], events) as Promise<EntityIdRef>
     }
-    update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]) {
-        return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [entity, matchExpressionData, rawData], events)
+    update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [entity, matchExpressionData, rawData], events) as Promise<EntityIdRef>
     }
-    delete(entityName: string, matchExpressionData: MatchExpressionData, events?: RecordMutationEvent[]) {
-        return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData], events)
+    delete(entityName: string, matchExpressionData: MatchExpressionData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData], events) as Promise<EntityIdRef>
     }
-    async callWithEvents<T extends any[]>(method: (...arg: [...T, RecordMutationEvent[]]) => any, args: T, events: RecordMutationEvent[] = []) {
+    async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = []) {
         const methodEvents:RecordMutationEvent[] = []
         const result = await method(...args, methodEvents)
         // FIXME 还没有实现异步机制
@@ -142,14 +142,14 @@ class MonoStorage implements Storage{
     findOneRelationByName(...arg: Parameters<EntityQueryHandle["findOneRelationByName"]>) {
         return this.queryHandle!.findOneRelationByName(...arg)
     }
-    updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[] ) {
-        return this.callWithEvents(this.queryHandle!.updateRelationByName.bind(this.queryHandle), [relationName, matchExpressionData, rawData], events)
+    updateRelationByName(relationName: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        return this.callWithEvents(this.queryHandle!.updateRelationByName.bind(this.queryHandle), [relationName, matchExpressionData, rawData], events) as Promise<EntityIdRef>
     }
-    removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData, events?: RecordMutationEvent[]) {
-        return this.callWithEvents(this.queryHandle!.removeRelationByName.bind(this.queryHandle), [relationName, matchExpressionData], events)
+    removeRelationByName(relationName: string, matchExpressionData: MatchExpressionData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        return this.callWithEvents(this.queryHandle!.removeRelationByName.bind(this.queryHandle), [relationName, matchExpressionData], events) as Promise<EntityIdRef>
     }
-    addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {}, events?: RecordMutationEvent[]) {
-        return this.callWithEvents(this.queryHandle!.addRelationByNameById.bind(this.queryHandle), [relationName, sourceEntityId, targetEntityId, rawData], events)
+    addRelationByNameById(relationName: string, sourceEntityId: string, targetEntityId: string, rawData: RawEntityData = {}, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        return this.callWithEvents(this.queryHandle!.addRelationByNameById.bind(this.queryHandle), [relationName, sourceEntityId, targetEntityId, rawData], events) as Promise<EntityIdRef>
     }
     getRelationName(...arg:Parameters<EntityQueryHandle["getRelationName"]>) {
         return this.queryHandle!.getRelationName(...arg)
@@ -236,13 +236,13 @@ export const dbConsoleLogger = new DBConsoleLogger()
 export const systemConsoleLogger = new SystemConsoleLogger()
 
 export class MonoSystem implements System {
-    conceptClass: Map<string, any> = new Map()
+    conceptClass: Map<string, unknown> = new Map()
     storage: Storage
     constructor(db: Database, public logger: SystemLogger = systemConsoleLogger) {
         this.storage = new MonoStorage(db)
     }
     
-    setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], install = false){
+    async setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], install = false){
         // Use RefContainer to handle cloning and reference updates
         const container = new RefContainer(originalEntities, originalRelations);
         
@@ -289,13 +289,13 @@ export class MonoSystem implements System {
 
         
         // Pass the prepared entities to storage.setup
-        return this.storage.setup(
+        await this.storage.setup(
             [...entities, DictionaryEntity, SystemEntity], 
             relations,
             install
         )
     }
-    destroy() {
-        this.storage.destroy()
+    async destroy() {
+        await this.storage.destroy()
     }
 }

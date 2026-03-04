@@ -56,7 +56,7 @@ export class PostgreSQLDB implements Database{
         await this.idSystem.setup()
 
     }
-    async query<T extends any>(sql:string, where: any[] =[], name= '')  {
+    async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
 
@@ -69,7 +69,7 @@ export class PostgreSQLDB implements Database{
         })
         return  (await this.db.query(sql, params)).rows as T[]
     }
-    async update<T extends any>(sql:string,values: any[], idField?:string, name='') {
+    async update<T>(sql:string,values: unknown[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
@@ -84,7 +84,7 @@ export class PostgreSQLDB implements Database{
         })
         return  (await this.db.query(sql, params)).rows as T[]
     }
-    async insert(sql:string, values:any[], name='')  {
+    async insert(sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
@@ -100,7 +100,7 @@ export class PostgreSQLDB implements Database{
         const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
         return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
     }
-    async delete<T extends any> (sql:string, where: any[], name='') {
+    async delete<T> (sql:string, where: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = where.map(x => x===false ? 0 : x===true ? 1 : x)

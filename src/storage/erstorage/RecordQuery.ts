@@ -12,7 +12,7 @@ export type RecordQueryData = {
     modifier?: ModifierData,
     label?: string,
     goto?: string
-    exit? : (data:RecursiveContext) => Promise<any>
+    exit? : (data:RecursiveContext) => Promise<boolean | void>
 }
 
 
@@ -76,7 +76,7 @@ export class RecordQuery {
         public allowNull = false,
         public label?: string,
         public goto?: string,
-        public exit? : (context: RecursiveContext) => Promise<boolean>,
+        public exit? : (context: RecursiveContext) => Promise<boolean | void>,
         // 返回时在父节点中的名字，这是针对使用 filtered relation 名称查询时需要的。
         public alias?: string
     ) {}
@@ -173,7 +173,7 @@ export class RecordQueryTree {
             this.records[name].addRecord(rest, subTree)
         }
     }
-    forEachRecords(handle: (t:RecordQueryTree) => any) {
+    forEachRecords(handle: (t:RecordQueryTree) => void) {
         Object.values(this.records).forEach(r => handle(r))
     }
     onlyIdField() {
@@ -206,7 +206,7 @@ export class RecordQueryTree {
         return new RecordQueryTree(this.recordName, this.map, this.parentRecord, this.attributeName, { fields, records }, this.parent, parentLinkQueryTree)
     }
     getData() {
-        const result: {[k:string]: any} = {
+        const result: {[k:string]: unknown} = {
             __fields: this.fields
         }
 

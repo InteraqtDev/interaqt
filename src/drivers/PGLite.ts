@@ -44,7 +44,7 @@ export class PGLiteDB implements Database{
 
         await this.idSystem.setup()
     }
-    async query<T extends any>(sql:string, params: any[] =[], name= '')  {
+    async query<T>(sql:string, params: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
 
@@ -56,18 +56,18 @@ export class PGLiteDB implements Database{
         })
         try {
             return (await this.db.query(sql, params)).rows as T[]
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error({
                 type:'query',
                 name,
                 sql,
                 params,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             })
             throw error
         }
     }
-    async update<T extends any>(sql:string,values: any[], idField?:string, name='') {
+    async update<T>(sql:string,values: unknown[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
@@ -83,7 +83,7 @@ export class PGLiteDB implements Database{
         return  (await this.db.query(sql, params)).rows as T[]
         
     }
-    async insert(sql:string, values:any[], name='')  {
+    async insert(sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
@@ -99,18 +99,18 @@ export class PGLiteDB implements Database{
         const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
         try {
             return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error({
                 type:'insert',
                 name,
                 sql: finalSQL,
                 params,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             })
             throw error
         }
     }
-    async delete<T extends any> (sql:string, params: any[], name='') {
+    async delete<T> (sql:string, params: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         logger.info({
@@ -132,12 +132,12 @@ export class PGLiteDB implements Database{
         })
         try {
             return await this.db.query(sql)
-        } catch (error: any) {
+        } catch (error: unknown) {
             logger.error({
                 type:'scheme',
                 name,
                 sql,
-                error: error.message
+                error: error instanceof Error ? error.message : String(error)
             })
             throw error
         }

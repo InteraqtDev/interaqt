@@ -77,7 +77,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
         return count > 0 ? sum / count : 0;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新
         if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
@@ -224,7 +224,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
         return count > 0 ? sum / count : 0;
     }
 
-    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<number|ComputationResult> {
+    async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
         // 只能支持通过 args.record 指定的关联关系或者关联实体的增量更新
         if (
             mutationEvent.recordName !== this.dataContext.host.name ||

@@ -1,4 +1,4 @@
-export function assert(condition: any, message: string ) {
+export function assert(condition: unknown, message: string ) {
     if (!condition) {
         // if (__DEV__) debugger
         throw new Error(message)
@@ -51,6 +51,6 @@ export function deepMerge(a: ObjectContainer, b: ObjectContainer) {
 }
 
 
-export function indexBy(arr: any[], key: string) {
+export function indexBy(arr: Record<string, unknown>[], key: string) {
 return Object.fromEntries(arr.map(o => [o[key], o]))
 }

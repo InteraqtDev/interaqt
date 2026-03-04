@@ -16,7 +16,7 @@ export class SideEffectError extends FrameworkError {
             recordName: string
             mutationType?: 'create' | 'update' | 'delete'
             recordId?: string
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         }
     ) {

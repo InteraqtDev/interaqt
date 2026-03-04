@@ -9,7 +9,7 @@ import {
     ComputationError, ComputationStateError,
     ComputationDataDepError
 } from "./errors/index.js";
-import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
+import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import {
     EntityEventSourceMap,
@@ -570,24 +570,21 @@ export class Scheduler {
         
         // 检查 task 是否仍然是 dataContext 当前最新的，如果不是，说明 task 已经过期，返回值不用管了。
         if (taskRecord.status === 'success') {
-            const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args)
+            const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args) as ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined
             
             if (computation.dataContext.type === 'global') {
-                // Global 类型不需要 record 参数
                 if (computation.incrementalPatchCompute) {
                     await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
                 } else {
                     await this.controller.applyResult(computation.dataContext, resultOrPatch)
                 }
             } else if (computation.dataContext.type === 'property') {
-                // Property 和其他类型需要 record 参数
                 if (computation.incrementalPatchCompute) {
-                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record)
+                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
                 } else {
-                    await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record)
+                    await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
                 }
             } else if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') {
-                // Entity 和 Relation 类型不需要 record 参数
                 if (computation.incrementalPatchCompute) {
                     await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
                 } else {

@@ -5,8 +5,8 @@ import type { ComputationRecord } from "./types"
 export type RecordsDataDep = {
     type: 'records',
     source: ComputationRecord,
-    match?: any,
-    modifier?: any,
+    match?: object,
+    modifier?: object,
     attributeQuery?: AttributeQueryData
 }
 

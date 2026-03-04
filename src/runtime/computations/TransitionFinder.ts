@@ -1,7 +1,6 @@
-import { StateMachineInstance } from "@core";
+import { StateMachineInstance, StateNodeInstance } from "@core";
 
-// Deep partial matching function for RecordMutationEvent patterns
-function deepPartialMatch(event: any, pattern: any): boolean {
+function deepPartialMatch(event: unknown, pattern: unknown): boolean {
     if (pattern === undefined || pattern === null) return true;
     if (event === pattern) return true;
     
@@ -15,14 +14,13 @@ function deepPartialMatch(event: any, pattern: any): boolean {
         return false;
     }
     
-    // Check all properties in the pattern
-    for (const key in pattern) {
-        if (!(key in event)) {
+    const eventObj = event as Record<string, unknown>;
+    const patternObj = pattern as Record<string, unknown>;
+    for (const key in patternObj) {
+        if (!(key in eventObj)) {
             return false;
         }
-        
-        // Recursively check nested objects
-        if (!deepPartialMatch(event[key], pattern[key])) {
+        if (!deepPartialMatch(eventObj[key], patternObj[key])) {
             return false;
         }
     }
@@ -31,8 +29,10 @@ function deepPartialMatch(event: any, pattern: any): boolean {
 }
 
 
+type TransitionEntry = { trigger: unknown; next: StateNodeInstance };
+
 export class TransitionFinder {
-    map: {[stateName: string]: any} = {}
+    map: {[stateName: string]: TransitionEntry[]} = {}
     constructor(public data: StateMachineInstance) {
         for(const transfer of data.transfers) {
             if(!this.map[transfer.current.name]) {
@@ -45,7 +45,7 @@ export class TransitionFinder {
         }
     }
 
-    findNextState(currentState: string, event: any) {
+    findNextState(currentState: string, event: unknown) {
         const transitions = this.map[currentState]
         if (transitions) {
             for (const transition of transitions) {
@@ -57,7 +57,7 @@ export class TransitionFinder {
         return null
     }
 
-    findTransfers(event: any) {
+    findTransfers(event: unknown) {
         return this.data.transfers.filter(transfer => deepPartialMatch(event, transfer.trigger))
     }
 }

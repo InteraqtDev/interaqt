@@ -20,16 +20,16 @@ import { asyncEffectsContext } from "./asyncEffectsContext.js";
 
 export const USER_ENTITY = 'User'
 
-export interface IRecordMutationSideEffect<T extends any> {
+export interface IRecordMutationSideEffect<T> {
     name: string;
     record: { name: string };
     content: (this: Controller, event: RecordMutationEvent) => Promise<T>;
 }
 
-export class RecordMutationSideEffect<T extends any> implements IRecordMutationSideEffect<T> {
+export class RecordMutationSideEffect<T> implements IRecordMutationSideEffect<T> {
     name: string;
     record: { name: string };
-    content: (this: Controller, event: RecordMutationEvent) => Promise<any>;
+    content: (this: Controller, event: RecordMutationEvent) => Promise<T>;
 
     constructor(data: IRecordMutationSideEffect<T>) {
         this.name = data.name;
@@ -43,8 +43,8 @@ export class RecordMutationSideEffect<T extends any> implements IRecordMutationS
 }
 
 export type InteractionContext = {
-    logContext?: any
-    [k: string]: any
+    logContext?: unknown
+    [k: string]: unknown
 }
 
 export type ComputationType = 'global' | 'entity' | 'relation' | 'property'
@@ -66,9 +66,11 @@ export interface ControllerOptions {
     system: System
     entities?: EntityInstance[]
     relations?: RelationInstance[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous collection of different event source types
     eventSources?: EventSourceInstance<any, any>[]
     dict?: DictionaryInstance[]
-    recordMutationSideEffects?: RecordMutationSideEffect<any>[]
+    recordMutationSideEffects?: RecordMutationSideEffect<unknown>[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     computations?: (new (...args: any[]) => Computation)[]
     ignoreGuard?: boolean
     forceThrowDispatchError?: boolean
@@ -86,7 +88,7 @@ export const HardDeletionProperty = {
 }
 
 export class Controller {
-    public recordNameToSideEffects = new Map<string, Set<RecordMutationSideEffect<any>>>()
+    public recordNameToSideEffects = new Map<string, Set<RecordMutationSideEffect<unknown>>>()
     public globals = {
         BoolExp,
         MatchExp
@@ -95,13 +97,16 @@ export class Controller {
     public system: System
     public entities: EntityInstance[]
     public relations: RelationInstance[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous collection
     public eventSources: EventSourceInstance<any, any>[]
     public dict: DictionaryInstance[] = []
-    public recordMutationSideEffects: RecordMutationSideEffect<any>[] = []
+    public recordMutationSideEffects: RecordMutationSideEffect<unknown>[] = []
     public ignoreGuard: boolean
     public forceThrowDispatchError: boolean
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private eventSourcesByName = new Map<string, EventSourceInstance<any, any>>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private eventSourcesByUUID = new Map<string, EventSourceInstance<any, any>>()
 
     constructor(options: ControllerOptions) {
@@ -174,20 +179,20 @@ export class Controller {
         await this.scheduler.setup(install)
     }
     
-    async retrieveLastValue(dataContext: DataContext, record?: any) {
+    async retrieveLastValue(dataContext: DataContext, record?: Record<string, unknown>) {
         if (dataContext.type === 'global') {
             return this.system.storage.dict.get(dataContext.id.name)
         } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
             return this.system.storage.find(dataContext.id.name!, undefined, undefined, ['*'])
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            if (record[propertyDataContext.id.name]) return record[propertyDataContext.id.name]
+            if (record![propertyDataContext.id.name]) return record![propertyDataContext.id.name]
 
             const item = await this.system.storage.findOne(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
             return item[propertyDataContext.id.name]
         }
     }
-    async applyResult(dataContext: DataContext, result: any, record?: any) {
+    async applyResult(dataContext: DataContext, result: unknown, record?: Record<string, unknown>) {
         if (result instanceof ComputationResultSkip) return
 
         if (dataContext.type === 'global') {
@@ -211,13 +216,13 @@ export class Controller {
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
             if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
-                await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))
+                await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}))
             } else {
-                await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: result})
+                await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: result})
             }
         }   
     }
-    async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: any) {
+    async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: Record<string, unknown>) {
         if (patch instanceof ComputationResultSkip||patch === undefined) return
 
         const patches = Array.isArray(patch) ? patch : [patch]
@@ -240,14 +245,14 @@ export class Controller {
 
                 if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && patch.data) {
                     assert(patch.type !== 'delete', 'Hard deletion property cannot be deleted')
-                    await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))
+                    await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}))
                 } else {
                     if (patch.type === 'insert') {
-                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: patch.data})
                     } else if (patch.type === 'update') {
-                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: patch.data})
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: patch.data})
                     } else if (patch.type === 'delete') {
-                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[propertyDataContext.id.name]: null})
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: null})
                     }
                 }
 
@@ -255,13 +260,13 @@ export class Controller {
             }
         }
     }
-    callbacks: Map<any, Set<SystemCallback>> = new Map()
+    callbacks: Map<string, Set<SystemCallback>> = new Map()
 
     /**
      * Unified dispatch API for all event source types.
      * First parameter is an object reference to the event source, second is the event args.
      */
-    async dispatch<TArgs = any, TResult = any>(
+    async dispatch<TArgs = unknown, TResult = unknown>(
         eventSource: EventSourceInstance<TArgs, TResult>,
         args: TArgs
     ): Promise<DispatchResponse> {
@@ -357,13 +362,14 @@ export class Controller {
             }
         }
     }
-    addEventListener(eventName: string, callback: (...args: any[]) => any) {
+    addEventListener(eventName: string, callback: SystemCallback) {
         if (!this.callbacks.has(eventName)) {
             this.callbacks.set(eventName, new Set());
         }
         this.callbacks.get(eventName)!.add(callback);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findEventSourceByName(name: string): EventSourceInstance<any, any> | undefined {
         return this.eventSourcesByName.get(name)
     }

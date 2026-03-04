@@ -18,12 +18,12 @@ export class ActivityError extends FrameworkError {
             activityInstanceId?: string
             currentState?: any
             severity?: ErrorSeverity
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {
         super(message, {
-            errorType: options.context?.errorType || 'ActivityError',
+            errorType: (options.context?.errorType as string) || 'ActivityError',
             context: {
                 category: ErrorCategory.ACTIVITY,
                 activityName: options.activityName,
@@ -61,7 +61,7 @@ export class ActivityStateError extends ActivityError {
             activityId?: string
             activityInstanceId?: string
             currentState?: any
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {

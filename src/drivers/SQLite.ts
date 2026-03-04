@@ -33,7 +33,7 @@ export class SQLiteDB implements Database{
         this.db = new SQLite(this.file, this.options)
         await this.idSystem.setup()
     }
-    async query<T extends any>(sql:string, where: any[] =[], name= '')  {
+    async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
 
@@ -46,7 +46,7 @@ export class SQLiteDB implements Database{
         })
         return  this.db.prepare(sql).all(...params) as T[]
     }
-    async update(sql:string,values: any[], idField?:string, name='') {
+    async update(sql:string,values: unknown[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING ${idField} AS id`: ''}`
@@ -59,9 +59,9 @@ export class SQLiteDB implements Database{
             sql:finalSQL,
             params
         })
-        return this.db.prepare(finalSQL).run(...params)  as unknown as any[]
+        return this.db.prepare(finalSQL).run(...params)  as unknown as EntityIdRef[]
     }
-    async insert (sql:string, values:any[], name='')  {
+    async insert (sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
@@ -75,7 +75,7 @@ export class SQLiteDB implements Database{
         })
         return  this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).run(...params) as unknown as EntityIdRef
     }
-    async delete (sql:string, where: any[], name='') {
+    async delete<T> (sql:string, where: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
@@ -85,7 +85,7 @@ export class SQLiteDB implements Database{
             sql,
             params
         })
-        return this.db.prepare(sql).run(...params) as unknown as  any[]
+        return this.db.prepare(sql).run(...params) as unknown as T[]
     }
     async scheme(sql: string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext

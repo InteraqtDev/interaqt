@@ -90,9 +90,9 @@ export class DataAttributive implements DataAttributiveInstance {
     const data: SerializedData<DataAttributiveCreateArgs> = JSON.parse(json);
     const args = data.public;
     
-    // 反序列化函数
-    if (args.content && typeof args.content === 'string' && (args.content as any).startsWith('func::')) {
-      args.content = new Function('return ' + (args.content as any).substring(6))();
+    const raw = args as unknown as Record<string, unknown>;
+    if (typeof raw.content === 'string' && raw.content.startsWith('func::')) {
+      args.content = new Function('return ' + raw.content.substring(6))();
     }
     
     return this.create(args, data.options);

@@ -142,12 +142,12 @@ export class Property implements PropertyInstance {
     const data: SerializedData<PropertyCreateArgs> = JSON.parse(json);
     const args = data.public;
     
-    // 反序列化函数
-    if (args.defaultValue && typeof args.defaultValue === 'string' && (args.defaultValue as any).startsWith('func::')) {
-      args.defaultValue = new Function('return ' + (args.defaultValue as any).substring(6))();
+    const raw = args as unknown as Record<string, unknown>;
+    if (typeof raw.defaultValue === 'string' && raw.defaultValue.startsWith('func::')) {
+      args.defaultValue = new Function('return ' + raw.defaultValue.substring(6))();
     }
-    if (args.computed && typeof args.computed === 'string' && (args.computed as any).startsWith('func::')) {
-      args.computed = new Function('return ' + (args.computed as any).substring(6))();
+    if (typeof raw.computed === 'string' && raw.computed.startsWith('func::')) {
+      args.computed = new Function('return ' + raw.computed.substring(6))();
     }
     
     return this.create(args, data.options);

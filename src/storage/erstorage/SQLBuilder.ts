@@ -11,7 +11,7 @@ import { FieldAliasMap } from "./util/FieldAliasMap.js";
  * JOIN 表信息
  */
 export type JoinTables = {
-    for: any
+    for: unknown
     joinSource: [string, string]
     joinIdField: [string, string]
     joinTarget: [string, string]
@@ -61,7 +61,7 @@ export class SQLBuilder {
         recordQuery: RecordQuery,
         prefix = '',
         parentP?: PlaceholderGen
-    ): [string, any[], FieldAliasMap] {
+    ): [string, unknown[], FieldAliasMap] {
         // 从所有条件里面构建出 join clause
         const fieldQueryTree = recordQuery.attributeQuery!.xToOneQueryTree
         const matchQueryTree = recordQuery.matchExpression.xToOneQueryTree
@@ -156,9 +156,9 @@ ${modifierClause}
         fieldMatchExp: BoolExp<FieldMatchAtom> | null,
         prefix = '',
         p: PlaceholderGen
-    ): [string, any[]] {
+    ): [string, unknown[]] {
         let sql = ``
-        const values: any[] = []
+        const values: unknown[] = []
         if (!fieldMatchExp) return [`1=${p()}`, [1]]
 
         if (fieldMatchExp.isAtom()) {
@@ -422,8 +422,8 @@ ${innerQuerySQL}
      */
     buildInsertSQL(
         recordName: string,
-        fieldAndValues: Array<{ field: string, value: any, fieldType?: string }>
-    ): [string, any[]] {
+        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string }>
+    ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
         
@@ -444,8 +444,8 @@ VALUES
     buildUpdateSQL(
         entityName: string,
         idRef: { id: string | number },
-        columnAndValue: Array<{ field: string, value: any }>
-    ): [string, any[]] {
+        columnAndValue: Array<{ field: string, value: unknown }>
+    ): [string, unknown[]] {
         if (!columnAndValue.length) {
             return ['', []]
         }
@@ -470,7 +470,7 @@ WHERE "${entityInfo.idField}" = (${p()})
         recordName: string,
         idField: string,
         id: string | number
-    ): [string, any[]] {
+    ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
         
@@ -489,7 +489,7 @@ WHERE "${idField}" = ${p()}
         recordName: string,
         fields: string[],
         idRef: { id: string | number }
-    ): [string, any[]] {
+    ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
         
@@ -509,7 +509,7 @@ WHERE "${recordInfo.idField}" = ${p()}
     buildDeleteByWhereSQL(
         recordName: string,
         matchExp: BoolExp<FieldMatchAtom>
-    ): [string, any[]] {
+    ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
         const [whereClause, params] = this.buildWhereClause(matchExp, '', p)
@@ -533,7 +533,7 @@ WHERE ${whereClause}
     /**
      * 准备字段值（处理 JSON 等特殊类型）
      */
-    prepareFieldValue(value: any, fieldType?: string): any {
+    prepareFieldValue(value: unknown, fieldType?: string): unknown {
         if (fieldType?.toLowerCase() === 'json') {
             return JSON.stringify(value)
         }

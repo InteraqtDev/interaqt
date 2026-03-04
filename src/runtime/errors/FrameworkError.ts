@@ -6,7 +6,7 @@ export abstract class FrameworkError extends Error {
     public readonly timestamp: Date
     public readonly errorId: string
     public readonly errorType: string
-    public readonly context: Record<string, any>
+    public readonly context: Record<string, unknown>
     public readonly causedBy?: Error
     public readonly stackTrace?: string
 
@@ -14,7 +14,7 @@ export abstract class FrameworkError extends Error {
         message: string,
         options: {
             errorType?: string
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {
@@ -73,7 +73,7 @@ export abstract class FrameworkError extends Error {
     /**
      * Serialize error for JSON transmission
      */
-    public toJSON(): Record<string, any> {
+    public toJSON(): Record<string, unknown> {
         return {
             name: this.name,
             message: this.message,
@@ -167,7 +167,7 @@ export abstract class FrameworkError extends Error {
     /**
      * Check if error is of specific type
      */
-    public static isType<T extends FrameworkError>(error: any, ErrorClass: new (...args: any[]) => T): error is T {
+    public static isType<T extends FrameworkError>(error: unknown, ErrorClass: new (...args: any[]) => T): error is T {
         return error instanceof ErrorClass
     }
 

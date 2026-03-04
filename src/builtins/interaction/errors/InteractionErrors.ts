@@ -18,12 +18,12 @@ export class InteractionExecutionError extends FrameworkError {
             payload?: any
             executionPhase?: string
             severity?: ErrorSeverity
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {
         super(message, {
-            errorType: options.context?.errorType || 'InteractionExecutionError',
+            errorType: (options.context?.errorType as string) || 'InteractionExecutionError',
             context: {
                 category: ErrorCategory.INTERACTION,
                 interactionName: options.interactionName,

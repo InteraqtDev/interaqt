@@ -21,13 +21,13 @@ export class ConditionError extends FrameworkError {
             payload?: any
             evaluationError?: EvaluateError<any> | any
             severity?: ErrorSeverity
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
             type?: string  // For backward compatibility
         }
     ) {
         super(message, {
-            errorType: options.context?.errorType || 'ConditionError',
+            errorType: (options.context?.errorType as string) || 'ConditionError',
             context: {
                 category: ErrorCategory.PERMISSION,
                 checkType: options.checkType,
@@ -51,7 +51,7 @@ export class ConditionError extends FrameworkError {
     /**
      * Helper factory methods for common condition error scenarios
      */
-    static userCheckFailed(error: any, context?: Record<string, any>): ConditionError {
+    static userCheckFailed(error: unknown, context?: Record<string, unknown>): ConditionError {
         return new ConditionError('User check failed', {
             checkType: 'user',
             evaluationError: error,
@@ -61,7 +61,7 @@ export class ConditionError extends FrameworkError {
         })
     }
 
-    static payloadValidationFailed(fieldName: string, message: string, payload?: any, error?: any): ConditionError {
+    static payloadValidationFailed(fieldName: string, message: string, payload?: any, error?: unknown): ConditionError {
         const fullMessage = `${fieldName} ${message}`
         return new ConditionError(`Payload validation failed for field '${fieldName}': ${message}`, {
             checkType: 'payload',
@@ -73,7 +73,7 @@ export class ConditionError extends FrameworkError {
         })
     }
 
-    static conditionCheckFailed(error: EvaluateError<any>, context?: Record<string, any>): ConditionError {
+    static conditionCheckFailed(error: EvaluateError<any>, context?: Record<string, unknown>): ConditionError {
         return new ConditionError(`Condition check failed: ${error.data.name}`, {
             checkType: 'condition',
             evaluationError: error,
@@ -83,7 +83,7 @@ export class ConditionError extends FrameworkError {
         })
     }
 
-    static attributiveCheckFailed(fieldName: string, message: string, payload?: any, error?: any): ConditionError {
+    static attributiveCheckFailed(fieldName: string, message: string, payload?: any, error?: unknown): ConditionError {
         const fullMessage = `${fieldName} ${message}`
         return new ConditionError(`Attributive check failed for field '${fieldName}': ${message}`, {
             checkType: 'attributive',
@@ -95,7 +95,7 @@ export class ConditionError extends FrameworkError {
         })
     }
 
-    static conceptCheckFailed(fieldName: string, error: any): ConditionError {
+    static conceptCheckFailed(fieldName: string, error: unknown): ConditionError {
         return new ConditionError(`Concept check failed for field '${fieldName}'`, {
             checkType: 'concept',
             fieldName,

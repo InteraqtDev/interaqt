@@ -12,7 +12,7 @@ import { assert } from "../util.js";
 export class GlobalAnyHandle implements DataBasedComputation {
     static computationType = Any
     static contextType = 'global' as const
-    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: unknown}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -55,7 +55,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
         return matchCount>0
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<boolean|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
         if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
@@ -104,7 +104,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
 export class PropertyAnyHandle implements DataBasedComputation {
     static computationType = Any
     static contextType = 'property' as const
-    callback: (this: Controller, item: any, dataDeps?: {[key: string]: any}) => boolean
+    callback: (this: Controller, item: any, dataDeps?: {[key: string]: unknown}) => boolean
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = true
     dataDeps: {[key: string]: DataDep} = {}
@@ -177,7 +177,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
         return matchCount>0
     }
 
-    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: any}): Promise<boolean|ComputationResult> {
+    async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<boolean|ComputationResult> {
         // 只能支持通过 args.record 指定的关联关系或者关联实体的增量更新。
         if (
             mutationEvent.recordName !== this.dataContext.host.name ||

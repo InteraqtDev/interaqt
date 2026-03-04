@@ -213,7 +213,7 @@ export type BoolExpressionRawData<T> = {
 export type EvaluateError<T> = {
   data:T,
   stack: ExpressionData<T>[],
-  error: any,
+  error: string,
   inverse: boolean
 }
 
@@ -298,13 +298,15 @@ export class BoolExp<T> {
     return this.raw.type === 'expression'
   }
 
+  static isExpressionData(value: unknown): value is ExpressionData<unknown> {
+    return value !== null && typeof value === 'object' && 'type' in value &&
+      ((value as { type: unknown }).type === 'atom' || (value as { type: unknown }).type === 'expression')
+  }
+
   static standardizeData<T>(atomValueOrExp: unknown) :ExpressionData<T> {
-    return atomValueOrExp instanceof BoolExp ?
-    atomValueOrExp.raw :
-    (atomValueOrExp && typeof atomValueOrExp === 'object' && 
-     (atomValueOrExp as any).type === 'atom' || (atomValueOrExp as any).type === 'expression') ?
-      atomValueOrExp as ExpressionData<T>:
-      { type: 'atom', data: atomValueOrExp as T}
+    if (atomValueOrExp instanceof BoolExp) return atomValueOrExp.raw
+    if (BoolExp.isExpressionData(atomValueOrExp)) return atomValueOrExp as ExpressionData<T>
+    return { type: 'atom', data: atomValueOrExp as T}
   }
   
   and(atomValueOrExp: unknown) {
@@ -464,20 +466,29 @@ function defaultParse(key:string) {
   return {key}
 }
 
-function astNodeToBoolExpressionNode<T>(astNode: any, optionsByName: {[k:string]: any}, parseAtomNameToObject: ParseAtomNameToObjectType): ExpressionData<T> {
+type AstNode = {
+  type: string;
+  operator?: string;
+  name?: string;
+  left?: AstNode;
+  right?: AstNode;
+  argument?: AstNode;
+}
+
+function astNodeToBoolExpressionNode<T>(astNode: AstNode, optionsByName: Record<string, unknown>, parseAtomNameToObject: ParseAtomNameToObjectType): ExpressionData<T> {
   if (astNode.type === "LogicalExpression") {
     return {
       type: 'expression',
       operator: OperatorNames[astNode.operator as keyof typeof OperatorNames],
-      left: astNodeToBoolExpressionNode(astNode.left, optionsByName, parseAtomNameToObject),
-      right: astNodeToBoolExpressionNode(astNode.right, optionsByName, parseAtomNameToObject)
+      left: astNodeToBoolExpressionNode(astNode.left!, optionsByName, parseAtomNameToObject),
+      right: astNodeToBoolExpressionNode(astNode.right!, optionsByName, parseAtomNameToObject)
     } as BoolExpressionRawData<T>
   }
 
   if (astNode.type === "Identifier") {
     return {
       type: 'atom',
-      data: parseAtomNameToObject(astNode.name) as T
+      data: parseAtomNameToObject(astNode.name!) as T
     }
   }
 
@@ -485,7 +496,7 @@ function astNodeToBoolExpressionNode<T>(astNode: any, optionsByName: {[k:string]
     return {
       type: 'expression',
       operator: 'not',
-      left: astNodeToBoolExpressionNode(astNode.argument, optionsByName, parseAtomNameToObject),
+      left: astNodeToBoolExpressionNode(astNode.argument!, optionsByName, parseAtomNameToObject),
     } as BoolExpressionRawData<T>
   }
 

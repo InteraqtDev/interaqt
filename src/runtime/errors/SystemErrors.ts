@@ -13,12 +13,12 @@ export class SchedulerError extends FrameworkError {
         options: {
             schedulingPhase?: string
             failedComputations?: string[]
-            context?: Record<string, any>
+            context?: Record<string, unknown>
             causedBy?: Error
         } = {}
     ) {
         super(message, {
-            errorType: options.context?.errorType || 'SchedulerError',
+            errorType: (options.context?.errorType as string) || 'SchedulerError',
             context: {
                 category: ErrorCategory.SYSTEM,
                 schedulingPhase: options.schedulingPhase,

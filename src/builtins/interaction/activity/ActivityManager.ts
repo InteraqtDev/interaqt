@@ -2,6 +2,7 @@ import { ActivityInstance } from '../Activity.js';
 import { InteractionEventEntity, InteractionInstance, InteractionEventArgs, INTERACTION_RECORD } from '../Interaction.js';
 import { Entity, Property, Relation, EventSourceInstance, EntityInstance, RelationInstance } from '@core';
 import { assert } from '@runtime';
+import type { Controller } from '@runtime';
 import { ActivityCall } from './ActivityCall.js';
 
 export { INTERACTION_RECORD };
@@ -94,7 +95,7 @@ export class ActivityManager {
     ): EventSourceInstance<InteractionEventArgs> {
         const isHeadInteraction = activityCall.isActivityHead(interaction)
 
-        const wrappedGuard = async function(this: any, args: InteractionEventArgs) {
+        const wrappedGuard = async function(this: Controller, args: InteractionEventArgs) {
             if (isHeadInteraction && !args.activityId) {
                 if (interaction.guard) {
                     await interaction.guard.call(this, args)
@@ -115,7 +116,7 @@ export class ActivityManager {
             }
         }
 
-        const wrappedMapEventData = (args: InteractionEventArgs): Record<string, any> => {
+        const wrappedMapEventData = (args: InteractionEventArgs): Record<string, unknown> => {
             const baseData = interaction.mapEventData
                 ? interaction.mapEventData(args)
                 : {}
@@ -125,7 +126,7 @@ export class ActivityManager {
             return baseData
         }
 
-        const wrappedAfterDispatch = async function(this: any, args: InteractionEventArgs, result: { data?: any }) {
+        const wrappedAfterDispatch = async function(this: Controller, args: InteractionEventArgs, result: { data?: unknown }) {
             const activityId = args.activityId!
 
             await activityCall.saveUserRefs(this, activityId, interaction, args)

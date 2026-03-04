@@ -1,6 +1,6 @@
 import { RealTime } from "@core";
 import { Controller } from "../Controller";
-import { ComputationResultPatch, ComputationResult, DataBasedComputation, RecordBoundState, GlobalBoundState } from "./Computation";
+import { ComputationResultPatch, ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState } from "./Computation";
 import { RealTimeInstance, PropertyInstance } from "@core";
 import { DataContext } from "./Computation.js";
 import { Equation, Expression, Inequality } from "./MathResolver";
@@ -11,19 +11,18 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>;
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>;
-    // RealTimeValue 没有 dataDeps
-    dataDeps: {[key: string]: any}
+    dataDeps: {[key: string]: DataDep}
     useLastValue = false;
-    callback: (now: Expression, dataDeps: {[key: string]: any}) => Promise<Expression|Inequality|Equation>
-    nextRecomputeTime?: (now: number, dataDeps: {[key: string]: any}) => number
+    callback: (now: Expression, dataDeps: Record<string, unknown>) => Promise<Expression|Inequality|Equation>
+    nextRecomputeTime?: (now: number, dataDeps: Record<string, unknown>) => number
 
     constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
-        this.dataDeps = this.args.dataDeps ?? {};
-        this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
+        this.dataDeps = (this.args.dataDeps ?? {}) as {[key: string]: DataDep};
+        this.callback = (now: Expression, dataDeps: Record<string, unknown>) => {
             return this.args.callback.call(this.controller, now, dataDeps);
         };
         this.nextRecomputeTime = this.args.nextRecomputeTime ? 
-            (now: number, dataDeps: {[key: string]: any}) => {
+            (now: number, dataDeps: Record<string, unknown>) => {
                 return this.args.nextRecomputeTime!.call(this.controller, now, dataDeps);
             } : undefined;
     }
@@ -39,7 +38,7 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
     }
     
     // TODO now 是不是应该用 dataDeps 动态注入？？？这样能手动测试。改成在哪里配置？
-    async compute(dataDeps: {[key: string]: any}) : Promise<number|boolean>{
+    async compute(dataDeps: {[key: string]: unknown}) : Promise<number|boolean>{
         const result = await this.args.callback(Expression.variable('now'), dataDeps) as Expression|Inequality|Equation
         const now = Date.now()
         let resultValue: number|boolean
@@ -68,11 +67,10 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>;
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>;
-    // RealTimeValue 没有 dataDeps
-    dataDeps: {[key: string]: any}
+    dataDeps: {[key: string]: DataDep}
     useLastValue = false;
-    callback: (now: Expression, dataDeps: {[key: string]: any}) => Promise<Expression|Inequality|Equation>
-    nextRecomputeTime?: (now: number, dataDeps: {[key: string]: any}) => number
+    callback: (now: Expression, dataDeps: Record<string, unknown>) => Promise<Expression|Inequality|Equation>
+    nextRecomputeTime?: (now: number, dataDeps: Record<string, unknown>) => number
     isResultNumber: boolean
     constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
         this.dataDeps = {
@@ -83,11 +81,11 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
             ...(this.args.dataDeps || {})
         }
         this.isResultNumber = (this.dataContext.id as PropertyInstance).type === 'number'
-        this.callback = (now: Expression, dataDeps: {[key: string]: any}) => {
+        this.callback = (now: Expression, dataDeps: Record<string, unknown>) => {
             return this.args.callback.call(this.controller, now, dataDeps);
         };
         this.nextRecomputeTime = this.args.nextRecomputeTime ? 
-            (now: number, dataDeps: {[key: string]: any}) => {
+            (now: number, dataDeps: Record<string, unknown>) => {
                 return this.args.nextRecomputeTime!.call(this.controller, now, dataDeps);
             } : undefined;
     }
@@ -103,7 +101,7 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     }
     
     // TODO now 是不是应该用 dataDeps 动态注入？？？这样能手动测试。改成在哪里配置？
-    async compute(dataDeps: {[key: string]: any}, record: any) : Promise<number|boolean>{
+    async compute(dataDeps: {[key: string]: unknown}, record: any) : Promise<number|boolean>{
         const result = await this.args.callback(Expression.variable('now'), dataDeps) as Expression|Inequality|Equation
         const now = Date.now()
         let resultValue: number|boolean

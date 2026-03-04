@@ -137,9 +137,9 @@ export class WeightedSummation implements WeightedSummationInstance {
     const data: SerializedData<WeightedSummationCreateArgs> = JSON.parse(json);
     const args = data.public;
     
-    // 反序列化函数
-    if (args.callback && typeof args.callback === 'string' && (args.callback as any).startsWith('func::')) {
-      args.callback = new Function('return ' + (args.callback as any).substring(6))();
+    const raw = args as unknown as Record<string, unknown>;
+    if (typeof raw.callback === 'string' && raw.callback.startsWith('func::')) {
+      args.callback = new Function('return ' + raw.callback.substring(6))();
     }
     
     return this.create(args, data.options);

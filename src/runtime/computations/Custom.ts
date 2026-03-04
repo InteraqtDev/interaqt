@@ -36,7 +36,7 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     
     // 设置自定义的 dataDeps
     if (args.dataDeps) {
-      this.dataDeps = args.dataDeps;
+      this.dataDeps = args.dataDeps as {[key: string]: DataDep};
     }
     
 

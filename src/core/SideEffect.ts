@@ -90,9 +90,9 @@ export class SideEffect implements SideEffectInstance {
     const data: SerializedData<SideEffectCreateArgs> = JSON.parse(json);
     const args = data.public;
     
-    // 反序列化函数
-    if (args.handle && typeof args.handle === 'string' && (args.handle as any).startsWith('func::')) {
-      args.handle = new Function('return ' + (args.handle as any).substring(6))();
+    const raw = args as unknown as Record<string, unknown>;
+    if (typeof raw.handle === 'string' && raw.handle.startsWith('func::')) {
+      args.handle = new Function('return ' + raw.handle.substring(6))();
     }
     
     return this.create(args, data.options);

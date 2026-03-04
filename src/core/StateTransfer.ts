@@ -5,12 +5,8 @@ export type RecordMutationEventPattern = {
   recordName: string;
   type: 'create' | 'update' | 'delete';
   keys?: string[];
-  record?: {
-    [key: string]: any;
-  };
-  oldRecord?: {
-    [key: string]: any;
-  };
+  record?: Record<string, unknown>;
+  oldRecord?: Record<string, unknown>;
 };
 
 export interface StateTransferInstance extends IInstance {

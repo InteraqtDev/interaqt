@@ -13,7 +13,7 @@ export type FieldMatchAtom = MatchAtom & {
     //  value 类型的
     fieldName?: [string, string],
     fieldValue?: string,
-    fieldParams? :any[]
+    fieldParams? :unknown[]
     // entity 类型的
     namePath?: string[],
     isFunctionMatch?: boolean,
@@ -202,9 +202,9 @@ export class MatchExp {
         return `${tableAlias}.${rawFieldName}`
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database): [string, any[]] {
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database): [string, unknown[]] {
         let fieldValue =''
-        let fieldParams:any[] = []
+        let fieldParams:unknown[] = []
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
 
         if (simpleOp.includes(value[0]) || (value[0] === 'not' && value[1] !== null)) {
@@ -221,7 +221,7 @@ export class MatchExp {
             fieldValue = `IS NOT NULL`
         } else if (value[0].toLowerCase() === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
-            fieldValue = `IN (${value[1].map((x: any) => p()).join(',')})`
+            fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
             fieldParams = value[1]
         } else if (value[0].toLowerCase() === 'between') {
             if (isReferenceValue) {
@@ -417,7 +417,7 @@ export class MatchExp {
      * 将 MatchExp 实例序列化为 JSON 格式
      * @returns JSON 可序列化的对象
      */
-    toJSON(): any {
+    toJSON(): Record<string, unknown> {
         return {
             entityName: this.entityName,
             data: this.data ? this.data.raw : undefined,
@@ -432,14 +432,14 @@ export class MatchExp {
      * @param map EntityToTableMap 实例
      * @returns MatchExp 实例
      */
-    static fromJSON(json: any, map: EntityToTableMap): MatchExp {
-        const data = json.data ? BoolExp.fromValue<MatchAtom>(json.data) : undefined;
+    static fromJSON(json: Record<string, unknown>, map: EntityToTableMap): MatchExp {
+        const data = json.data ? BoolExp.fromValue<MatchAtom>(json.data as any) : undefined;
         return new MatchExp(
-            json.entityName,
+            json.entityName as string,
             map,
             data,
-            json.contextRootEntity,
-            json.fromRelation
+            json.contextRootEntity as string | undefined,
+            json.fromRelation as boolean | undefined
         );
     }
 }

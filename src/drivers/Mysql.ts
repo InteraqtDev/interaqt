@@ -55,7 +55,7 @@ export class MysqlDB implements Database{
         await this.idSystem.setup()
 
     }
-    async query<T extends any>(sql:string, where: any[] =[], name= '')  {
+    async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
 
@@ -68,7 +68,7 @@ export class MysqlDB implements Database{
         })
         return  (await this.db.query(sql, params))[0] as T[]
     }
-    async update<T extends any>(sql:string,values: any[], idField?:string, name='') {
+    async update<T>(sql:string,values: unknown[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
@@ -83,7 +83,7 @@ export class MysqlDB implements Database{
         })
         return  (await this.db.query(sql, params))[0] as T[]
     }
-    async insert(sql:string, values:any[], name='')  {
+    async insert(sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
@@ -102,7 +102,7 @@ export class MysqlDB implements Database{
         const insertedId = (rows as RowDataPacket[])[0]['LAST_INSERT_ID()']
         return {id: insertedId} as EntityIdRef
     }
-    async delete<T extends any> (sql:string, where: any[], name='') {
+    async delete<T> (sql:string, where: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
