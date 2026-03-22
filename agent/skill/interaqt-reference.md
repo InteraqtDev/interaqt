@@ -8,18 +8,21 @@
 
 ```typescript
 Entity.create(args: {
-  name: string                        // PascalCase, singular, unique
-  properties: PropertyInstance[]      // Array of Property.create() results
+  name: string                        // PascalCase, singular, unique, must match /^[a-zA-Z0-9_]+$/
+  properties?: PropertyInstance[]     // Array of Property.create() results (defaults to [])
   computation?: ComputationInstance   // Transform for derived entities
-  baseEntity?: EntityInstance         // For filtered entities
-  filterCondition?: MatchExp          // For filtered entities
+  baseEntity?: EntityInstance | RelationInstance  // For filtered entities
+  matchExpression?: MatchExp          // Filter condition for filtered entities
+  inputEntities?: EntityInstance[]    // For merged entities
+  commonProperties?: PropertyInstance[]  // Shared attributes for merged entities
 }): EntityInstance
 ```
 
 Constraints:
 - NEVER pass `uuid` — the framework generates it
-- `name` must match `/^[a-zA-Z0-9_]+$/`
 - `computation` accepts only Transform (for creating derived entity collections)
+- **Filtered entity**: set `baseEntity` + `matchExpression`
+- **Merged entity**: set `inputEntities` + `commonProperties` (cannot define own `properties`)
 
 ---
 
@@ -27,21 +30,21 @@ Constraints:
 
 ```typescript
 Property.create(args: {
-  name: string                        // Property name
-  type?: 'string' | 'number' | 'boolean' | 'object'
+  name: string                        // Must match /^[a-zA-Z0-9_]+$/
+  type: string                        // Required: 'string' | 'number' | 'boolean' | 'object'
   collection?: boolean                // true for array types
-  defaultValue?: any | (() => any)    // Static value or factory function
-  getValue?: (record: any) => any     // Computed from same-record fields (not persisted)
-  computed?: (record: any) => any     // Alias for getValue
-  computation?: ComputationInstance   // Reactive: Count, WeightedSummation, Every, Any, StateMachine
+  defaultValue?: Function             // Factory function returning default value
+  computed?: (record: any) => any     // Computed from same-record fields (not persisted)
+  computation?: ComputationInstance   // Reactive: Count, Summation, WeightedSummation, Every, Any, StateMachine, Custom
 }): PropertyInstance
 ```
 
 Constraints:
-- `getValue`/`computed` are for same-record derivations only — NOT persisted
+- `type` is REQUIRED — always specify it
+- `computed` is for same-record derivations only — NOT persisted
 - `computation` results ARE persisted and auto-updated
-- When using `computation`, ALWAYS provide `defaultValue`
-- NEVER use Transform on Property `computation` — Transform belongs on Entity `computation`
+- When using `computation`, provide `defaultValue`
+- NEVER use Transform on Property `computation` — Transform belongs on Entity/Relation `computation`
 
 ---
 
@@ -49,20 +52,33 @@ Constraints:
 
 ```typescript
 Relation.create(args: {
-  source: EntityInstance               // Source entity
+  // Base relation (all required for normal relations):
+  name?: string                       // Optional — auto-generated if omitted
+  source: EntityInstance | RelationInstance
   sourceProperty: string              // Navigation property on source
-  target: EntityInstance               // Target entity
+  target: EntityInstance | RelationInstance
   targetProperty: string              // Navigation property on target
   type: '1:1' | '1:n' | 'n:1' | 'n:n'
   properties?: PropertyInstance[]     // Relation's own properties
   computation?: ComputationInstance   // Transform for computed relations
+  isTargetReliance?: boolean          // Defaults to false
+
+  // Filtered relation:
+  baseRelation?: RelationInstance     // Base relation to filter from
+  matchExpression?: MatchExp          // Filter condition
+
+  // Merged relation:
+  inputRelations?: RelationInstance[] // Relations to merge (must share same source/target)
+  commonProperties?: PropertyInstance[]  // Shared attributes for merged relations
 }): RelationInstance
 ```
 
 Constraints:
-- NEVER specify `name` — auto-generated from source+target entity names
-- ALWAYS specify `type` explicitly
+- `name` is optional — auto-generated as `${source.name}_${sourceProperty}_${targetProperty}_${target.name}`
+- ALWAYS specify `type` explicitly for base relations
 - Symmetric relations: set `source === target` AND `sourceProperty === targetProperty`
+- **Filtered relation**: requires `baseRelation` + `matchExpression` + `sourceProperty` + `targetProperty`
+- **Merged relation**: requires `inputRelations` + `sourceProperty` + `targetProperty` (cannot specify `source`/`target`/`properties`)
 
 ---
 
@@ -73,9 +89,15 @@ Interaction.create(args: {
   name: string                        // Interaction identifier
   action: ActionInstance              // Action.create() result (identifier only)
   payload?: PayloadInstance           // Payload.create() result
-  conditions?: ConditionInstance      // Execution conditions
+  conditions?: ConditionsInstance | ConditionInstance  // Execution conditions
+  data?: EntityInstance | RelationInstance  // Entity/Relation to query (for data retrieval)
+  dataPolicy?: DataPolicyInstance     // Fixed data access constraints
 }): InteractionInstance
 ```
+
+Constraints:
+- For data retrieval, use `GetAction` as action and specify `data`
+- `conditions` accepts either a single `Condition` or a `Conditions` (combined with BoolExp)
 
 ---
 
@@ -89,6 +111,7 @@ Action.create(args: {
 
 Constraints:
 - Action is ONLY an identifier — no `handler`, `execute`, or `callback`
+- Use `GetAction` (pre-built) for data retrieval interactions
 
 ---
 
@@ -101,19 +124,14 @@ Payload.create(args: {
 
 PayloadItem.create(args: {
   name: string                        // Parameter name
+  type: string                        // Required: data type
   base?: EntityInstance               // Entity reference for validation
   isRef?: boolean                     // true = reference by ID to existing entity
   required?: boolean                  // true = mandatory parameter
   isCollection?: boolean             // true = array of items
-  attributives?: AttributiveInstance  // Validation rules (only works when base is set)
+  itemRef?: AttributiveInstance | EntityInstance  // Reference to entities defined in other interactions (for Activity)
 }): PayloadItemInstance
 ```
-
-Constraints:
-- Without `base`: framework only checks required/collection, no concept validation
-- With `base` + `isRef: true`: framework verifies entity exists by ID
-- With `base` + `attributives`: framework validates data against attributive rules
-- `attributives` are checked for EVERY item when `isCollection: true`
 
 ---
 
@@ -121,17 +139,19 @@ Constraints:
 
 ```typescript
 Count.create(args: {
-  record: EntityInstance | RelationInstance   // What to count
+  record?: EntityInstance | RelationInstance   // What to count (for entity/global level)
+  property?: string                           // Relation property name (for property level)
   direction?: 'source' | 'target'            // For relation counting
   callback?: (record: any) => boolean        // Filter function
   attributeQuery?: AttributeQueryData        // Fields to load for callback
-  dataDeps?: DataDepsConfig                  // External data dependencies
+  dataDeps?: DataDependencies                // External data dependencies
 }): CountInstance
 ```
 
 Constraints:
-- Place on Property `computation`, not Entity `computation`
-- ALWAYS provide `defaultValue` on the Property
+- Use `record` for global/entity-level counting, `property` for property-level counting
+- Place on Property `computation` or Dictionary `computation`
+- Provide `defaultValue` on the Property when using as property computation
 
 ---
 
@@ -139,10 +159,12 @@ Constraints:
 
 ```typescript
 WeightedSummation.create(args: {
-  record: RelationInstance                   // Relation to aggregate
-  callback: (relation: any) => { weight: number, value: number }
+  record?: EntityInstance | RelationInstance   // Entity/relation to aggregate (for global level)
+  property?: string                           // Relation property name (for property level)
+  direction?: 'source' | 'target'            // For relation-based computation
+  callback: (record: any) => { weight: number, value: number }
   attributeQuery?: AttributeQueryData
-  dataDeps?: DataDepsConfig
+  dataDeps?: DataDependencies
 }): WeightedSummationInstance
 ```
 
@@ -150,19 +172,41 @@ Result: `sum(weight * value) / sum(weight)`
 
 ---
 
+## Summation.create
+
+```typescript
+Summation.create(args: {
+  record?: EntityInstance | RelationInstance   // Entity/relation to sum (for global level)
+  property?: string                           // Relation property name (for property level)
+  direction?: 'source' | 'target'            // For relation-based summation
+  attributeQuery: AttributeQueryData          // Required: specifies field path to sum
+}): SummationInstance
+```
+
+Sums the field pointed to by the leftmost path in `attributeQuery`. Undefined/null/NaN/Infinity values are treated as 0.
+
+---
+
 ## Every.create / Any.create
 
 ```typescript
 Every.create(args: {
-  record: RelationInstance
-  callback: (relation: any) => boolean
+  record?: EntityInstance | RelationInstance   // For global level
+  property?: string                           // Relation property name (for property level)
+  direction?: 'source' | 'target'
+  callback: (record: any) => boolean
   attributeQuery?: AttributeQueryData
+  dataDeps?: DataDependencies
+  notEmpty?: boolean                          // Return value when collection is empty
 }): EveryInstance
 
 Any.create(args: {
-  record: RelationInstance
-  callback: (relation: any) => boolean
+  record?: EntityInstance | RelationInstance
+  property?: string
+  direction?: 'source' | 'target'
+  callback: (record: any) => boolean
   attributeQuery?: AttributeQueryData
+  dataDeps?: DataDependencies
 }): AnyInstance
 ```
 
@@ -175,17 +219,33 @@ Any.create(args: {
 
 ```typescript
 Transform.create(args: {
-  record: EntityInstance | RelationInstance   // Source data
-  callback: (record: any, dataDeps?: any) => any | null
+  // Mode 1: Entity/Relation Transform
+  record?: EntityInstance | RelationInstance   // Source data
   attributeQuery?: AttributeQueryData
-  dataDeps?: DataDepsConfig
+
+  // Mode 2: Event-Driven Transform
+  eventDeps?: {
+    [key: string]: {
+      recordName: string
+      type: 'create' | 'update' | 'delete'
+      record?: Record<string, unknown>
+      oldRecord?: Record<string, unknown>
+    }
+  }
+
+  // Common
+  callback: Function                          // (this: Controller, record/mutationEvent) => any | any[] | null
+  dataDeps?: { [key: string]: DataDep }
 }): TransformInstance
 ```
 
 Constraints:
 - Place on Entity `computation` or Relation `computation`, NEVER on Property
-- Return `null` from callback to skip (conditional transformation)
+- Return `null`/`undefined` from callback to skip (conditional transformation)
+- Return array to create multiple records from one source
 - NEVER reference the entity being defined as `record` (circular reference)
+- Use `eventDeps` mode for interaction-based transformations (recommended)
+- Use `record` mode for deriving entities from other entities
 
 ---
 
@@ -208,12 +268,16 @@ Place on Property `computation`. The property value equals the current state nod
 ```typescript
 StateNode.create(args: {
   name: string
-  computeValue?: (lastValue: any) => any    // Dynamic value when entering this state
+  computeValue?: (this: Controller, lastValue: any, event?: any) => any
 }): StateNodeInstance
 ```
 
 - Without `computeValue`: property value is the state name string
 - With `computeValue`: property value is the function's return value
+- `lastValue`: previous property value before transition (undefined for initial state)
+- `event`: the event record that triggered the transition (undefined during initialization)
+  - For interaction triggers: access `event.payload`, `event.user`, `event.interactionName`
+- `this` is bound to the Controller instance — async functions can use `this.system.storage`
 
 ---
 
@@ -223,12 +287,28 @@ StateNode.create(args: {
 StateTransfer.create(args: {
   current: StateNodeInstance                // From state
   next: StateNodeInstance                   // To state
-  trigger: InteractionInstance              // Interaction that causes transition
-  computeTarget: (event: any) => { id: any }  // Identifies which record to transition
+  trigger: RecordMutationEventPattern       // Pattern to match against mutation events
+  computeTarget?: Function                  // Determines which records to transition
 }): StateTransferInstance
 ```
 
-`computeTarget` extracts the target entity ID from the interaction event payload.
+**`trigger`** — a partial pattern object, NOT an Interaction instance:
+```typescript
+trigger: {
+  recordName: string             // e.g. InteractionEventEntity.name
+  type: 'create' | 'update' | 'delete'
+  record?: Record<string, any>   // deep partial match, e.g. { interactionName: myInteraction.name }
+  oldRecord?: Record<string, any>
+  keys?: string[]
+}
+```
+
+**`computeTarget`** — receives the mutation event, returns which record(s) to transition:
+- Entity: `{ id: string }` or `{ id: string }[]`
+- Relation: `{ source: { id: string }, target: { id: string } }`
+- Return `undefined` to skip
+- `this` is bound to Controller — async functions can use `this.system.storage`
+- Required for property-level StateMachines; omit for global StateMachines
 
 ---
 
@@ -236,26 +316,34 @@ StateTransfer.create(args: {
 
 ```typescript
 new Controller(args: {
-  system: MonoSystem
-  entities: EntityInstance[]
-  relations: RelationInstance[]
-  activities: ActivityInstance[]
-  interactions: InteractionInstance[]
-  dict: DictionaryInstance[]               // Global dictionaries, NOT computations
-  recordMutationSideEffects?: any[]
+  system: System
+  entities?: EntityInstance[]
+  relations?: RelationInstance[]
+  eventSources?: EventSourceInstance[]       // Interactions, custom EventSources, etc.
+  dict?: DictionaryInstance[]               // Global dictionaries
+  recordMutationSideEffects?: RecordMutationSideEffect[]
+  computations?: (new (...args: any[]) => Computation)[]  // Additional computation handle classes
+  ignoreGuard?: boolean                     // Skip guard checks when true
+  forceThrowDispatchError?: boolean         // Throw errors instead of returning them
 }): Controller
 
-controller.setup(install: boolean): Promise<void>
-controller.callInteraction(name: string, args: {
-  user: { id: string, [key: string]: any }
-  payload?: { [key: string]: any }
-}): Promise<{ error?: { message: string, [key: string]: any }, [key: string]: any }>
+controller.setup(install?: boolean): Promise<void>
+
+controller.dispatch<TArgs, TResult>(
+  eventSource: EventSourceInstance<TArgs, TResult>,
+  args: TArgs
+): Promise<DispatchResponse>
+
+// DispatchResponse = { error?, data?, effects?, sideEffects?, context? }
 ```
 
 Constraints:
-- ALWAYS call `setup(true)` before any `callInteraction`
+- ALWAYS call `setup(true)` before any `dispatch`
 - `dict` is for Dictionary instances ONLY — never pass computations here
-- `callInteraction` NEVER throws — errors are in `result.error`
+- `dispatch` first parameter is the event source object reference, NOT a name string
+- `dispatch` NEVER throws by default — errors are in `result.error`
+- Set `forceThrowDispatchError: true` to make dispatch throw instead
+- Controller automatically registers event source entities (e.g. `InteractionEventEntity`)
 
 ---
 
@@ -284,20 +372,29 @@ system.storage.find(
 
 system.storage.findOne(
   entityName: string,
-  matchExp: MatchExp,
+  matchExp?: MatchExp,
   modifier?: any,
   attributeQuery?: AttributeQuery
 ): Promise<any>
 
 system.storage.create(entityName: string, data: object): Promise<any>
-system.storage.update(entityName: string, matchExp: MatchExp, data: object): Promise<void>
+system.storage.update(entityName: string, matchExp: MatchExp, data: object): Promise<any>
 system.storage.delete(entityName: string, matchExp: MatchExp): Promise<void>
+
+// Dictionary-specific API
+system.storage.dict.get(key: string): Promise<any>
+system.storage.dict.set(key: string, value: any): Promise<void>
+
+// General KV storage
+system.storage.get(itemName: string, id: string, initialValue?: any): Promise<any>
+system.storage.set(itemName: string, id: string, value: any): Promise<any>
 ```
 
 Constraints:
 - ALWAYS pass `attributeQuery` to `find`/`findOne` — without it, only `id` is returned
 - Use `['*']` for all fields
 - `create`/`update`/`delete` bypass all validation — use ONLY for test setup
+- When querying relations, use dot notation for source/target: `{ key: 'source.id', value: ['=', id] }`
 
 ---
 
@@ -306,11 +403,14 @@ Constraints:
 ```typescript
 MatchExp.atom(args: { key: string, value: [operator, value] }): MatchExp
 
-// Operators: '=', '!=', '>', '>=', '<', '<=', 'like', 'in', 'between', 'not', 'exist'
+// Operators: '=', '!=', '>', '>=', '<', '<=', 'like', 'in', 'between', 'not'
 
 // Chaining
 matchExp.and(args: { key: string, value: [operator, value] }): MatchExp
 matchExp.or(args: { key: string, value: [operator, value] }): MatchExp
+
+// From object (all AND)
+MatchExp.fromObject({ status: 'active', age: 25 }): MatchExp
 
 // Nested field access
 MatchExp.atom({ key: 'author.name', value: ['=', 'Alice'] })
@@ -346,24 +446,43 @@ MatchExp.atom({ key: 'author.name', value: ['=', 'Alice'] })
 
 ```typescript
 Attributive.create(args: {
-  name: string
+  name?: string
   content: (record: any, eventArgs: any) => boolean
 }): AttributiveInstance
 ```
 
-Used on PayloadItem `attributives` to validate referenced entities.
+Used on Interaction `userAttributives` to validate user context.
 
 ---
 
 ## BoolExp
 
 ```typescript
-BoolExp.atom(attributive: AttributiveInstance): BoolExp
-boolExp.and(other: BoolExp): BoolExp
-boolExp.or(other: BoolExp): BoolExp
+BoolExp.atom(data: T): BoolExp
+boolExp.and(other: BoolExp | T): BoolExp
+boolExp.or(other: BoolExp | T): BoolExp
 ```
 
-Combines multiple Attributives for complex validation logic.
+Combines multiple Attributives, Conditions, or other expressions for complex logic.
+
+---
+
+## Condition.create / Conditions.create
+
+```typescript
+Condition.create(args: {
+  name?: string
+  content: (this: Controller, event: InteractionEventArgs) => Promise<boolean>
+}): ConditionInstance
+
+Conditions.create(args: {
+  content: BoolExp<ConditionInstance>     // Combined with AND/OR logic
+}): ConditionsInstance
+```
+
+- `content` returns `true` to allow, `false` to reject
+- `this` is bound to Controller — can access `this.system.storage`
+- Failed conditions return `{ error: { type: 'condition check failed' } }`
 
 ---
 
@@ -374,12 +493,53 @@ Dictionary.create(args: {
   name: string
   type: 'string' | 'number' | 'boolean' | 'object'
   collection?: boolean
-  defaultValue?: any | (() => any)
+  defaultValue?: Function
   computation?: ComputationInstance
 }): DictionaryInstance
 ```
 
-Global state values. Pass to Controller's `dict` parameter. Access via `system.storage.get('state', name)`.
+Global state values. Pass to Controller's `dict` parameter. Access via `system.storage.dict.get(name)` / `system.storage.dict.set(name, value)`.
+
+---
+
+## EventSource.create
+
+```typescript
+EventSource.create(args: {
+  name: string                        // Event source identifier
+  entity: EntityInstance              // Entity to persist event records
+  guard?: (this: Controller, args: TArgs) => Promise<void>
+  mapEventData?: (args: TArgs) => Record<string, any>
+  resolve?: (this: Controller, args: TArgs) => Promise<TResult>
+  afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+}): EventSourceInstance
+```
+
+Custom event source for scheduled tasks, webhooks, or any non-interaction trigger. Dispatch via `controller.dispatch(eventSource, args)`.
+
+---
+
+## HardDeletionProperty.create
+
+```typescript
+HardDeletionProperty.create(): PropertyInstance
+```
+
+Creates a property named `_isDeleted_`. When its value transitions to `true` (via StateMachine), the Controller physically deletes the record. Use with `DELETED_STATE` / `NON_DELETED_STATE`.
+
+---
+
+## RecordMutationSideEffect.create
+
+```typescript
+RecordMutationSideEffect.create(args: {
+  name: string
+  record: { name: string }            // Entity/relation name to monitor
+  content: (this: Controller, event: RecordMutationEvent) => Promise<any>
+}): RecordMutationSideEffect
+```
+
+Triggers custom logic on record mutations within dispatch context. Results available in `dispatchResult.sideEffects`.
 
 ---
 
@@ -387,23 +547,52 @@ Global state values. Pass to Controller's `dict` parameter. Access via `system.s
 
 ```typescript
 import {
+  // Data model
   Entity, Property, Relation,
-  Interaction, Action, Payload, PayloadItem,
+
+  // Event sources
+  EventSource, Interaction, Action, GetAction, Payload, PayloadItem,
   Activity,
-  Count, Every, Any, Sum, Summation, WeightedSummation, Average,
+
+  // Computations
+  Count, Every, Any, Summation, WeightedSummation, Average,
   Transform, StateMachine, StateNode, StateTransfer,
-  RealTime, Expression, Inequality, Equation, MathResolver,
-  Attributive, Attributives, Condition, Conditions,
+  RealTime, Custom,
+
+  // Math (for RealTime)
+  Expression, Inequality, Equation, MathResolver,
+
+  // Validation & conditions
+  Attributive, Attributives, DataAttributive, DataAttributives,
+  Condition, Conditions,
+
+  // Data policy
+  DataPolicy,
+
+  // Expressions
   BoolExp, MatchExp,
+
+  // System
   Controller, MonoSystem, Dictionary,
+  RecordMutationSideEffect,
+  HardDeletionProperty, HARD_DELETION_PROPERTY_NAME,
+  NON_DELETED_STATE, DELETED_STATE,
+
+  // Built-in entities
   InteractionEventEntity,
+
+  // Drivers
   PGLiteDB, SQLiteDB, PostgreSQLDB, MysqlDB,
+
+  // Utilities
   KlassByName
 } from 'interaqt'
 ```
 
 Non-existent exports (commonly mistaken):
 - `InteractionEvent` → use `InteractionEventEntity`
-- `FilteredEntity` → use `Entity.create` with `baseEntity` + `filterCondition`
+- `FilteredEntity` → use `Entity.create` with `baseEntity` + `matchExpression`
 - `RelationBasedEvery` → use `Every`
+- `Sum` → use `Summation`
+- `callInteraction` → use `controller.dispatch(eventSource, args)`
 - `User`, `Post`, etc. → no pre-built entities exist

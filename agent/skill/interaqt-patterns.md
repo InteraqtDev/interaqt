@@ -15,12 +15,12 @@ const User = Entity.create({
     Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'email', type: 'string' }),
     Property.create({ name: 'age', type: 'number' }),
-    Property.create({ name: 'status', type: 'string', defaultValue: 'active' }),
+    Property.create({ name: 'status', type: 'string', defaultValue: () => 'active' }),
     Property.create({ name: 'createdAt', type: 'string', defaultValue: () => new Date().toISOString() }),
     Property.create({
       name: 'fullName',
       type: 'string',
-      getValue: (record) => `${record.firstName} ${record.lastName}`
+      computed: (record) => `${record.firstName} ${record.lastName}`
     })
   ]
 })
@@ -52,7 +52,7 @@ The Klass pattern uses `generateUUID()` internally. Manual IDs risk collisions a
 ### Checklist
 - [ ] Entity name is PascalCase and singular (`User` not `users`)
 - [ ] No manual UUID assignment
-- [ ] Computed properties that depend only on the same record use `getValue`, NOT Transform
+- [ ] Computed properties that depend only on the same record use `computed`, NOT Transform
 - [ ] Properties with reactive computations (Count, etc.) include `defaultValue`
 
 ---
@@ -148,7 +148,7 @@ Without `type`, the framework cannot determine cardinality. ALWAYS explicitly se
 | Check ANY related record matches condition | `Any` |
 | Derive new entities from events or other entities | `Transform` (on Entity `computation`) |
 | Update a property value based on state transitions | `StateMachine` (on Property `computation`) |
-| Simple computation from same-record fields | `getValue` (on Property) |
+| Simple computation from same-record fields | `computed` (on Property) |
 
 ```typescript
 import { Entity, Property, Relation, Count, WeightedSummation, Transform, InteractionEventEntity } from 'interaqt'
@@ -184,12 +184,12 @@ Property.create({
 Property.create({
   name: 'formattedPrice',
   type: 'string',
-  getValue: (record) => `$${record.price}`
+  computed: (record) => `$${record.price}`
 })
 ```
 
 ### WHY
-Transform creates new records in a computed entity collection. It CANNOT update a single property. Use `getValue` for same-entity property computations.
+Transform creates new records in a computed entity collection. It CANNOT update a single property. Use `computed` for same-entity property computations.
 
 ### WRONG: Transform for counting
 ```typescript
@@ -220,8 +220,8 @@ Count uses incremental algorithms. Transform loads all records into memory, whic
 ```typescript
 // DON'T — Controller does NOT accept a computations parameter
 const controller = new Controller({
-  system, entities, relations, activities, interactions,
-  dict: [myComputation],  // dict is for Dictionaries, not computations
+  system, entities, relations,
+  eventSources: [myComputation],  // eventSources is for Interactions, not computations
 })
 ```
 
@@ -243,7 +243,7 @@ All computations are declared within the `computation` field of Entity, Relation
 - [ ] Transform is on `Entity.computation` or `Relation.computation`, NEVER on `Property.computation`
 - [ ] Count, WeightedSummation, Every, Any are on `Property.computation`
 - [ ] StateMachine is on `Property.computation`
-- [ ] `getValue` is used for same-record-only property derivations
+- [ ] `computed` is used for same-record-only property derivations
 - [ ] Properties with computation ALWAYS have `defaultValue`
 - [ ] NEVER pass computations to Controller constructor
 
@@ -261,9 +261,9 @@ const CreatePost = Interaction.create({
   action: Action.create({ name: 'createPost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', required: true }),
-      PayloadItem.create({ name: 'content', required: true }),
-      PayloadItem.create({ name: 'postId', base: Post, isRef: true })
+      PayloadItem.create({ name: 'title', type: 'string', required: true }),
+      PayloadItem.create({ name: 'content', type: 'string', required: true }),
+      PayloadItem.create({ name: 'postId', type: 'string', base: Post, isRef: true })
     ]
   })
 })
@@ -310,8 +310,7 @@ const controller = new Controller({
   system,
   entities: [User, Post],
   relations: [UserPosts],
-  activities: [],
-  interactions: [CreatePost],
+  eventSources: [CreatePost],
   dict: [],
   recordMutationSideEffects: []
 })
@@ -319,18 +318,18 @@ const controller = new Controller({
 await controller.setup(true)
 ```
 
-### WRONG: Calling callInteraction before setup
+### WRONG: Calling dispatch before setup
 ```typescript
 // DON'T — setup MUST come first
-const controller = new Controller({ system, entities, relations, activities, interactions, dict: [] })
-await controller.callInteraction('CreatePost', { user: { id: '1' }, payload: { title: 'Hi' } })
+const controller = new Controller({ system, entities, relations, eventSources: [CreatePost], dict: [] })
+await controller.dispatch(CreatePost, { user: { id: '1' }, payload: { title: 'Hi' } })
 ```
 
 ### CORRECT:
 ```typescript
-const controller = new Controller({ system, entities, relations, activities, interactions, dict: [] })
+const controller = new Controller({ system, entities, relations, eventSources: [CreatePost], dict: [] })
 await controller.setup(true)
-await controller.callInteraction('CreatePost', { user: { id: '1' }, payload: { title: 'Hi' } })
+await controller.dispatch(CreatePost, { user: { id: '1' }, payload: { title: 'Hi' } })
 ```
 
 ### WHY
@@ -338,15 +337,15 @@ await controller.callInteraction('CreatePost', { user: { id: '1' }, payload: { t
 
 ### Checklist
 - [ ] `system.conceptClass = KlassByName` is set before creating Controller
-- [ ] `controller.setup(true)` is called BEFORE any `callInteraction`
+- [ ] `controller.setup(true)` is called BEFORE any `dispatch`
 - [ ] `dict` contains only Dictionary instances, not computations
 
 ---
 
-## When Calling Interactions
+## When Dispatching Interactions
 
 ```typescript
-const result = await controller.callInteraction('CreatePost', {
+const result = await controller.dispatch(CreatePost, {
   user: { id: 'user-1', role: 'author' },
   payload: {
     title: 'My Post',
@@ -361,17 +360,17 @@ if (result.error) {
 
 ### WRONG: Using try-catch for error handling
 ```typescript
-// DON'T — interaqt does NOT throw exceptions
+// DON'T — interaqt does NOT throw exceptions by default
 try {
-  await controller.callInteraction('CreatePost', { user: { id: '1' }, payload: {} })
+  await controller.dispatch(CreatePost, { user: { id: '1' }, payload: {} })
 } catch (e) {
-  // This code will NEVER execute
+  // This code will NEVER execute (unless forceThrowDispatchError is true)
 }
 ```
 
 ### CORRECT:
 ```typescript
-const result = await controller.callInteraction('CreatePost', {
+const result = await controller.dispatch(CreatePost, {
   user: { id: '1' },
   payload: {}
 })
@@ -381,20 +380,26 @@ if (result.error) {
 ```
 
 ### WHY
-The framework catches all errors internally and returns them via `result.error`. Exceptions are never thrown to callers.
+The framework catches all errors internally and returns them via `result.error`. Exceptions are never thrown to callers (unless `forceThrowDispatchError: true` is set on Controller).
+
+### WRONG: Passing a name string instead of instance
+```typescript
+// DON'T — first argument must be the event source instance, not a string
+controller.dispatch('CreatePost', payload)
+```
 
 ### WRONG: Using non-existent API methods
 ```typescript
 // DON'T — these methods do NOT exist
-controller.dispatch('CreatePost', payload)
+controller.callInteraction('CreatePost', payload)
 controller.run()
 controller.execute()
 ```
 
 ### CORRECT:
 ```typescript
-// The ONLY method to trigger interactions
-await controller.callInteraction('CreatePost', {
+// The ONLY method to trigger interactions — first arg is the instance reference
+await controller.dispatch(CreatePost, {
   user: { id: 'user-1' },
   payload: { title: 'Hi' }
 })
@@ -403,7 +408,7 @@ await controller.callInteraction('CreatePost', {
 ### Checklist
 - [ ] ALWAYS pass a `user` object with at least `id`
 - [ ] ALWAYS check `result.error` — NEVER use try-catch
-- [ ] Use `controller.callInteraction(name, args)` — no other dispatch method exists
+- [ ] Use `controller.dispatch(eventSourceInstance, args)` — first arg is the instance, NOT a name string
 
 ---
 
@@ -486,13 +491,13 @@ describe('Feature', () => {
     system = new MonoSystem(new PGLiteDB())
     system.conceptClass = KlassByName
     controller = new Controller({
-      system, entities, relations, activities, interactions, dict: [], recordMutationSideEffects: []
+      system, entities, relations, eventSources, dict: [], recordMutationSideEffects: []
     })
     await controller.setup(true)
   })
 
   test('creates a post via interaction', async () => {
-    const result = await controller.callInteraction('CreatePost', {
+    const result = await controller.dispatch(CreatePost, {
       user: { id: 'user-1' },
       payload: { title: 'Test', content: 'Hello' }
     })
@@ -518,8 +523,8 @@ const post = await system.storage.create('Post', { title: 'Test', content: 'Hell
 
 ### CORRECT:
 ```typescript
-// Use callInteraction to test business logic
-const result = await controller.callInteraction('CreatePost', {
+// Use dispatch to test business logic
+const result = await controller.dispatch(CreatePost, {
   user: { id: 'user-1' },
   payload: { title: 'Test', content: 'Hello' }
 })
@@ -531,6 +536,6 @@ const result = await controller.callInteraction('CreatePost', {
 ### Checklist
 - [ ] Use `PGLiteDB` for test databases
 - [ ] Call `controller.setup(true)` in `beforeEach`
-- [ ] Test business logic through `callInteraction`, not direct storage
+- [ ] Test business logic through `controller.dispatch`, not direct storage
 - [ ] Check `result.error` — NEVER use try-catch
 - [ ] ALWAYS pass `attributeQuery` when asserting on query results

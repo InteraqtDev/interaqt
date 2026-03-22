@@ -30,7 +30,7 @@ const User = Entity.create({
       name: 'postCount',
       type: 'number',
       defaultValue: () => 0,
-      computation: Count.create({ record: UserPosts })
+      computation: Count.create({ property: 'posts' })
     })
   ]
 })
@@ -76,8 +76,8 @@ const CreatePost = Interaction.create({
   action: Action.create({ name: 'createPost' }),
   payload: Payload.create({
     items: [
-      PayloadItem.create({ name: 'title', required: true }),
-      PayloadItem.create({ name: 'content', required: true })
+      PayloadItem.create({ name: 'title', type: 'string', required: true }),
+      PayloadItem.create({ name: 'content', type: 'string', required: true })
     ]
   })
 })
@@ -91,8 +91,7 @@ const controller = new Controller({
   system,
   entities: [User, Post],
   relations: [UserPosts],
-  activities: [],
-  interactions: [CreatePost],
+  eventSources: [CreatePost],
   dict: [],
   recordMutationSideEffects: []
 })
@@ -105,7 +104,7 @@ const adminUser = await system.storage.create('User', {
   name: 'Alice', email: 'alice@example.com'
 })
 
-const result = await controller.callInteraction('CreatePost', {
+const result = await controller.dispatch(CreatePost, {
   user: adminUser,
   payload: { title: 'First Post', content: 'Hello World' }
 })
@@ -121,7 +120,7 @@ const user = await system.storage.findOne(
 ```
 
 ## Design Decisions
-- **Count on `postCount`**: Automatically maintained when UserPosts relations change. No manual update logic needed.
+- **Count on `postCount`**: Uses `property: 'posts'` to count related Post records via the `posts` navigation property. Automatically maintained when UserPosts relations change — no manual update logic needed.
 - **Transform on Post entity**: Posts are created reactively when `CreatePost` interaction fires. The Transform checks `interactionName` and returns entity data.
 - **Relation direction**: `source: Post, target: User, type: 'n:1'` — many posts to one user. `sourceProperty: 'author'` lets you navigate from Post to User; `targetProperty: 'posts'` lets you navigate from User to Posts.
 
@@ -142,49 +141,6 @@ import {
   StateMachine, StateNode, StateTransfer,
   Controller, MonoSystem, PGLiteDB, KlassByName, MatchExp
 } from 'interaqt'
-
-// --- Interactions ---
-
-const SubmitOrder = Interaction.create({
-  name: 'SubmitOrder',
-  action: Action.create({ name: 'submitOrder' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'product', required: true }),
-      PayloadItem.create({ name: 'quantity', required: true })
-    ]
-  })
-})
-
-const PayOrder = Interaction.create({
-  name: 'PayOrder',
-  action: Action.create({ name: 'payOrder' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'orderId', base: Order, isRef: true, required: true })
-    ]
-  })
-})
-
-const ShipOrder = Interaction.create({
-  name: 'ShipOrder',
-  action: Action.create({ name: 'shipOrder' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'orderId', base: Order, isRef: true, required: true })
-    ]
-  })
-})
-
-const CancelOrder = Interaction.create({
-  name: 'CancelOrder',
-  action: Action.create({ name: 'cancelOrder' }),
-  payload: Payload.create({
-    items: [
-      PayloadItem.create({ name: 'orderId', base: Order, isRef: true, required: true })
-    ]
-  })
-})
 
 // --- State Nodes ---
 
@@ -211,18 +167,36 @@ const Order = Entity.create({
         transfers: [
           StateTransfer.create({
             current: pendingState, next: paidState,
-            trigger: PayOrder,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: 'PayOrder' }
+            },
+            computeTarget: function(mutationEvent) {
+              return { id: mutationEvent.record.payload.orderId }
+            }
           }),
           StateTransfer.create({
             current: paidState, next: shippedState,
-            trigger: ShipOrder,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: 'ShipOrder' }
+            },
+            computeTarget: function(mutationEvent) {
+              return { id: mutationEvent.record.payload.orderId }
+            }
           }),
           StateTransfer.create({
             current: pendingState, next: cancelledState,
-            trigger: CancelOrder,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: 'CancelOrder' }
+            },
+            computeTarget: function(mutationEvent) {
+              return { id: mutationEvent.record.payload.orderId }
+            }
           })
         ],
         initialState: pendingState
@@ -245,6 +219,49 @@ const Order = Entity.create({
   })
 })
 
+// --- Interactions ---
+
+const SubmitOrder = Interaction.create({
+  name: 'SubmitOrder',
+  action: Action.create({ name: 'submitOrder' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'product', type: 'string', required: true }),
+      PayloadItem.create({ name: 'quantity', type: 'number', required: true })
+    ]
+  })
+})
+
+const PayOrder = Interaction.create({
+  name: 'PayOrder',
+  action: Action.create({ name: 'payOrder' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', type: 'string', base: Order, isRef: true, required: true })
+    ]
+  })
+})
+
+const ShipOrder = Interaction.create({
+  name: 'ShipOrder',
+  action: Action.create({ name: 'shipOrder' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', type: 'string', base: Order, isRef: true, required: true })
+    ]
+  })
+})
+
+const CancelOrder = Interaction.create({
+  name: 'CancelOrder',
+  action: Action.create({ name: 'cancelOrder' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'orderId', type: 'string', base: Order, isRef: true, required: true })
+    ]
+  })
+})
+
 // --- Controller Setup & Usage ---
 
 const system = new MonoSystem(new PGLiteDB())
@@ -254,8 +271,7 @@ const controller = new Controller({
   system,
   entities: [Order],
   relations: [],
-  activities: [],
-  interactions: [SubmitOrder, PayOrder, ShipOrder, CancelOrder],
+  eventSources: [SubmitOrder, PayOrder, ShipOrder, CancelOrder],
   dict: [],
   recordMutationSideEffects: []
 })
@@ -264,7 +280,7 @@ await controller.setup(true)
 const user = { id: 'user-1' }
 
 // Submit order
-const submitResult = await controller.callInteraction('SubmitOrder', {
+const submitResult = await controller.dispatch(SubmitOrder, {
   user,
   payload: { product: 'Widget', quantity: 3 }
 })
@@ -276,14 +292,14 @@ const order = await system.storage.findOne('Order',
 // order.status === 'pending'
 
 // Pay order
-await controller.callInteraction('PayOrder', {
+await controller.dispatch(PayOrder, {
   user,
   payload: { orderId: order.id }
 })
 // order.status → 'paid'
 
 // Ship order
-await controller.callInteraction('ShipOrder', {
+await controller.dispatch(ShipOrder, {
   user,
   payload: { orderId: order.id }
 })
@@ -292,22 +308,27 @@ await controller.callInteraction('ShipOrder', {
 
 ## Design Decisions
 - **StateMachine on `status` property**: Status transitions are declarative. The framework enforces valid transitions — you cannot jump from `pending` to `shipped` directly.
-- **`computeTarget`**: Each StateTransfer uses `computeTarget` to identify WHICH order the transition applies to, using the orderId from the interaction payload.
+- **`trigger` is a pattern object**: Each StateTransfer `trigger` is a `RecordMutationEventPattern` that matches against InteractionEvent creation events — it is NOT an Interaction instance. The `record.interactionName` field matches the specific interaction by name string.
+- **`computeTarget`**: Receives the `RecordMutationEvent` and returns which order the transition applies to. Access the InteractionEvent data via `mutationEvent.record` (e.g. `mutationEvent.record.payload.orderId`).
 - **Transform on Entity `computation`**: Creates order records reactively when `SubmitOrder` fires.
 - **Cancellation only from `pending`**: Only one `cancelledState` transfer is defined (from `pending`). Attempting to cancel a paid order will have no effect.
+- **Declaration order**: Order entity is defined before the Interactions that reference it (via `base: Order`). The StateMachine triggers use interaction name strings (not variable references), avoiding circular dependencies.
 
 ---
 
 # Recipe: Student GPA with Weighted Summation
 
 ## Scenario
-A student grading system where each student has grades for multiple subjects, each with different credit weights. The student's GPA is automatically computed using WeightedSummation.
+A student grading system where each student has grades for multiple subjects, each with different credit weights. The student's GPA is automatically computed using WeightedSummation. Grades are added via an Interaction to ensure computations trigger correctly.
 
 ## Complete Implementation
 
 ```typescript
 import {
-  Entity, Property, Relation, WeightedSummation, Count,
+  Entity, Property, Relation,
+  WeightedSummation, Summation, Count,
+  Interaction, Action, Payload, PayloadItem,
+  Transform, InteractionEventEntity,
   Controller, MonoSystem, PGLiteDB, KlassByName, MatchExp
 } from 'interaqt'
 
@@ -322,7 +343,8 @@ const Student = Entity.create({
       type: 'number',
       defaultValue: () => 0,
       computation: WeightedSummation.create({
-        record: StudentGrades,
+        property: 'grades',
+        direction: 'source',
         attributeQuery: [['target', { attributeQuery: ['score', 'credit'] }]],
         callback: (relation) => ({
           weight: relation.target.credit,
@@ -334,20 +356,17 @@ const Student = Entity.create({
       name: 'totalCredits',
       type: 'number',
       defaultValue: () => 0,
-      computation: WeightedSummation.create({
-        record: StudentGrades,
-        attributeQuery: [['target', { attributeQuery: ['credit'] }]],
-        callback: (relation) => ({
-          weight: 1,
-          value: relation.target.credit
-        })
+      computation: Summation.create({
+        property: 'grades',
+        direction: 'source',
+        attributeQuery: [['target', { attributeQuery: ['credit'] }]]
       })
     }),
     Property.create({
       name: 'courseCount',
       type: 'number',
       defaultValue: () => 0,
-      computation: Count.create({ record: StudentGrades })
+      computation: Count.create({ property: 'grades' })
     })
   ]
 })
@@ -358,7 +377,22 @@ const Grade = Entity.create({
     Property.create({ name: 'subject', type: 'string' }),
     Property.create({ name: 'score', type: 'number' }),
     Property.create({ name: 'credit', type: 'number' })
-  ]
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: function(event) {
+      if (event.interactionName === 'AddGrade') {
+        return {
+          subject: event.payload.subject,
+          score: event.payload.score,
+          credit: event.payload.credit,
+          student: { id: event.payload.studentId }
+        }
+      }
+      return null
+    }
+  })
 })
 
 // --- Relations ---
@@ -371,6 +405,21 @@ const StudentGrades = Relation.create({
   type: '1:n'
 })
 
+// --- Interactions ---
+
+const AddGrade = Interaction.create({
+  name: 'AddGrade',
+  action: Action.create({ name: 'addGrade' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'studentId', type: 'string', required: true }),
+      PayloadItem.create({ name: 'subject', type: 'string', required: true }),
+      PayloadItem.create({ name: 'score', type: 'number', required: true }),
+      PayloadItem.create({ name: 'credit', type: 'number', required: true })
+    ]
+  })
+})
+
 // --- Controller Setup & Usage ---
 
 const system = new MonoSystem(new PGLiteDB())
@@ -380,8 +429,7 @@ const controller = new Controller({
   system,
   entities: [Student, Grade],
   relations: [StudentGrades],
-  activities: [],
-  interactions: [],
+  eventSources: [AddGrade],
   dict: [],
   recordMutationSideEffects: []
 })
@@ -389,8 +437,14 @@ await controller.setup(true)
 
 const student = await system.storage.create('Student', { name: 'Alice' })
 
-await system.storage.create('Grade', { subject: 'Math', score: 90, credit: 4, student: student.id })
-await system.storage.create('Grade', { subject: 'English', score: 80, credit: 3, student: student.id })
+await controller.dispatch(AddGrade, {
+  user: { id: 'system' },
+  payload: { studentId: student.id, subject: 'Math', score: 90, credit: 4 }
+})
+await controller.dispatch(AddGrade, {
+  user: { id: 'system' },
+  payload: { studentId: student.id, subject: 'English', score: 80, credit: 3 }
+})
 
 const result = await system.storage.findOne('Student',
   MatchExp.atom({ key: 'id', value: ['=', student.id] }),
@@ -403,16 +457,17 @@ const result = await system.storage.findOne('Student',
 ```
 
 ## Design Decisions
-- **WeightedSummation for GPA**: The `weight` is the credit value, and the `value` is the score. The framework computes `sum(weight*value) / sum(weight)` automatically.
-- **Separate Count for courseCount**: Even though totalCredits could imply count, Count is more efficient and semantically clear for counting.
-- **`attributeQuery` in computation**: Specifies which fields of related records to fetch, avoiding loading unnecessary data.
+- **WeightedSummation for GPA**: Uses `property: 'grades'` (property-level mode) to aggregate per-student. The `weight` is the credit value, and the `value` is the score. The framework computes `sum(weight*value) / sum(weight)` automatically.
+- **Summation for totalCredits**: Uses `Summation` (not `WeightedSummation`) because `totalCredits` is a simple sum. `WeightedSummation` with `weight=1` would compute an average, not a sum.
+- **Count for courseCount**: More efficient and semantically clear for counting than Summation or WeightedSummation.
+- **Grades added via Interaction + Transform**: Using `controller.dispatch` ensures reactive computations (WeightedSummation, Summation, Count) are triggered. Direct `storage.create` bypasses reactive computations and should only be used for prerequisite data (like creating the Student record).
 
 ---
 
-# Recipe: Interaction with Payload Validation
+# Recipe: Interaction with Condition Validation
 
 ## Scenario
-A content moderation system where only published posts can be shared. Demonstrates Attributive-based payload validation on interactions.
+A content moderation system where only published posts can be shared. Demonstrates Condition-based validation on Interactions: the framework checks the condition before allowing the interaction to proceed.
 
 ## Complete Implementation
 
@@ -420,7 +475,7 @@ A content moderation system where only published posts can be shared. Demonstrat
 import {
   Entity, Property,
   Interaction, Action, Payload, PayloadItem,
-  Attributive, BoolExp,
+  Condition,
   Controller, MonoSystem, PGLiteDB, KlassByName, MatchExp
 } from 'interaqt'
 
@@ -430,20 +485,11 @@ const Post = Entity.create({
   name: 'Post',
   properties: [
     Property.create({ name: 'title', type: 'string' }),
-    Property.create({ name: 'status', type: 'string', defaultValue: 'draft' })
+    Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' })
   ]
 })
 
-// --- Attributive (validation rule) ---
-
-const PublishedPost = Attributive.create({
-  name: 'PublishedPost',
-  content: function(post, eventArgs) {
-    return post.status === 'published'
-  }
-})
-
-// --- Interaction with validation ---
+// --- Interaction with condition ---
 
 const SharePost = Interaction.create({
   name: 'SharePost',
@@ -452,12 +498,23 @@ const SharePost = Interaction.create({
     items: [
       PayloadItem.create({
         name: 'post',
+        type: 'string',
         base: Post,
         isRef: true,
-        required: true,
-        attributives: PublishedPost
+        required: true
       })
     ]
+  }),
+  conditions: Condition.create({
+    name: 'postMustBePublished',
+    content: async function(event) {
+      const post = await this.system.storage.findOne('Post',
+        MatchExp.atom({ key: 'id', value: ['=', event.payload.post] }),
+        undefined,
+        ['id', 'status']
+      )
+      return post?.status === 'published'
+    }
   })
 })
 
@@ -470,8 +527,7 @@ const controller = new Controller({
   system,
   entities: [Post],
   relations: [],
-  activities: [],
-  interactions: [SharePost],
+  eventSources: [SharePost],
   dict: [],
   recordMutationSideEffects: []
 })
@@ -480,22 +536,22 @@ await controller.setup(true)
 const draftPost = await system.storage.create('Post', { title: 'Draft', status: 'draft' })
 const publishedPost = await system.storage.create('Post', { title: 'Published', status: 'published' })
 
-// Sharing a draft post fails validation
-const failResult = await controller.callInteraction('SharePost', {
+// Sharing a draft post fails the condition check
+const failResult = await controller.dispatch(SharePost, {
   user: { id: 'user-1' },
-  payload: { post: { id: draftPost.id } }
+  payload: { post: draftPost.id }
 })
-// failResult.error is defined — draft post cannot be shared
+// failResult.error is defined — condition rejected: post is not published
 
 // Sharing a published post succeeds
-const successResult = await controller.callInteraction('SharePost', {
+const successResult = await controller.dispatch(SharePost, {
   user: { id: 'user-1' },
-  payload: { post: { id: publishedPost.id } }
+  payload: { post: publishedPost.id }
 })
 // successResult.error is undefined — success
 ```
 
 ## Design Decisions
-- **Attributive on PayloadItem**: The `PublishedPost` attributive is attached directly to the PayloadItem, so the framework validates the referenced entity's data before the interaction proceeds.
-- **`isRef: true`**: The payload contains only an ID reference. The framework loads the full record and runs the attributive check against it.
-- **Error in result, not exception**: Validation failures are returned in `result.error`, consistent with all interaqt error handling.
+- **Condition on Interaction**: The `Condition.create` is attached to the Interaction's `conditions` field. The `content` function receives the event args and returns `true` to allow or `false` to reject. The `this` context is bound to the Controller, providing access to `this.system.storage` for database queries.
+- **`isRef: true`**: The payload contains only an ID reference. With `isRef: true`, the payload value is the entity ID directly (e.g., `payload: { post: draftPost.id }`).
+- **Error in result, not exception**: Condition failures return `{ error: { type: 'condition check failed' } }`, consistent with all interaqt error handling. Never use try-catch.
