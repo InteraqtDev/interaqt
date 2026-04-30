@@ -8,6 +8,19 @@ import {
   Dictionary, MatchExp, KlassByName
 } from 'interaqt';
 
+type StateManagerResult = { value: number; triggerValue: number };
+type CounterState = { count: number };
+type AuthorCountMap = Record<string, { title: string; authorCount: number }>;
+type EventStatistics = {
+  total: number;
+  byType: { local: number; virtual: number; hybrid: number };
+  byStatus: { scheduled: number; completed?: number };
+  totalAttendees: number;
+  avgAttendees: number;
+  hybridOnlineAttendees: number;
+};
+type PopularEvent = { title: string };
+
 describe('Custom computation', () => {
   let system: MonoSystem; 
   let controller: Controller;
@@ -278,12 +291,12 @@ describe('Custom computation', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // 验证状态被更新
-    let managerState = await system.storage.dict.get('stateManager');
+    let managerState = await system.storage.dict.get('stateManager') as StateManagerResult;
     console.log('After first trigger:', managerState);
     expect(managerState.value).toBe(2);
     expect(managerState.triggerValue).toBe(2);
     
-    let savedState = await system.storage.dict.get('_stateManager_bound_myState');
+    let savedState = await system.storage.dict.get('_stateManager_bound_myState') as CounterState;
     console.log('Saved state after first trigger:', savedState);
     expect(savedState).toEqual({ count: 2 });
     
@@ -291,12 +304,12 @@ describe('Custom computation', () => {
     await system.storage.dict.set('stateTrigger', 3);
     
     // 验证状态被累加更新
-    managerState = await system.storage.dict.get('stateManager');
+    managerState = await system.storage.dict.get('stateManager') as StateManagerResult;
     console.log('After second trigger:', managerState);
     expect(managerState.value).toBe(5); // 2 + 3 = 5
     expect(managerState.triggerValue).toBe(3);
     
-    savedState = await system.storage.dict.get('_stateManager_bound_myState');
+    savedState = await system.storage.dict.get('_stateManager_bound_myState') as CounterState;
     console.log('Saved state after second trigger:', savedState);
     expect(savedState).toEqual({ count: 5 });
   });
@@ -500,7 +513,7 @@ describe('Custom computation', () => {
     // 等待计算完成
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    const counts = await system.storage.dict.get('postAuthorCounts');
+    const counts = await system.storage.dict.get('postAuthorCounts') as AuthorCountMap;
     console.log('Final author counts:', counts);
     
     expect(counts[post.id]).toEqual({
@@ -677,11 +690,11 @@ describe('Custom computation', () => {
     await controller.setup(true);
 
     // Initial statistics should be empty
-    let stats = await system.storage.dict.get('eventStatistics');
+    let stats = await system.storage.dict.get('eventStatistics') as EventStatistics;
     expect(stats.total).toBe(0);
     expect(stats.byType.local).toBe(0);
 
-    let popular = await system.storage.dict.get('popularEvents');
+    let popular = await system.storage.dict.get('popularEvents') as PopularEvent[] | undefined;
     expect(popular).toEqual([]);
 
     // Create events through different input entities
@@ -706,7 +719,7 @@ describe('Custom computation', () => {
     });
 
     // Check statistics
-    stats = await system.storage.dict.get('eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics') as EventStatistics;
     expect(stats.total).toBe(3);
     expect(stats.byType.local).toBe(1);
     expect(stats.byType.virtual).toBe(1);
@@ -717,7 +730,7 @@ describe('Custom computation', () => {
     expect(stats.hybridOnlineAttendees).toBe(200);
 
     // Check popular events
-    popular = await system.storage.dict.get('popularEvents');
+    popular = await system.storage.dict.get('popularEvents') as PopularEvent[];
     
     // popular might not be an array initially, check if it exists first
     if (popular && Array.isArray(popular)) {
@@ -736,7 +749,7 @@ describe('Custom computation', () => {
     );
 
     // Check updated statistics
-    stats = await system.storage.dict.get('eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics') as EventStatistics;
     expect(stats.byStatus.scheduled).toBe(2);
     expect(stats.byStatus.completed).toBe(1);
 
@@ -749,14 +762,14 @@ describe('Custom computation', () => {
     });
 
     // Check updated statistics
-    stats = await system.storage.dict.get('eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics') as EventStatistics;
     expect(stats.total).toBe(4);
     expect(stats.byType.local).toBe(2);
     expect(stats.totalAttendees).toBe(760);
     expect(stats.avgAttendees).toBe(190);
 
     // Check popular events now includes the festival
-    popular = await system.storage.dict.get('popularEvents');
+    popular = await system.storage.dict.get('popularEvents') as PopularEvent[];
     expect(popular.length).toBe(3);
     expect(popular[0].title).toBe('Music Festival');
 
@@ -766,7 +779,7 @@ describe('Custom computation', () => {
     );
 
     // Final statistics check
-    stats = await system.storage.dict.get('eventStatistics');
+    stats = await system.storage.dict.get('eventStatistics') as EventStatistics;
     expect(stats.total).toBe(3);
     expect(stats.byType.hybrid).toBe(0);
     expect(stats.hybridOnlineAttendees).toBe(0);

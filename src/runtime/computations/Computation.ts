@@ -95,6 +95,16 @@ export class RecordBoundState<T> {
         await this.controller.system.storage.update(this.record!, MatchExp.atom({key: 'id', value: ['=', record!.id]}), {[this.key]: value})
         return value
     }
+    async setInternal(record: Record<string, unknown> | undefined, value: T): Promise<T> {
+        try {
+            await this.replace(record, value)
+        } catch (error) {
+            if (!(error instanceof Error) || !error.message.includes('Atomic replace target not found')) {
+                throw error
+            }
+        }
+        return value
+    }
     async get(record: Record<string, unknown> | undefined):Promise<T> {
         if (!record || record[this.key] === undefined) {
             const fullRecord = record ? await this.controller.system.storage.findOne(this.record!, MatchExp.atom({key: 'id', value: ['=', record.id]}), undefined, [this.key]) : undefined
@@ -102,6 +112,30 @@ export class RecordBoundState<T> {
             return (value !== undefined ? value : this.defaultValue) as T
         }
         return record[this.key] as T
+    }
+    async increment(record: Record<string, unknown> | undefined, delta: number): Promise<number> {
+        return this.controller.system.storage.atomic.increment({
+            recordName: this.record!,
+            id: record!.id as string,
+            field: this.key
+        }, delta)
+    }
+    async replace(record: Record<string, unknown> | undefined, value: T): Promise<{ oldValue: T | null, newValue: T }> {
+        return this.controller.system.storage.atomic.replace({
+            recordName: this.record!,
+            id: record!.id as string,
+            field: this.key
+        }, value)
+    }
+    async compareAndSet(record: Record<string, unknown> | undefined, expected: T, next: T): Promise<boolean> {
+        return this.controller.system.storage.atomic.compareAndSet({
+            recordName: this.record!,
+            id: record!.id as string,
+            field: this.key
+        }, expected, next, { defaultValue: this.defaultValue as T })
+    }
+    async lock(record: Record<string, unknown> | undefined, attributeQuery: AttributeQueryData = ['*']): Promise<Record<string, unknown> | undefined> {
+        return this.controller.system.storage.atomic.lockRecord(this.record!, record!.id as string, attributeQuery)
     }
 }
 
@@ -113,11 +147,63 @@ export class GlobalBoundState<T> {
 
     }
     async set(value: T):Promise<T> {
+        await this.controller.system.storage.atomic.replace({
+            key: this.key,
+            valueType: this.getValueType(value),
+            defaultValue: this.defaultValue
+        }, value)
         await this.controller.system.storage.dict.set(this.key, value)
         return value
     }
+    async setInternal(value: T): Promise<T> {
+        await this.controller.system.storage.atomic.replace({
+            key: this.key,
+            valueType: this.getValueType(value),
+            defaultValue: this.defaultValue
+        }, value)
+        await this.controller.system.storage.dict.setInternal?.(this.key, value)
+        return value
+    }
     async get():Promise<T> {
-        return await this.controller.system.storage.dict.get(this.key) as T
+        const value = await this.controller.system.storage.atomic.get<T>({
+            key: this.key,
+            valueType: this.getValueType(),
+            defaultValue: this.defaultValue
+        })
+        return (value ?? this.defaultValue) as T
+    }
+    async increment(delta: number): Promise<number> {
+        return this.controller.system.storage.atomic.increment({
+            key: this.key,
+            valueType: 'number',
+            defaultValue: this.defaultValue
+        }, delta)
+    }
+    async replace(value: T): Promise<{ oldValue: T | null, newValue: T }> {
+        return this.controller.system.storage.atomic.replace({
+            key: this.key,
+            valueType: this.getValueType(value),
+            defaultValue: this.defaultValue
+        }, value)
+    }
+    async compareAndSet(expected: T, next: T): Promise<boolean> {
+        return this.controller.system.storage.atomic.compareAndSet({
+            key: this.key,
+            valueType: this.getValueType(next),
+            defaultValue: this.defaultValue
+        }, expected, next, { defaultValue: this.defaultValue as T })
+    }
+    async lock(): Promise<T | null> {
+        return this.controller.system.storage.atomic.lockGlobal<T>({
+            key: this.key,
+            valueType: this.getValueType(),
+            defaultValue: this.defaultValue
+        })
+    }
+    private getValueType(value: unknown = this.defaultValue): 'number' | 'boolean' | 'string' | 'json' {
+        const valueType = typeof value
+        if (valueType === 'number' || valueType === 'boolean' || valueType === 'string') return valueType
+        return 'json'
     }
 }
 

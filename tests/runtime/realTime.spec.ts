@@ -3,6 +3,12 @@ import { Controller, MonoSystem, Property, Entity, RealTime, Dictionary, BoolExp
 import { Expression } from 'interaqt';
 
 import { PGLiteDB, SQLiteDB } from '@drivers';
+
+function expectNumber(value: unknown): number {
+  expect(typeof value).toBe('number');
+  return value as number;
+}
+
 describe('RealTime computed handle', () => {
   
   test('should calculate global real-time value with Expression', async () => {
@@ -71,11 +77,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for global computation
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
-    
-    expect(typeof lastRecomputeTime).toBe('number');
-    expect(typeof nextRecomputeTime).toBe('number');
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
+    const nextRecomputeTime = expectNumber(await system.storage.dict.get(nextRecomputeTimeKey));
     expect(lastRecomputeTime).toBeGreaterThan(0);
     expect(nextRecomputeTime).toBeGreaterThan(lastRecomputeTime); // next should be after last
     expect(nextRecomputeTime - lastRecomputeTime).toBe(1000); // Expression type: should be lastTime + 1000
@@ -147,11 +150,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for global computation with Inequality
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
-    
-    expect(typeof lastRecomputeTime).toBe('number');
-    expect(typeof nextRecomputeTime).toBe('number');
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
+    const nextRecomputeTime = expectNumber(await system.storage.dict.get(nextRecomputeTimeKey));
     expect(lastRecomputeTime).toBeGreaterThan(0);
     // For Inequality/Equation type: nextRecomputeTime is the solve() result (critical threshold)
     expect(nextRecomputeTime).toBeGreaterThan(Date.now()); // Should be in the future (threshold time)
@@ -222,12 +222,9 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for global computation with Equation
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
-    
-    expect(typeof lastRecomputeTime).toBe('number');
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
+    const nextRecomputeTime = expectNumber(await system.storage.dict.get(nextRecomputeTimeKey));
     expect(lastRecomputeTime).toBeGreaterThan(0);
-    expect(typeof nextRecomputeTime).toBe('number');
   });
 
   test('should calculate property-level real-time value', async () => {
@@ -381,11 +378,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for complex Expression computation
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
-    
-    expect(typeof lastRecomputeTime).toBe('number');
-    expect(typeof nextRecomputeTime).toBe('number');
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
+    const nextRecomputeTime = expectNumber(await system.storage.dict.get(nextRecomputeTimeKey));
     expect(lastRecomputeTime).toBeGreaterThan(0);
     expect(nextRecomputeTime).toBeGreaterThan(lastRecomputeTime);
     // Expression type with complex math: should be lastTime + 1000
@@ -460,11 +454,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for dataDeps Expression computation
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
-    
-    expect(typeof lastRecomputeTime).toBe('number');
-    expect(typeof nextRecomputeTime).toBe('number');
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
+    const nextRecomputeTime = expectNumber(await system.storage.dict.get(nextRecomputeTimeKey));
     expect(lastRecomputeTime).toBeGreaterThan(0);
     expect(nextRecomputeTime).toBeGreaterThan(lastRecomputeTime);
     // Expression type with dataDeps: should be lastTime + 1000
@@ -543,10 +534,9 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for business logic Inequality computation
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
     const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
     
-    expect(typeof lastRecomputeTime).toBe('number');
     expect(lastRecomputeTime).toBeGreaterThan(0);
     // For Inequality type: nextRecomputeTime is solve() result (critical change point)
     if (nextRecomputeTime !== null) {
@@ -726,11 +716,8 @@ describe('RealTime computed handle', () => {
     );
     
     // Verify state values for time-based counter Expression computation
-    const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
-    const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
-    
-    expect(typeof lastRecomputeTime).toBe('number');
-    expect(typeof nextRecomputeTime).toBe('number');
+    const lastRecomputeTime = expectNumber(await system.storage.dict.get(lastRecomputeTimeKey));
+    const nextRecomputeTime = expectNumber(await system.storage.dict.get(nextRecomputeTimeKey));
     expect(lastRecomputeTime).toBeGreaterThan(0);
     expect(nextRecomputeTime).toBeGreaterThan(lastRecomputeTime);
     // Expression type: nextRecomputeTime should be lastTime + 1000 (from nextRecomputeTime function)

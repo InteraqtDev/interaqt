@@ -190,7 +190,7 @@ describe('QueryExecutor edge cases', () => {
         const found = (await entityQueryHandle.find('User',
             MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
             undefined,
-            ['*', ['teams', { attributeQuery: ['*'], onlyRelationData: true }]],
+            ['*', ['teams', { attributeQuery: ['*'] }, true]],
         ))[0]
 
         expect(found.id).toBe(user1.id)

@@ -100,7 +100,8 @@ export class QueryExecutor {
         entityQuery: RecordQuery, 
         queryName = '', 
         recordQueryRef?: RecordQueryRef, 
-        context: RecursiveContext = new RecursiveContext(ROOT_LABEL)
+        context: RecursiveContext = new RecursiveContext(ROOT_LABEL),
+        forUpdate = false
     ): Promise<Record[]> {
         // 一定在一开始的时候就创建 findContext ，并且是通过直接遍历 entityQuery 拿到原始的 label 的 recordQuery，因为后面
         //  拿不到原始的了，都会带上 parent 的 id，会产生叠加 parent id match 的问题
@@ -137,7 +138,12 @@ export class QueryExecutor {
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
         const [querySQL, params, fieldAliasMap] = this.sqlBuilder.buildXToOneFindQuery(entityQuery, '')
-        const rawReturns: { [k: string]: unknown }[] = await this.database.query(querySQL, params, queryName)
+        const supportsForUpdate = this.database.constructor.name !== 'SQLiteDB'
+        const rawReturns: { [k: string]: unknown }[] = await this.database.query(
+            forUpdate && supportsForUpdate ? `${querySQL}\nFOR UPDATE` : querySQL,
+            params,
+            queryName
+        )
         const records = this.structureRawReturns(rawReturns, this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap)
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。

@@ -234,13 +234,13 @@ describe('Entity async computed', () => {
     
     const rec1 = recommendations.find(r => r.productId === String(product1.id));
     expect(rec1).toBeDefined();
-    expect(rec1.score).toBe('0.9');
-    expect(rec1.reason).toBe('Recommended based on electronics category');
+    expect(rec1!.score).toBe('0.9');
+    expect(rec1!.reason).toBe('Recommended based on electronics category');
     
     const rec2 = recommendations.find(r => r.productId === String(product2.id));
     expect(rec2).toBeDefined();
-    expect(rec2.score).toBe('0.8');
-    expect(rec2.reason).toBe('Recommended based on electronics category');
+    expect(rec2!.score).toBe('0.8');
+    expect(rec2!.reason).toBe('Recommended based on electronics category');
     
     // 添加新的电子产品应该触发新的计算
     const product4 = await system.storage.create('Product', {

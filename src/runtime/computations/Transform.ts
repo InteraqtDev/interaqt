@@ -12,7 +12,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
     static contextType = ['entity', 'relation'] as const
     transformCallback: (this: Controller, item: any) => any
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     eventDeps?: {[key: string]: EventDep}
     constructor(public controller: Controller, public args: TransformInstance, public dataContext: DataContext) {
@@ -36,9 +36,12 @@ export class RecordsTransformHandle implements DataBasedComputation {
     }
     
     createState() {
+        const sourceRecordId = new RecordBoundState<any>('')
+        const transformIndex = new RecordBoundState<number>(0)
+        ;(sourceRecordId as any).unique = !this.eventDeps
         return {
-            sourceRecordId: new RecordBoundState<any>(''),
-            transformIndex: new RecordBoundState<number>(0)
+            sourceRecordId,
+            transformIndex
         }
     }
     
@@ -119,22 +122,29 @@ export class RecordsTransformHandle implements DataBasedComputation {
         } else {
             // update or delete
             const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
-            const match = MatchExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
-            const mappedRecords = await this.controller.system.storage.find(dataContext.id.name!, match, undefined, ['*'])
-            
-
-            const mappedRecordsByIndex = mappedRecords.reduce((acc, record) => {
-                acc[record[this.state.transformIndex.key]] = record
-                return acc
-            }, {} as Record<number, any>)
-            
             let transformedRecords: any[] = []
             if (mutationEvent.type === 'update') {
-                const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', sourceRecordId]})
-                const sourceRecord = await this.controller.system.storage.findOne((this.dataDeps._source as RecordsDataDep).source.name!, matchSourceRecord, undefined, (this.dataDeps._source as RecordsDataDep).attributeQuery)
+                const sourceDataDep = this.dataDeps._source as RecordsDataDep
+                const sourceRecord = await this.controller.system.storage.atomic.lockRecord(
+                    sourceDataDep.source.name!,
+                    sourceRecordId,
+                    sourceDataDep.attributeQuery
+                )
+                if (!sourceRecord) {
+                    return []
+                }
                 const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
                 transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             }
+            const match = MatchExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
+            const mappedRecords = await this.controller.system.storage.atomic.lockRows(dataContext.id.name!, match, ['*'])
+            
+
+            const mappedRecordsByIndex = mappedRecords.reduce((acc: Record<number, any>, record: any) => {
+                acc[Number(record[this.state.transformIndex.key])] = record
+                return acc
+            }, {} as Record<number, any>)
+            
             transformedRecords.forEach((transformedRecord, index) => {
                 if (transformedRecord) {
                     if(mappedRecordsByIndex[index]) {
@@ -145,7 +155,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
                                 [this.state.sourceRecordId.key]: sourceRecordId,
                                 [this.state.transformIndex.key]: index
                             },
-                            affectedId: mappedRecordsByIndex[index].id
+                            affectedId: (mappedRecordsByIndex[index] as any).id
                         })
                         delete mappedRecordsByIndex[index]
                     } else {

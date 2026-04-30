@@ -69,6 +69,10 @@ export class RecordQueryAgent {
         return this.queryExecutor.findRecords(entityQuery, queryName, recordQueryRef, context)
     }
 
+    async lockRecords(entityQuery: RecordQuery, queryName = ''): Promise<Record[]> {
+        return this.queryExecutor.findRecords(entityQuery, queryName, undefined, new RecursiveContext(ROOT_LABEL), true)
+    }
+
 
 
     // 委托给 CreationExecutor

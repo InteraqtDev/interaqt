@@ -10,7 +10,7 @@ beforeEach(() => {
 
 describe('DataAttributives serialization', () => {
     test('stringify/parse round-trip preserves data', () => {
-        const content = BoolAtomData.create({ key: 'role', value: ['=', 'admin'] });
+        const content = BoolAtomData.create({ data: { key: 'role', value: ['=', 'admin'] } });
         const instance = DataAttributives.create({ content }, { uuid: 'da-1' });
 
         const json = DataAttributives.stringify(instance);
@@ -102,7 +102,7 @@ describe('DataAttributives.check()', () => {
 
 describe('DataAttributives.clone()', () => {
     test('creates independent copy with new uuid', () => {
-        const content = BoolAtomData.create({ key: 'status', value: ['=', 'active'] });
+        const content = BoolAtomData.create({ data: { key: 'status', value: ['=', 'active'] } });
         const instance = DataAttributives.create({ content });
         const cloned = DataAttributives.clone(instance, false);
 
@@ -128,7 +128,7 @@ describe('DataAttributives.clone()', () => {
 
 describe('DataAttributives.create()', () => {
     test('basic construction assigns uuid and content', () => {
-        const content = BoolAtomData.create({ key: 'x', value: ['=', 1] });
+        const content = BoolAtomData.create({ data: { key: 'x', value: ['=', 1] } });
         const instance = DataAttributives.create({ content }, { uuid: 'da-test' });
 
         expect(instance.uuid).toBe('da-test');

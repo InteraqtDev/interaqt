@@ -14,7 +14,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
     static contextType = 'global' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: unknown}) => boolean
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     defaultValue: boolean
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: DataContext, ) {
@@ -32,8 +32,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
 
     createState() {
         return {
-            matchCount: new GlobalBoundState<number>(0),
-            totalCount: new GlobalBoundState<number>(0),
+            aggregate: new GlobalBoundState<Record<string, number>>({ matchCount: 0, totalCount: 0 }),
             isItemMatch: new RecordBoundState<boolean>(false, this.args.record!.name!)
         }
     }
@@ -43,7 +42,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
     }
 
     async compute({main: records, ...dataDeps}: {main: any[], [key: string]: any}): Promise<boolean> {
-        const totalCount = await this.state.totalCount.set(records.length)
+        const totalCount = records.length
         let matchCount = 0
         
         for (const item of records) {
@@ -51,10 +50,10 @@ export class GlobalEveryHandle implements DataBasedComputation {
             if (isMatch) {
                 matchCount++
             }
-            await this.state.isItemMatch.set(item, isMatch)
+            await this.state.isItemMatch.setInternal(item, isMatch)
         }
         
-        await this.state.matchCount.set(matchCount)
+        await this.state.aggregate.setInternal({ matchCount, totalCount })
 
         return matchCount === totalCount
     }
@@ -64,37 +63,35 @@ export class GlobalEveryHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
-        let totalCount = await this.state!.totalCount.get()
-        let matchCount = await this.state!.matchCount.get()
+        let totalDelta = 0
+        let matchDelta = 0
         if (mutationEvent.type === 'create') {
-            totalCount = await this.state!.totalCount.set(totalCount + 1)
+            totalDelta = 1
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
-            if (newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(matchCount + 1)
-            }
-            await this.state!.isItemMatch.set(mutationEvent.record, newItemMatch)
+            const { oldValue } = await this.state!.isItemMatch.replace(mutationEvent.record, newItemMatch)
+            matchDelta = Number(newItemMatch) - Number(!!oldValue)
         } else if (mutationEvent.type === 'delete') {
-            totalCount = await this.state!.totalCount.set(totalCount - 1)
-            // Get the old match status from state instead of recalculating
+            totalDelta = -1
             const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.record)
-            // Convert to boolean because database may store false as 0 or true as 1
-            if (!!oldItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(matchCount - 1)
-            }
+            matchDelta = oldItemMatch ? -1 : 0
         } else if (mutationEvent.type === 'update') {
-            // Get the old match status from state instead of recalculating
-            const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.oldRecord)
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-            // Convert to boolean because database may store false as 0 or true as 1
-            const oldItemMatchBool = !!oldItemMatch
-            if (oldItemMatchBool === true && newItemMatch === false) {
-                matchCount = await this.state!.matchCount.set(matchCount - 1)
-            } else if (oldItemMatchBool === false && newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(matchCount + 1)
-            }
-            await this.state!.isItemMatch.set(mutationEvent.record, newItemMatch)
+            const { oldValue } = await this.state!.isItemMatch.replace(mutationEvent.record, newItemMatch)
+            matchDelta = Number(newItemMatch) - Number(!!oldValue)
         }
 
+        const aggregate = await this.controller.system.storage.atomic.updateGlobalFields(
+            {
+                key: this.state.aggregate.key,
+                valueType: 'json',
+                defaultValue: { matchCount: 0, totalCount: 0 }
+            },
+            { matchCount: matchDelta, totalCount: totalDelta },
+            { matchCount: 0, totalCount: 0 }
+        )
+        const matchCount = aggregate.matchCount
+        const totalCount = aggregate.totalCount
+        if (totalCount === 0) return this.defaultValue
         return matchCount === totalCount
     }
 }
@@ -107,7 +104,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
     static contextType = 'property' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: unknown}) => boolean
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
     relation: RelationInstance
@@ -158,14 +155,17 @@ export class PropertyEveryHandle implements DataBasedComputation {
     }
 
     async compute({_current, ...dataDeps}: {_current: any, [key: string]: any}): Promise<boolean> {
-        const totalCount = await this.state.totalCount.set(_current,_current[this.relationAttr].length)
+        const totalCount = await this.state.totalCount.setInternal(_current,_current[this.relationAttr].length)
         let matchCount = 0
         for(const item of _current[this.relationAttr]) {
-            if (this.callback.call(this.controller, item, dataDeps)) {
+            const relationStateRecord = item[LINK_SYMBOL] || item['&'] || item
+            const isMatch = this.callback.call(this.controller, item, dataDeps)
+            if (isMatch) {
                 matchCount++
-                await this.state!.isItemMatch.set(item, true)
             }
+            await this.state!.isItemMatch.setInternal(relationStateRecord, isMatch)
         }
+        await this.state.matchCount.setInternal(_current, matchCount)
 
         return matchCount === totalCount
     }
@@ -187,8 +187,8 @@ export class PropertyEveryHandle implements DataBasedComputation {
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!
 
         // TODO 如果未来支持用户可以自定义 dataDeps，那么这里也要支持如果发现是其他 dataDeps 变化，这里要直接返回重算的信号。
-        let matchCount = await this.state!.matchCount.get(mutationEvent.record)
-        let totalCount = await this.state!.totalCount.get(mutationEvent.record)
+        let matchDelta = 0
+        let totalDelta = 0
 
         // 关联实体只有更新才会触发到这里来，这是监听时就决定了的。
         // 关联关系的增删改都会到这里来。
@@ -204,21 +204,23 @@ export class PropertyEveryHandle implements DataBasedComputation {
             relatedRecord['&'] = relationRecord
 
             const newItemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps) 
-            if (newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount + 1)
-                await this.state!.isItemMatch.set(relationRecord, true)
+            let oldValue: boolean | null
+            try {
+                ;({ oldValue } = await this.state!.isItemMatch.replace(relationRecord, newItemMatch))
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('Atomic replace target not found')) {
+                    return ComputationResult.fullRecompute('relation contribution state target not found')
+                }
+                throw error
             }
-
-            totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount + 1)
+            matchDelta = Number(newItemMatch) - Number(!!oldValue)
+            totalDelta = 1
         } else if (relatedMutationEvent.type === 'delete'&&relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除
             const relationRecord = relatedMutationEvent.record!
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
-            if (oldItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(mutationEvent.record, matchCount - 1)
-            }
-
-            totalCount = await this.state!.totalCount.set(mutationEvent.record, totalCount - 1)
+            matchDelta = oldItemMatch ? -1 : 0
+            totalDelta = -1
         } else if (relatedMutationEvent.type === 'update'&&(relatedMutationEvent.recordName === this.relation.name!||relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!
@@ -243,19 +245,23 @@ export class PropertyEveryHandle implements DataBasedComputation {
             const relatedRecord = relationRecord[this.isSource ? 'target' : 'source']
             relatedRecord['&'] = relationRecord
 
-            const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
             const newItemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps)
-            if (oldItemMatch === true && newItemMatch === false) {
-                matchCount = await this.state!.matchCount.set(currentRecord, matchCount - 1)
-            } else if (oldItemMatch === false && newItemMatch === true) {
-                matchCount = await this.state!.matchCount.set(currentRecord, matchCount + 1)
+            let oldValue: boolean | null
+            try {
+                ;({ oldValue } = await this.state!.isItemMatch.replace(relationRecord, newItemMatch))
+            } catch (error) {
+                if (error instanceof Error && error.message.includes('Atomic replace target not found')) {
+                    return ComputationResult.fullRecompute('relation contribution state target not found')
+                }
+                throw error
             }
-            await this.state!.isItemMatch.set(relationRecord, newItemMatch)
-        
-            totalCount = await this.state!.totalCount.set(currentRecord, totalCount)
+            matchDelta = Number(newItemMatch) - Number(!!oldValue)
         } else {
             return ComputationResult.fullRecompute('mutation is not caused by relation.')
         }
+        const matchCount = await this.state!.matchCount.increment(mutationEvent.record, matchDelta)
+        const totalCount = await this.state!.totalCount.increment(mutationEvent.record, totalDelta)
+        if (totalCount === 0) return !this.args.notEmpty
         return matchCount === totalCount
     }
 }

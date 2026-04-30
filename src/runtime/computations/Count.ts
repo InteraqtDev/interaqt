@@ -17,7 +17,7 @@ export class GlobalCountHandle implements DataBasedComputation {
     static contextType = 'global' as const
     callback: (this: Controller, item: any, dataDeps?: {[key: string]: unknown}) => boolean
     state!: GlobalCountState
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     record: (EntityInstance|RelationInstance)
 
@@ -54,10 +54,10 @@ export class GlobalCountHandle implements DataBasedComputation {
             if (isMatch) {
                 count++
             }
-            await this.state.isItemMatch.set(item, isMatch)
+            await this.state.isItemMatch.setInternal(item, isMatch)
         }
         
-        await this.state.count.set(count)
+        await this.state.count.setInternal(count)
         return count;
     }
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
@@ -66,40 +66,23 @@ export class GlobalCountHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
-        let count = await this.state.count.get() || lastValue || 0;
-        
+        let delta = 0
         if (mutationEvent.type === 'create') {
             // 检查新创建的记录是否符合条件
             const itemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-            if (itemMatch) {
-                count = count + 1;
-            }
-            await this.state.isItemMatch.set(mutationEvent.record, itemMatch)
+            const { oldValue } = await this.state.isItemMatch.replace(mutationEvent.record, itemMatch)
+            delta = Number(itemMatch) - Number(!!oldValue)
         } else if (mutationEvent.type === 'delete') {
-            // Get the old match status from state instead of recalculating
             const itemMatch = await this.state.isItemMatch.get(mutationEvent.record)
-            // Convert to boolean because database may store false as 0 or true as 1
-            if (!!itemMatch) {
-                count = count - 1;
-            }
+            delta = itemMatch ? -1 : 0
         } else if (mutationEvent.type === 'update') {
-            // Get the old match status from state instead of recalculating
-            const oldItemMatch = await this.state.isItemMatch.get(mutationEvent.oldRecord)
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-            // Convert to boolean because database may store false as 0 or true as 1
-            const oldItemMatchBool = !!oldItemMatch
-            
-            if (oldItemMatchBool && !newItemMatch) {
-                count = count - 1;
-            } else if (!oldItemMatchBool && newItemMatch) {
-                count = count + 1;
-            }
-            await this.state.isItemMatch.set(mutationEvent.record, newItemMatch)
+            const { oldValue } = await this.state.isItemMatch.replace(mutationEvent.record, newItemMatch)
+            delta = Number(newItemMatch) - Number(!!oldValue)
         }
         
-        // 防止计数为负数
-        count = Math.max(0, count);
-        await this.state.count.set(count);
+        const count = await this.state.count.increment(delta)
+        if (count < 0) throw new Error('GlobalCount became negative')
         return count;
     }
 }
@@ -112,7 +95,7 @@ export class PropertyCountHandle implements DataBasedComputation {
     static contextType = 'property' as const
     callback?: (this: Controller, item: any, dataDeps?: {[key: string]: unknown}) => boolean
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
     relatedRecordName: string
@@ -158,10 +141,13 @@ export class PropertyCountHandle implements DataBasedComputation {
         }
     }
 
-    createState(): {}| StateWithCallback {
-        return this.callback ? {
-            isItemMatchCount: new RecordBoundState<boolean>(false, this.relation.name!)
-        } : {}
+    createState(): { count: RecordBoundState<number> } | ({ count: RecordBoundState<number> } & StateWithCallback) {
+        return {
+            count: new RecordBoundState<number>(0, this.dataContext.host.name),
+            ...(this.callback ? {
+                isItemMatchCount: new RecordBoundState<boolean>(false, this.relation.name!)
+            } : {})
+        }
     }
     
     getInitialValue() {
@@ -175,12 +161,13 @@ export class PropertyCountHandle implements DataBasedComputation {
         if (this.callback) {
             // 如果有 callback，过滤符合条件的关联记录
             for(let item of relations) {
+                const relationStateRecord = item[LINK_SYMBOL] || item['&'] || item
                 const isItemMatch = this.callback!.call(this.controller, item, dataDeps)
                 if (isItemMatch) {
-                    await (this.state as StateWithCallback).isItemMatchCount!.set(item, true)
+                    await (this.state as StateWithCallback).isItemMatchCount!.setInternal(relationStateRecord, true)
                     count++
                 } else {
-                    await (this.state as StateWithCallback).isItemMatchCount!.set(item, false)
+                    await (this.state as StateWithCallback).isItemMatchCount!.setInternal(relationStateRecord, false)
                 }
             }
         } else {
@@ -188,6 +175,7 @@ export class PropertyCountHandle implements DataBasedComputation {
             count = relations.length;
         }
         
+        await this.state.count.setInternal(_current, count)
         return count;
     }
 
@@ -207,7 +195,7 @@ export class PropertyCountHandle implements DataBasedComputation {
 
         const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
         
-        let count = lastValue || 0;
+        let delta = 0
 
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
@@ -224,13 +212,10 @@ export class PropertyCountHandle implements DataBasedComputation {
                 relatedRecord['&'] = relationRecord
                 
                 const itemMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps);
-                const previousMatch = await (this.state as StateWithCallback).isItemMatchCount!.get(relationRecord)
-                if (itemMatch && !previousMatch) {
-                    count = count + 1;
-                }
-                await (this.state as StateWithCallback).isItemMatchCount!.set(relationRecord, itemMatch)
+                const { oldValue } = await (this.state as StateWithCallback).isItemMatchCount!.replace(relationRecord, itemMatch)
+                delta = Number(itemMatch) - Number(!!oldValue)
             } else {
-                count = count + 1;
+                delta = 1
             }
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除。
@@ -238,10 +223,10 @@ export class PropertyCountHandle implements DataBasedComputation {
             // 这与 Every 和 Summation 的实现保持一致
             if (this.callback) {
                 if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.record))) {
-                    count = count - 1
+                    delta = -1
                 }
             } else {
-                count = count - 1;
+                delta = -1;
             }
         } else if (relatedMutationEvent.type === 'update') {
             // 这里可能是关联关系上的更新，也可能是关联实体的更新。不管哪一种，我们都重新查询一遍。
@@ -266,16 +251,15 @@ export class PropertyCountHandle implements DataBasedComputation {
                 relatedRecord['&'] = newRelationWithEntity
                 
                 const isNewMatch = !!this.callback.call(this.controller, relatedRecord, dataDeps);
-                const isOldMatch = await (this.state as StateWithCallback).isItemMatchCount!.get(newRelationWithEntity)
-                if (isNewMatch !== isOldMatch) {
-                    count = isNewMatch ? (count + 1) : (count-1);
-                    await (this.state as StateWithCallback).isItemMatchCount!.set(newRelationWithEntity, isNewMatch)
-                }
+                const { oldValue } = await (this.state as StateWithCallback).isItemMatchCount!.replace(newRelationWithEntity, isNewMatch)
+                delta = Number(isNewMatch) - Number(!!oldValue)
             }
         } else {
             return ComputationResult.fullRecompute(`unknown related mutation event for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
         }
 
+        const count = await this.state.count.increment(mutationEvent.record, delta)
+        if (count < 0) throw new Error('PropertyCount became negative')
         return count;
     }
 }

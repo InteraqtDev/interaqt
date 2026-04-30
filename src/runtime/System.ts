@@ -3,19 +3,53 @@ import { GlobalBoundState } from "./computations/Computation.js";
 import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
+import { AttributeQueryData, MatchExpressionData } from "@storage";
 export type SystemCallback = (...arg: unknown[]) => unknown
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
 export const DICTIONARY_RECORD = '_Dictionary_'
+
+export type AtomicRecordTarget = {
+    recordName: string
+    id: string | number
+    field: string
+}
+
+export type AtomicGlobalTarget = {
+    key: string
+    valueType?: 'number' | 'boolean' | 'string' | 'json'
+    defaultValue?: unknown
+}
+
+export type AtomicTarget = AtomicRecordTarget | AtomicGlobalTarget
+
+export type AtomicStorage = {
+    get<T>(target: AtomicTarget): Promise<T | null>
+    increment(target: AtomicTarget, delta: number): Promise<number>
+    replace<T>(target: AtomicTarget, value: T): Promise<{ oldValue: T | null, newValue: T }>
+    compareAndSet<T>(target: AtomicTarget, expected: T, next: T, options?: { defaultValue?: T }): Promise<boolean>
+    lockGlobal<T>(target: AtomicGlobalTarget): Promise<T | null>
+    updateGlobalFields(
+        target: AtomicGlobalTarget,
+        deltas: Record<string, number>,
+        defaults?: Record<string, number>
+    ): Promise<Record<string, number>>
+    lockRecord(recordName: string, id: string | number, attributeQuery?: AttributeQueryData): Promise<Record<string, unknown> | undefined>
+    lockRows(recordName: string, match: MatchExpressionData, attributeQuery?: AttributeQueryData): Promise<Record<string, unknown>[]>
+}
+
 export type Storage = {
     map: unknown
     beginTransaction: (transactionName?:string) => Promise<void>
     commitTransaction: (transactionName?:string) => Promise<void>
     rollbackTransaction: (transactionName?:string) => Promise<void>
 
+    atomic: AtomicStorage
+
     dict: {
         get: (key: string) => Promise<unknown>
         set: (key: string, value: unknown) => Promise<void>
+        setInternal?: (key: string, value: unknown) => Promise<void>
     }
 
     get: (itemName: string, id: string, initialValue?: unknown) => Promise<unknown>
@@ -107,6 +141,8 @@ export type Database = {
     getAutoId: (recordName: string) => Promise<string>,
     parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => { fieldValue: string, fieldParams: unknown[] } | undefined
     getPlaceholder?: () => (name?:string) => string,
+    supportsSelectForUpdate?: boolean,
+    setupInternalComputationState?: () => Promise<void>,
     mapToDBFieldType: (type: string, collection?: boolean) => string
     close: () => Promise<void>
     beginTransaction?: (name?:string) => Promise<void>

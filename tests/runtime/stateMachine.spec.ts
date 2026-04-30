@@ -4,6 +4,12 @@ import { createData as createPropertyStateMachineData } from "./data/propertySta
 import { createData as createGlobalStateMachineData } from "./data/globalStateMachine.js";
 import { createData as createRelationStateMachineData } from "./data/relationStateMachine.js";
 import { PGLiteDB, SQLiteDB } from '@drivers';
+
+function mustFind<T>(value: T | undefined): T {
+    expect(value).toBeDefined()
+    return value!
+}
+
 describe('StateMachineRunner', () => {
 
     test('property state machine', async () => {
@@ -1674,8 +1680,7 @@ describe('StateMachineRunner', () => {
         // 验证创建了 urgent 状态的任务
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
         expect(tasks.length).toBe(2)
-        const urgentTask = tasks.find(t => t.title === 'Task for Urgent Project')
-        expect(urgentTask).toBeDefined()
+        const urgentTask = mustFind(tasks.find(t => t.title === 'Task for Urgent Project'))
         expect(urgentTask.priority).toBe('high')
         
         // 检查状态数据是否正确设置
@@ -1695,7 +1700,7 @@ describe('StateMachineRunner', () => {
         })
 
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
-        let currentUrgentTask = tasks.find(t => t.id === urgentTask.id)
+        let currentUrgentTask = mustFind(tasks.find(t => t.id === urgentTask.id))
         expect(currentUrgentTask.status).toBe('urgent') // 应该仍然是 urgent，因为 startTask 不适用于 urgent 状态
 
         // 使用正确的交互 - escalateTask
@@ -1707,11 +1712,11 @@ describe('StateMachineRunner', () => {
         })
 
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
-        currentUrgentTask = tasks.find(t => t.id === urgentTask.id)
+        currentUrgentTask = mustFind(tasks.find(t => t.id === urgentTask.id))
         expect(currentUrgentTask.status).toBe('in_progress') // 现在应该转换成功
 
         // todo 状态的任务使用 startTask 可以转换
-        const todoTask = tasks.find(t => t.title === 'Task for Normal Project')
+        const todoTask = mustFind(tasks.find(t => t.title === 'Task for Normal Project'))
         await controller.dispatch(StartTaskInteraction, {
             user: { id: 'test-user' },
             payload: {
@@ -1720,7 +1725,7 @@ describe('StateMachineRunner', () => {
         })
 
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
-        const startedTodoTask = tasks.find(t => t.id === todoTask.id)
+        const startedTodoTask = mustFind(tasks.find(t => t.id === todoTask.id))
         expect(startedTodoTask.status).toBe('in_progress')
         
         // 测试 todo 状态的任务不能使用 escalateTask
@@ -1749,7 +1754,7 @@ describe('StateMachineRunner', () => {
         })
 
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
-        const completedUrgentTask = tasks.find(t => t.id === urgentTask.id)
+        const completedUrgentTask = mustFind(tasks.find(t => t.id === urgentTask.id))
         expect(completedUrgentTask.status).toBe('done')
         
         await controller.dispatch(CompleteTaskInteraction, {
@@ -1760,7 +1765,7 @@ describe('StateMachineRunner', () => {
         })
 
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
-        const completedTodoTask = tasks.find(t => t.id === todoTask.id)
+        const completedTodoTask = mustFind(tasks.find(t => t.id === todoTask.id))
         expect(completedTodoTask.status).toBe('done')
 
         // 创建另一个项目，测试动态任务创建
@@ -1771,7 +1776,7 @@ describe('StateMachineRunner', () => {
 
         tasks = await controller.system.storage.find('Task', undefined, undefined, ['*'])
         expect(tasks.length).toBe(3)
-        const anotherUrgentTask = tasks.find(t => t.title === 'Task for Another Urgent')
+        const anotherUrgentTask = mustFind(tasks.find(t => t.title === 'Task for Another Urgent'))
         expect(anotherUrgentTask.status).toBe('urgent') // 验证新任务也有正确的初始状态
     })
 

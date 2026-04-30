@@ -116,7 +116,7 @@ describe('MonoSystem setup edge cases', () => {
         const statusProp = Property.create({
             name: 'entityStatus',
             type: 'string',
-            computedData: sm,
+            computation: sm,
         });
 
         const TestEntity2 = Entity.create({
@@ -159,6 +159,7 @@ describe('MonoSystem setup edge cases', () => {
                     trigger: { recordName: 'TestEntity5', type: 'create' },
                     current: inactive,
                     next: active,
+                    computeTarget: (mutationEvent: any) => mutationEvent.record,
                 })
             ],
             initialState: inactive
@@ -166,8 +167,8 @@ describe('MonoSystem setup edge cases', () => {
 
         const statusProp = Property.create({
             name: 'isActive',
-            type: 'string',
-            computedData: sm,
+            type: 'boolean',
+            computation: sm,
         });
 
         TestEntity.properties.push(statusProp);

@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext, RecordBoundState } from "./Computation.js";
+import { DataContext, PropertyDataContext, RecordBoundState, GlobalBoundState } from "./Computation.js";
 import { Summation } from "@core";
 import { Controller } from "../Controller.js";
 import { SummationInstance, EntityInstance, RelationInstance } from "@core";
@@ -12,7 +12,7 @@ export class GlobalSumHandle implements DataBasedComputation {
     static computationType = Summation
     static contextType = 'global' as const
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     record: (EntityInstance|RelationInstance)
     sumFieldPath: string[]
@@ -42,6 +42,7 @@ export class GlobalSumHandle implements DataBasedComputation {
     
     createState() {
         return {
+            sum: new GlobalBoundState<number>(0),
             itemValue: new RecordBoundState<number>(0, this.record.name!)
         }   
     }
@@ -64,9 +65,10 @@ export class GlobalSumHandle implements DataBasedComputation {
         for (const record of records) {
             const value = this.resolveSumField(record) || 0;
             sum += value;
-            await this.state.itemValue.set(record, value);
+            await this.state.itemValue.setInternal(record, value);
         }
         
+        await this.state.sum.setInternal(sum)
         return sum;
     }
 
@@ -76,28 +78,24 @@ export class GlobalSumHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
-        let sum = lastValue || 0;
+        let delta = 0
         
         if (mutationEvent.type === 'create') {
             const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const value = this.resolveSumField(newRecord);
-            sum += value;
-            await this.state.itemValue.set(newRecord, value);
+            const { oldValue } = await this.state.itemValue.replace(newRecord, value)
+            delta = value - (oldValue ?? 0)
         } else if (mutationEvent.type === 'delete') {
-            // Get the old value from state instead of returning fullRecompute
             const oldValue = await this.state.itemValue.get(mutationEvent.record);
-            sum -= oldValue;
+            delta = -(oldValue ?? 0)
         } else if (mutationEvent.type === 'update') {
             const newRecord = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({key:'id', value:['=', mutationEvent.record!.id]}), undefined, this.args.attributeQuery)
             const newValue = this.resolveSumField(newRecord);
-            
-            // Get the old value from state
-            const oldValue = await this.state.itemValue.get(mutationEvent.oldRecord);
-            sum += newValue - oldValue;
-            await this.state.itemValue.set(newRecord, newValue);
+            const { oldValue } = await this.state.itemValue.replace(newRecord, newValue)
+            delta = newValue - (oldValue ?? 0)
         }
         
-        return sum;
+        return this.state.sum.increment(delta);
     }
 }
 
@@ -105,7 +103,7 @@ export class PropertySumHandle implements DataBasedComputation {
     static computationType = Summation
     static contextType = 'property' as const
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
     relatedRecordName: string
@@ -155,6 +153,7 @@ export class PropertySumHandle implements DataBasedComputation {
 
     createState() {
         return {
+            sum: new RecordBoundState<number>(0, this.dataContext.host.name),
             itemResult: new RecordBoundState<number>(0, this.relation.name!)
         }    
     }
@@ -176,11 +175,13 @@ export class PropertySumHandle implements DataBasedComputation {
         let sum = 0;
         
         for (const relatedItem of relations) {
+            const relationStateRecord = relatedItem[LINK_SYMBOL] || relatedItem['&'] || relatedItem
             const value = this.resolveSumField(relatedItem, this.sumFieldPath) || 0;
             sum += value;
-            await this.state.itemResult.set(relatedItem, value);
+            await this.state.itemResult.setInternal(relationStateRecord, value);
         }
         
+        await this.state.sum.setInternal(_current, sum)
         return sum;
     }
 
@@ -203,7 +204,7 @@ export class PropertySumHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('No related mutation event')
         }
         
-        let sum = lastValue || 0;
+        let delta = 0
 
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
@@ -218,12 +219,12 @@ export class PropertySumHandle implements DataBasedComputation {
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const value = this.resolveSumField(relatedRecord) || 0;
-            sum += value;
-            await this.state.itemResult.set(newRelationWithEntity, value);
+            const { oldValue } = await this.state.itemResult.replace(newRelationWithEntity, value);
+            delta = value - (oldValue ?? 0);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
              // 关联关系的删除
              const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
-             sum = sum - oldResult;
+             delta = -(oldResult ?? 0);
         } else if (relatedMutationEvent.type === 'update') {
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。
@@ -244,12 +245,11 @@ export class PropertySumHandle implements DataBasedComputation {
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const newValue = this.resolveSumField(relatedRecord) || 0;
-            const oldValue = (await this.state.itemResult.get(newRelationWithEntity)) || 0;
-            await this.state.itemResult.set(newRelationWithEntity, newValue);
-            sum += newValue - oldValue;
+            const { oldValue } = await this.state.itemResult.replace(newRelationWithEntity, newValue);
+            delta = newValue - (oldValue ?? 0);
         }
 
-        return sum;
+        return this.state.sum.increment(mutationEvent.record, delta);
     }
 }
 

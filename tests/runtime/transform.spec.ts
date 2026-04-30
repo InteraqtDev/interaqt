@@ -12,6 +12,11 @@ import {
   PayloadItem, Transform
 } from 'interaqt';
 
+function mustFind<T>(value: T | undefined): T {
+  expect(value).toBeDefined();
+  return value!;
+}
+
 describe('Transform computed handle', () => {
   
   test('should transform entity collection to another entity collection', async () => {
@@ -74,7 +79,7 @@ describe('Transform computed handle', () => {
     expect(transform1).toHaveLength(3);
     
     // Check specific product transformation
-    const transformedProduct1 = transform1.find((p: any) => p.name === 'Product 1');
+    const transformedProduct1 = mustFind(transform1.find((p: any) => p.name === 'Product 1'));
     expect(transformedProduct1).toBeDefined();
     expect(transformedProduct1.originalPrice).toBe(100);
     expect(transformedProduct1.discountedPrice).toBe(90);
@@ -198,7 +203,7 @@ describe('Transform computed handle', () => {
     expect(summaries2).toHaveLength(2);
     
     // Find the Product A order summary
-    const productAOrder = summaries2.find((summary: any) => summary.product === 'Product A');
+    const productAOrder = mustFind(summaries2.find((summary: any) => summary.product === 'Product A'));
     expect(productAOrder).toBeDefined();
     expect(productAOrder.totalAmount).toBe(100); // 2 * 50
     
@@ -207,7 +212,7 @@ describe('Transform computed handle', () => {
     
     // Check order summaries after quantity update
     const summaries3 = await system.storage.find('OrderSummary', undefined, undefined, ['*']);
-    const updatedOrder = summaries3.find((summary: any) => summary.product === 'Product B');
+    const updatedOrder = mustFind(summaries3.find((summary: any) => summary.product === 'Product B'));
     expect(updatedOrder.totalAmount).toBe(300); // 3 * 100
     
     // Delete an order
@@ -296,17 +301,17 @@ describe('Transform computed handle', () => {
     expect(tiers1).toHaveLength(3);
     
     // Verify each tier
-    const budgetTier = tiers1.find((tier: any) => tier.tierName === 'Budget');
+    const budgetTier = mustFind(tiers1.find((tier: any) => tier.tierName === 'Budget'));
     expect(budgetTier).toBeDefined();
     expect(budgetTier.productName).toBe('Laptop Pro');
     expect(budgetTier.price).toBe(800); // 1000 * 0.8
     expect(budgetTier.description).toBe('Budget tier for Laptop Pro');
     
-    const standardTier = tiers1.find((tier: any) => tier.tierName === 'Standard');
+    const standardTier = mustFind(tiers1.find((tier: any) => tier.tierName === 'Standard'));
     expect(standardTier).toBeDefined();
     expect(standardTier.price).toBe(1000);
     
-    const premiumTier = tiers1.find((tier: any) => tier.tierName === 'Premium');
+    const premiumTier = mustFind(tiers1.find((tier: any) => tier.tierName === 'Premium'));
     expect(premiumTier).toBeDefined();
     expect(premiumTier.price).toBe(1500); // 1000 * 1.5
     
@@ -334,9 +339,9 @@ describe('Transform computed handle', () => {
     // Check that tiers are updated
     const tiers3 = await system.storage.find('PriceTier', undefined, undefined, ['*']);
     const updatedLaptopTiers = tiers3.filter((tier: any) => tier.productName === 'Laptop Pro');
-    expect(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Budget').price).toBe(960); // 1200 * 0.8
-    expect(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Standard').price).toBe(1200);
-    expect(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Premium').price).toBe(1800); // 1200 * 1.5
+    expect(mustFind(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Budget')).price).toBe(960); // 1200 * 0.8
+    expect(mustFind(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Standard')).price).toBe(1200);
+    expect(mustFind(updatedLaptopTiers.find((tier: any) => tier.tierName === 'Premium')).price).toBe(1800); // 1200 * 1.5
     
     // Delete a product
     await system.storage.delete('Product', BoolExp.atom({key: 'id', value: ['=', product2.id]}));
@@ -528,7 +533,7 @@ describe('Transform computed handle', () => {
     expect(recommendations).toHaveLength(3);
 
     // Verify physical book recommendation
-    const physicalRec = recommendations.find((r: any) => r.title === 'The Great Adventure');
+    const physicalRec = mustFind(recommendations.find((r: any) => r.title === 'The Great Adventure'));
     expect(physicalRec).toBeDefined();
     expect(physicalRec.originalPrice).toBe(35);
     expect(physicalRec.recommendedPrice).toBe(29.75); // 15% discount
@@ -536,7 +541,7 @@ describe('Transform computed handle', () => {
     expect(physicalRec.reason).toBe('Physical book bulk discount');
 
     // Verify ebook recommendation
-    const ebookRec = recommendations.find((r: any) => r.title === 'Digital Revolution');
+    const ebookRec = mustFind(recommendations.find((r: any) => r.title === 'Digital Revolution'));
     expect(ebookRec).toBeDefined();
     expect(ebookRec.originalPrice).toBe(15);
     expect(ebookRec.recommendedPrice).toBe(12); // 20% discount
@@ -544,7 +549,7 @@ describe('Transform computed handle', () => {
     expect(ebookRec.reason).toBe('Digital format promotion');
 
     // Verify audiobook recommendation
-    const audiobookRec = recommendations.find((r: any) => r.title === 'Voice of History');
+    const audiobookRec = mustFind(recommendations.find((r: any) => r.title === 'Voice of History'));
     expect(audiobookRec).toBeDefined();
     expect(audiobookRec.originalPrice).toBe(45);
     expect(audiobookRec.recommendedPrice).toBe(33.75); // 25% discount
@@ -603,7 +608,7 @@ describe('Transform computed handle', () => {
 
     // Check that transformations are updated
     const finalRecommendations = await system.storage.find('BookRecommendation', undefined, undefined, ['*']);
-    const updatedPhysicalRec = finalRecommendations.find((r: any) => r.title === 'The Great Adventure');
+    const updatedPhysicalRec = mustFind(finalRecommendations.find((r: any) => r.title === 'The Great Adventure'));
     expect(updatedPhysicalRec.originalPrice).toBe(20);
     expect(updatedPhysicalRec.recommendedPrice).toBe(19); // 5% standard discount (price <= 30)
     expect(updatedPhysicalRec.discountPercentage).toBe(5);
@@ -720,7 +725,7 @@ describe('Transform computed handle', () => {
     // Check second audit log entry
     const audits2 = await system.storage.find('UserAudit', undefined, undefined, ['*']);
     expect(audits2).toHaveLength(2);
-    const audit2 = audits2.find((a: any) => a.userId === user2.id.toString());
+    const audit2 = mustFind(audits2.find((a: any) => a.userId === user2.id.toString()));
     expect(audit2.action).toBe('create');
     expect(audit2.changes.new.name).toBe('Jane Smith');
   });
@@ -940,7 +945,7 @@ describe('Transform computed handle', () => {
     // Check both documents are in trash
     const trash3 = await system.storage.find('Trash', undefined, undefined, ['*']);
     expect(trash3).toHaveLength(2);
-    const doc2Trash = trash3.find((t: any) => t.originalId === doc2.id.toString());
+    const doc2Trash = mustFind(trash3.find((t: any) => t.originalId === doc2.id.toString()));
     expect(doc2Trash.originalData.name).toBe('Meeting Notes');
   });
   
@@ -1154,12 +1159,12 @@ describe('Transform computed handle', () => {
     const notifications1 = await system.storage.find('Notification', undefined, undefined, ['*']);
     expect(notifications1).toHaveLength(2);
     
-    const customerNotif = notifications1.find((n: any) => n.type === 'order_placed');
+    const customerNotif = mustFind(notifications1.find((n: any) => n.type === 'order_placed'));
     expect(customerNotif.recipient).toBe('customer@example.com');
     expect(customerNotif.message).toContain('ORD-001');
     expect(customerNotif.orderId).toBe(order.id.toString());
     
-    const warehouseNotif = notifications1.find((n: any) => n.type === 'new_order');
+    const warehouseNotif = mustFind(notifications1.find((n: any) => n.type === 'new_order'));
     expect(warehouseNotif.recipient).toBe('warehouse@company.com');
     
     // Update order status
@@ -1172,7 +1177,7 @@ describe('Transform computed handle', () => {
     const notifications2 = await system.storage.find('Notification', undefined, undefined, ['*']);
     expect(notifications2).toHaveLength(3);
     
-    const statusNotif = notifications2.find((n: any) => n.type === 'status_change');
+    const statusNotif = mustFind(notifications2.find((n: any) => n.type === 'status_change'));
     expect(statusNotif.message).toContain('status changed to shipped');
   });
   
@@ -1339,7 +1344,7 @@ describe('Transform computed handle', () => {
     // Also check that high priority order update was tracked
     const highPriorityAudits3 = await system.storage.find('HighPriorityOrderAudit', undefined, undefined, ['*']);
     expect(highPriorityAudits3).toHaveLength(2); // One create, one update
-    const updateAudit = highPriorityAudits3.find((a: any) => a.action === 'update');
+    const updateAudit = mustFind(highPriorityAudits3.find((a: any) => a.action === 'update'));
     expect(updateAudit).toBeDefined();
     expect(updateAudit.details.status).toBe('completed');
     expect(updateAudit.details.oldStatus).toBe('pending');

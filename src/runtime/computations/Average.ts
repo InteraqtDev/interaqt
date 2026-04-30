@@ -10,7 +10,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
     static computationType = Average
     static contextType = 'global' as const
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     record: (EntityInstance|RelationInstance)
     avgFieldPath: string[]
@@ -41,8 +41,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
     
     createState() {
         return {
-            sum: new GlobalBoundState<number>(0),
-            count: new GlobalBoundState<number>(0),
+            aggregate: new GlobalBoundState<Record<string, number>>({ sum: 0, count: 0 }),
             itemValue: new RecordBoundState<number>(0, this.record.name!)
         }   
     }
@@ -68,11 +67,10 @@ export class GlobalAverageHandle implements DataBasedComputation {
             const value = this.resolveAvgField(record) || 0;
             sum += value;
             count++;
-            await this.state.itemValue.set(record, value);
+            await this.state.itemValue.setInternal(record, value);
         }
         
-        await this.state.sum.set(sum);
-        await this.state.count.set(count);
+        await this.state.aggregate.setInternal({ sum, count });
         
         return count > 0 ? sum / count : 0;
     }
@@ -84,8 +82,8 @@ export class GlobalAverageHandle implements DataBasedComputation {
         }
 
         
-        let count = await this.state.count.get() || 0;
-        let sum = await this.state.sum.get() || 0;
+        let sumDelta = 0
+        let countDelta = 0
 
         if (mutationEvent.type === 'create') {
             const newRecord = await this.controller.system.storage.findOne(
@@ -95,14 +93,14 @@ export class GlobalAverageHandle implements DataBasedComputation {
                 this.args.attributeQuery
             )
             const value = this.resolveAvgField(newRecord) || 0;
-            sum += value;
-            count++;
-            await this.state.itemValue.set(newRecord, value);
+            const { oldValue } = await this.state.itemValue.replace(newRecord, value);
+            sumDelta = value - (oldValue ?? 0);
+            countDelta = 1;
         } else if (mutationEvent.type === 'delete') {
             // Get the old value from state instead of returning fullRecompute
             const oldValue = (await this.state.itemValue.get(mutationEvent.record)) || 0;
-            sum -= oldValue;
-            count--;
+            sumDelta = -oldValue;
+            countDelta = -1;
         } else if (mutationEvent.type === 'update') {
             const newRecord = await this.controller.system.storage.findOne(
                 this.record.name!, 
@@ -111,17 +109,21 @@ export class GlobalAverageHandle implements DataBasedComputation {
                 this.args.attributeQuery
             )
             const newValue = this.resolveAvgField(newRecord) || 0;
-            
-            // Get the old value from state
-            const oldValue = (await this.state.itemValue.get(mutationEvent.oldRecord)) || 0;
-            
-            // 更新 sum 和 count
-            sum += newValue - oldValue;
-            await this.state.itemValue.set(newRecord, newValue);
+            const { oldValue } = await this.state.itemValue.replace(newRecord, newValue);
+            sumDelta = newValue - (oldValue ?? 0);
         }
         
-        await this.state.sum.set(sum);
-        await this.state.count.set(count);
+        const aggregate = await this.controller.system.storage.atomic.updateGlobalFields(
+            {
+                key: this.state.aggregate.key,
+                valueType: 'json',
+                defaultValue: { sum: 0, count: 0 }
+            },
+            { sum: sumDelta, count: countDelta },
+            { sum: 0, count: 0 }
+        )
+        const sum = aggregate.sum
+        const count = aggregate.count
         
         return count > 0 ? sum / count : 0;
     }
@@ -141,7 +143,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
     static computationType = Average
     static contextType = 'property' as const
     state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
     relationAttr: string
     relatedRecordName: string
@@ -189,6 +191,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
 
     createState() {
         return {
+            sum: new RecordBoundState<number>(0, this.dataContext.host.name),
             count: new RecordBoundState<number>(0, this.dataContext.host.name),
             itemResult: new RecordBoundState<number>(0, this.relation.name!)
         }   
@@ -213,13 +216,15 @@ export class PropertyAverageHandle implements DataBasedComputation {
         let count = 0;
         
         for (const relatedItem of relations) {
+            const relationStateRecord = relatedItem[LINK_SYMBOL] || relatedItem['&'] || relatedItem
             const value = this.resolveAvgField(relatedItem, this.avgFieldPath) || 0;
             sum += value;
             count++;
-            await this.state.itemResult.set(relatedItem, value);
+            await this.state.itemResult.setInternal(relationStateRecord, value);
         }
         
-        await this.state.count.set(_current, count);
+        await this.state.sum.setInternal(_current, sum);
+        await this.state.count.setInternal(_current, count);
         
         return count > 0 ? sum / count : 0;
     }
@@ -243,8 +248,8 @@ export class PropertyAverageHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('No related mutation event')
         }
         
-        let count = await this.state.count.get(mutationEvent.record) || 0;
-        let sum = (lastValue || 0) * count
+        let sumDelta = 0
+        let countDelta = 0
 
         // 关联关系的新建
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
@@ -260,13 +265,13 @@ export class PropertyAverageHandle implements DataBasedComputation {
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const value = this.resolveAvgField(relatedRecord) || 0;
-            sum += value;
-            count++;
-            await this.state.itemResult.set(newRelationWithEntity, value);
+            const { oldValue } = await this.state.itemResult.replace(newRelationWithEntity, value);
+            sumDelta = value - (oldValue ?? 0);
+            countDelta = 1;
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
-            sum = sum - oldResult;  
-            count--;
+            sumDelta = -(oldResult ?? 0);
+            countDelta = -1;
         } else if (relatedMutationEvent.type === 'update') {
             // 可能是关系更新也可能是关联实体更新
             const newRelationWithEntity = await this.controller.system.storage.findOne(
@@ -280,14 +285,12 @@ export class PropertyAverageHandle implements DataBasedComputation {
             relatedRecord['&'] = newRelationWithEntity;
             const newValue = this.resolveAvgField(relatedRecord) || 0;
 
-            const oldValue = (await this.state.itemResult.get(newRelationWithEntity)) || 0;
-            await this.state.itemResult.set(newRelationWithEntity, newValue);
-            
-            // 更新 sum 和 count
-            sum += newValue - oldValue;
+            const { oldValue } = await this.state.itemResult.replace(newRelationWithEntity, newValue);
+            sumDelta = newValue - (oldValue ?? 0);
         }
 
-        await this.state.count.set(mutationEvent.record, count);
+        const sum = await this.state.sum.increment(mutationEvent.record, sumDelta);
+        const count = await this.state.count.increment(mutationEvent.record, countDelta);
         
         return count > 0 ? sum / count : 0;
     }

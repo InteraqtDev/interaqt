@@ -25,6 +25,7 @@ export class SQLiteDB implements Database{
     db!: InstanceType<typeof SQLite>
     idSystem!: IDSystem
     logger: DatabaseLogger
+    supportsSelectForUpdate = false
     constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger
@@ -32,6 +33,16 @@ export class SQLiteDB implements Database{
     async open() {
         this.db = new SQLite(this.file, this.options)
         await this.idSystem.setup()
+    }
+    async setupInternalComputationState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_ComputationState_" (
+    "key" TEXT PRIMARY KEY,
+    "numberValue" NUMERIC NULL,
+    "booleanValue" BOOLEAN NULL,
+    "stringValue" TEXT NULL,
+    "jsonValue" JSON NULL
+)`, 'setup computation state table')
     }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

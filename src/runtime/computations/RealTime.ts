@@ -54,8 +54,8 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
             throw new Error('Invalid result type');
         }
 
-        await this.state.lastRecomputeTime.set(now);
-        await this.state.nextRecomputeTime.set(nextRecomputeTime);
+        await this.state.lastRecomputeTime.setInternal(now);
+        await this.state.nextRecomputeTime.setInternal(nextRecomputeTime);
 
         return resultValue;
     }
@@ -117,8 +117,8 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
             throw new Error('Invalid result type');
         }
 
-        await this.state.lastRecomputeTime.set(record, now);
-        await this.state.nextRecomputeTime.set(record, nextRecomputeTime);
+        await this.state.lastRecomputeTime.setInternal(record, now);
+        await this.state.nextRecomputeTime.setInternal(record, nextRecomputeTime);
 
         return resultValue;
     }

@@ -27,6 +27,7 @@ export class PostgreSQLDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db: InstanceType<typeof Client>
+    supportsSelectForUpdate = true
     constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger
@@ -56,11 +57,22 @@ export class PostgreSQLDB implements Database{
         await this.idSystem.setup()
 
     }
+
+    async setupInternalComputationState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_ComputationState_" (
+    "key" TEXT PRIMARY KEY,
+    "numberValue" NUMERIC NULL,
+    "booleanValue" BOOLEAN NULL,
+    "stringValue" TEXT NULL,
+    "jsonValue" JSONB NULL
+)`, 'setup computation state table')
+    }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
 
-        const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
+        const params = where
         logger.info({
             type:'query',
             name,
@@ -74,7 +86,7 @@ export class PostgreSQLDB implements Database{
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x
         })
         logger.info({
             type:'update',
@@ -88,7 +100,7 @@ export class PostgreSQLDB implements Database{
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x
         })
         logger.info({
             type:'insert',
@@ -103,7 +115,7 @@ export class PostgreSQLDB implements Database{
     async delete<T> (sql:string, where: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
-        const params = where.map(x => x===false ? 0 : x===true ? 1 : x)
+        const params = where
         logger.info({
             type:'delete',
             name,

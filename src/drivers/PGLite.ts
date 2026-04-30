@@ -18,6 +18,7 @@ export class PGLiteDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db: InstanceType<typeof PGlite>
+    supportsSelectForUpdate = true
     constructor(public database?:string, public options: PGLiteDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger
@@ -43,6 +44,16 @@ export class PGLiteDB implements Database{
         }
 
         await this.idSystem.setup()
+    }
+    async setupInternalComputationState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_ComputationState_" (
+    "key" TEXT PRIMARY KEY,
+    "numberValue" NUMERIC NULL,
+    "booleanValue" BOOLEAN NULL,
+    "stringValue" TEXT NULL,
+    "jsonValue" JSON NULL
+)`, 'setup computation state table')
     }
     async query<T>(sql:string, params: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

@@ -314,7 +314,7 @@ export class Scheduler {
                 for(const state of Object.values(computationHandle.state)) {
                     if (state instanceof GlobalBoundState) {
                         state.controller = this.controller
-                        await this.controller.system.storage.dict.set(state.key , state.defaultValue ?? null)
+                        await state.setInternal(state.defaultValue ?? null)
                     } 
                 }
             }

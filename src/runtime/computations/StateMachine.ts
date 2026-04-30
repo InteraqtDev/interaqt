@@ -17,7 +17,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     static contextType = 'global' as const
     transitionFinder: TransitionFinder
     state!: {[key: string]: GlobalBoundState<any>}
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     eventDeps: {[key: string]: EventDep} = {}
     useMutationEvent: boolean = true
     initialState: StateNodeInstance
@@ -46,13 +46,14 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     }
     async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
         // Now we can handle any mutationEvent, not just interaction events
-        const currentStateName = await this.state.currentState.get()
+        const currentStateName = (await this.state.currentState.lock()) ?? this.initialState.name
         const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)
         if (!nextState) return ComputationResult.skip()
 
-        await this.state.currentState.set(nextState.name)
+        await this.state.currentState.setInternal(nextState.name)
 
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, mutationEvent)) : nextState.name
+        const previousValue = await this.controller.retrieveLastValue(this.dataContext)
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, previousValue, mutationEvent)) : nextState.name
     }
 }
 
@@ -62,7 +63,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     static contextType = 'property' as const
     transitionFinder: TransitionFinder
     state!: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
-    useLastValue: boolean = true
+    useLastValue: boolean = false
     eventDeps: {[key: string]: EventDep} = {}
     initialState: StateNodeInstance
     dataContext: PropertyDataContext
@@ -127,12 +128,15 @@ Or if you want to use state name as value, you should not set ${this.dataContext
     
     async incrementalCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any) {
         // Now we can handle any mutationEvent, not just interaction events
-        const currentStateName = await this.state.currentState.get(dirtyRecord)
+        const lockedRecord = await this.state.currentState.lock(dirtyRecord, ['*'])
+        if (!lockedRecord) return ComputationResult.skip()
+        const currentStateName = (lockedRecord[this.state.currentState.key] ?? this.initialState.name) as string
         const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)
         if (!nextState) return ComputationResult.skip()
 
-        await this.state.currentState.set(dirtyRecord, nextState.name)
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, lastValue, mutationEvent)) : nextState.name
+        await this.state.currentState.setInternal(lockedRecord, nextState.name)
+        const previousValue = lockedRecord[this.dataContext.id.name]
+        return nextState.computeValue? (await nextState.computeValue.call(this.controller, previousValue, mutationEvent)) : nextState.name
     }
     // 给外部用的，因为可能在 Transform 里面设置初始值。
     async createStateData(state: StateNodeInstance) {

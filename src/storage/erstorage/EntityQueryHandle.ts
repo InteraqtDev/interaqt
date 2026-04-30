@@ -41,6 +41,20 @@ export class EntityQueryHandle {
         return this.agent.findRecords(entityQuery, `finding ${entityName} from handle`)
     }
 
+    async lock(entityName: string, matchExpressionData?: MatchExpressionData, attributeQueryData: AttributeQueryData = []): Promise<Record[]> {
+        assert(this.map.getRecord(entityName), `cannot find entity ${entityName}`)
+        const entityQuery = RecordQuery.create(
+            entityName,
+            this.map,
+            {
+                matchExpression: matchExpressionData,
+                attributeQuery: attributeQueryData
+            },
+        )
+
+        return this.agent.lockRecords(entityQuery, `locking ${entityName} from handle`)
+    }
+
     async create(entityName: string, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
         // 支持使用外部 id。
         // assert(rawData[ID_ATTR] === null || rawData[ID_ATTR] === undefined, `${ID_ATTR} should be null or undefined when creating new record`)

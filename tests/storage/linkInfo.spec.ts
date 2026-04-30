@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { LinkInfo } from '../../src/storage/erstorage/LinkInfo.js';
 import { EntityToTableMap } from '../../src/storage/erstorage/EntityToTableMap.js';
+import { MatchExp } from '../../src/storage/erstorage/MatchExp.js';
 import type { MapData, LinkMapItem } from '../../src/storage/erstorage/EntityToTableMap.js';
 
 function createMapData(links: Record<string, LinkMapItem>, records: MapData['records'] = {}): MapData {
@@ -333,7 +334,7 @@ describe('LinkInfo filtered relation methods', () => {
     });
 
     test('getResolvedMatchExpression for filtered relation', () => {
-        const resolved = { key: 'resolved', value: ['=', true] };
+        const resolved = MatchExp.atom({ key: 'resolved', value: ['=', true] });
         const link = createLinkInfo('rel', {
             isFilteredRelation: true,
             resolvedMatchExpression: resolved,

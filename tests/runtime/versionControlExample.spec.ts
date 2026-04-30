@@ -19,6 +19,21 @@ import {
   DictionaryEntity
 } from 'interaqt';
 
+type VersionInfo = {
+  version: number;
+  type?: 'publish' | 'rollback';
+  publishedAt?: number;
+  publishedStyleId?: string;
+  fromVersion?: number;
+  rollbackTo?: number;
+  rollbackAt?: number;
+};
+
+function mustFind<T>(value: T | undefined): T {
+  expect(value).toBeDefined();
+  return value!;
+}
+
 describe('Version Control Example', () => {
   test('Style entity with version control', async () => {
     
@@ -113,12 +128,13 @@ describe('Version Control Example', () => {
     // Define state for version info changes
     const versionUpdatedState = StateNode.create({
       name: 'versionUpdated',
-      computeValue: (lastValue, mutationEvent) => {
-        const event = mutationEvent?.record;
-        if (!event) return lastValue || { version: 0 };
+      computeValue: (lastValue: unknown, mutationEvent) => {
+        const event = (mutationEvent as RecordMutationEvent | undefined)?.record;
+        const previousVersion = (lastValue as VersionInfo | undefined) ?? { version: 0 };
+        if (!event) return previousVersion;
 
         const timestamp = Math.floor(Date.now()/1000);
-        const newVersion = lastValue.version + 1;
+        const newVersion = previousVersion.version + 1;
 
         if (event.interactionName === 'PublishStyle') {
           return {
@@ -130,7 +146,7 @@ describe('Version Control Example', () => {
         } else if (event.interactionName === 'RollbackVersion') {
           return {
             version: newVersion,
-            fromVersion: lastValue.version,
+            fromVersion: previousVersion.version,
             rollbackTo: event.payload.version,
             rollbackAt: timestamp,
             type: 'rollback'
@@ -190,7 +206,7 @@ describe('Version Control Example', () => {
         // Handle style creation
         if (mutationEvent.type === 'create' && event.interactionName === 'CreateStyle') {
           // Get current version info
-          let versionInfo = await this.system.storage.dict.get('currentVersionInfo');
+          let versionInfo = await this.system.storage.dict.get('currentVersionInfo') as VersionInfo;
           
           return {
             content: event.payload.content,
@@ -347,7 +363,7 @@ describe('Version Control Example', () => {
     expect(publishResult.error).toBeUndefined();
 
     // Check version info
-    let versionInfo1 = await system.storage.dict.get('currentVersionInfo');
+    let versionInfo1 = await system.storage.dict.get('currentVersionInfo') as VersionInfo;
     console.log('Version info after publish:', versionInfo1);
     expect(versionInfo1).toBeDefined();
     expect(versionInfo1.type).toBe('publish');
@@ -365,8 +381,8 @@ describe('Version Control Example', () => {
     expect(newVersionStyles).toHaveLength(2);
     
     // Find the style that was published (same content as the original)
-    const publishedStyle = newVersionStyles.find(s => s.content === 'Style 1 content');
-    const otherStyle = newVersionStyles.find(s => s.content === 'Style 2 content');
+    const publishedStyle = mustFind(newVersionStyles.find(s => s.content === 'Style 1 content'));
+    const otherStyle = mustFind(newVersionStyles.find(s => s.content === 'Style 2 content'));
     
     expect(publishedStyle).toBeDefined();
     expect(otherStyle).toBeDefined();
@@ -390,8 +406,7 @@ describe('Version Control Example', () => {
       payload: { content: 'Style 4 content' }
     });
 
-    let versionInfo2;
-    versionInfo2 = await system.storage.dict.get('currentVersionInfo');
+    let versionInfo2 = await system.storage.dict.get('currentVersionInfo') as VersionInfo;
     const version2 = versionInfo2?.version;
 
     // 4. Rollback to first version
@@ -402,7 +417,7 @@ describe('Version Control Example', () => {
 
 
     // Check rollback results
-    let versionInfo3 = await system.storage.dict.get('currentVersionInfo');
+    let versionInfo3 = await system.storage.dict.get('currentVersionInfo') as VersionInfo;
     expect(versionInfo3).toBeDefined();
     expect(versionInfo3.type).toBe('rollback');
     expect(versionInfo3.rollbackTo).toBe(versionInfo1.version);

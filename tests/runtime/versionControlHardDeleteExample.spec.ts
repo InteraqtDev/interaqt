@@ -23,6 +23,21 @@ import {
   HARD_DELETION_PROPERTY_NAME
 } from 'interaqt';
 
+type VersionInfo = {
+  version: number;
+  type?: 'publish' | 'rollback';
+  publishedAt?: number;
+  publishedStyleId?: string;
+  fromVersion?: number;
+  rollbackTo?: number;
+  rollbackAt?: number;
+};
+
+function mustFind<T>(value: T | undefined): T {
+  expect(value).toBeDefined();
+  return value!;
+}
+
 describe('Version Control Example with Hard Delete', () => {
   test('Style entity with version control using hard deletion', async () => {
     
@@ -117,12 +132,13 @@ describe('Version Control Example with Hard Delete', () => {
     // Define state for version info changes
     const versionUpdatedState = StateNode.create({
       name: 'versionUpdated',
-      computeValue: (lastValue, mutationEvent) => {
-        const event = mutationEvent?.record;
-        if (!event) return lastValue || { version: 0 };
+      computeValue: (lastValue: unknown, mutationEvent) => {
+        const event = (mutationEvent as RecordMutationEvent | undefined)?.record;
+        const previousVersion = (lastValue as VersionInfo | undefined) ?? { version: 0 };
+        if (!event) return previousVersion;
 
         const timestamp = Math.floor(Date.now()/1000);
-        const newVersion = lastValue.version + 1;
+        const newVersion = previousVersion.version + 1;
 
         if (event.interactionName === 'PublishStyle') {
           return {
@@ -134,7 +150,7 @@ describe('Version Control Example with Hard Delete', () => {
         } else if (event.interactionName === 'RollbackVersion') {
           return {
             version: newVersion,
-            fromVersion: lastValue.version,
+            fromVersion: previousVersion.version,
             rollbackTo: event.payload.version,
             rollbackAt: timestamp,
             type: 'rollback'
@@ -194,7 +210,7 @@ describe('Version Control Example with Hard Delete', () => {
         // Handle style creation
         if (mutationEvent.type === 'create' && event.interactionName === 'CreateStyle') {
           // Get current version info
-          let versionInfo = await this.system.storage.dict.get('currentVersionInfo');
+          let versionInfo = await this.system.storage.dict.get('currentVersionInfo') as VersionInfo;
           
           return {
             content: event.payload.content,
@@ -337,7 +353,7 @@ describe('Version Control Example with Hard Delete', () => {
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // Check version info
-    let versionInfo1 = await system.storage.dict.get('currentVersionInfo');
+    let versionInfo1 = await system.storage.dict.get('currentVersionInfo') as VersionInfo;
     console.log('Version info after publish:', versionInfo1);
     expect(versionInfo1).toBeDefined();
     expect(versionInfo1.type).toBe('publish');
@@ -357,13 +373,12 @@ describe('Version Control Example with Hard Delete', () => {
     expect(version0Styles).toHaveLength(2); // Original version still exists
     expect(version1Styles).toHaveLength(2); // New version created
     
-    const styleBeforePublished = version0Styles.find(s => s.content === 'Style 1 content');
-    expect(styleBeforePublished).toBeDefined();
+    const styleBeforePublished = mustFind(version0Styles.find(s => s.content === 'Style 1 content'));
     expect(styleBeforePublished.status).toBe('draft');
 
     // Check the published style in new version
-    const publishedStyle = version1Styles.find(s => s.content === 'Style 1 content');
-    const otherStyle = version1Styles.find(s => s.content === 'Style 2 content');
+    const publishedStyle = mustFind(version1Styles.find(s => s.content === 'Style 1 content'));
+    const otherStyle = mustFind(version1Styles.find(s => s.content === 'Style 2 content'));
     
     expect(publishedStyle).toBeDefined();
     expect(otherStyle).toBeDefined();
@@ -393,7 +408,7 @@ describe('Version Control Example with Hard Delete', () => {
     // Wait for async operations
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    let versionInfo2 = await system.storage.dict.get('currentVersionInfo');
+    let versionInfo2 = await system.storage.dict.get('currentVersionInfo') as VersionInfo;
     const version2 = versionInfo2?.version;
     console.log('Version 2:', version2);
 
@@ -415,7 +430,7 @@ describe('Version Control Example with Hard Delete', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Check rollback results
-    let versionInfo3 = await system.storage.dict.get('currentVersionInfo');
+    let versionInfo3 = await system.storage.dict.get('currentVersionInfo') as VersionInfo;
     expect(versionInfo3).toBeDefined();
     expect(versionInfo3.type).toBe('rollback');
     expect(versionInfo3.rollbackTo).toBe(versionInfo1.version);
