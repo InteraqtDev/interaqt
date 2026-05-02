@@ -87,7 +87,7 @@ Built-in computations such as Count, Summation, Average, Every, Any, WeightedSum
 
 Custom computations are different because interaqt cannot inspect user callback logic. `Custom.create()` defaults to `concurrency: 'serializable'`, so the framework promotes the transaction to PostgreSQL `SERIALIZABLE` and retries on `40001` / `40P01`. Use `concurrency: 'atomic-safe'` only when the custom computation is explicitly written with atomic state, idempotent patches, or other safe primitives.
 
-Because retry replays the transaction attempt, `guard`, `mapEventData`, `resolve`, computation callbacks, `afterDispatch`, and `asyncReturn` must be deterministic and retry-safe. Put irreversible external IO in `recordMutationSideEffects`, which runs after the final commit.
+Because retry replays the transaction attempt, `guard`, `mapEventData`, `resolve`, computation callbacks, `afterDispatch`, and `asyncReturn` must be deterministic and retry-safe. Put irreversible external IO in `postCommit` for interaction-specific effects or `recordMutationSideEffects` for mutation-driven effects; both run after the final commit.
 
 ### Core Principle: Data Existence
 

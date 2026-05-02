@@ -36,14 +36,20 @@ One-to-one relations represent unique correspondences between two entities, such
 ### Basic One-to-One Relation
 
 ```javascript
-import { Entity, Property, Relation } from 'interaqt';
+import { Entity, Property, Relation, UniqueConstraint } from 'interaqt';
 
 // Define user entity
 const User = Entity.create({
   name: 'User',
   properties: [
-    Property.create({ name: 'email', type: 'string', unique: true }),
+    Property.create({ name: 'email', type: 'string' }),
     Property.create({ name: 'name', type: 'string' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'User_email_unique',
+      properties: ['email']
+    })
   ]
 });
 
@@ -116,8 +122,14 @@ One-to-many relations represent that one entity can be associated with multiple 
 const User = Entity.create({
   name: 'User',
   properties: [
-    Property.create({ name: 'email', type: 'string', unique: true }),
+    Property.create({ name: 'email', type: 'string' }),
     Property.create({ name: 'name', type: 'string' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'User_email_unique',
+      properties: ['email']
+    })
   ]
 });
 
@@ -195,8 +207,14 @@ Many-to-many relations represent multiple associations between two entities, suc
 const Tag = Entity.create({
   name: 'Tag',
   properties: [
-    Property.create({ name: 'name', type: 'string', unique: true }),
+    Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'color', type: 'string', defaultValue: '#666666' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'Tag_name_unique',
+      properties: ['name']
+    })
   ]
 });
 
@@ -499,15 +517,21 @@ const UserPosts = Relation.create({
 ## Complete Example: Blog System Relation Design
 
 ```javascript
-import { Entity, Property, Relation } from 'interaqt';
+import { Entity, Property, Relation, UniqueConstraint } from 'interaqt';
 
 // Entity definitions
 const User = Entity.create({
   name: 'User',
   properties: [
-    Property.create({ name: 'email', type: 'string', unique: true }),
+    Property.create({ name: 'email', type: 'string' }),
     Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'avatar', type: 'string' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'User_email_unique',
+      properties: ['email']
+    })
   ]
 });
 
@@ -532,8 +556,14 @@ const Comment = Entity.create({
 const Tag = Entity.create({
   name: 'Tag',
   properties: [
-    Property.create({ name: 'name', type: 'string', unique: true }),
+    Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'color', type: 'string', defaultValue: '#666666' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'Tag_name_unique',
+      properties: ['name']
+    })
   ]
 });
 

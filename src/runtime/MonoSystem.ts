@@ -15,6 +15,7 @@ import {
     SystemEntity,
     SystemLogger,
     SystemLogType,
+    StorageSchemaMetadata,
     DictionaryEntity,
     EntityIdRef
 } from "./System.js";
@@ -23,6 +24,7 @@ import { RequireSerializableRetry, runWithTransactionRetry, TransactionIsolation
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
 import {
+    ConstraintSchemaItem,
     DBSetup,
     EntityQueryHandle,
     EntityToTableMap,
@@ -32,6 +34,9 @@ import {
 } from '@storage';
 // SQLiteDB is now imported from @drivers when needed
 import { RecordBoundState } from "./computations/Computation.js";
+import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
+import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
+import { createUniqueIndexSQL, getSchemaDialect } from "@storage";
 
 function JSONStringify(value: unknown) {
     return encodeURI(JSON.stringify(value))
@@ -49,6 +54,13 @@ type StorageTransactionContext = {
 class MonoStorage implements Storage{
     public map!: DBSetup["map"]
     public queryHandle?: EntityQueryHandle
+    private constraintSchemaItems: ConstraintSchemaItem[] = []
+    public schema: StorageSchemaMetadata = {
+        dialect: getSchemaDialect(),
+        records: [],
+        tables: [],
+        constraints: []
+    }
     public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void> }
     public atomic: AtomicStorage
     private transactionContext = new AsyncLocalStorage<StorageTransactionContext>()
@@ -164,12 +176,24 @@ class MonoStorage implements Storage{
         if (createTables && this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
         }
-        const dbSetup = new DBSetup(
-            entities, 
-            relations, 
-            this.db
-        )
+        let dbSetup: DBSetup
+        try {
+            dbSetup = new DBSetup(
+                entities, 
+                relations, 
+                this.db
+            )
+        } catch (error) {
+            throw new ConstraintSetupError(
+                error instanceof Error ? error.message : String(error),
+                {
+                    driver: this.db.constructor?.name,
+                    causedBy: error instanceof Error ? error : undefined,
+                }
+            )
+        }
         if (createTables) await dbSetup.createTables()
+        await this.createConstraints(dbSetup)
         if (this.db.setupRecordSequences) {
             const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
             await this.db.setupRecordSequences(Object.keys(dbSetup.map.records).map(recordName => {
@@ -188,6 +212,62 @@ class MonoStorage implements Storage{
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), this.db)
 
         this.map = dbSetup.map
+        this.constraintSchemaItems = dbSetup.constraintSchemaItems
+        this.schema = this.createSchemaMetadata(dbSetup)
+    }
+
+    private createSchemaMetadata(dbSetup: DBSetup): StorageSchemaMetadata {
+        return {
+            dialect: getSchemaDialect(this.db),
+            records: Object.entries(dbSetup.map.records).map(([recordName, record]) => ({
+                recordName,
+                tableName: record.table,
+                isRelation: record.isRelation === true,
+                isFiltered: record.isFilteredEntity === true || record.isFilteredRelation === true,
+                attributes: Object.keys(record.attributes),
+            })),
+            tables: Object.entries(dbSetup.tables).map(([tableName, table]) => ({
+                tableName,
+                columns: Object.keys(table.columns),
+            })),
+            constraints: dbSetup.constraintSchemaItems.map(item => ({ ...item })),
+        }
+    }
+
+    private async createConstraints(dbSetup: DBSetup) {
+        let statements
+        try {
+            statements = dbSetup.createConstraintSQL()
+        } catch (error) {
+            throw new ConstraintSetupError(
+                error instanceof Error ? error.message : String(error),
+                {
+                    driver: this.db.constructor?.name,
+                    causedBy: error instanceof Error ? error : undefined,
+                }
+            )
+        }
+
+        for (const statement of statements) {
+            const item = statement.item
+            try {
+                await this.db.scheme(statement.sql, `setup constraint ${item.constraintName}`)
+            } catch (error) {
+                throw new ConstraintSetupError(
+                    `Failed to setup constraint "${item.constraintName}" on "${item.recordName}"`,
+                    {
+                        constraintName: item.constraintName,
+                        physicalName: item.physicalName,
+                        recordName: item.recordName,
+                        tableName: item.tableName,
+                        properties: item.properties,
+                        driver: this.db.constructor?.name,
+                        rawCode: normalizeDatabaseError(error, this.db).rawCode,
+                        causedBy: error instanceof Error ? error : undefined,
+                    }
+                )
+            }
+        }
     }
 
     private isRecordTarget(target: AtomicTarget): target is AtomicRecordTarget {
@@ -487,30 +567,68 @@ RETURNING "numberValue" AS value`,
     delete(entityName: string, matchExpressionData: MatchExpressionData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
         return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData], events) as Promise<EntityIdRef>
     }
+    private findConstraintForError(error: unknown) {
+        const normalized = normalizeDatabaseError(error, this.db)
+        if (normalized.constraintName) {
+            const byConstraint = this.constraintSchemaItems.find(item => item.physicalName === normalized.constraintName || item.constraintName === normalized.constraintName)
+            if (byConstraint) return byConstraint
+        }
+        const byName = this.constraintSchemaItems.find(item => normalized.message.includes(item.physicalName) || normalized.message.includes(item.constraintName))
+        if (byName) return byName
+        return this.constraintSchemaItems.find(item => {
+            const normalizedFields = normalized.fields || []
+            const exactFieldMatch = normalized.tableName === item.tableName && item.fields.every(field => normalizedFields.includes(field))
+            return exactFieldMatch || (normalized.message.includes(item.tableName) && item.fields.every(field => normalized.message.includes(field)))
+        })
+    }
+    private mapConstraintError(error: unknown): unknown {
+        const existing = findConstraintViolationError(error)
+        if (existing) return existing
+        const normalized = normalizeDatabaseError(error, this.db)
+        if (!normalized.isUniqueViolation) return error
+        const item = this.findConstraintForError(error)
+        return new ConstraintViolationError(
+            item ? `Unique constraint "${item.constraintName}" was violated` : 'Unique constraint was violated',
+            {
+                kind: 'unique',
+                constraintName: item?.constraintName,
+                recordName: item?.recordName,
+                properties: item?.properties,
+                violationCode: item?.violationCode,
+                driver: normalized.driver,
+                rawCode: normalized.rawCode,
+                causedBy: error instanceof Error ? error : undefined,
+            }
+        )
+    }
     async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = []): Promise<unknown> {
         if (!this.isInTransaction()) {
             return this.withAtomicTransaction('storage mutation with events', async () => this.callWithEvents(method, args, events))
         }
-        const methodEvents:RecordMutationEvent[] = []
-        const result = await method(...args, methodEvents)
-        // FIXME 还没有实现异步机制
-        // nextJob(() => {
-        //     this.dispatch(events)
-        // })
-        // CAUTION 特别注意这里会空充 events
-        const  newEvents = await this.dispatch(methodEvents)
-        events.push(...methodEvents, ...newEvents)
-        
-        // Also add to async context if available
-        const contextEffects = getCurrentEffects()
-        if (contextEffects && methodEvents.length > 0) {
-            addToCurrentEffects(methodEvents)
+        try {
+            const methodEvents:RecordMutationEvent[] = []
+            const result = await method(...args, methodEvents)
+            // FIXME 还没有实现异步机制
+            // nextJob(() => {
+            //     this.dispatch(events)
+            // })
+            // CAUTION 特别注意这里会空充 events
+            const  newEvents = await this.dispatch(methodEvents)
+            events.push(...methodEvents, ...newEvents)
+            
+            // Also add to async context if available
+            const contextEffects = getCurrentEffects()
+            if (contextEffects && methodEvents.length > 0) {
+                addToCurrentEffects(methodEvents)
+            }
+            if (contextEffects && newEvents.length > 0) {
+                addToCurrentEffects(newEvents)
+            }
+            
+            return result
+        } catch (error) {
+            throw this.mapConstraintError(error)
         }
-        if (contextEffects && newEvents.length > 0) {
-            addToCurrentEffects(newEvents)
-        }
-        
-        return result
     }
     findRelationByName(...arg:Parameters<EntityQueryHandle["findRelationByName"]>) {
         return this.queryHandle!.findRelationByName(...arg)
@@ -701,8 +819,9 @@ export class MonoSystem implements System {
             const [, sourceRecordIdField] = map.getTableAliasAndFieldName([recordName], sourceRecordId.key, true)
             const [, transformIndexField] = map.getTableAliasAndFieldName([recordName], transformIndex.key, true)
             const indexName = `idx_transform_${this.hashIdentifier(`${recordInfo.table}_${sourceRecordIdField}_${transformIndexField}`)}`
+            const dialect = getSchemaDialect(storage.db)
             await storage.db.scheme(
-                `CREATE UNIQUE INDEX IF NOT EXISTS "${indexName}" ON "${recordInfo.table}" ("${sourceRecordIdField}", "${transformIndexField}")`,
+                createUniqueIndexSQL(indexName, recordInfo.table, [sourceRecordIdField, transformIndexField], dialect),
                 `setup transform unique index ${recordName}`
             )
         }

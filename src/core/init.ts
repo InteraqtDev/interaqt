@@ -2,6 +2,7 @@ import { KlassByName, registerKlass } from './utils.js';
 import { Entity } from './Entity.js';
 import { Relation } from './Relation.js';
 import { Property } from './Property.js';
+import { UniqueConstraint } from './Constraint.js';
 import { StateNode } from './StateNode.js';
 import { StateTransfer } from './StateTransfer.js';
 import { StateMachine } from './StateMachine.js';
@@ -21,6 +22,7 @@ const klassesToRegister = [
   Entity,
   Relation,
   Property,
+  UniqueConstraint,
   StateNode,
   StateTransfer,
   StateMachine,

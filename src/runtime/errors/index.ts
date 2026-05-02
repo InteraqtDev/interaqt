@@ -8,6 +8,12 @@ export {
     ComputationStateError,
     ComputationDataDepError
 } from './ComputationErrors.js'
+export {
+    ConstraintViolationError,
+    ConstraintSetupError,
+    findConstraintViolationError
+} from './ConstraintErrors.js'
+export { normalizeDatabaseError } from './DatabaseErrors.js'
 
 // System errors
 export {

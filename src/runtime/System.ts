@@ -3,7 +3,7 @@ import { GlobalBoundState } from "./computations/Computation.js";
 import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
-import { AttributeQueryData, MatchExpressionData } from "@storage";
+import type { AttributeQueryData, ConstraintSchemaItem, MatchExpressionData, SchemaDialect } from "@storage";
 import { TransactionIsolation, TransactionOptions } from "./transaction.js";
 export type SystemCallback = (...arg: unknown[]) => unknown
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
@@ -39,8 +39,29 @@ export type AtomicStorage = {
     lockRows(recordName: string, match: MatchExpressionData, attributeQuery?: AttributeQueryData): Promise<Record<string, unknown>[]>
 }
 
+export type StorageSchemaRecordItem = {
+    recordName: string,
+    tableName: string,
+    isRelation: boolean,
+    isFiltered: boolean,
+    attributes: readonly string[],
+}
+
+export type StorageSchemaTableItem = {
+    tableName: string,
+    columns: readonly string[],
+}
+
+export type StorageSchemaMetadata = {
+    dialect: SchemaDialect,
+    records: readonly StorageSchemaRecordItem[],
+    tables: readonly StorageSchemaTableItem[],
+    constraints: readonly ConstraintSchemaItem[],
+}
+
 export type Storage = {
     map: unknown
+    schema: StorageSchemaMetadata
     runInTransaction: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
     getTransactionIsolation: () => TransactionIsolation | undefined
 
@@ -129,10 +150,22 @@ export type DatabaseLogger = {
     child:(fixed: object) => DatabaseLogger,
 }
 
+export type SchemaDialectConfig = {
+    name: 'postgres' | 'sqlite' | 'mysql',
+    maxIdentifierLength?: number,
+    supportsCreateIndexIfNotExists?: boolean,
+    encodeLiteral?: (value: string | number | boolean | null) => string,
+    constraints?: {
+        unique?: boolean,
+        filteredUnique?: boolean,
+    },
+}
+
 // FIXME 这里应该继承自 storage？
 export type Database = {
     open: (forceDrop?:boolean) => Promise<void>
     logger: DatabaseLogger
+    schemaDialect?: SchemaDialectConfig
     scheme: (sql:string, name?:string) => Promise<unknown>
     query: <T>(sql: string, values: unknown[],name?:string) => Promise<T[]>
     delete: <T>(sql: string, where: unknown[], name?:string) => Promise<T[]>

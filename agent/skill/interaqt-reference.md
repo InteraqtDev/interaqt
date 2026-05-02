@@ -512,10 +512,11 @@ EventSource.create(args: {
   mapEventData?: (args: TArgs) => Record<string, any>
   resolve?: (this: Controller, args: TArgs) => Promise<TResult>
   afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+  postCommit?: (this: Controller, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>
 }): EventSourceInstance
 ```
 
-Custom event source for scheduled tasks, webhooks, or any non-interaction trigger. Dispatch via `controller.dispatch(eventSource, args)`.
+Custom event source for scheduled tasks, webhooks, or any non-interaction trigger. Dispatch via `controller.dispatch(eventSource, args)`. `afterDispatch` runs inside the retryable transaction; use `postCommit` for external IO that must run only after commit.
 
 ---
 

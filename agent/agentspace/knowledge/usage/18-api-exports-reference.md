@@ -9,6 +9,7 @@ import {
   // Entity-related
   Entity,
   Property,
+  UniqueConstraint,
   
   // Relation-related
   Relation,
@@ -56,6 +57,10 @@ import {
   runWithTransactionRetry,
   isRetryableTransactionError,
   isRequireSerializableRetry,
+  ConstraintViolationError,
+  ConstraintSetupError,
+  findConstraintViolationError,
+  normalizeDatabaseError,
   
   // Dictionary (Global State)
   Dictionary,
@@ -95,16 +100,35 @@ import {
 
 ### Basic Entity Definition
 ```javascript
-import { Entity, Property } from 'interaqt';
+import { Entity, Property, UniqueConstraint } from 'interaqt';
 
 const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({ name: 'name', type: 'string' }),
     Property.create({ name: 'email', type: 'string' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'User_email_unique',
+      properties: ['email']
+    })
   ]
 });
 ```
+
+### Data Constraints
+```javascript
+import {
+  UniqueConstraint,
+  ConstraintViolationError,
+  ConstraintSetupError,
+  findConstraintViolationError,
+  normalizeDatabaseError
+} from 'interaqt';
+```
+
+`UniqueConstraint` declares persistent database uniqueness at Entity or Relation level. Runtime duplicate writes are reported with `ConstraintViolationError`; setup/index creation problems are reported with `ConstraintSetupError`. Use `findConstraintViolationError(error)` when the top-level error may be a wrapped computation error.
 
 ### Complete CRUD Setup
 ```javascript
@@ -179,3 +203,5 @@ const controller = new Controller({
 5. **Database Drivers**: Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. 
 
 6. **Transaction helpers**: `runWithTransactionRetry`, `isRetryableTransactionError`, and `isRequireSerializableRetry` are exported for advanced runtime integrations and tests. Most application code should use `Controller.dispatch()` or `system.storage.runInTransaction()` instead of calling retry helpers directly.
+
+7. **Constraint helpers**: `UniqueConstraint`, `ConstraintViolationError`, `ConstraintSetupError`, `findConstraintViolationError`, and `normalizeDatabaseError` are exported for schema-level uniqueness and stable duplicate handling.

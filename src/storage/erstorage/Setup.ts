@@ -1,6 +1,6 @@
-import { LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
+import { EntityToTableMap, LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
-import { EntityInstance, RelationInstance, PropertyInstance, RefContainer } from "@core";
+import { ConstraintPredicate, ConstraintPredicateOperator, EntityInstance, RelationInstance, PropertyInstance, RefContainer, UniqueConstraintInstance } from "@core";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
 import { MatchExpressionData, MatchExp } from "./MatchExp.js";
@@ -8,6 +8,7 @@ import { Entity, Property, Relation } from "@core";
 import { BoolExp } from "@core";
 import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
+import { ConstraintSchemaStatement, createUniqueConstraintStatement, getSchemaDialect } from "./SchemaDialect.js";
 
 // Define the types we need
 
@@ -31,6 +32,18 @@ export type TableData = {
 
 export type MergeLinks = string[]
 
+export type ConstraintSchemaItem = {
+    kind: 'unique',
+    constraintName: string,
+    physicalName: string,
+    recordName: string,
+    tableName: string,
+    properties: string[],
+    fields: string[],
+    where?: ConstraintPredicate,
+    violationCode?: string,
+}
+
 
 export class DBSetup {
     private fieldNameMap: Map<string, string> = new Map()
@@ -42,6 +55,7 @@ export class DBSetup {
     public tables:TableData = {}
     public map: MapData = { links: {}, records: {}}
     public aliasManager: AliasManager = new AliasManager()
+    public constraintSchemaItems: ConstraintSchemaItem[] = []
     constructor(
         public entities: EntityInstance[],
         public relations: RelationInstance[],
@@ -50,6 +64,7 @@ export class DBSetup {
     ) {
         this.buildMap()
         this.buildTables()
+        this.buildConstraints()
     }
     createRecordToTable(item:string, table:string) {
         this.recordToTableMap.set(item, table)
@@ -958,6 +973,144 @@ ${Object.values(this.tables[tableName].columns).map(column => {
     createTables() {
         return Promise.all(this.createTableSQL().map(sql => {
             return this.database!.scheme(sql)
+        }))
+    }
+
+    private stableHash(input: string) {
+        let hash = 5381
+        for (let i = 0; i < input.length; i++) {
+            hash = ((hash << 5) + hash) ^ input.charCodeAt(i)
+        }
+        return (hash >>> 0).toString(36)
+    }
+
+    private buildPhysicalConstraintName(recordName: string, constraintName: string) {
+        const base = `uniq_${recordName}_${constraintName}`.replace(/[^a-zA-Z0-9_]/g, '_')
+        const hash = this.stableHash(`${recordName}:${constraintName}`)
+        const maxLength = getSchemaDialect(this.database).maxIdentifierLength
+        if (base.length + hash.length + 1 <= maxLength) return `${base}_${hash}`
+        return `${base.slice(0, maxLength - hash.length - 1)}_${hash}`
+    }
+
+    private resolveConstraintField(recordName: string, property: string) {
+        const map = new EntityToTableMap(this.map, this.aliasManager)
+        const recordInfo = map.getRecordInfo(recordName)
+        const attribute = this.map.records[recordName]?.attributes[property]
+        if (!attribute) {
+            throw new Error(`constraint property "${property}" not found on "${recordName}"`)
+        }
+        if (!(attribute as RecordAttribute).isRecord && (attribute as ValueAttribute).computed) {
+            throw new Error(`constraint property "${property}" on "${recordName}" is computed and cannot be used in a persistent constraint`)
+        }
+        const [, fieldName, tableName] = map.getTableAliasAndFieldName([recordName], property, true)
+        if (!fieldName) {
+            throw new Error(`constraint property "${property}" on "${recordName}" cannot be resolved to a single physical field`)
+        }
+        if (tableName !== recordInfo.table) {
+            throw new Error(`constraint property "${property}" on "${recordName}" is not stored on record table "${recordInfo.table}"`)
+        }
+        return fieldName
+    }
+
+    private validatePredicateValue(value: unknown, constraintName: string, property: string) {
+        const type = typeof value
+        if (value !== null && type !== 'string' && type !== 'number' && type !== 'boolean') {
+            throw new Error(`constraint "${constraintName}" predicate for "${property}" has unsupported value type "${type}"`)
+        }
+        if (typeof value === 'number' && !Number.isFinite(value)) {
+            throw new Error(`constraint "${constraintName}" predicate for "${property}" has non-finite number value`)
+        }
+    }
+
+    private validatePredicateOperator(constraintName: string, property: string, operator: ConstraintPredicateOperator) {
+        if (!operator || typeof operator !== 'object' || !('op' in operator)) {
+            throw new Error(`constraint "${constraintName}" predicate for "${property}" must use a valid operator`)
+        }
+        switch (operator.op) {
+            case 'isNull':
+            case 'isNotNull':
+                return
+            case 'equals':
+            case 'notEquals':
+                this.validatePredicateValue(operator.value, constraintName, property)
+                return
+            case 'in':
+            case 'notIn':
+                if (!Array.isArray(operator.value) || operator.value.length === 0) {
+                    throw new Error(`constraint "${constraintName}" predicate "${operator.op}" for "${property}" requires a non-empty value array`)
+                }
+                operator.value.forEach(value => this.validatePredicateValue(value, constraintName, property))
+                return
+            default:
+                throw new Error(`constraint "${constraintName}" predicate for "${property}" uses unsupported operator "${(operator as { op?: unknown }).op}"`)
+        }
+    }
+
+    private validateConstraintPredicate(recordName: string, constraint: UniqueConstraintInstance) {
+        Object.entries(constraint.where || {}).forEach(([property, operator]) => {
+            this.resolveConstraintField(recordName, property)
+            this.validatePredicateOperator(constraint.name, property, operator)
+        })
+    }
+
+    private validateConstraintRecord(recordName: string, constraint: UniqueConstraintInstance) {
+        const record = this.map.records[recordName]
+        if (!record) throw new Error(`constraint "${constraint.name}" references unknown record "${recordName}"`)
+        if (record.isFilteredEntity === true || record.isFilteredRelation === true) {
+            throw new Error(`constraint "${constraint.name}" on filtered record "${recordName}" is not supported yet`)
+        }
+        if (!constraint.properties?.length) {
+            throw new Error(`constraint "${constraint.name}" must declare at least one property`)
+        }
+        constraint.properties.forEach(property => this.resolveConstraintField(recordName, property))
+        this.validateConstraintPredicate(recordName, constraint)
+    }
+
+    private buildConstraints() {
+        const logicalNames = new Set<string>()
+        const allRecords: Array<{ recordName: string, constraints?: UniqueConstraintInstance[] }> = [
+            ...this.entities.map(entity => ({ recordName: entity.name, constraints: entity.constraints as UniqueConstraintInstance[] | undefined })),
+            ...this.relations.map(relation => ({ recordName: relation.name!, constraints: relation.constraints as UniqueConstraintInstance[] | undefined })),
+        ]
+
+        for (const { recordName, constraints } of allRecords) {
+            for (const constraint of constraints || []) {
+                if (logicalNames.has(constraint.name)) {
+                    throw new Error(`duplicate constraint name "${constraint.name}"`)
+                }
+                logicalNames.add(constraint.name)
+                this.validateConstraintRecord(recordName, constraint)
+
+                const fields = constraint.properties.map(property => this.resolveConstraintField(recordName, property))
+                this.constraintSchemaItems.push({
+                    kind: 'unique',
+                    constraintName: constraint.name,
+                    physicalName: this.buildPhysicalConstraintName(recordName, constraint.name),
+                    recordName,
+                    tableName: this.map.records[recordName].table,
+                    properties: [...constraint.properties],
+                    fields,
+                    where: constraint.where,
+                    violationCode: constraint.violationCode,
+                })
+            }
+        }
+    }
+
+    createConstraintSQL(): ConstraintSchemaStatement[] {
+        const dialect = getSchemaDialect(this.database)
+        return this.constraintSchemaItems.map(item => {
+            return createUniqueConstraintStatement(
+                item,
+                dialect,
+                property => item.fields[item.properties.indexOf(property)] || this.resolveConstraintField(item.recordName, property)
+            )
+        })
+    }
+
+    createConstraints() {
+        return Promise.all(this.createConstraintSQL().map(statement => {
+            return this.database!.scheme(statement.sql, `setup constraint ${statement.item.constraintName}`)
         }))
     }
 

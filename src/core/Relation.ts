@@ -2,6 +2,7 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { PropertyInstance, Property } from './Property.js';
 import { EntityInstance } from './Entity.js';
 import type { ComputationInstance } from './types.js';
+import type { ConstraintInstance } from './Constraint.js';
 
 export interface RelationInstance extends IInstance {
   name?: string;
@@ -17,6 +18,7 @@ export interface RelationInstance extends IInstance {
   matchExpression?: object; // for Filtered Relation
   inputRelations?: RelationInstance[]; // for Merged Relation
   commonProperties?: PropertyInstance[]; // for Merged Relation
+  constraints?: ConstraintInstance[];
 }
 
 export interface RelationCreateArgs {
@@ -33,6 +35,7 @@ export interface RelationCreateArgs {
   matchExpression?: object;
   inputRelations?: RelationInstance[]; // for Merged Relation
   commonProperties?: PropertyInstance[]; // for Merged Relation
+  constraints?: ConstraintInstance[];
 }
 
 export class Relation implements RelationInstance {
@@ -52,6 +55,7 @@ export class Relation implements RelationInstance {
   public matchExpression?: object;
   public inputRelations?: RelationInstance[]; // for Merged Relation
   public commonProperties?: PropertyInstance[]; // for Merged Relation
+  public constraints?: ConstraintInstance[];
   // Getter for name that returns computed name if _name is undefined
   get name(): string | undefined {
     if (this._name !== undefined) {
@@ -144,6 +148,7 @@ export class Relation implements RelationInstance {
     this.isTargetReliance = args.isTargetReliance ?? false;
     this.computation = args.computation;
     this.properties = args.properties || [];
+    this.constraints = args.constraints;
   }
   
   // 静态属性和方法
@@ -247,6 +252,12 @@ export class Relation implements RelationInstance {
           return true;
         }
       }
+    },
+    constraints: {
+      type: 'UniqueConstraint' as const,
+      collection: true as const,
+      required: false as const,
+      defaultValue: () => []
     }
   };
   
@@ -269,7 +280,8 @@ export class Relation implements RelationInstance {
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
-      properties: instance.properties
+      properties: instance.properties,
+      constraints: instance.constraints
     };
     
     // Only include source and target if not a merged relation
@@ -302,7 +314,8 @@ export class Relation implements RelationInstance {
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
-      properties: instance.properties?.map(p => Property.clone(p, deep))
+      properties: instance.properties?.map(p => Property.clone(p, deep)),
+      constraints: instance.constraints
     };
     
     // Only include source and target if not a merged relation

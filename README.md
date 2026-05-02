@@ -245,6 +245,40 @@ const system = new MonoSystem(new PostgreSQLDB({ /* connection config */ }))
 
 ---
 
+## Schema Constraints and Transaction Boundaries
+
+interaqt supports schema-level uniqueness for framework-managed records. Declare uniqueness at the Entity or Relation level with `UniqueConstraint`; the storage setup installs database unique indexes and reports duplicate writes as structured framework errors.
+
+```typescript
+import { Entity, Property, UniqueConstraint } from 'interaqt'
+
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'email', type: 'string' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'User_email_unique',
+      properties: ['email'],
+      violationCode: 'USER_EMAIL_DUPLICATE'
+    })
+  ]
+})
+```
+
+`controller.dispatch()` runs event persistence and synchronous computation writes in one transaction. Unique conflicts roll back the whole dispatch attempt and can be handled with `ConstraintViolationError` or `findConstraintViolationError(error)`.
+
+For diagnostics and migration planning, inspect the read-only schema metadata:
+
+```typescript
+system.storage.schema.constraints
+system.storage.schema.records
+system.storage.schema.tables
+```
+
+---
+
 ## Installation
 
 ```bash
@@ -291,8 +325,9 @@ npm install @electric-sql/pglite
 - **Activities** — Compose multi-step business workflows from ordered Interactions
 - **Attributive Permissions** — Declarative, entity-aware access control
 - **Dictionary** — Global reactive key-value state
+- **Schema Constraints** — Persistent unique constraints with structured duplicate errors
 - **Hard Deletion** — Built-in support for both soft and hard delete patterns
-- **Side Effects** — Hook into record mutations for external integrations (email, payments, file uploads)
+- **Post-Commit Side Effects** — Use `postCommit` or record mutation side effects for external integrations after commit
 
 ---
 

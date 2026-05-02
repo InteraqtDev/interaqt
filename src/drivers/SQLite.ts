@@ -1,5 +1,6 @@
 import SQLite from "better-sqlite3";
 import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
+import { sqliteEncodeLiteral } from "@storage";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -26,6 +27,13 @@ export class SQLiteDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     supportsSelectForUpdate = false
+    schemaDialect = {
+        name: 'sqlite' as const,
+        maxIdentifierLength: 63,
+        supportsCreateIndexIfNotExists: true,
+        encodeLiteral: sqliteEncodeLiteral,
+        constraints: { unique: true, filteredUnique: true },
+    }
     constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger

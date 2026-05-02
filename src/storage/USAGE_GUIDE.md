@@ -90,10 +90,41 @@ await db.open();
 // Set up the database schema based on your models
 const setup = new DBSetup(entities, relations, db);
 await setup.createTables();
+await setup.createConstraints();
 
 // Create the query handle to interact with the database
 const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
 ```
+
+### Schema Constraints and Metadata
+
+Entities and relations can declare persistent unique constraints through the core `UniqueConstraint` API. `DBSetup.createConstraints()` installs the corresponding unique indexes after tables exist.
+
+```typescript
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'email', type: 'string' })
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'User_email_unique',
+      properties: ['email']
+    })
+  ]
+});
+```
+
+When using `MonoSystem`, setup installs constraints automatically and exposes a read-only schema metadata snapshot:
+
+```typescript
+system.storage.schema.dialect
+system.storage.schema.records
+system.storage.schema.tables
+system.storage.schema.constraints
+```
+
+This metadata is intended for diagnostics, migration planning, and stable constraint error mapping.
 
 ## Working with Entities
 

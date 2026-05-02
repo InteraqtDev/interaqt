@@ -1,5 +1,6 @@
 import {Database, DatabaseLogger, EntityIdRef, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
 import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mysql2/promise'
+import { defaultEncodeLiteral } from "@storage";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -25,6 +26,13 @@ export class MysqlDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db!: Connection
+    schemaDialect = {
+        name: 'mysql' as const,
+        maxIdentifierLength: 64,
+        supportsCreateIndexIfNotExists: false,
+        encodeLiteral: defaultEncodeLiteral,
+        constraints: { unique: false, filteredUnique: false },
+    }
     constructor(public database:string, public options: MysqlDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger

@@ -152,6 +152,7 @@ export class ActivityManager {
             mapEventData: wrappedMapEventData,
             resolve: interaction.resolve,
             afterDispatch: wrappedAfterDispatch,
+            postCommit: interaction.postCommit,
         } as EventSourceInstance<InteractionEventArgs>
     }
 

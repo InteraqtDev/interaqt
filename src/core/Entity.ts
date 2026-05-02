@@ -2,6 +2,7 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { PropertyInstance } from './Property.js';
 import type { ComputationInstance } from './types.js';
 import type { RelationInstance } from './Relation.js';
+import type { ConstraintInstance } from './Constraint.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -13,6 +14,7 @@ export interface EntityInstance extends IInstance {
   matchExpression?: object; // for Filtered Entity
   inputEntities?: EntityInstance[]; // for Merged Entity
   commonProperties?: PropertyInstance[]; // for Merged Entity
+  constraints?: ConstraintInstance[];
 }
 
 export interface EntityCreateArgs {
@@ -23,6 +25,7 @@ export interface EntityCreateArgs {
   matchExpression?: object;
   inputEntities?: EntityInstance[]; // for Merged Entity
   commonProperties?: PropertyInstance[]; // for Merged Entity
+  constraints?: ConstraintInstance[];
 }
 
 export class Entity implements EntityInstance {
@@ -36,6 +39,7 @@ export class Entity implements EntityInstance {
   public matchExpression?: object;
   public inputEntities?: EntityInstance[]; // for Merged Entity
   public commonProperties?: PropertyInstance[]; // for Merged Entity
+  public constraints?: ConstraintInstance[];
   constructor(args: EntityCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
@@ -46,6 +50,7 @@ export class Entity implements EntityInstance {
     this.matchExpression = args.matchExpression;
     this.inputEntities = args.inputEntities;
     this.commonProperties = args.commonProperties;
+    this.constraints = args.constraints;
   }
   
   // 静态属性和方法
@@ -115,6 +120,12 @@ export class Entity implements EntityInstance {
           return true;
         }
       }
+    },
+    constraints: {
+      type: 'UniqueConstraint' as const,
+      collection: true as const,
+      required: false as const,
+      defaultValue: () => []
     }
   };
   
@@ -138,7 +149,9 @@ export class Entity implements EntityInstance {
       computation: instance.computation,
       baseEntity: instance.baseEntity,
       matchExpression: instance.matchExpression,
-      inputEntities: instance.inputEntities
+      inputEntities: instance.inputEntities,
+      commonProperties: instance.commonProperties,
+      constraints: instance.constraints
     };
     
     const data: SerializedData<EntityCreateArgs> = {
@@ -158,7 +171,8 @@ export class Entity implements EntityInstance {
       baseEntity: instance.baseEntity,
       matchExpression: instance.matchExpression,
       inputEntities: instance.inputEntities,
-      commonProperties: instance.commonProperties
+      commonProperties: instance.commonProperties,
+      constraints: instance.constraints
     };
     
     return this.create(args);

@@ -2,6 +2,7 @@ import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionCont
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import pg, { type ClientConfig, type PoolClient} from 'pg'
+import { defaultEncodeLiteral } from "@storage";
 
 const { Client, Pool } = pg
 
@@ -93,6 +94,13 @@ export class PostgreSQLDB implements Database{
     pool?: InstanceType<typeof Pool>
     private transactionContext = new AsyncLocalStorage<TransactionContext>()
     supportsSelectForUpdate = true
+    schemaDialect = {
+        name: 'postgres' as const,
+        maxIdentifierLength: 63,
+        supportsCreateIndexIfNotExists: true,
+        encodeLiteral: defaultEncodeLiteral,
+        constraints: { unique: true, filteredUnique: true },
+    }
     constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger

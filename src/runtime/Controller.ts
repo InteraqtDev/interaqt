@@ -334,10 +334,48 @@ export class Controller {
         }
 
         if (!result.error) {
+            await this.runPostCommitHook(eventSource, args, result, this.system.logger)
             await this.runRecordChangeSideEffects(result, this.system.logger)
         }
 
         return result
+    }
+
+    async runPostCommitHook<TArgs = unknown, TResult = unknown>(
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        args: TArgs,
+        result: DispatchResponse,
+        logger: SystemLogger
+    ) {
+        if (!eventSource.postCommit) return
+        try {
+            const postCommitContext = await eventSource.postCommit.call(this, args, {
+                data: result.data as TResult,
+                context: result.context,
+            })
+            if (postCommitContext) {
+                result.context = {
+                    ...(result.context || {}),
+                    ...postCommitContext,
+                }
+            }
+        } catch (e) {
+            const sideEffectError = new SideEffectError(
+                `Post-commit hook '${eventSource.name}' failed`,
+                {
+                    sideEffectName: eventSource.name,
+                    recordName: eventSource.entity.name,
+                    context: {
+                        eventSourceName: eventSource.name,
+                    },
+                    causedBy: e instanceof Error ? e : new Error(String(e))
+                }
+            )
+            logger.error({label: "postCommit", message: eventSource.name, error: sideEffectError})
+            result.sideEffects!.__postCommit = {
+                error: sideEffectError,
+            }
+        }
     }
 
     async runRecordChangeSideEffects(result: DispatchResponse, logger: SystemLogger) {

@@ -1,6 +1,7 @@
 import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
 import { PGlite} from '@electric-sql/pglite'
 import { uuidv7 } from "@interaqt/uuidv7";
+import { defaultEncodeLiteral } from "@storage";
 
 class IDSystem {
     constructor(public db: Database) {}
@@ -19,6 +20,13 @@ export class PGLiteDB implements Database{
     logger: DatabaseLogger
     db: InstanceType<typeof PGlite>
     supportsSelectForUpdate = true
+    schemaDialect = {
+        name: 'postgres' as const,
+        maxIdentifierLength: 63,
+        supportsCreateIndexIfNotExists: true,
+        encodeLiteral: defaultEncodeLiteral,
+        constraints: { unique: true, filteredUnique: true },
+    }
     constructor(public database?:string, public options: PGLiteDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger

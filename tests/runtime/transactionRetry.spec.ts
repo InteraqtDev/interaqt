@@ -274,6 +274,122 @@ describe("transaction retry and serializable promotion", () => {
     await system.destroy();
   });
 
+  test("runs postCommit after commit and does not roll back when it fails", async () => {
+    const Item = Entity.create({
+      name: "PostCommitItem",
+      properties: [Property.create({ name: "value", type: "number" })],
+    });
+    const AddItem = Interaction.create({
+      name: "addPostCommitItem",
+      action: Action.create({ name: "addPostCommitItem" }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({
+            type: "Entity",
+            name: "item",
+            base: Item,
+          }),
+        ],
+      }),
+    });
+
+    let postCommitRuns = 0;
+    AddItem.resolve = async function(this: Controller, event: any) {
+      return this.system.storage.create("PostCommitItem", event.payload.item);
+    };
+    AddItem.postCommit = async () => {
+      postCommitRuns++;
+      throw new Error("external side effect failed");
+    };
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [Item],
+      relations: [],
+      eventSources: [AddItem],
+    });
+    await controller.setup(true);
+
+    const result = await controller.dispatch(AddItem, {
+      user: { id: "tester" },
+      payload: { item: { value: 1 } },
+    });
+    const records = await system.storage.find("PostCommitItem", undefined, undefined, ["id", "value"]);
+
+    expect(result.error).toBeUndefined();
+    expect(result.sideEffects?.__postCommit?.error).toBeDefined();
+    expect(postCommitRuns).toBe(1);
+    expect(records).toHaveLength(1);
+    await system.destroy();
+  });
+
+  test("merges successful postCommit context and skips postCommit when dispatch fails", async () => {
+    const Item = Entity.create({
+      name: "PostCommitSuccessItem",
+      properties: [Property.create({ name: "value", type: "number" })],
+    });
+    const AddItem = Interaction.create({
+      name: "addPostCommitSuccessItem",
+      action: Action.create({ name: "addPostCommitSuccessItem" }),
+      payload: Payload.create({
+        items: [
+          PayloadItem.create({
+            type: "Entity",
+            name: "item",
+            base: Item,
+          }),
+        ],
+      }),
+    });
+
+    let postCommitRuns = 0;
+    AddItem.resolve = async function(this: Controller, event: any) {
+      if (event.payload.item.value < 0) {
+        throw new Error("reject negative value");
+      }
+      return this.system.storage.create("PostCommitSuccessItem", event.payload.item);
+    };
+    AddItem.afterDispatch = async () => ({ transactionContext: "committed" });
+    AddItem.postCommit = async (_args, result) => {
+      postCommitRuns++;
+      return {
+        postCommitContext: "sent",
+        sawTransactionContext: result.context?.transactionContext,
+      };
+    };
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [Item],
+      relations: [],
+      eventSources: [AddItem],
+    });
+    await controller.setup(true);
+
+    const success = await controller.dispatch(AddItem, {
+      user: { id: "tester" },
+      payload: { item: { value: 1 } },
+    });
+    const failed = await controller.dispatch(AddItem, {
+      user: { id: "tester" },
+      payload: { item: { value: -1 } },
+    });
+
+    expect(success.error).toBeUndefined();
+    expect(success.context).toMatchObject({
+      transactionContext: "committed",
+      postCommitContext: "sent",
+      sawTransactionContext: "committed",
+    });
+    expect(failed.error).toBeDefined();
+    expect(postCommitRuns).toBe(1);
+    await system.destroy();
+  });
+
   test("retries retryable SQLSTATE errors regardless of current isolation", async () => {
     let attempts = 0;
 

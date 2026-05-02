@@ -28,6 +28,11 @@ export interface EventSourceInstance<TArgs = unknown, TResult = void> extends II
    * response context, but it must not perform irreversible external IO.
    */
   afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+  /**
+   * Runs after the dispatch transaction has committed successfully. Failures do
+   * not roll back committed storage changes and are reported in sideEffects.
+   */
+  postCommit?: (this: CallbackThis, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>
 }
 
 export interface EventSourceCreateArgs<TArgs = unknown, TResult = void> {
@@ -37,6 +42,7 @@ export interface EventSourceCreateArgs<TArgs = unknown, TResult = void> {
   mapEventData?: (args: TArgs) => Record<string, unknown>
   resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>
   afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
+  postCommit?: (this: CallbackThis, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>
 }
 
 export class EventSource<TArgs = unknown, TResult = void> implements EventSourceInstance<TArgs, TResult> {
@@ -49,6 +55,7 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
   public mapEventData?: (args: TArgs) => Record<string, unknown>;
   public resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>;
   public afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>;
+  public postCommit?: (this: CallbackThis, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>;
 
   constructor(args: EventSourceCreateArgs<TArgs, TResult>, options?: { uuid?: string }) {
     this._options = options;
@@ -59,6 +66,7 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
     this.mapEventData = args.mapEventData;
     this.resolve = args.resolve;
     this.afterDispatch = args.afterDispatch;
+    this.postCommit = args.postCommit;
   }
 
   static isKlass = true as const;
@@ -110,6 +118,7 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
       mapEventData: instance.mapEventData,
       resolve: instance.resolve,
       afterDispatch: instance.afterDispatch,
+      postCommit: instance.postCommit,
     });
   }
 

@@ -12,6 +12,8 @@ export * from './computations/MathResolver.js'
 // error related
 export * from './errors/FrameworkError.js'
 export * from './errors/ComputationErrors.js'
+export * from './errors/ConstraintErrors.js'
+export * from './errors/DatabaseErrors.js'
 export { ConditionError } from './errors/ConditionErrors.js'
 // Export everything from util except indexBy to avoid conflict with shared module
 export { 

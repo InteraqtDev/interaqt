@@ -32,7 +32,18 @@ These interaction callbacks must be deterministic and retry-safe:
 - `resolve`
 - `afterDispatch`
 
-`afterDispatch` runs before commit inside the retryable transaction attempt. It can return response context or perform retry-safe database work, but it must not perform irreversible external IO. Put emails, webhooks, message publishing, payment calls, and other post-commit external effects in `recordMutationSideEffects`.
+`afterDispatch` runs before commit inside the retryable transaction attempt. It can return response context or perform retry-safe database work, but it must not perform irreversible external IO.
+
+Use `postCommit` for interaction-specific external IO that should run only after the final successful commit:
+
+```javascript
+CreateOrder.postCommit = async function(args, result) {
+  await sendOrderWebhook(result.data);
+  return { webhookSent: true };
+};
+```
+
+If `postCommit` fails, committed data is not rolled back; the error is reported in `result.sideEffects.__postCommit.error`. Use `recordMutationSideEffects` when the side effect should be driven by record mutation events rather than by a specific interaction.
 
 ## Basic Concepts of Interactions
 
