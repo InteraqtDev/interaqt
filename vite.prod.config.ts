@@ -41,6 +41,8 @@ export default defineConfig({
         'node:path',
         'node:util',
         'node:assert',
+        'node:async_hooks',
+        'node:crypto',
         // npm 依赖
         'acorn',
         'better-sqlite3',
