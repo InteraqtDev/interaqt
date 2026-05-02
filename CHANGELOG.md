@@ -1,5 +1,12 @@
 
 
+## [1.4.0](https://github.com/InteraqtDev/interaqt/compare/v1.3.0...v1.4.0) (2026-05-02)
+
+
+### Features
+
+* add dispatch transaction contract ([a52dda9](https://github.com/InteraqtDev/interaqt/commit/a52dda917ba26dc58772fb2932303892cf6bcec4))
+
 ## [1.3.0](https://github.com/InteraqtDev/interaqt/compare/v1.2.0...v1.3.0) (2026-05-02)
 
 
