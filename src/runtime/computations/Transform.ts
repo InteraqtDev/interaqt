@@ -6,6 +6,7 @@ import { ComputationResultPatch, DataDep, RecordBoundState, RecordsDataDep } fro
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { assert } from "../util.js";
+import { RequireSerializableRetry } from "../transaction.js";
 
 export class RecordsTransformHandle implements DataBasedComputation {
     static computationType = Transform
@@ -121,6 +122,9 @@ export class RecordsTransformHandle implements DataBasedComputation {
             })
         } else {
             // update or delete
+            if (this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                throw new RequireSerializableRetry('data-based Transform update/delete patch')
+            }
             const sourceRecordId = mutationEvent.oldRecord?.id ?? mutationEvent.record!.id
             let transformedRecords: any[] = []
             if (mutationEvent.type === 'update') {

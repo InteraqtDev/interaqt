@@ -17,6 +17,7 @@ import { CustomHandles } from "./computations/Custom.js";
 import { SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
+import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 
 export const USER_ENTITY = 'User'
 
@@ -199,6 +200,9 @@ export class Controller {
             return this.system.storage.dict.set(dataContext.id.name, result)
         } else if (dataContext.type === 'entity') {
             if (result === undefined || result === null) return
+            if (this.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                throw new RequireSerializableRetry('entity replace result')
+            }
             const entityContext = dataContext as EntityDataContext
             await this.system.storage.delete(entityContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
             const items = Array.isArray(result) ? result : [result]
@@ -207,6 +211,9 @@ export class Controller {
             }
         } else if (dataContext.type === 'relation') {
             if (result === undefined || result === null) return
+            if (this.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                throw new RequireSerializableRetry('relation replace result')
+            }
             const relationContext = dataContext as RelationDataContext
             await this.system.storage.delete(relationContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
             const items = Array.isArray(result) ? result : [result]
@@ -270,58 +277,54 @@ export class Controller {
         eventSource: EventSourceInstance<TArgs, TResult>,
         args: TArgs
     ): Promise<DispatchResponse> {
-        const effectsContext = { effects: [] as RecordMutationEvent[] }
-        
-        return asyncEffectsContext.run(effectsContext, async () => {
-            await this.system.storage.beginTransaction(eventSource.name)
-            
-            let result: DispatchResponse
-            try {
-                if (!this.ignoreGuard && eventSource.guard) {
-                    await eventSource.guard.call(this, args)
-                }
-                
-                const eventData = eventSource.mapEventData
-                    ? eventSource.mapEventData(args)
-                    : {}
-                    
-                await this.system.storage.create(eventSource.entity.name!, eventData)
-                
-                let data: unknown = undefined
-                if (eventSource.resolve) {
-                    data = await eventSource.resolve.call(this, args)
-                }
-                
-                let context: Record<string, unknown> | undefined = undefined
-                if (eventSource.afterDispatch) {
-                    const afterResult = await (eventSource.afterDispatch as Function).call(this, args, { data })
-                    if (afterResult) {
-                        context = afterResult
-                    }
-                }
-                
-                result = { data, effects: effectsContext.effects, sideEffects: {}, context }
-                
-                await this.system.storage.commitTransaction(eventSource.name)
-            } catch (e) {
-                await this.system.storage.rollbackTransaction(eventSource.name)
-                
-                if (this.forceThrowDispatchError) throw e
-                result = {
-                    error: e,
-                    effects: [],
-                    sideEffects: {}
-                }
+        assert(!!eventSource, 'eventSource is required for dispatch')
+        let result: DispatchResponse
+        try {
+            result = await runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
+                const effectsContext = { effects: [] as RecordMutationEvent[] }
+                return asyncEffectsContext.run(effectsContext, async () => {
+                    return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
+                        if (!this.ignoreGuard && eventSource.guard) {
+                            await eventSource.guard.call(this, args)
+                        }
+                        
+                        const eventData = eventSource.mapEventData
+                            ? eventSource.mapEventData(args)
+                            : {}
+                            
+                        await this.system.storage.create(eventSource.entity.name!, eventData)
+                        
+                        let data: unknown = undefined
+                        if (eventSource.resolve) {
+                            data = await eventSource.resolve.call(this, args)
+                        }
+                        
+                        let context: Record<string, unknown> | undefined = undefined
+                        if (eventSource.afterDispatch) {
+                            const afterResult = await (eventSource.afterDispatch as Function).call(this, args, { data })
+                            if (afterResult) {
+                                context = afterResult
+                            }
+                        }
+                        
+                        return { data, effects: effectsContext.effects, sideEffects: {}, context }
+                    })
+                })
+            })
+        } catch (e) {
+            if (this.forceThrowDispatchError) throw e
+            result = {
+                error: e,
+                effects: [],
+                sideEffects: {}
             }
-            
-            result.effects = effectsContext.effects
-            
-            if (!result.error) {
-                await this.runRecordChangeSideEffects(result, this.system.logger)
-            }
-            
-            return result
-        })
+        }
+
+        if (!result.error) {
+            await this.runRecordChangeSideEffects(result, this.system.logger)
+        }
+
+        return result
     }
 
     async runRecordChangeSideEffects(result: DispatchResponse, logger: SystemLogger) {

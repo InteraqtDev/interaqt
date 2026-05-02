@@ -1,23 +1,86 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
-import pg, { type ClientConfig} from 'pg'
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, RequireSerializableRetry, TransactionOptions} from "interaqt";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
+import pg, { type ClientConfig, type PoolClient} from 'pg'
 
-const { Client} = pg
+const { Client, Pool } = pg
+
+type TransactionContext = {
+    client: PoolClient
+    depth: number
+    isolation: TransactionOptions['isolation']
+}
 
 class IDSystem {
-    constructor(public db: Database) {}
+    private initialized = new Set<string>()
+    private recordToSequenceName = new Map<string, string>()
+    constructor(public db: PostgreSQLDB) {}
     setup() {
         return this.db.scheme(`CREATE Table IF NOT EXISTS "_IDS_" (last INTEGER, name TEXT)`)
     }
-    async getAutoId(recordName: string) {
-        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM "_IDS_" WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
-        const newId = (lastId || 0) +1
-        const name =`set last id for ${recordName}: ${newId}`
-        if (lastId === undefined) {
-            await this.db.scheme(`INSERT INTO "_IDS_" (name, last) VALUES ('${recordName}', ${newId})`, name)
-        } else {
-            await this.db.update(`UPDATE "_IDS_" SET last = $1 WHERE name = $2`, [newId, recordName], undefined, name)
+    private sanitizeIdentifierPart(value: string) {
+        const sanitized = value.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^_+/, '')
+        return (sanitized || 'record').slice(0, 32)
+    }
+    sequenceName(recordName: string) {
+        return this.sequenceNameForKey(recordName, recordName)
+    }
+    private sequenceNameForKey(key: string, displayName: string) {
+        const hash = createHash('sha1').update(key).digest('hex').slice(0, 12)
+        return `seq_${hash}_${this.sanitizeIdentifierPart(displayName)}`.slice(0, 63)
+    }
+    private quoteIdentifier(identifier: string) {
+        return `"${identifier.replace(/"/g, '""')}"`
+    }
+    async setupSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
+        const idsTableExists = (await this.db.query<{ exists: string | null }>(
+            `SELECT to_regclass($1) AS exists`,
+            ['"_IDS_"'],
+            'check legacy id table'
+        ))[0]?.exists
+
+        const sequenceMax = new Map<string, number>()
+        for (const record of records) {
+            const sequenceName = this.sequenceNameForKey(`${record.tableName}.${record.idField}`, record.tableName)
+            this.recordToSequenceName.set(record.recordName, sequenceName)
+            const quotedSequence = this.quoteIdentifier(sequenceName)
+            await this.db.scheme(`CREATE SEQUENCE IF NOT EXISTS ${quotedSequence} START WITH 1`, `create sequence ${record.recordName}`)
+
+            const tableRows = await this.db.query<{ max: number | string | null }>(
+                `SELECT COALESCE(MAX("${record.idField}"), 0) AS max FROM ${this.quoteIdentifier(record.tableName)}`,
+                [],
+                `read max id for ${record.recordName}`
+            )
+            let legacyMax = 0
+            if (idsTableExists) {
+                const legacyRows = await this.db.query<{ last: number | string | null }>(
+                    `SELECT COALESCE(MAX("last"), 0) AS last FROM "_IDS_" WHERE "name" = $1`,
+                    [record.recordName],
+                    `read legacy id for ${record.recordName}`
+                )
+                legacyMax = Number(legacyRows[0]?.last ?? 0)
+            }
+            const maxExistingId = Math.max(Number(tableRows[0]?.max ?? 0), legacyMax)
+            sequenceMax.set(quotedSequence, Math.max(sequenceMax.get(quotedSequence) ?? 0, maxExistingId))
+            this.initialized.add(record.recordName)
         }
-        return newId as unknown as string
+        for (const [quotedSequence, maxExistingId] of sequenceMax) {
+            if (maxExistingId >= 1) {
+                await this.db.query(`SELECT setval($1::regclass, $2, true)`, [quotedSequence, maxExistingId], `set sequence ${quotedSequence}`)
+            }
+        }
+    }
+    async getAutoId(recordName: string) {
+        if (!this.initialized.has(recordName)) {
+            throw new Error(`PostgreSQL sequence for ${recordName} is not initialized. Run storage setup before creating records.`)
+        }
+        const sequenceName = this.recordToSequenceName.get(recordName) ?? this.sequenceName(recordName)
+        const rows = await this.db.query<{ id: number | string }>(
+            `SELECT nextval($1::regclass) AS id`,
+            [this.quoteIdentifier(sequenceName)],
+            `next id for ${recordName}`
+        )
+        return rows[0]!.id as unknown as string
     }
 }
 
@@ -27,37 +90,89 @@ export class PostgreSQLDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db: InstanceType<typeof Client>
+    pool?: InstanceType<typeof Pool>
+    private transactionContext = new AsyncLocalStorage<TransactionContext>()
     supportsSelectForUpdate = true
     constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger
-        this.db = new Client({
-            ...options,
-        })
+        this.db = new Client({ ...options })
     }
     async open(forceDrop = false) {
-        await this.db.connect()
+        const adminClient = new Client({
+            ...this.options,
+        })
+        await adminClient.connect()
         // 要不要有存在 就删掉的？
         // SELECT 'DROP DATABASE your_database_name' WHERE EXISTS (SELECT FROM pg_database WHERE dataname = 'your_database_name');
-        const databaseExist = await this.db.query(`SELECT FROM pg_database WHERE datname = '${this.database}'`)
+        const databaseExist = await adminClient.query(`SELECT FROM pg_database WHERE datname = $1`, [this.database])
         if (databaseExist.rows.length === 0) {
-            await this.db.query(`CREATE DATABASE ${this.database}`)
+            await adminClient.query(`CREATE DATABASE "${this.database}"`)
         } else {
             if (forceDrop) {
-                await this.db.query(`DROP DATABASE ${this.database}`)
-                await this.db.query(`CREATE DATABASE ${this.database}`)
+                await adminClient.query(`DROP DATABASE "${this.database}" WITH (FORCE)`)
+                await adminClient.query(`CREATE DATABASE "${this.database}"`)
             }
-            this.db = new Client({
-                ...this.options,
-                database: this.database
-            })
-            await this.db.connect()
         }
+        await adminClient.end()
 
-        await this.idSystem.setup()
+        this.pool = new Pool({
+            ...this.options,
+            database: this.database
+        })
 
+        this.db = new Client({
+            ...this.options,
+            database: this.database
+        })
     }
-
+    private getQueryable() {
+        const context = this.transactionContext.getStore()
+        if (context && context.depth > 0) return context.client
+        if (!this.pool) {
+            throw new Error(`PostgreSQL pool is not initialized. Call open() before querying.`)
+        }
+        return this.pool
+    }
+    async runInTransaction<T>(options: TransactionOptions, fn: () => Promise<T>): Promise<T> {
+        const existing = this.transactionContext.getStore()
+        if (existing && existing.depth > 0) {
+            if (existing.isolation !== 'SERIALIZABLE' && (options.isolation ?? 'READ COMMITTED') === 'SERIALIZABLE') {
+                throw new RequireSerializableRetry(`${options.name || 'nested transaction'} requires SERIALIZABLE isolation`)
+            }
+            existing.depth++
+            try {
+                return await fn()
+            } finally {
+                existing.depth--
+            }
+        }
+        if (!this.pool) {
+            throw new Error(`PostgreSQL pool is not initialized. Call open() before starting a transaction.`)
+        }
+        const isolation = options.isolation ?? 'READ COMMITTED'
+        const client = await this.pool.connect()
+        const context: TransactionContext = { client, depth: 1, isolation }
+        let released = false
+        try {
+            await client.query(`BEGIN ISOLATION LEVEL ${isolation}`)
+            const result = await this.transactionContext.run(context, fn)
+            await client.query('COMMIT')
+            return result
+        } catch (error) {
+            try {
+                await client.query('ROLLBACK')
+            } finally {
+                client.release()
+                released = true
+            }
+            throw error
+        } finally {
+            if (!released) {
+                client.release()
+            }
+        }
+    }
     async setupInternalComputationState() {
         await this.scheme(`
 CREATE TABLE IF NOT EXISTS "_ComputationState_" (
@@ -79,7 +194,7 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
             sql,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.getQueryable().query(sql, params)).rows as T[]
     }
     async update<T>(sql:string,values: unknown[], idField?:string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -94,7 +209,7 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
             sql:finalSQL,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.getQueryable().query(finalSQL, params)).rows as T[]
     }
     async insert(sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -110,7 +225,7 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
         })
 
         const finalSQL = `${sql} RETURNING "${ROW_ID_ATTR}"`
-        return (await this.db.query(finalSQL, params)).rows[0] as EntityIdRef
+        return (await this.getQueryable().query(finalSQL, params)).rows[0] as EntityIdRef
     }
     async delete<T> (sql:string, where: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -122,7 +237,7 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
             sql,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.getQueryable().query(sql, params)).rows as T[]
     }
     async scheme(sql: string, name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext
@@ -132,13 +247,16 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
             name,
             sql,
         })
-        return  await this.db.query(sql)
+        return  await this.getQueryable().query(sql)
     }
     close() {
-        return this.db.end()
+        return this.pool ? this.pool.end() : this.db.end()
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
+    }
+    setupRecordSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
+        return this.idSystem.setupSequences(records)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
         if (fieldType === 'JSON') {

@@ -18,6 +18,8 @@ import {
     DictionaryEntity,
     EntityIdRef
 } from "./System.js";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { RequireSerializableRetry, runWithTransactionRetry, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
 import {
@@ -39,13 +41,17 @@ function JSONParse(value: string) {
     return value === undefined ? undefined : JSON.parse(decodeURI(value))
 }
 
+type StorageTransactionContext = {
+    depth: number
+    isolation: TransactionIsolation
+}
 
 class MonoStorage implements Storage{
     public map!: DBSetup["map"]
     public queryHandle?: EntityQueryHandle
     public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void> }
     public atomic: AtomicStorage
-    private transactionDepth = 0
+    private transactionContext = new AsyncLocalStorage<StorageTransactionContext>()
     
     constructor(public db: Database) {
         // Initialize dict property with get/set methods
@@ -65,30 +71,46 @@ class MonoStorage implements Storage{
         this.atomic = this.createAtomicStorage()
     }
     public callbacks: Set<RecordMutationCallback> = new Set()
-    async beginTransaction(name='') {
-        if (this.transactionDepth === 0) {
-            await (this.db.beginTransaction ? this.db.beginTransaction(name) : this.db.scheme('BEGIN', name))
-        }
-        this.transactionDepth++
+    private getActiveTransactionContext() {
+        const context = this.transactionContext.getStore()
+        return context && context.depth > 0 ? context : undefined
     }
-    async commitTransaction(name='') {
-        if (this.transactionDepth <= 0) {
-            throw new Error('Cannot commit transaction: no active transaction')
-        }
-        this.transactionDepth--
-        if (this.transactionDepth === 0) {
-            await (this.db.commitTransaction ? this.db.commitTransaction(name) : this.db.scheme('COMMIT', name))
-        }
+    getTransactionIsolation() {
+        return this.getActiveTransactionContext()?.isolation
     }
-    async rollbackTransaction(name='') {
-        if (this.transactionDepth <= 0) {
-            return
+    async runInTransaction<T>(options: TransactionOptions, fn: () => Promise<T>): Promise<T> {
+        const isolation = options.isolation ?? 'READ COMMITTED'
+        const existing = this.getActiveTransactionContext()
+        if (existing) {
+            if (existing.isolation !== 'SERIALIZABLE' && isolation === 'SERIALIZABLE') {
+                throw new RequireSerializableRetry(`${options.name || 'nested transaction'} requires SERIALIZABLE isolation`)
+            }
+            existing.depth++
+            try {
+                return await fn()
+            } finally {
+                existing.depth--
+            }
         }
-        this.transactionDepth = 0
-        await (this.db.rollbackTransaction ? this.db.rollbackTransaction(name) : this.db.scheme('ROLLBACK', name))
+
+        const context: StorageTransactionContext = { depth: 1, isolation }
+        const run = async () => this.transactionContext.run(context, fn)
+        if (this.db.runInTransaction) {
+            return this.db.runInTransaction({ name: options.name, isolation }, run)
+        }
+
+        await this.db.scheme('BEGIN', options.name)
+        try {
+            const result = await run()
+            await this.db.scheme('COMMIT', options.name)
+            return result
+        } catch (error) {
+            await this.db.scheme('ROLLBACK', options.name)
+            throw error
+        }
     }
     private isInTransaction() {
-        return this.transactionDepth > 0
+        return (this.getActiveTransactionContext()?.depth ?? 0) > 0
     }
     private requireTransaction(operation: string) {
         if (!this.isInTransaction()) {
@@ -99,15 +121,7 @@ class MonoStorage implements Storage{
         if (this.isInTransaction()) {
             return fn()
         }
-        await this.beginTransaction(operation)
-        try {
-            const result = await fn()
-            await this.commitTransaction(operation)
-            return result
-        } catch (error) {
-            await this.rollbackTransaction(operation)
-            throw error
-        }
+        return runWithTransactionRetry(operation, (isolation) => this.runInTransaction({ name: operation, isolation }, fn))
     }
     private async setDictionaryValue(key: string, value: unknown, emitEvents: boolean): Promise<void> {
         const match = MatchExp.atom({key: 'key', value: ['=', key]})
@@ -156,6 +170,21 @@ class MonoStorage implements Storage{
             this.db
         )
         if (createTables) await dbSetup.createTables()
+        if (this.db.setupRecordSequences) {
+            const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
+            await this.db.setupRecordSequences(Object.keys(dbSetup.map.records).map(recordName => {
+                const recordInfo = tableMap.getRecordInfo(recordName)
+                const idField = recordInfo.idField
+                if (!idField) {
+                    throw new Error(`id field not found for ${recordName}`)
+                }
+                return {
+                    recordName,
+                    tableName: recordInfo.table,
+                    idField,
+                }
+            }))
+        }
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), this.db)
 
         this.map = dbSetup.map

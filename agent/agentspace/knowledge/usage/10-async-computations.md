@@ -205,6 +205,19 @@ const currentWeather = await system.storage.get('state', 'currentWeather');
 console.log('Current weather:', currentWeather);
 ```
 
+### Retry and Freshness Semantics
+
+`handleAsyncReturn()` runs inside the same retryable transaction model as `Controller.dispatch()`. If PostgreSQL reports a retryable transaction error, or if the async result applies a custom/full-replace path that requires `SERIALIZABLE`, interaqt may replay the async return attempt.
+
+Keep `asyncReturn` deterministic and database-focused. Do not send emails, call payment APIs, publish messages, or perform other irreversible external IO from `asyncReturn`; those effects can be duplicated by a retry. Put irreversible post-commit work in `recordMutationSideEffects`.
+
+Async tasks also use a freshness key so stale results do not overwrite newer work:
+
+- Property async computations default to a key scoped by computation and host record.
+- Global async computations default to a key scoped by computation and global result.
+- Entity and relation async computations default to the result target, which means each target has one global freshness stream.
+- Pass an explicit `freshnessKey` to `ComputationResult.async({ freshnessKey })` when multiple independent async streams should be allowed for the same entity or relation target.
+
 ## Implementing Entity Async Computations
 
 ### Use Cases

@@ -5,6 +5,12 @@ Computations are the reactive core of interaqt, connecting interactions to entit
 
 ## Types of Computations
 
+## Retry Safety
+
+Computation callbacks may be replayed under PostgreSQL transaction retry. Keep callbacks deterministic and database-focused. Do not perform irreversible external IO in `compute`, `incrementalCompute`, `incrementalPatchCompute`, Transform callbacks, StateMachine compute functions, or `asyncReturn`.
+
+For custom computations, the default concurrency mode is `serializable`; use `concurrency: 'atomic-safe'` only when the callback is explicitly safe under concurrent `READ COMMITTED` execution.
+
 ### 1. Transform - Creates Entities/Relations
 
 **ONLY use in Entity/Relation computation, NEVER in Property!**

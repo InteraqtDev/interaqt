@@ -1,4 +1,4 @@
-import { MatchExp } from "@storage";
+import { AttributeQueryData, MatchExp } from "@storage";
 import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance, DictionaryInstance } from "@core";
 import { DataBasedEntityEventsSourceMap, EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
@@ -11,6 +11,7 @@ import {
 } from "./errors/index.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
+import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import {
     EntityEventSourceMap,
     DataSourceMapTree,
@@ -95,106 +96,123 @@ export class Scheduler {
 
             // 为每一个 async computation 建立自己所需要的 task 任务表。应该每一个 asyncComputation 都有一张独立的表。global state 总共一张。
             if(this.isAsyncComputation(computationHandle)) {
+                const asyncTaskRecordKey = this.getAsyncTaskRecordKey(computationHandle)
                 if (computationHandle.dataContext.type === 'property') {
-                    const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computationHandle),
+                    const AsyncTaskEntity = new Entity({
+                        name: asyncTaskRecordKey,
                         properties: [
-                        Property.create({
+                        new Property({
                             name: 'status',
                             type: 'string',
-                        }),
-                        Property.create({
+                        }, { uuid: `${asyncTaskRecordKey}_status` }),
+                        new Property({
                             name: 'args',
                             type: 'json',
-                        }),
-                        Property.create({
+                        }, { uuid: `${asyncTaskRecordKey}_args` }),
+                        new Property({
                             name: 'result',
                             type: 'json',
-                        })
-                    ]})
-                    const AsyncTaskRelation = Relation.create({
+                        }, { uuid: `${asyncTaskRecordKey}_result` }),
+                        new Property({
+                            name: 'freshnessKey',
+                            type: 'string',
+                        }, { uuid: `${asyncTaskRecordKey}_freshnessKey` })
+                    ]}, { uuid: asyncTaskRecordKey })
+                    const AsyncTaskRelation = new Relation({
                         name: `${AsyncTaskEntity.name}_${computationHandle.dataContext.host.name}_${computationHandle.dataContext.id.name}`,
                         source: AsyncTaskEntity,
                         target: computationHandle.dataContext.host,
                         sourceProperty: 'record',
                         targetProperty: `_${computationHandle.dataContext.id.name}_task`,
                         type: '1:1'
-                    })
+                    }, { uuid: `${asyncTaskRecordKey}_record_relation` })
                     entities.push(AsyncTaskEntity)
                     relations.push(AsyncTaskRelation)
                 } else if (computationHandle.dataContext.type === 'global') {
                     // Global 类型的异步任务表
-                    const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computationHandle),
+                    const AsyncTaskEntity = new Entity({
+                        name: asyncTaskRecordKey,
                         properties: [
-                            Property.create({
+                            new Property({
                                 name: 'status',
                                 type: 'string',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_status` }),
+                            new Property({
                                 name: 'args',
                                 type: 'json',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_args` }),
+                            new Property({
                                 name: 'result',
                                 type: 'json',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_result` }),
+                            new Property({
+                                name: 'freshnessKey',
+                                type: 'string',
+                            }, { uuid: `${asyncTaskRecordKey}_freshnessKey` }),
+                            new Property({
                                 name: 'globalKey',
                                 type: 'string',
-                            })
+                            }, { uuid: `${asyncTaskRecordKey}_globalKey` })
                         ]
-                    })
+                    }, { uuid: asyncTaskRecordKey })
                     entities.push(AsyncTaskEntity)
                 } else if (computationHandle.dataContext.type === 'entity') {
                     // Entity 类型的异步任务表
                     const entityContext = computationHandle.dataContext as EntityDataContext
-                    const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computationHandle),
+                    const AsyncTaskEntity = new Entity({
+                        name: asyncTaskRecordKey,
                         properties: [
-                            Property.create({
+                            new Property({
                                 name: 'status',
                                 type: 'string',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_status` }),
+                            new Property({
                                 name: 'args',
                                 type: 'json',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_args` }),
+                            new Property({
                                 name: 'result',
                                 type: 'json',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_result` }),
+                            new Property({
+                                name: 'freshnessKey',
+                                type: 'string',
+                            }, { uuid: `${asyncTaskRecordKey}_freshnessKey` }),
+                            new Property({
                                 name: 'entityName',
                                 type: 'string',
-                            })
+                            }, { uuid: `${asyncTaskRecordKey}_entityName` })
                         ]
-                    })
+                    }, { uuid: asyncTaskRecordKey })
                     entities.push(AsyncTaskEntity)
                 } else if (computationHandle.dataContext.type === 'relation') {
                     // Relation 类型的异步任务表
                     const relationContext = computationHandle.dataContext as RelationDataContext
-                    const AsyncTaskEntity = Entity.create({
-                        name: this.getAsyncTaskRecordKey(computationHandle),
+                    const AsyncTaskEntity = new Entity({
+                        name: asyncTaskRecordKey,
                         properties: [
-                            Property.create({
+                            new Property({
                                 name: 'status',
                                 type: 'string',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_status` }),
+                            new Property({
                                 name: 'args',
                                 type: 'json',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_args` }),
+                            new Property({
                                 name: 'result',
                                 type: 'json',
-                            }),
-                            Property.create({
+                            }, { uuid: `${asyncTaskRecordKey}_result` }),
+                            new Property({
+                                name: 'freshnessKey',
+                                type: 'string',
+                            }, { uuid: `${asyncTaskRecordKey}_freshnessKey` }),
+                            new Property({
                                 name: 'relationName',
                                 type: 'string',
-                            })
+                            }, { uuid: `${asyncTaskRecordKey}_relationName` })
                         ]
-                    })
+                    }, { uuid: asyncTaskRecordKey })
                     entities.push(AsyncTaskEntity)
                 }
             }
@@ -527,21 +545,48 @@ export class Scheduler {
             return `${ASYNC_TASK_RECORD}_${computation.dataContext.type}_${(computation.dataContext as any).id?.name}`
         }
     }
+    private getComputationName(computation: Computation) {
+        return (computation.args as any).name || computation.args.constructor.displayName
+    }
+    private isCustomSerializable(computation: Computation) {
+        return (computation.args as any)?._type === 'Custom' && (computation.args as any).concurrency !== 'atomic-safe'
+    }
+    private requireSerializableForCustomCallback(computation: Computation, phase: string) {
+        if (this.isCustomSerializable(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+            throw new RequireSerializableRetry(`${phase} custom computation ${this.getComputationName(computation)}`)
+        }
+    }
+    private requiresSerializablePatchApply(computation: Computation) {
+        return (
+            (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') &&
+            this.isCustomSerializable(computation)
+        )
+    }
+    private getAsyncTaskFreshnessKey(computation: Computation, args: any, record?: any) {
+        if (args?.freshnessKey !== undefined) return String(args.freshnessKey)
+        if (computation.dataContext.type === 'property') return String(record?.id)
+        if (computation.dataContext.type === 'global') return String(computation.dataContext.id.name)
+        if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') return String((computation.dataContext as EntityDataContext | RelationDataContext).id.name)
+        return 'default'
+    }
     async createAsyncTask(computation: Computation, args: any, record?: any, result?: any) {
+        const freshnessKey = this.getAsyncTaskFreshnessKey(computation, args, record)
         // 根据不同 dataContext 来创建不同的 task
         if (computation.dataContext.type === 'property') {
             return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
                 status: result === undefined ? 'pending' : 'success',
                 args,
                 record,
-                result
+                result,
+                freshnessKey
             })
         } else if (computation.dataContext.type === 'global') {
             return this.controller.system.storage.create(this.getAsyncTaskRecordKey(computation), {
                 status: result === undefined ? 'pending' : 'success',
                 args,
-                globalKey: computation.dataContext.id,
-                result
+                globalKey: computation.dataContext.id.name,
+                result,
+                freshnessKey
             })
         } else if (computation.dataContext.type === 'entity') {
             const entityContext = computation.dataContext as EntityDataContext
@@ -549,7 +594,8 @@ export class Scheduler {
                 status: result === undefined ? 'pending' : 'success',
                 args,
                 entityName: entityContext.id.name,
-                result
+                result,
+                freshnessKey
             })
         } else if (computation.dataContext.type === 'relation') {
             const relationContext = computation.dataContext as RelationDataContext
@@ -557,7 +603,8 @@ export class Scheduler {
                 status: result === undefined ? 'pending' : 'success',
                 args,
                 relationName: relationContext.id.name,
-                result
+                result,
+                freshnessKey
             })
         } else {
             throw new Error(`Async computation for ${(computation.dataContext as any).type} is not implemented yet`)
@@ -565,35 +612,73 @@ export class Scheduler {
     }
 
     async handleAsyncReturn(computation: DataBasedComputation, taskRecordIdRef: {id: string}) {
-        const attributeQuery = computation.dataContext.type === 'property' ? ['*', ['record', {attributeQuery: ['id']}]] : ['*']
-        const taskRecord = await this.controller.system.storage.findOne(this.getAsyncTaskRecordKey(computation), MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}), {}, attributeQuery)
-        
-        // 检查 task 是否仍然是 dataContext 当前最新的，如果不是，说明 task 已经过期，返回值不用管了。
-        if (taskRecord.status === 'success') {
-            const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args) as ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined
-            
-            if (computation.dataContext.type === 'global') {
-                if (computation.incrementalPatchCompute) {
-                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
-                } else {
-                    await this.controller.applyResult(computation.dataContext, resultOrPatch)
+        return runWithTransactionRetry(`asyncReturn:${this.getAsyncTaskRecordKey(computation)}`, async (isolation) => {
+            return this.controller.system.storage.runInTransaction({ name: `asyncReturn:${this.getAsyncTaskRecordKey(computation)}`, isolation }, async () => {
+                const taskRecordName = this.getAsyncTaskRecordKey(computation)
+                const attributeQuery: AttributeQueryData = computation.dataContext.type === 'property' ? ['*', ['record', {attributeQuery: ['id']}]] : ['*']
+                const taskRecords = await this.controller.system.storage.atomic.lockRows(
+                    taskRecordName,
+                    MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}),
+                    attributeQuery
+                )
+                const taskRecord = taskRecords[0]
+                if (!taskRecord) return { skipped: true, reason: 'missing-task' }
+                if (taskRecord.status === 'applied' || taskRecord.status === 'skipped') {
+                    return { skipped: true, reason: 'already-handled' }
                 }
-            } else if (computation.dataContext.type === 'property') {
-                if (computation.incrementalPatchCompute) {
-                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
-                } else {
-                    await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
+                
+                if (!(await this.isLatestAsyncTask(computation, taskRecord))) {
+                    await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
+                    return { skipped: true, reason: 'stale-task' }
                 }
-            } else if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') {
-                if (computation.incrementalPatchCompute) {
-                    await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
-                } else {
-                    await this.controller.applyResult(computation.dataContext, resultOrPatch)
+
+                if (taskRecord.status === 'success') {
+                    this.requireSerializableForCustomCallback(computation, 'async return')
+                    const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args) as ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined
+                    if (computation.incrementalPatchCompute && this.requiresSerializablePatchApply(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                        throw new RequireSerializableRetry(`entity/relation async patch from custom computation ${this.getComputationName(computation)}`)
+                    }
+                    
+                    if (computation.dataContext.type === 'global') {
+                        if (computation.incrementalPatchCompute) {
+                            await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
+                        } else {
+                            await this.controller.applyResult(computation.dataContext, resultOrPatch)
+                        }
+                    } else if (computation.dataContext.type === 'property') {
+                        if (computation.incrementalPatchCompute) {
+                            await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
+                        } else {
+                            await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
+                        }
+                    } else if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') {
+                        if (computation.incrementalPatchCompute) {
+                            await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
+                        } else {
+                            await this.controller.applyResult(computation.dataContext, resultOrPatch)
+                        }
+                    }
+                    await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'applied')
+                    return { skipped: false }
                 }
-            }
-        } else {
-            // TODO error 处理
-        }
+                return { skipped: true, reason: 'task-not-success' }
+            })
+        })
+    }
+
+    private async markAsyncTaskStatus(taskRecordName: string, taskId: string, status: 'applied' | 'skipped') {
+        await this.controller.system.storage.update(
+            taskRecordName,
+            MatchExp.atom({key: 'id', value: ['=', taskId]}),
+            { status }
+        )
+    }
+
+    private async isLatestAsyncTask(computation: DataBasedComputation, taskRecord: any) {
+        const taskRecordName = this.getAsyncTaskRecordKey(computation)
+        const match = MatchExp.atom({key: 'freshnessKey', value: ['=', taskRecord.freshnessKey]})
+        const latest = await this.controller.system.storage.findOne(taskRecordName, match, { orderBy: { id: 'DESC' } }, ['id'])
+        return String(latest?.id) === String(taskRecord.id)
     }
 
     isAsyncComputation(computation: Computation) {
@@ -604,6 +689,11 @@ export class Scheduler {
     async runComputation(computation: Computation, erRecordMutationEvent: RecordMutationEvent, record?: any, forceFullCompute: boolean = false) {
         try {
             let computationResult: ComputationResult|any
+            const currentIsolation = this.controller.system.storage.getTransactionIsolation()
+            this.requireSerializableForCustomCallback(computation, 'run')
+            if (forceFullCompute && currentIsolation !== 'SERIALIZABLE') {
+                throw new RequireSerializableRetry(`force full compute ${this.getComputationName(computation)}`)
+            }
 
             // 1. 依赖解析阶段的错误处理
             let dataDeps: any = {}
@@ -676,6 +766,9 @@ export class Scheduler {
                     if (computationResult instanceof ComputationResultFullRecompute) {
                         // 如果计算结果为 false ，说明不能增量计算，要全量计算。
                         const databasedComputation = computation as DataBasedComputation
+                        if (this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                            throw new RequireSerializableRetry(`full recompute ${(computation.args as any).name || computation.args.constructor.displayName}`)
+                        }
                         if (!databasedComputation.compute) {
                             const error = new ComputationError('compute must be defined for computation when incrementalCompute returns ComputationResultFullRecompute', {
                                 handleName: computation.constructor.name,
@@ -685,6 +778,7 @@ export class Scheduler {
                             })
                             throw error
                         }
+                        dataDeps = databasedComputation.dataDeps ? await this.resolveDataDeps(databasedComputation, record) : {}
                         computationResult = await databasedComputation.compute(dataDeps, record)
                     }   
                 }
@@ -725,6 +819,9 @@ export class Scheduler {
                 const result = computationResult instanceof ComputationResultResolved ? await computation.asyncReturn!(computationResult.result, computationResult.args) : computationResult
                 
                 if (computation.incrementalPatchCompute) {
+                    if (this.requiresSerializablePatchApply(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                        throw new RequireSerializableRetry(`entity/relation patch from custom computation ${this.getComputationName(computation)}`)
+                    }
                     await this.controller.applyResultPatch(computation.dataContext, result, record)
                 } else {
                     await this.controller.applyResult(computation.dataContext, result, record)

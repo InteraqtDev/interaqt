@@ -553,7 +553,7 @@ EventSource.create<TArgs, TResult>(
   ```typescript
   async function(this: Controller, args: TArgs): Promise<TResult>
   ```
-- `config.afterDispatch` (function, optional): Hook called after dispatch completes. Can return additional context.
+- `config.afterDispatch` (function, optional): Hook called inside the retryable transaction attempt. Can return additional context, but must be retry-safe and must not perform irreversible external IO.
   ```typescript
   async function(this: Controller, args: TArgs, result: { data?: TResult }): Promise<Record<string, unknown> | void>
   ```
@@ -664,7 +664,7 @@ const result = await controller.dispatch(webhookSource, {
 2. `guard` runs before event processing; throw to reject the event
 3. `mapEventData` converts dispatch args into the format stored in the entity
 4. `resolve` returns data to the caller (useful for query-type events)
-5. `afterDispatch` runs after successful processing and can return additional context
+5. `afterDispatch` runs inside the retryable transaction attempt and can return additional context
 6. The Controller automatically registers the event source's entity if not already in the entities list
 7. Interaction is a built-in EventSource type that provides pre-built `guard`, `mapEventData`, and `resolve` implementations
 
@@ -1631,6 +1631,13 @@ Custom.create(config: CustomConfig): CustomInstance
   - For accessing dictionaries: use `type: 'global'` with `source: DictionaryInstance`
 - `config.useLastValue` (boolean, optional): Whether to use last computed value in incremental computation
 - `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
+- `config.concurrency` (`'serializable' | 'atomic-safe'`, optional): Defaults to `'serializable'`. Serializable custom computations are retried in PostgreSQL `SERIALIZABLE` transactions. Use `'atomic-safe'` only when the callback is explicitly written with atomic state, idempotent patches, or other safe primitives.
+
+**Retry safety**
+
+Custom `compute`, `incrementalCompute`, `incrementalPatchCompute`, and `asyncReturn` callbacks may be replayed after transaction retry. Keep them deterministic and avoid irreversible external IO. Put post-commit external work in `recordMutationSideEffects`.
+
+For async custom computations, `ComputationResult.async({ freshnessKey })` can override the default freshness stream. Property async freshness is scoped to the host record, global async freshness is scoped to the global result, and entity/relation async freshness defaults to the result target.
 
 **Examples**
 
@@ -3376,7 +3383,7 @@ type DispatchResponse = {
 2. Execute `guard` (if provided and `ignoreGuard` is false)
 3. Map event data via `mapEventData` and create event record
 4. Execute `resolve` (if provided) - returns data
-5. Execute `afterDispatch` (if provided) - returns context
+5. Execute `afterDispatch` (if provided) inside the retryable transaction attempt - returns context
 6. Commit transaction
 7. Run RecordMutationSideEffects
 
@@ -3465,9 +3472,10 @@ interface Storage {
     map: any
     
     // Transaction operations
-    beginTransaction: (transactionName?: string) => Promise<any>
-    commitTransaction: (transactionName?: string) => Promise<any>
-    rollbackTransaction: (transactionName?: string) => Promise<any>
+    runInTransaction: <T>(
+        options: { name?: string; isolation?: 'READ COMMITTED' | 'SERIALIZABLE' },
+        fn: () => Promise<T>
+    ) => Promise<T>
     
     // Dictionary-specific API
     dict: {
@@ -3506,22 +3514,12 @@ interface Storage {
 
 #### Transaction Operations
 
-**beginTransaction(transactionName?: string)**
-Begin a database transaction.
+**runInTransaction(options, fn)**
+Run a callback inside a database transaction. The callback form is the only supported transaction boundary because it keeps the transaction connection bound to the full async chain.
 ```typescript
-await storage.beginTransaction('updateOrder')
-```
-
-**commitTransaction(transactionName?: string)**
-Commit a database transaction.
-```typescript
-await storage.commitTransaction('updateOrder')
-```
-
-**rollbackTransaction(transactionName?: string)**
-Rollback a database transaction.
-```typescript
-await storage.rollbackTransaction('updateOrder')
+await storage.runInTransaction({ name: 'updateOrder' }, async () => {
+  await storage.update('Order', match, data)
+})
 ```
 
 #### Entity/Relation Operations

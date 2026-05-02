@@ -2,6 +2,8 @@ import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
 import { DataDep } from './Computation.js';
 
+export type CustomConcurrency = 'serializable' | 'atomic-safe';
+
 export interface CustomInstance extends IInstance {
   name: string;
   dataDeps?: { [key: string]: DataDep };
@@ -10,8 +12,18 @@ export interface CustomInstance extends IInstance {
   incrementalPatchCompute?: Function;
   createState?: Function;
   getInitialValue?: Function;
+  /**
+   * Runs inside the retryable transaction attempt when async task results are
+   * applied. Keep it deterministic and free of irreversible external IO.
+   */
   asyncReturn?: Function;
   useLastValue?: boolean;
+  /**
+   * Defaults to 'serializable'. Use 'atomic-safe' only when the custom
+   * computation's incremental path is built from framework atomic primitives or
+   * otherwise remains correct under READ COMMITTED retry boundaries.
+   */
+  concurrency?: CustomConcurrency;
 }
 
 export interface CustomCreateArgs {
@@ -24,6 +36,7 @@ export interface CustomCreateArgs {
   getInitialValue?: Function;
   asyncReturn?: Function;
   useLastValue?: boolean;
+  concurrency?: CustomConcurrency;
 }
 
 export class Custom implements CustomInstance {
@@ -39,6 +52,7 @@ export class Custom implements CustomInstance {
   public getInitialValue?: Function;
   public asyncReturn?: Function;
   public useLastValue?: boolean;
+  public concurrency?: CustomConcurrency;
   
   constructor(args: CustomCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -52,6 +66,10 @@ export class Custom implements CustomInstance {
     this.getInitialValue = args.getInitialValue;
     this.asyncReturn = args.asyncReturn;
     this.useLastValue = args.useLastValue;
+    if (args.concurrency !== undefined && args.concurrency !== 'serializable' && args.concurrency !== 'atomic-safe') {
+      throw new Error(`Invalid Custom concurrency '${args.concurrency}'. Expected 'serializable' or 'atomic-safe'.`);
+    }
+    this.concurrency = args.concurrency ?? 'serializable';
   }
   
   // 静态属性和方法
@@ -104,6 +122,11 @@ export class Custom implements CustomInstance {
       type: 'boolean' as const,
       collection: false as const,
       required: false as const
+    },
+    concurrency: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
     }
   };
   
@@ -132,6 +155,7 @@ export class Custom implements CustomInstance {
     if (instance.getInitialValue !== undefined) args.getInitialValue = stringifyAttribute(instance.getInitialValue);
     if (instance.asyncReturn !== undefined) args.asyncReturn = stringifyAttribute(instance.asyncReturn);
     if (instance.useLastValue !== undefined) args.useLastValue = instance.useLastValue;
+    if (instance.concurrency !== undefined) args.concurrency = instance.concurrency;
     
     const data: SerializedData<Record<string, unknown>> = {
       type: 'Custom',
@@ -152,7 +176,8 @@ export class Custom implements CustomInstance {
       createState: instance.createState,
       getInitialValue: instance.getInitialValue,
       asyncReturn: instance.asyncReturn,
-      useLastValue: instance.useLastValue
+      useLastValue: instance.useLastValue,
+      concurrency: instance.concurrency
     });
   }
   

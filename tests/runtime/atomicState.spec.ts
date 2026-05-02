@@ -96,8 +96,7 @@ describe("Atomic storage primitives", () => {
       })
     ).rejects.toThrow("requires an active transaction");
 
-    await system.storage.beginTransaction("atomic-lock-test");
-    try {
+    await system.storage.runInTransaction({ name: "atomic-lock-test" }, async () => {
       const lockedGlobal = await system.storage.atomic.lockGlobal<string>({
         key: "atomic-global-lock",
         valueType: "string",
@@ -118,11 +117,7 @@ describe("Atomic storage primitives", () => {
         ["status"]
       );
       expect(lockedCounter?.status).toBeDefined();
-      await system.storage.commitTransaction("atomic-lock-test");
-    } catch (error) {
-      await system.storage.rollbackTransaction("atomic-lock-test");
-      throw error;
-    }
+    });
 
     await system.destroy();
   });

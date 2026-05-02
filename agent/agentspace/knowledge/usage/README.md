@@ -142,6 +142,7 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 18. [Performance Optimization](./17-performance-optimization.md) - Performance tips
 19. [API Exports Reference](./18-api-exports-reference.md) - Complete list of available imports
 20. [Common Anti-Patterns](./19-common-anti-patterns.md) - Mistakes to avoid
+21. [PostgreSQL Concurrency Migration](./20-postgresql-concurrency-migration.md) - Retry, async, and sequence migration notes
 
 ## 📞 Need Help?
 

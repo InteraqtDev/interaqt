@@ -206,6 +206,8 @@ async setup(controller: Controller) {
 
 **Purpose**: Define side effects that synchronize reactive data changes to external systems.
 
+`RecordMutationSideEffect` is the recommended place for irreversible external IO. Interaction callbacks, custom computation callbacks, `afterDispatch`, and `asyncReturn` may be replayed by PostgreSQL transaction retry; side effects run after the final successful commit.
+
 **Use Cases**:
 - Push data mutations to external APIs
 - Publish messages to message queues

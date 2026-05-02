@@ -13,10 +13,10 @@ Many LLMs generate incorrect API usage. Here's the correct way to use interaqt t
 controller.run()                           // ❌ No such method
 storage.findByProperty('Entity', 'prop')   // ❌ No such method
 controller.execute()                       // ❌ No such method
-controller.dispatch()                      // ❌ No such method
 
 // ✅ CORRECT: Use these APIs instead
-controller.callInteraction('InteractionName', args)  // ✅ Call interactions
+controller.callInteraction('InteractionName', args)  // ✅ Call interaction by name
+controller.dispatch(InteractionObject, args)         // ✅ Dispatch an event source object
 storage.findOne('Entity', MatchExp)                  // ✅ Find single record
 storage.find('Entity', MatchExp)                     // ✅ Find multiple records
 storage.create('Entity', data)                       // ✅ Create record
@@ -138,6 +138,16 @@ describe('Feature Tests', () => {
   })
 })
 ```
+
+### PostgreSQL Concurrency Tests
+
+For changes that affect runtime transactions, custom computations, async computations, PostgreSQL id generation, or reactive computation state, run the real PostgreSQL suite:
+
+```bash
+INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-concurrency
+```
+
+This script fails when the database environment variable is missing. Plain `npm test` may skip PostgreSQL-specific tests in local lightweight environments.
 
 ### Key API Methods
 

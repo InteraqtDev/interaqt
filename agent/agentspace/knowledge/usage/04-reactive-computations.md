@@ -81,6 +81,14 @@ Reactive computation is a **declarative way of defining data**:
 - **Incremental computation**: Framework uses efficient incremental algorithms to avoid unnecessary recomputation
 - **Persistent**: Computation results are stored in the database for fast queries
 
+### PostgreSQL Concurrency Guarantees
+
+Built-in computations such as Count, Summation, Average, Every, Any, WeightedSummation, StateMachine, and data-based Transform use atomic state updates, row locks, or unique indexes on PostgreSQL. They are safe when multiple Node.js processes share one PostgreSQL database.
+
+Custom computations are different because interaqt cannot inspect user callback logic. `Custom.create()` defaults to `concurrency: 'serializable'`, so the framework promotes the transaction to PostgreSQL `SERIALIZABLE` and retries on `40001` / `40P01`. Use `concurrency: 'atomic-safe'` only when the custom computation is explicitly written with atomic state, idempotent patches, or other safe primitives.
+
+Because retry replays the transaction attempt, `guard`, `mapEventData`, `resolve`, computation callbacks, `afterDispatch`, and `asyncReturn` must be deterministic and retry-safe. Put irreversible external IO in `recordMutationSideEffects`, which runs after the final commit.
+
 ### Core Principle: Data Existence
 
 In interaqt, all data has its "reason for existence":

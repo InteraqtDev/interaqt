@@ -53,6 +53,9 @@ import {
   // Storage and Query
   Controller,
   MonoSystem,
+  runWithTransactionRetry,
+  isRetryableTransactionError,
+  isRequireSerializableRetry,
   
   // Dictionary (Global State)
   Dictionary,
@@ -174,3 +177,5 @@ const controller = new Controller({
 4. **Filtered Entities**: Created using `Entity.create()` with `baseEntity` and `filterCondition`, not a separate import.
 
 5. **Database Drivers**: Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. 
+
+6. **Transaction helpers**: `runWithTransactionRetry`, `isRetryableTransactionError`, and `isRequireSerializableRetry` are exported for advanced runtime integrations and tests. Most application code should use `Controller.dispatch()` or `system.storage.runInTransaction()` instead of calling retry helpers directly.

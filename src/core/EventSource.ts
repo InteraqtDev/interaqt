@@ -7,9 +7,26 @@ type CallbackThis = any
 export interface EventSourceInstance<TArgs = unknown, TResult = void> extends IInstance {
   name: string
   entity: EntityInstance
+  /**
+   * Runs inside the dispatch transaction attempt. It may be replayed when the
+   * transaction is promoted or retried, so it must be deterministic and must
+   * not perform irreversible external IO.
+   */
   guard?: (this: CallbackThis, args: TArgs) => Promise<void>
+  /**
+   * Runs inside the dispatch transaction attempt and may be replayed on retry.
+   */
   mapEventData?: (args: TArgs) => Record<string, unknown>
+  /**
+   * Runs inside the dispatch transaction attempt and may be replayed on retry.
+   * External side effects should be modeled with record mutation side effects,
+   * which run after the final successful commit.
+   */
   resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>
+  /**
+   * Runs before commit inside the retryable transaction attempt. It may produce
+   * response context, but it must not perform irreversible external IO.
+   */
   afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
 }
 

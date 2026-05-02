@@ -4,6 +4,7 @@ import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
 import { AttributeQueryData, MatchExpressionData } from "@storage";
+import { TransactionIsolation, TransactionOptions } from "./transaction.js";
 export type SystemCallback = (...arg: unknown[]) => unknown
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
@@ -40,9 +41,8 @@ export type AtomicStorage = {
 
 export type Storage = {
     map: unknown
-    beginTransaction: (transactionName?:string) => Promise<void>
-    commitTransaction: (transactionName?:string) => Promise<void>
-    rollbackTransaction: (transactionName?:string) => Promise<void>
+    runInTransaction: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
+    getTransactionIsolation: () => TransactionIsolation | undefined
 
     atomic: AtomicStorage
 
@@ -143,11 +143,10 @@ export type Database = {
     getPlaceholder?: () => (name?:string) => string,
     supportsSelectForUpdate?: boolean,
     setupInternalComputationState?: () => Promise<void>,
+    setupRecordSequences?: (records: Array<{ recordName: string, tableName: string, idField: string }>) => Promise<void>,
     mapToDBFieldType: (type: string, collection?: boolean) => string
     close: () => Promise<void>
-    beginTransaction?: (name?:string) => Promise<void>
-    commitTransaction?: (name?:string) => Promise<void>
-    rollbackTransaction?: (name?:string) => Promise<void>
+    runInTransaction?: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
 } // activity 数据
 // state 等系统配置数据的实体化
 // FIXME 应该独立到外部

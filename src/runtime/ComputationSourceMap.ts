@@ -188,6 +188,11 @@ export class ComputationSourceMapManager {
             return mutationEvent.record?.key === source.dataDep.source.name
         } else {
             // 如果是更新，检查是否是依赖的属性有变化。
+            if (source.attributes!.includes('*')) {
+                return Object.keys(mutationEvent.record || {}).some(attr =>
+                    attr !== 'id' && mutationEvent.record![attr] !== mutationEvent.oldRecord?.[attr]
+                )
+            }
             const propAttrs = source.attributes!.filter(attr => attr !== 'id')
             return !propAttrs.every(attr => 
                 !mutationEvent.record!.hasOwnProperty(attr) || 
@@ -352,7 +357,7 @@ export class ComputationSourceMapManager {
             if (typeof attr === 'string' && attr !== '*') {
                 primitiveAttr.push(attr)
             } else if (attr ==='*') {
-                // TODO 要读定义
+                primitiveAttr.push('*')
             } else if (Array.isArray(attr)) {
                 relationQueryAttr.push(attr as [string, RecordQueryData])
             } else {

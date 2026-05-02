@@ -21,6 +21,19 @@ const result = await controller.callInteraction('CreatePost', {
 });
 ```
 
+## Retry-Safe Interaction Callbacks
+
+`Controller.dispatch()` runs interaction processing inside a retryable transaction. PostgreSQL SERIALIZABLE promotion or retryable SQLSTATE errors (`40001`, `40P01`) may replay the transaction attempt.
+
+These interaction callbacks must be deterministic and retry-safe:
+
+- `guard`
+- `mapEventData`
+- `resolve`
+- `afterDispatch`
+
+`afterDispatch` runs before commit inside the retryable transaction attempt. It can return response context or perform retry-safe database work, but it must not perform irreversible external IO. Put emails, webhooks, message publishing, payment calls, and other post-commit external effects in `recordMutationSideEffects`.
+
 ## Basic Concepts of Interactions
 
 ### What is an Interaction

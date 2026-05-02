@@ -514,6 +514,16 @@ Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
 - `config.callback` (function, required): Transformation function that converts source data to target data
 - `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
 
+### Custom.create()
+
+Create a custom computation when built-in computations are not expressive enough.
+
+**Concurrency parameter**
+- `config.concurrency` (optional): `'serializable' | 'atomic-safe'`, defaults to `'serializable'`.
+- `'serializable'`: interaqt runs the custom computation in a retryable PostgreSQL `SERIALIZABLE` transaction.
+- `'atomic-safe'`: you explicitly promise the custom computation only uses atomic state, idempotent patches, or other concurrency-safe primitives. Full recompute and entity/relation full replace paths still require SERIALIZABLE even for `atomic-safe` custom computations.
+
+Custom callbacks may be replayed after retryable transaction failures. Do not perform irreversible external IO inside custom `compute`, `incrementalCompute`, `incrementalPatchCompute`, or `asyncReturn`; use `recordMutationSideEffects` for post-commit external work.
 
 ### StateMachine.create()
 
