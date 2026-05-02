@@ -1,4 +1,4 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, RequireSerializableRetry, TransactionOptions} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, RequireSerializableRetry, TransactionCapability, TransactionOptions} from "interaqt";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import pg, { type ClientConfig, type PoolClient} from 'pg'
@@ -94,6 +94,13 @@ export class PostgreSQLDB implements Database{
     pool?: InstanceType<typeof Pool>
     private transactionContext = new AsyncLocalStorage<TransactionContext>()
     supportsSelectForUpdate = true
+    transactionCapability: TransactionCapability = {
+        transactions: true,
+        isolationLevels: ['READ COMMITTED', 'SERIALIZABLE'],
+        transactionBoundConnection: true,
+        concurrentTransactions: 'database',
+        nestedStrategy: 'reuse',
+    }
     schemaDialect = {
         name: 'postgres' as const,
         maxIdentifierLength: 63,

@@ -20,7 +20,7 @@ import {
     EntityIdRef
 } from "./System.js";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { RequireSerializableRetry, runWithTransactionRetry, TransactionIsolation, TransactionOptions } from "./transaction.js";
+import { RequireSerializableRetry, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
 import {
@@ -90,8 +90,37 @@ class MonoStorage implements Storage{
     getTransactionIsolation() {
         return this.getActiveTransactionContext()?.isolation
     }
+    getTransactionCapability(): TransactionCapability {
+        return this.db.transactionCapability ?? {
+            transactions: true,
+            isolationLevels: ['READ COMMITTED'],
+            transactionBoundConnection: false,
+            concurrentTransactions: 'unsupported',
+            nestedStrategy: 'reuse',
+            notes: [
+                'This driver has no explicit transaction capability declaration; MonoStorage will use fallback BEGIN/COMMIT semantics only.'
+            ],
+        }
+    }
     async runInTransaction<T>(options: TransactionOptions, fn: () => Promise<T>): Promise<T> {
         const isolation = options.isolation ?? 'READ COMMITTED'
+        const capability = this.getTransactionCapability()
+        if (!capability.transactions) {
+            throw new TransactionCapabilityError({
+                transactionName: options.name,
+                requestedIsolation: isolation,
+                capability,
+                reason: 'driver does not support transactions',
+            })
+        }
+        if (!capability.isolationLevels.includes(isolation)) {
+            throw new TransactionCapabilityError({
+                transactionName: options.name,
+                requestedIsolation: isolation,
+                capability,
+                reason: `driver does not support ${isolation} isolation`,
+            })
+        }
         const existing = this.getActiveTransactionContext()
         if (existing) {
             if (existing.isolation !== 'SERIALIZABLE' && isolation === 'SERIALIZABLE') {

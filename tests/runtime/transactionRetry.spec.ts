@@ -5,16 +5,21 @@ import {
   Custom,
   Dictionary,
   Entity,
+  EventSource,
   Interaction,
   KlassByName,
   MonoSystem,
   MatchExp,
+  NestedDispatchError,
   Payload,
   PayloadItem,
   Property,
   RecordMutationSideEffect,
   ComputationResult,
+  collectErrorChain,
+  hasErrorCode,
   isRetryableTransactionError,
+  isTransactionRetryExhaustedError,
   runWithTransactionRetry,
 } from "interaqt";
 import { PGLiteDB } from "@drivers";
@@ -390,6 +395,243 @@ describe("transaction retry and serializable promotion", () => {
     await system.destroy();
   });
 
+  test("rejects nested dispatch inside a dispatch transaction and rolls back the outer event", async () => {
+    const OuterEventRecord = Entity.create({
+      name: "_NestedDispatchOuterEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const InnerEventRecord = Entity.create({
+      name: "_NestedDispatchInnerEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const InnerWrite = Entity.create({
+      name: "NestedDispatchInnerWrite",
+      properties: [Property.create({ name: "value", type: "string" })],
+    });
+
+    const inner = EventSource.create({
+      name: "nestedDispatchInner",
+      entity: InnerEventRecord,
+      mapEventData: () => ({ kind: "inner" }),
+      resolve: async function(this: Controller) {
+        await this.system.storage.create("NestedDispatchInnerWrite", { value: "inner" });
+      },
+    });
+    const outer = EventSource.create({
+      name: "nestedDispatchOuter",
+      entity: OuterEventRecord,
+      mapEventData: () => ({ kind: "outer" }),
+      resolve: async function(this: Controller) {
+        await this.dispatch(inner, {});
+      },
+    });
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [InnerWrite],
+      relations: [],
+      eventSources: [outer, inner],
+    });
+    await controller.setup(true);
+
+    const result = await controller.dispatch(outer, {});
+    const outerEvents = await system.storage.find("_NestedDispatchOuterEvent_", undefined, undefined, ["*"]);
+    const innerEvents = await system.storage.find("_NestedDispatchInnerEvent_", undefined, undefined, ["*"]);
+    const innerWrites = await system.storage.find("NestedDispatchInnerWrite", undefined, undefined, ["*"]);
+
+    expect(result.error).toBeInstanceOf(NestedDispatchError);
+    expect(outerEvents).toHaveLength(0);
+    expect(innerEvents).toHaveLength(0);
+    expect(innerWrites).toHaveLength(0);
+    await system.destroy();
+  });
+
+  test("rejects nested dispatch from guard, afterDispatch, and synchronous computation", async () => {
+    let controller: Controller;
+    const InnerEventRecord = Entity.create({
+      name: "_NestedDispatchBoundaryInnerEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const GuardEventRecord = Entity.create({
+      name: "_NestedDispatchGuardEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const AfterEventRecord = Entity.create({
+      name: "_NestedDispatchAfterEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const ComputationEventRecord = Entity.create({
+      name: "_NestedDispatchComputationEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const ComputationSource = Entity.create({
+      name: "NestedDispatchComputationSource",
+      properties: [Property.create({ name: "value", type: "number" })],
+    });
+
+    const inner = EventSource.create({
+      name: "nestedDispatchBoundaryInner",
+      entity: InnerEventRecord,
+      mapEventData: () => ({ kind: "inner" }),
+    });
+    const fromGuard = EventSource.create({
+      name: "nestedDispatchFromGuard",
+      entity: GuardEventRecord,
+      guard: async function(this: Controller) {
+        await this.dispatch(inner, {});
+      },
+      mapEventData: () => ({ kind: "guard" }),
+    });
+    const fromAfterDispatch = EventSource.create({
+      name: "nestedDispatchFromAfterDispatch",
+      entity: AfterEventRecord,
+      mapEventData: () => ({ kind: "afterDispatch" }),
+      afterDispatch: async function(this: Controller) {
+        await this.dispatch(inner, {});
+      },
+    });
+    const fromComputation = EventSource.create({
+      name: "nestedDispatchFromComputation",
+      entity: ComputationEventRecord,
+      mapEventData: () => ({ kind: "computation" }),
+      resolve: async function(this: Controller) {
+        await this.system.storage.create("NestedDispatchComputationSource", { value: 1 });
+      },
+    });
+    const computationResult = Dictionary.create({
+      name: "nestedDispatchComputationResult",
+      type: "number",
+      collection: false,
+      computation: Custom.create({
+        name: "NestedDispatchComputationResult",
+        dataDeps: {
+          sources: { type: "records", source: ComputationSource, attributeQuery: ["value"] },
+        },
+        compute: async () => {
+          await controller.dispatch(inner, {});
+          return 1;
+        },
+        getInitialValue: () => 0,
+      }),
+    });
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    controller = new Controller({
+      system,
+      entities: [ComputationSource],
+      relations: [],
+      eventSources: [inner, fromGuard, fromAfterDispatch, fromComputation],
+      dict: [computationResult],
+    });
+    await controller.setup(true);
+
+    const guardResult = await controller.dispatch(fromGuard, {});
+    const afterResult = await controller.dispatch(fromAfterDispatch, {});
+    const computationDispatchResult = await controller.dispatch(fromComputation, {});
+    const computationSources = await system.storage.find("NestedDispatchComputationSource", undefined, undefined, ["*"]);
+    const innerEvents = await system.storage.find("_NestedDispatchBoundaryInnerEvent_", undefined, undefined, ["*"]);
+
+    expect(guardResult.error).toBeInstanceOf(NestedDispatchError);
+    expect(afterResult.error).toBeInstanceOf(NestedDispatchError);
+    expect(collectErrorChain(computationDispatchResult.error).some(error => error instanceof NestedDispatchError)).toBe(true);
+    expect(computationSources).toHaveLength(0);
+    expect(innerEvents).toHaveLength(0);
+    await system.destroy();
+  });
+
+  test("allows post-commit and record side effect dispatch as independent transactions", async () => {
+    const PrimaryEventRecord = Entity.create({
+      name: "_PostCommitDispatchPrimaryEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const PostCommitEventRecord = Entity.create({
+      name: "_PostCommitDispatchEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const SideEffectEventRecord = Entity.create({
+      name: "_SideEffectDispatchEvent_",
+      properties: [Property.create({ name: "kind", type: "string" })],
+    });
+    const PrimaryWrite = Entity.create({
+      name: "PostCommitDispatchPrimaryWrite",
+      properties: [Property.create({ name: "value", type: "string" })],
+    });
+    const PostCommitWrite = Entity.create({
+      name: "PostCommitDispatchWrite",
+      properties: [Property.create({ name: "value", type: "string" })],
+    });
+    const SideEffectWrite = Entity.create({
+      name: "SideEffectDispatchWrite",
+      properties: [Property.create({ name: "value", type: "string" })],
+    });
+
+    const postCommitDispatch = EventSource.create({
+      name: "postCommitDispatchTarget",
+      entity: PostCommitEventRecord,
+      mapEventData: () => ({ kind: "postCommit" }),
+      resolve: async function(this: Controller) {
+        await this.system.storage.create("PostCommitDispatchWrite", { value: "postCommit" });
+      },
+    });
+    const sideEffectDispatch = EventSource.create({
+      name: "sideEffectDispatchTarget",
+      entity: SideEffectEventRecord,
+      mapEventData: () => ({ kind: "sideEffect" }),
+      resolve: async function(this: Controller) {
+        await this.system.storage.create("SideEffectDispatchWrite", { value: "sideEffect" });
+      },
+    });
+    const primary = EventSource.create({
+      name: "postCommitDispatchPrimary",
+      entity: PrimaryEventRecord,
+      mapEventData: () => ({ kind: "primary" }),
+      resolve: async function(this: Controller) {
+        await this.system.storage.create("PostCommitDispatchPrimaryWrite", { value: "primary" });
+      },
+      postCommit: async function(this: Controller) {
+        const result = await this.dispatch(postCommitDispatch, {});
+        if (result.error) throw result.error;
+        return { postCommitDispatch: "ok" };
+      },
+    });
+    const sideEffect = RecordMutationSideEffect.create({
+      name: "dispatch-from-record-side-effect",
+      record: PrimaryWrite,
+      content: async function(this: Controller) {
+        const result = await this.dispatch(sideEffectDispatch, {});
+        if (result.error) throw result.error;
+        return "ok";
+      },
+    });
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [PrimaryWrite, PostCommitWrite, SideEffectWrite],
+      relations: [],
+      eventSources: [primary, postCommitDispatch, sideEffectDispatch],
+      recordMutationSideEffects: [sideEffect],
+    });
+    await controller.setup(true);
+
+    const result = await controller.dispatch(primary, {});
+    const primaryWrites = await system.storage.find("PostCommitDispatchPrimaryWrite", undefined, undefined, ["*"]);
+    const postCommitWrites = await system.storage.find("PostCommitDispatchWrite", undefined, undefined, ["*"]);
+    const sideEffectWrites = await system.storage.find("SideEffectDispatchWrite", undefined, undefined, ["*"]);
+
+    expect(result.error).toBeUndefined();
+    expect(result.context).toMatchObject({ postCommitDispatch: "ok" });
+    expect(result.sideEffects?.["dispatch-from-record-side-effect"]?.result).toBe("ok");
+    expect(primaryWrites).toHaveLength(1);
+    expect(postCommitWrites).toHaveLength(1);
+    expect(sideEffectWrites).toHaveLength(1);
+    await system.destroy();
+  });
+
   test("retries retryable SQLSTATE errors regardless of current isolation", async () => {
     let attempts = 0;
 
@@ -406,6 +648,32 @@ describe("transaction retry and serializable promotion", () => {
     expect(result).toBe("ok");
     expect(attempts).toBe(2);
     expect(isRetryableTransactionError({ error: { code: "40001" } })).toBe(true);
+  });
+
+  test("exposes transaction error helpers across wrapped error chains", async () => {
+    const businessError = new Error("business rule failed");
+    Object.assign(businessError, { code: "BILLING_LIMIT" });
+
+    expect(hasErrorCode({ causedBy: { error: businessError } }, "BILLING_LIMIT")).toBe(true);
+
+    try {
+      await runWithTransactionRetry(
+        "retry-helper-test",
+        async () => {
+          const error = new Error("serialization failure");
+          Object.assign(error, { code: "40001" });
+          throw error;
+        },
+        { maxAttempts: 1 }
+      );
+      throw new Error("Expected retry-helper-test to fail");
+    } catch (error) {
+      expect(isTransactionRetryExhaustedError(error)).toBe(true);
+      expect(hasErrorCode(error, "40001")).toBe(true);
+      expect((error as any).transactionAttempts).toBe(1);
+      expect((error as any).transactionIsolation).toBe("READ COMMITTED");
+      expect((error as any).transactionName).toBe("retry-helper-test");
+    }
   });
 
   test("requires serializable transaction for entity replace outside a transaction", async () => {

@@ -4,7 +4,7 @@ import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
 import type { AttributeQueryData, ConstraintSchemaItem, MatchExpressionData, SchemaDialect } from "@storage";
-import { TransactionIsolation, TransactionOptions } from "./transaction.js";
+import { TransactionCapability, TransactionIsolation, TransactionOptions } from "./transaction.js";
 export type SystemCallback = (...arg: unknown[]) => unknown
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
@@ -64,6 +64,7 @@ export type Storage = {
     schema: StorageSchemaMetadata
     runInTransaction: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
     getTransactionIsolation: () => TransactionIsolation | undefined
+    getTransactionCapability: () => TransactionCapability
 
     atomic: AtomicStorage
 
@@ -179,6 +180,7 @@ export type Database = {
     setupRecordSequences?: (records: Array<{ recordName: string, tableName: string, idField: string }>) => Promise<void>,
     mapToDBFieldType: (type: string, collection?: boolean) => string
     close: () => Promise<void>
+    transactionCapability?: TransactionCapability
     runInTransaction?: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
 } // activity 数据
 // state 等系统配置数据的实体化

@@ -1,4 +1,4 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability} from "interaqt";
 import { PGlite} from '@electric-sql/pglite'
 import { uuidv7 } from "@interaqt/uuidv7";
 import { defaultEncodeLiteral } from "@storage";
@@ -20,6 +20,16 @@ export class PGLiteDB implements Database{
     logger: DatabaseLogger
     db: InstanceType<typeof PGlite>
     supportsSelectForUpdate = true
+    transactionCapability: TransactionCapability = {
+        transactions: true,
+        isolationLevels: ['READ COMMITTED', 'SERIALIZABLE'],
+        transactionBoundConnection: false,
+        concurrentTransactions: 'unsupported',
+        nestedStrategy: 'reuse',
+        notes: [
+            'PGLite uses MonoStorage fallback BEGIN/COMMIT; SERIALIZABLE is framework metadata for retry-path tests, not a production PostgreSQL isolation guarantee.'
+        ],
+    }
     schemaDialect = {
         name: 'postgres' as const,
         maxIdentifierLength: 63,

@@ -1,5 +1,5 @@
 import SQLite from "better-sqlite3";
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability} from "interaqt";
 import { sqliteEncodeLiteral } from "@storage";
 
 class IDSystem {
@@ -27,6 +27,16 @@ export class SQLiteDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     supportsSelectForUpdate = false
+    transactionCapability: TransactionCapability = {
+        transactions: true,
+        isolationLevels: ['READ COMMITTED', 'SERIALIZABLE'],
+        transactionBoundConnection: false,
+        concurrentTransactions: 'unsupported',
+        nestedStrategy: 'reuse',
+        notes: [
+            'SQLite uses MonoStorage fallback transaction metadata for retry paths and does not provide PostgreSQL-level concurrent dispatch isolation.'
+        ],
+    }
     schemaDialect = {
         name: 'sqlite' as const,
         maxIdentifierLength: 63,

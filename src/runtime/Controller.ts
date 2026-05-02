@@ -17,7 +17,8 @@ import { CustomHandles } from "./computations/Custom.js";
 import { SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
-import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
+import { NestedDispatchError, RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export const USER_ENTITY = 'User'
 
@@ -78,6 +79,12 @@ export interface ControllerOptions {
 }
 
 export const HARD_DELETION_PROPERTY_NAME = '_isDeleted_'
+
+type DispatchExecutionContext = {
+    eventSourceName?: string
+}
+
+const dispatchExecutionContext = new AsyncLocalStorage<DispatchExecutionContext>()
 
 export const HardDeletionProperty = {
     create() {
@@ -284,12 +291,27 @@ export class Controller {
     /**
      * Unified dispatch API for all event source types.
      * First parameter is an object reference to the event source, second is the event args.
+     *
+     * A dispatch is the framework's synchronous fact transaction boundary:
+     * guard, mapEventData, event record creation, resolve, synchronous computations,
+     * and afterDispatch all run inside one retryable storage transaction attempt.
+     * If any of those steps fails, the attempt is rolled back and postCommit plus
+     * record mutation side effects are skipped. After a successful commit,
+     * postCommit and record mutation side effects run outside the transaction;
+     * their failures are reported in sideEffects without rolling back committed facts.
      */
     async dispatch<TArgs = unknown, TResult = unknown>(
         eventSource: EventSourceInstance<TArgs, TResult>,
         args: TArgs
     ): Promise<DispatchResponse> {
         assert(!!eventSource, 'eventSource is required for dispatch')
+        const activeDispatch = dispatchExecutionContext.getStore()
+        if (activeDispatch) {
+            throw new NestedDispatchError({
+                outerEventSourceName: activeDispatch.eventSourceName,
+                nestedEventSourceName: eventSource.name,
+            })
+        }
         let result: DispatchResponse
         try {
             result = await runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
@@ -297,30 +319,32 @@ export class Controller {
                 const effectsContext = { effects: [] as RecordMutationEvent[] }
                 return asyncEffectsContext.run(effectsContext, async () => {
                     return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
-                        if (!this.ignoreGuard && eventSource.guard) {
-                            await eventSource.guard.call(this, attemptArgs)
-                        }
-                        
-                        const eventData = eventSource.mapEventData
-                            ? eventSource.mapEventData(attemptArgs)
-                            : {}
-                            
-                        await this.system.storage.create(eventSource.entity.name!, eventData)
-                        
-                        let data: unknown = undefined
-                        if (eventSource.resolve) {
-                            data = await eventSource.resolve.call(this, attemptArgs)
-                        }
-                        
-                        let context: Record<string, unknown> | undefined = undefined
-                        if (eventSource.afterDispatch) {
-                            const afterResult = await (eventSource.afterDispatch as Function).call(this, attemptArgs, { data })
-                            if (afterResult) {
-                                context = afterResult
+                        return dispatchExecutionContext.run({ eventSourceName: eventSource.name }, async () => {
+                            if (!this.ignoreGuard && eventSource.guard) {
+                                await eventSource.guard.call(this, attemptArgs)
                             }
-                        }
-                        
-                        return { data, effects: effectsContext.effects, sideEffects: {}, context }
+                            
+                            const eventData = eventSource.mapEventData
+                                ? await eventSource.mapEventData(attemptArgs)
+                                : {}
+                                
+                            await this.system.storage.create(eventSource.entity.name!, eventData)
+                            
+                            let data: unknown = undefined
+                            if (eventSource.resolve) {
+                                data = await eventSource.resolve.call(this, attemptArgs)
+                            }
+                            
+                            let context: Record<string, unknown> | undefined = undefined
+                            if (eventSource.afterDispatch) {
+                                const afterResult = await (eventSource.afterDispatch as Function).call(this, attemptArgs, { data })
+                                if (afterResult) {
+                                    context = afterResult
+                                }
+                            }
+                            
+                            return { data, effects: effectsContext.effects, sideEffects: {}, context }
+                        })
                     })
                 })
             })

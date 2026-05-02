@@ -1,4 +1,4 @@
-import {Database, DatabaseLogger, EntityIdRef, asyncInteractionContext, InteractionContext, dbConsoleLogger} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability} from "interaqt";
 import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mysql2/promise'
 import { defaultEncodeLiteral } from "@storage";
 
@@ -26,6 +26,16 @@ export class MysqlDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db!: Connection
+    transactionCapability: TransactionCapability = {
+        transactions: false,
+        isolationLevels: [],
+        transactionBoundConnection: false,
+        concurrentTransactions: 'unsupported',
+        nestedStrategy: 'unsupported',
+        notes: [
+            'The current MySQL driver has no transaction-bound connection implementation; strong dispatch transactions are unsupported.'
+        ],
+    }
     schemaDialect = {
         name: 'mysql' as const,
         maxIdentifierLength: 64,

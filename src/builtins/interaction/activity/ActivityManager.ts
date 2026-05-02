@@ -116,9 +116,9 @@ export class ActivityManager {
             }
         }
 
-        const wrappedMapEventData = (args: InteractionEventArgs): Record<string, unknown> => {
+        const wrappedMapEventData = async (args: InteractionEventArgs): Promise<Record<string, unknown>> => {
             const baseData = interaction.mapEventData
-                ? interaction.mapEventData(args)
+                ? await interaction.mapEventData(args)
                 : {}
             if (args.activityId) {
                 baseData.activity = { id: args.activityId }

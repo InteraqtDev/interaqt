@@ -61,6 +61,36 @@ No update handlers. No sync bugs. When a like relationship is created, `likeCoun
 
 ---
 
+## Dispatch Transactions
+
+`Controller.dispatch()` is the synchronous fact transaction boundary in interaqt. The framework runs guard checks, `mapEventData`, event record creation, `resolve`, synchronous computations, and `afterDispatch` inside one retryable storage transaction attempt.
+
+If any transaction step fails, the event record and all synchronous derived writes from that attempt are rolled back. `postCommit` and record mutation side effects run only after a successful commit; their failures are reported in `sideEffects` and do not roll back committed facts.
+
+Use these hooks with the transaction boundary in mind:
+
+| Hook | Transaction boundary |
+|---|---|
+| `guard` / `mapEventData` / `resolve` | Run inside the retryable transaction attempt and may be replayed. |
+| `afterDispatch` | Runs before commit inside the transaction. Use it only for response context or local reversible storage work. Do not perform irreversible external IO here. |
+| `postCommit` | Runs after commit. Use it for external IO, notifications, outbox enqueueing, or non-critical response context. |
+| `RecordMutationSideEffect` | Runs after commit for committed mutation events. Failure is reported in `sideEffects`. |
+
+Nested `controller.dispatch()` calls are rejected inside a dispatch transaction with `NestedDispatchError`. Dispatching again from `postCommit` or a record mutation side effect is allowed because it starts a new transaction boundary.
+
+Database drivers declare their transaction support through `getTransactionCapability()`:
+
+| Driver | Transaction support |
+|---|---|
+| PostgreSQL | Strong transaction target: transaction-bound pool client, `READ COMMITTED` and `SERIALIZABLE`, PostgreSQL retryable SQLSTATE handling. |
+| PGLite | Fallback support for local tests and framework retry-path metadata. `SERIALIZABLE` is not a production PostgreSQL isolation guarantee. |
+| SQLite | Local fallback atomicity and framework retry-path metadata. It does not provide PostgreSQL-level concurrent dispatch isolation. |
+| MySQL | Marked unsupported for strong dispatch transactions until it has a transaction-bound connection implementation. |
+
+Useful exported helpers include `TransactionCapabilityError`, `TransactionRetryExhaustedError`, `NestedDispatchError`, `isTransactionCapabilityError()`, `isTransactionRetryExhaustedError()`, `isRetryableTransactionError()`, and `hasErrorCode()`.
+
+---
+
 ## Quick Example: Social Post System
 
 ```typescript

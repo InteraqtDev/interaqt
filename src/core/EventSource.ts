@@ -16,7 +16,7 @@ export interface EventSourceInstance<TArgs = unknown, TResult = void> extends II
   /**
    * Runs inside the dispatch transaction attempt and may be replayed on retry.
    */
-  mapEventData?: (args: TArgs) => Record<string, unknown>
+  mapEventData?: (args: TArgs) => Record<string, unknown> | Promise<Record<string, unknown>>
   /**
    * Runs inside the dispatch transaction attempt and may be replayed on retry.
    * External side effects should be modeled with record mutation side effects,
@@ -39,7 +39,7 @@ export interface EventSourceCreateArgs<TArgs = unknown, TResult = void> {
   name: string
   entity: EntityInstance
   guard?: (this: CallbackThis, args: TArgs) => Promise<void>
-  mapEventData?: (args: TArgs) => Record<string, unknown>
+  mapEventData?: (args: TArgs) => Record<string, unknown> | Promise<Record<string, unknown>>
   resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>
   afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
   postCommit?: (this: CallbackThis, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>
@@ -52,7 +52,7 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
   public name: string;
   public entity: EntityInstance;
   public guard?: (this: CallbackThis, args: TArgs) => Promise<void>;
-  public mapEventData?: (args: TArgs) => Record<string, unknown>;
+  public mapEventData?: (args: TArgs) => Record<string, unknown> | Promise<Record<string, unknown>>;
   public resolve?: (this: CallbackThis, args: TArgs) => Promise<TResult>;
   public afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>;
   public postCommit?: (this: CallbackThis, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>;
