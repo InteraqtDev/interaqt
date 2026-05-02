@@ -1,4 +1,12 @@
 
+
+## [1.3.0](https://github.com/InteraqtDev/interaqt/compare/v1.2.0...v1.3.0) (2026-05-02)
+
+
+### Features
+
+* add schema-level data constraints ([be0df4c](https://github.com/InteraqtDev/interaqt/commit/be0df4cf0c908683bb44e883e399c99423035b1e))
+
 ## [1.2.0](https://github.com/InteraqtDev/interaqt/compare/v1.1.3...v1.2.0) (2026-05-02)
 
 
