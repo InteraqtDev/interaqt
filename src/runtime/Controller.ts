@@ -269,6 +269,18 @@ export class Controller {
     }
     callbacks: Map<string, Set<SystemCallback>> = new Map()
 
+    private cloneDispatchArgs<TArgs>(args: TArgs): TArgs {
+        if (!args || typeof args !== 'object') return args
+        const cloned = { ...(args as Record<string, unknown>) }
+        if (cloned.payload && typeof cloned.payload === 'object') {
+            cloned.payload = { ...(cloned.payload as Record<string, unknown>) }
+        }
+        if (cloned.user && typeof cloned.user === 'object') {
+            cloned.user = { ...(cloned.user as Record<string, unknown>) }
+        }
+        return cloned as TArgs
+    }
+
     /**
      * Unified dispatch API for all event source types.
      * First parameter is an object reference to the event source, second is the event args.
@@ -281,27 +293,28 @@ export class Controller {
         let result: DispatchResponse
         try {
             result = await runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
+                const attemptArgs = this.cloneDispatchArgs(args)
                 const effectsContext = { effects: [] as RecordMutationEvent[] }
                 return asyncEffectsContext.run(effectsContext, async () => {
                     return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
                         if (!this.ignoreGuard && eventSource.guard) {
-                            await eventSource.guard.call(this, args)
+                            await eventSource.guard.call(this, attemptArgs)
                         }
                         
                         const eventData = eventSource.mapEventData
-                            ? eventSource.mapEventData(args)
+                            ? eventSource.mapEventData(attemptArgs)
                             : {}
                             
                         await this.system.storage.create(eventSource.entity.name!, eventData)
                         
                         let data: unknown = undefined
                         if (eventSource.resolve) {
-                            data = await eventSource.resolve.call(this, args)
+                            data = await eventSource.resolve.call(this, attemptArgs)
                         }
                         
                         let context: Record<string, unknown> | undefined = undefined
                         if (eventSource.afterDispatch) {
-                            const afterResult = await (eventSource.afterDispatch as Function).call(this, args, { data })
+                            const afterResult = await (eventSource.afterDispatch as Function).call(this, attemptArgs, { data })
                             if (afterResult) {
                                 context = afterResult
                             }
