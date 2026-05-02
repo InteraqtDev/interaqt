@@ -1,4 +1,14 @@
 
+## [1.2.0](https://github.com/InteraqtDev/interaqt/compare/v1.1.3...v1.2.0) (2026-05-02)
+
+
+### Bug Fixes
+
+* atomicize reactive computation updates ([88232b2](https://github.com/InteraqtDev/interaqt/commit/88232b2137028afa22d960d636da4b4e25b62697))
+* close PostgreSQL computation concurrency gaps ([5c3c27a](https://github.com/InteraqtDev/interaqt/commit/5c3c27a0ef93721c9b9cf367d103d02c1f2cef70))
+* externalize node async hooks in build ([0547a24](https://github.com/InteraqtDev/interaqt/commit/0547a24ef7218bd26c4dcf66ca5e530399169ee6))
+* isolate dispatch retry arguments ([5683bd6](https://github.com/InteraqtDev/interaqt/commit/5683bd6d331a29f60e96d90ee90b01ffced1b645))
+
 
 ## [1.1.3](https://github.com/InteraqtDev/interaqt/compare/v1.1.2...v1.1.3) (2026-03-22)
 
