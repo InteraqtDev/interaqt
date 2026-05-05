@@ -22,7 +22,7 @@ import {
 import { AsyncLocalStorage } from "node:async_hooks";
 import { RequireSerializableRetry, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
-import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer } from "@core";
+import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer, type ConstraintPredicateOperator } from "@core";
 import {
     ConstraintSchemaItem,
     DBSetup,
@@ -37,6 +37,7 @@ import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
 import { createUniqueIndexSQL, getSchemaDialect } from "@storage";
+import type { AdditiveDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
     return encodeURI(JSON.stringify(value))
@@ -81,6 +82,15 @@ class MonoStorage implements Storage{
             }
         }
         this.atomic = this.createAtomicStorage()
+    }
+
+    private async ensureDbOpenForSchemaRead() {
+        if (this.db.openForSchemaRead) {
+            await this.db.openForSchemaRead()
+        } else {
+            if ((this.db as unknown as { db?: unknown }).db) return
+            await this.db.open(false)
+        }
     }
     public callbacks: Set<RecordMutationCallback> = new Set()
     private getActiveTransactionContext() {
@@ -245,7 +255,297 @@ class MonoStorage implements Storage{
         this.schema = this.createSchemaMetadata(dbSetup)
     }
 
+    async prepareMigrationAdditive(entities: EntityInstance[], relations: RelationInstance[]): Promise<MigrationSchemaPlan> {
+        await this.ensureDbOpenForSchemaRead()
+        if (this.db.setupInternalComputationState) {
+            // The table creation itself is idempotent, but planning must stay
+            // read-only. The actual setup runs in applyMigrationAdditivePlan.
+        }
+        let dbSetup: DBSetup
+        try {
+            dbSetup = new DBSetup(
+                entities,
+                relations,
+                this.db
+            )
+        } catch (error) {
+            throw new ConstraintSetupError(
+                error instanceof Error ? error.message : String(error),
+                {
+                    driver: this.db.constructor?.name,
+                    causedBy: error instanceof Error ? error : undefined,
+                }
+            )
+        }
+
+        const preRecomputeDDL = await this.createAdditiveSchemaPlan(dbSetup)
+        const { verificationDDL, postRecomputeDDL } = this.createPostRecomputeSchemaPlan(dbSetup)
+        return {
+            schema: this.createSchemaMetadata(dbSetup),
+            preRecomputeDDL,
+            postRecomputeDDL,
+            verificationDDL,
+            blockingChanges: [],
+            internal: { dbSetup },
+        }
+    }
+
+    private migrationOperationKey(phase: string, operation: AdditiveDDLOperation, index: number) {
+        return `${phase}:${index}:${operation.kind}:${operation.tableName || ''}:${operation.columnName || ''}:${operation.logicalPath || ''}:${operation.sql || operation.description}`
+    }
+
+    async isMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
+        if (!migrationId) return false
+        const dialect = getSchemaDialect(this.db).name
+        const rows = await this.db.query<{ status: string }>(
+            dialect === 'mysql'
+                ? `SELECT "status" FROM "__interaqt_migration_operation_log" WHERE "migrationId" = ? AND "operationKey" = ? LIMIT 1`
+                : `SELECT "status" FROM "__interaqt_migration_operation_log" WHERE "migrationId" = $1 AND "operationKey" = $2 LIMIT 1`,
+            [migrationId, operationKey],
+            'read migration operation log'
+        )
+        return rows[0]?.status === 'succeeded'
+    }
+
+    async markMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
+        if (!migrationId) return
+        const escapedMigrationId = migrationId.replace(/'/g, "''")
+        const escapedOperationKey = operationKey.replace(/'/g, "''")
+        if (getSchemaDialect(this.db).name === 'mysql') {
+            await this.db.scheme(
+                `INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES ('${escapedMigrationId}', '${escapedOperationKey}', 'succeeded') ON DUPLICATE KEY UPDATE "status" = VALUES("status")`,
+                'write migration operation log'
+            )
+            return
+        }
+        await this.db.scheme(
+            `INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES ('${escapedMigrationId}', '${escapedOperationKey}', 'succeeded') ON CONFLICT ("migrationId", "operationKey") DO UPDATE SET "status" = EXCLUDED."status"`,
+            'write migration operation log'
+        )
+    }
+
+    private async applyMigrationOperations(phase: string, operations: AdditiveDDLOperation[], migrationId?: string) {
+        for (const [index, operation] of operations.entries()) {
+            if (!operation.sql) continue
+            const operationKey = this.migrationOperationKey(phase, operation, index)
+            if (await this.isMigrationOperationComplete(migrationId, operationKey)) continue
+            await this.db.scheme(operation.sql, operation.description)
+            await this.markMigrationOperationComplete(migrationId, operationKey)
+        }
+    }
+
+    async applyMigrationAdditivePlan(plan: MigrationSchemaPlan, migrationId?: string) {
+        const dbSetup = (plan.internal as { dbSetup: DBSetup }).dbSetup
+        await this.db.open(false)
+        if (this.db.setupInternalComputationState) {
+            await this.db.setupInternalComputationState()
+        }
+        await this.applyMigrationOperations('schema', plan.preRecomputeDDL, migrationId)
+        if (this.db.setupRecordSequences) {
+            const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
+            await this.db.setupRecordSequences(Object.keys(dbSetup.map.records).map(recordName => {
+                const recordInfo = tableMap.getRecordInfo(recordName)
+                const idField = recordInfo.idField
+                if (!idField) {
+                    throw new Error(`id field not found for ${recordName}`)
+                }
+                return {
+                    recordName,
+                    tableName: recordInfo.table,
+                    idField,
+                }
+            }))
+        }
+        this.queryHandle = new EntityQueryHandle(new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), this.db)
+        this.map = dbSetup.map
+        this.constraintSchemaItems = dbSetup.constraintSchemaItems
+        this.schema = this.createSchemaMetadata(dbSetup)
+    }
+
+    async applyPostRecomputeSchemaPlan(plan: MigrationSchemaPlan, migrationId?: string) {
+        await this.applyMigrationOperations('constraints', plan.postRecomputeDDL, migrationId)
+    }
+
+    async verifyMigrationPlan(plan: MigrationSchemaPlan, migrationId?: string) {
+        for (const [index, operation] of plan.verificationDDL.entries()) {
+            if (!operation.sql) continue
+            const operationKey = this.migrationOperationKey('verification', operation, index)
+            if (await this.isMigrationOperationComplete(migrationId, operationKey)) continue
+            const rows = await this.db.query<Record<string, unknown>>(operation.sql, [], operation.description)
+            if (rows.length > 0) {
+                throw new ConstraintSetupError(`Migration verification failed for ${operation.logicalPath || operation.description}`, {
+                    tableName: operation.tableName,
+                    constraintName: operation.logicalPath,
+                })
+            }
+            await this.markMigrationOperationComplete(migrationId, operationKey)
+        }
+    }
+
+    private async createAdditiveSchemaPlan(dbSetup: DBSetup): Promise<AdditiveDDLOperation[]> {
+        const operations: AdditiveDDLOperation[] = []
+        const existingTables = await this.getExistingTables()
+        for (const [tableName, table] of Object.entries(dbSetup.tables)) {
+            if (!existingTables.has(tableName)) {
+                const createTableSQL = dbSetup.createTableSQL().find(sql => sql.includes(`CREATE TABLE "${tableName}"`))
+                if (!createTableSQL) {
+                    throw new Error(`Cannot find create table SQL for ${tableName}`)
+                }
+                operations.push({
+                    kind: 'create-table',
+                    sql: createTableSQL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS'),
+                    tableName,
+                    description: `migration create table ${tableName}`,
+                })
+                continue
+            }
+
+            const existingColumns = await this.getExistingColumns(tableName)
+            for (const column of Object.values(table.columns)) {
+                if (existingColumns.has(column.name) || column.name === '_rowId') continue
+                operations.push({
+                    kind: 'add-column',
+                    sql: `ALTER TABLE "${tableName}" ADD COLUMN "${column.name}" ${column.fieldType}`,
+                    tableName,
+                    columnName: column.name,
+                    description: `migration add column ${tableName}.${column.name}`,
+                })
+            }
+        }
+        return operations
+    }
+
+    private createPostRecomputeSchemaPlan(dbSetup: DBSetup): { verificationDDL: AdditiveDDLOperation[], postRecomputeDDL: AdditiveDDLOperation[] } {
+        const dialect = getSchemaDialect(this.db)
+        if (dbSetup.constraintSchemaItems.length && dialect.constraints?.unique !== true) {
+            const hasUnique = dbSetup.constraintSchemaItems.some(item => item.kind === 'unique')
+            if (hasUnique) throw new ConstraintSetupError(`Migration post-recompute unique constraints are not supported by ${dialect.name}`, {
+                driver: this.db.constructor?.name,
+            })
+        }
+        if (dbSetup.constraintSchemaItems.some(item => item.kind === 'non-null') && dialect.constraints?.nonNull !== true) {
+            throw new ConstraintSetupError(`Migration post-recompute non-null constraints are not supported by ${dialect.name}`, {
+                driver: this.db.constructor?.name,
+            })
+        }
+        const verificationDDL = dbSetup.constraintSchemaItems.map(item => ({
+            kind: 'verify' as const,
+            sql: item.kind === 'unique' ? this.createUniqueVerificationSQL(item) : this.createNonNullVerificationSQL(item),
+            tableName: item.tableName,
+            logicalPath: item.kind === 'unique' ? `${item.recordName}.${item.properties.join('.')}` : `${item.recordName}.${item.property}`,
+            description: `migration verify constraint ${item.constraintName}`,
+        }))
+        const postRecomputeDDL = dbSetup.createConstraintSQL().map(statement => ({
+            kind: 'create-constraint' as const,
+            sql: statement.sql,
+            tableName: statement.item.tableName,
+            logicalPath: statement.item.kind === 'unique'
+                ? `${statement.item.recordName}.${statement.item.properties.join('.')}`
+                : `${statement.item.recordName}.${statement.item.property}`,
+            description: `migration setup constraint ${statement.item.constraintName}`,
+        }))
+        return { verificationDDL, postRecomputeDDL }
+    }
+
+    private createNonNullVerificationSQL(item: ConstraintSchemaItem) {
+        if (item.kind !== 'non-null') {
+            throw new Error('expected non-null constraint')
+        }
+        return `SELECT "${item.field}" FROM "${item.tableName}" WHERE "${item.field}" IS NULL LIMIT 1`
+    }
+
+    private createUniqueVerificationSQL(item: Extract<ConstraintSchemaItem, { kind: 'unique' }>) {
+        const fields = item.fields.map(field => `"${field}"`)
+        const notNull = fields.map(field => `${field} IS NOT NULL`)
+        const whereClauses = [...notNull]
+        Object.entries(item.where || {}).forEach(([property, operator]) => {
+            const field = item.fields[item.properties.indexOf(property)]
+            if (field) {
+                whereClauses.push(this.constraintPredicateToSQL(`"${field}"`, operator as ConstraintPredicateOperator))
+            }
+        })
+        const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
+        return `SELECT ${fields.join(', ')}, COUNT(*) AS "__count" FROM "${item.tableName}" ${where} GROUP BY ${fields.join(', ')} HAVING COUNT(*) > 1 LIMIT 1`
+    }
+
+    private constraintPredicateToSQL(field: string, operator: ConstraintPredicateOperator) {
+        const encode = getSchemaDialect(this.db).encodeLiteral || ((value: string | number | boolean | null) => value === null ? 'NULL' : `'${String(value).replace(/'/g, "''")}'`)
+        switch (operator.op) {
+            case 'isNull':
+                return `${field} IS NULL`
+            case 'isNotNull':
+                return `${field} IS NOT NULL`
+            case 'equals':
+                return `${field} = ${encode(operator.value)}`
+            case 'notEquals':
+                return `${field} <> ${encode(operator.value)}`
+            case 'in':
+                return `${field} IN (${operator.value.map(value => encode(value)).join(', ')})`
+            case 'notIn':
+                return `${field} NOT IN (${operator.value.map(value => encode(value)).join(', ')})`
+        }
+    }
+
+    async getExistingTables() {
+        await this.ensureDbOpenForSchemaRead()
+        const dialect = getSchemaDialect(this.db).name
+        if (dialect === 'postgres') {
+            const rows = await this.db.query<{ table_name: string }>(
+                `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`,
+                [],
+                'migration list tables'
+            )
+            return new Set(rows.map(row => row.table_name))
+        }
+        if (dialect === 'sqlite') {
+            const rows = await this.db.query<{ name: string }>(
+                `SELECT name FROM sqlite_master WHERE type = 'table'`,
+                [],
+                'migration list tables'
+            )
+            return new Set(rows.map(row => row.name))
+        }
+        const rows = await this.db.query<{ table_name: string }>(
+            `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()`,
+            [],
+            'migration list tables'
+        )
+        return new Set(rows.map(row => row.table_name))
+    }
+
+    private async getExistingColumns(tableName: string) {
+        const dialect = getSchemaDialect(this.db).name
+        if (dialect === 'postgres') {
+            const rows = await this.db.query<{ column_name: string }>(
+                `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+                [tableName],
+                `migration list columns ${tableName}`
+            )
+            return new Set(rows.map(row => row.column_name))
+        }
+        if (dialect === 'sqlite') {
+            const escapedTableName = tableName.replace(/"/g, '""')
+            const rows = await this.db.query<{ name: string }>(
+                `PRAGMA table_info("${escapedTableName}")`,
+                [],
+                `migration list columns ${tableName}`
+            )
+            return new Set(rows.map(row => row.name))
+        }
+        const rows = await this.db.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?`,
+            [tableName],
+            `migration list columns ${tableName}`
+        )
+        return new Set(rows.map(row => row.column_name))
+    }
+
     private createSchemaMetadata(dbSetup: DBSetup): StorageSchemaMetadata {
+        const tableOwners = new Map<string, string[]>()
+        Object.entries(dbSetup.map.records).forEach(([recordName, record]) => {
+            if (!tableOwners.has(record.table)) tableOwners.set(record.table, [])
+            tableOwners.get(record.table)!.push(recordName)
+        })
         return {
             dialect: getSchemaDialect(this.db),
             records: Object.entries(dbSetup.map.records).map(([recordName, record]) => ({
@@ -253,11 +553,36 @@ class MonoStorage implements Storage{
                 tableName: record.table,
                 isRelation: record.isRelation === true,
                 isFiltered: record.isFilteredEntity === true || record.isFilteredRelation === true,
+                resolvedBaseRecordName: record.resolvedBaseRecordName,
+                resolvedMatchExpression: record.resolvedMatchExpression,
                 attributes: Object.keys(record.attributes),
+                attributeDetails: Object.entries(record.attributes).map(([attributeName, attribute]) => {
+                    const valueAttribute = attribute as any
+                    const recordAttribute = attribute as any
+                    return {
+                        name: attributeName,
+                        kind: recordAttribute.isRecord ? 'record' as const : 'value' as const,
+                        tableName: valueAttribute.table || record.table,
+                        fieldName: valueAttribute.field,
+                        type: valueAttribute.type,
+                        fieldType: valueAttribute.fieldType,
+                        collection: valueAttribute.collection,
+                        computed: valueAttribute.computed !== undefined,
+                        linkName: recordAttribute.linkName,
+                        sourceField: dbSetup.map.links[recordAttribute.linkName]?.sourceField,
+                        targetField: dbSetup.map.links[recordAttribute.linkName]?.targetField,
+                        resolvedBaseRecordName: recordAttribute.resolvedBaseRecordName,
+                    }
+                }),
             })),
             tables: Object.entries(dbSetup.tables).map(([tableName, table]) => ({
                 tableName,
                 columns: Object.keys(table.columns),
+                columnDetails: Object.values(table.columns).map(column => ({
+                    columnName: column.name,
+                    fieldType: column.fieldType || '',
+                    ownerRecords: tableOwners.get(tableName) || [],
+                })),
             })),
             constraints: dbSetup.constraintSchemaItems.map(item => ({ ...item })),
         }
@@ -289,7 +614,7 @@ class MonoStorage implements Storage{
                         physicalName: item.physicalName,
                         recordName: item.recordName,
                         tableName: item.tableName,
-                        properties: item.properties,
+                        properties: item.kind === 'unique' ? item.properties : [item.property],
                         driver: this.db.constructor?.name,
                         rawCode: normalizeDatabaseError(error, this.db).rawCode,
                         causedBy: error instanceof Error ? error : undefined,
@@ -606,8 +931,9 @@ RETURNING "numberValue" AS value`,
         if (byName) return byName
         return this.constraintSchemaItems.find(item => {
             const normalizedFields = normalized.fields || []
-            const exactFieldMatch = normalized.tableName === item.tableName && item.fields.every(field => normalizedFields.includes(field))
-            return exactFieldMatch || (normalized.message.includes(item.tableName) && item.fields.every(field => normalized.message.includes(field)))
+            const itemFields = item.kind === 'unique' ? item.fields : [item.field]
+            const exactFieldMatch = normalized.tableName === item.tableName && itemFields.every(field => normalizedFields.includes(field))
+            return exactFieldMatch || (normalized.message.includes(item.tableName) && itemFields.every(field => normalized.message.includes(field)))
         })
     }
     private mapConstraintError(error: unknown): unknown {
@@ -622,7 +948,7 @@ RETURNING "numberValue" AS value`,
                 kind: 'unique',
                 constraintName: item?.constraintName,
                 recordName: item?.recordName,
-                properties: item?.properties,
+                properties: item?.kind === 'unique' ? item.properties : item ? [item.property] : undefined,
                 violationCode: item?.violationCode,
                 driver: normalized.driver,
                 rawCode: normalized.rawCode,
@@ -764,6 +1090,167 @@ export class MonoSystem implements System {
     constructor(db: Database, public logger: SystemLogger = systemConsoleLogger) {
         this.storage = new MonoStorage(db)
     }
+
+    private get db() {
+        return (this.storage as MonoStorage).db
+    }
+
+    private async ensureMigrationManifestTable() {
+        await this.db.scheme(`
+CREATE TABLE IF NOT EXISTS "__interaqt_migration_manifest" (
+    "key" TEXT PRIMARY KEY,
+    "value" TEXT NOT NULL
+)`, 'setup migration manifest table')
+        await this.db.scheme(`
+CREATE TABLE IF NOT EXISTS "__interaqt_migration_log" (
+    "id" TEXT PRIMARY KEY,
+    "modelHash" TEXT NOT NULL,
+    "phase" TEXT NOT NULL DEFAULT 'pending',
+    "status" TEXT NOT NULL,
+    "error" TEXT NULL,
+    "createdAt" TEXT NOT NULL,
+    "updatedAt" TEXT NOT NULL
+)`, 'setup migration log table')
+        try {
+            await this.db.scheme(`ALTER TABLE "__interaqt_migration_log" ADD COLUMN IF NOT EXISTS "phase" TEXT NOT NULL DEFAULT 'pending'`, 'setup migration log phase column')
+        } catch {
+            // Some drivers do not support ADD COLUMN IF NOT EXISTS; fresh schemas
+            // already have the column and legacy duplicate-column failures are safe.
+        }
+        await this.db.scheme(`
+CREATE TABLE IF NOT EXISTS "__interaqt_migration_lock" (
+    "key" TEXT PRIMARY KEY,
+    "migrationId" TEXT NOT NULL
+)`, 'setup migration lock table')
+        await this.db.scheme(`
+CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
+    "migrationId" TEXT NOT NULL,
+    "operationKey" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    PRIMARY KEY ("migrationId", "operationKey")
+)`, 'setup migration operation log table')
+    }
+
+    async readMigrationManifest(): Promise<MigrationManifest | undefined> {
+        const tables = await (this.storage as MonoStorage).getExistingTables()
+        if (!tables.has('__interaqt_migration_manifest')) return undefined
+        const dialect = getSchemaDialect(this.db).name
+        const rows = await this.db.query<{ value: string }>(
+            dialect === 'mysql'
+                ? `SELECT "value" FROM "__interaqt_migration_manifest" WHERE "key" = ? LIMIT 1`
+                : `SELECT "value" FROM "__interaqt_migration_manifest" WHERE "key" = $1 LIMIT 1`,
+            ['current'],
+            'read migration manifest'
+        )
+        return rows[0]?.value ? JSON.parse(rows[0].value) as MigrationManifest : undefined
+    }
+
+    async writeMigrationManifest(manifest: MigrationManifest): Promise<void> {
+        await this.ensureMigrationManifestTable()
+        const value = JSON.stringify(manifest)
+        const dialect = getSchemaDialect(this.db).name
+        if (dialect === 'mysql') {
+            await this.db.scheme(
+                `INSERT INTO "__interaqt_migration_manifest" ("key", "value") VALUES ('current', '${value.replace(/'/g, "''")}') ON DUPLICATE KEY UPDATE "value" = VALUES("value")`,
+                'write migration manifest'
+            )
+            return
+        }
+        await this.db.scheme(
+            `INSERT INTO "__interaqt_migration_manifest" ("key", "value") VALUES ('current', '${value.replace(/'/g, "''")}') ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`,
+            'write migration manifest'
+        )
+    }
+
+    async hasExistingData(): Promise<boolean> {
+        const storage = this.storage as MonoStorage
+        const tables = await storage.getExistingTables()
+        const ignored = new Set(['_IDS_', '__interaqt_migration_manifest', '__interaqt_migration_log', '__interaqt_migration_lock'])
+        for (const tableName of tables) {
+            if (ignored.has(tableName)) continue
+            const escaped = tableName.replace(/"/g, '""')
+            const rows = await this.db.query<{ exists: number }>(
+                `SELECT 1 AS "exists" FROM "${escaped}" LIMIT 1`,
+                [],
+                `migration check data ${tableName}`
+            )
+            if (rows.length > 0) return true
+        }
+        return false
+    }
+
+    async beginMigration(modelHash: string): Promise<MigrationRunState> {
+        await this.ensureMigrationManifestTable()
+        const dialect = getSchemaDialect(this.db).name
+        const existing = await this.db.query<{ migrationId: string }>(
+            dialect === 'mysql'
+                ? `SELECT "migrationId" FROM "__interaqt_migration_lock" WHERE "key" = ? LIMIT 1`
+                : `SELECT "migrationId" FROM "__interaqt_migration_lock" WHERE "key" = $1 LIMIT 1`,
+            ['current'],
+            'read migration lock'
+        )
+        if (existing[0]) {
+            throw new Error(`Migration is already running: ${existing[0].migrationId}`)
+        }
+        const resumable = await this.db.query<{ id: string, phase: MigrationPhase, status: string }>(
+            dialect === 'mysql'
+                ? `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = ? AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`
+                : `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = $1 AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`,
+            [modelHash],
+            'read resumable migration'
+        )
+        if (resumable[0]) {
+            await this.db.scheme(
+                `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', '${resumable[0].id}')`,
+                'acquire migration lock'
+            )
+            return { id: resumable[0].id, phase: resumable[0].phase }
+        }
+        const migrationId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        const now = new Date().toISOString()
+        await this.db.scheme(
+            `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', '${migrationId}')`,
+            'acquire migration lock'
+        )
+        await this.db.scheme(
+            `INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', 'pending', 'pending', '${now}', '${now}')`,
+            'write migration log pending'
+        )
+        return { id: migrationId, phase: 'pending' }
+    }
+
+    async updateMigrationPhase(migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>): Promise<void> {
+        await this.ensureMigrationManifestTable()
+        const now = new Date().toISOString()
+        await this.db.scheme(
+            `UPDATE "__interaqt_migration_log" SET "phase" = '${phase}', "status" = 'pending', "updatedAt" = '${now}' WHERE "id" = '${migrationId}'`,
+            `migration log ${phase}`
+        )
+    }
+
+    async finishMigration(migrationId: string, status: 'succeeded' | 'failed', error?: unknown): Promise<void> {
+        await this.ensureMigrationManifestTable()
+        const now = new Date().toISOString()
+        const errorMessage = error === undefined ? null : String(error instanceof Error ? error.message : error).replace(/'/g, "''")
+        await this.db.scheme(
+            `UPDATE "__interaqt_migration_log" SET "status" = '${status}', "error" = ${errorMessage === null ? 'NULL' : `'${errorMessage}'`}, "updatedAt" = '${now}' WHERE "id" = '${migrationId}'`,
+            'finish migration log'
+        )
+        await this.db.scheme(
+            `DELETE FROM "__interaqt_migration_lock" WHERE "key" = 'current' AND "migrationId" = '${migrationId}'`,
+            'release migration lock'
+        )
+    }
+
+    async isMigrationOperationComplete(migrationId: string | undefined, operationKey: string): Promise<boolean> {
+        await this.ensureMigrationManifestTable()
+        return (this.storage as MonoStorage).isMigrationOperationComplete(migrationId, operationKey)
+    }
+
+    async markMigrationOperationComplete(migrationId: string | undefined, operationKey: string): Promise<void> {
+        await this.ensureMigrationManifestTable()
+        await (this.storage as MonoStorage).markMigrationOperationComplete(migrationId, operationKey)
+    }
     
     async setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], install = false){
         // Use RefContainer to handle cloning and reference updates
@@ -820,6 +1307,91 @@ export class MonoSystem implements System {
         await this.setupTransformUniqueIndexes(states)
     }
 
+    private prepareEntitiesForStorage(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[]) {
+        // Use RefContainer to handle cloning and reference updates
+        const container = new RefContainer(originalEntities, originalRelations);
+
+        // Get cloned entities and relations with all references automatically updated
+        const { entities, relations } = container.getAll();
+
+        // Process states to inject properties into entities/relations
+        states.forEach(({state}) => {
+            Object.entries(state).forEach(([, stateItem]) => {
+                if (stateItem instanceof RecordBoundState) {
+                    if (!stateItem.record) {
+                        return;
+                    }
+                    let rootEntity: EntityInstance|RelationInstance | undefined = container.getEntityByName(stateItem.record);
+                    if (!rootEntity) {
+                        rootEntity = container.getRelationByName(stateItem.record);
+                    }
+                    if (!rootEntity) {
+                        throw new Error(`Entity or Relation not found: ${stateItem.record}`);
+                    }
+
+                    // 考虑 filtered entity 和 filtered relation 的级联问题，这里要找到根
+                    while ((rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation) {
+                        rootEntity = (rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation!
+                    }
+
+                    if (stateItem.defaultValue instanceof Property) {
+                        // CAUTION 特别注意这里改了 name
+                        stateItem.defaultValue.name = stateItem.key
+                        rootEntity.properties.push(stateItem.defaultValue)
+                    } else {
+                        const defaultValuetype = typeof stateItem.defaultValue
+                        rootEntity.properties.push(Property.create({
+                            name: stateItem.key,
+                            type: defaultValuetype,
+                            // 应该系统定义
+                            collection: Array.isArray(stateItem.defaultValue),
+                            defaultValue: () => stateItem.defaultValue
+                        }))
+                    }
+                }
+            })
+        })
+
+        return {
+            entities: [...entities, DictionaryEntity, SystemEntity],
+            relations,
+        }
+    }
+
+    async prepareMigrationSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[]) {
+        const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
+        const plan = await (this.storage as MonoStorage).prepareMigrationAdditive(
+            entities,
+            relations,
+        )
+        ;(plan.internal as { states?: ComputationState[] }).states = states
+        plan.postRecomputeDDL.push(...this.createTransformUniqueIndexOperations(plan, states))
+        return plan
+    }
+
+    async applyMigrationSchema(plan: MigrationSchemaPlan, migrationId?: string) {
+        await (this.storage as MonoStorage).applyMigrationAdditivePlan(plan, migrationId)
+    }
+
+    async applyMigrationPostSchema(plan: MigrationSchemaPlan, migrationId?: string) {
+        await (this.storage as MonoStorage).applyPostRecomputeSchemaPlan(plan, migrationId)
+    }
+
+    async verifyMigrationSchema(plan: MigrationSchemaPlan, migrationId?: string) {
+        await (this.storage as MonoStorage).verifyMigrationPlan(plan, migrationId)
+    }
+
+    async migrateSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[]) {
+        const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
+        const plan = await (this.storage as MonoStorage).prepareMigrationAdditive(
+            entities,
+            relations,
+        )
+        ;(plan.internal as { states?: ComputationState[] }).states = states
+        await (this.storage as MonoStorage).applyMigrationAdditivePlan(plan)
+        await this.setupTransformUniqueIndexes(states)
+    }
+
     private hashIdentifier(input: string) {
         let hash = 0
         for (let i = 0; i < input.length; i++) {
@@ -854,6 +1426,38 @@ export class MonoSystem implements System {
                 `setup transform unique index ${recordName}`
             )
         }
+    }
+
+    private createTransformUniqueIndexOperations(plan: MigrationSchemaPlan, states: ComputationState[]): AdditiveDDLOperation[] {
+        const dbSetup = (plan.internal as { dbSetup?: DBSetup }).dbSetup
+        if (!dbSetup) return []
+        const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
+        const dialect = getSchemaDialect((this.storage as MonoStorage).db)
+        return states.flatMap(({ dataContext, state }) => {
+            const sourceRecordId = state.sourceRecordId
+            const transformIndex = state.transformIndex
+            if (
+                !(sourceRecordId instanceof RecordBoundState) ||
+                !(transformIndex instanceof RecordBoundState) ||
+                (sourceRecordId as any).unique === false ||
+                (dataContext.type !== 'entity' && dataContext.type !== 'relation')
+            ) {
+                return []
+            }
+
+            const recordName = dataContext.id.name!
+            const recordInfo = tableMap.getRecordInfo(recordName)
+            const [, sourceRecordIdField] = tableMap.getTableAliasAndFieldName([recordName], sourceRecordId.key, true)
+            const [, transformIndexField] = tableMap.getTableAliasAndFieldName([recordName], transformIndex.key, true)
+            const indexName = `idx_transform_${this.hashIdentifier(`${recordInfo.table}_${sourceRecordIdField}_${transformIndexField}`)}`
+            return [{
+                kind: 'create-constraint' as const,
+                sql: createUniqueIndexSQL(indexName, recordInfo.table, [sourceRecordIdField, transformIndexField], dialect),
+                tableName: recordInfo.table,
+                logicalPath: `${recordName}.${sourceRecordId.key}.${transformIndex.key}`,
+                description: `migration setup transform unique index ${recordName}`,
+            }]
+        })
     }
     async destroy() {
         await this.storage.destroy()

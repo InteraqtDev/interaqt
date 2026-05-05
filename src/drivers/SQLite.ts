@@ -42,7 +42,7 @@ export class SQLiteDB implements Database{
         maxIdentifierLength: 63,
         supportsCreateIndexIfNotExists: true,
         encodeLiteral: sqliteEncodeLiteral,
-        constraints: { unique: true, filteredUnique: true },
+        constraints: { unique: true, filteredUnique: true, nonNull: false },
     }
     constructor(public file:string = ':memory:', public options?: SQLiteDBOptions) {
         this.idSystem = new IDSystem(this)
@@ -51,6 +51,9 @@ export class SQLiteDB implements Database{
     async open() {
         this.db = new SQLite(this.file, this.options)
         await this.idSystem.setup()
+    }
+    async openForSchemaRead() {
+        this.db = new SQLite(this.file, this.options)
     }
     async setupInternalComputationState() {
         await this.scheme(`

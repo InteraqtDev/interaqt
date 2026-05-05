@@ -1,12 +1,13 @@
 import type { Database } from "@runtime";
 import type { ConstraintPredicate, ConstraintPredicateOperator, ConstraintPredicateValue } from "@core";
-import type { ConstraintSchemaItem } from "./Setup.js";
+import type { ConstraintSchemaItem, NonNullConstraintSchemaItem, UniqueConstraintSchemaItem } from "./Setup.js";
 
 export type SchemaDialectName = 'postgres' | 'sqlite' | 'mysql';
 
 export type ConstraintCapabilities = {
     unique: boolean,
     filteredUnique: boolean,
+    nonNull?: boolean,
 }
 
 export type SchemaDialect = {
@@ -30,6 +31,7 @@ export const DEFAULT_SCHEMA_DIALECT: SchemaDialect = {
     constraints: {
         unique: true,
         filteredUnique: true,
+        nonNull: true,
     },
 }
 
@@ -129,7 +131,7 @@ export function createUniqueIndexSQL(
 }
 
 export function createUniqueConstraintStatement(
-    item: ConstraintSchemaItem,
+    item: UniqueConstraintSchemaItem,
     dialect: SchemaDialect,
     resolveWhereField: (property: string) => string,
 ): ConstraintSchemaStatement {
@@ -149,5 +151,27 @@ export function createUniqueConstraintStatement(
             item.where,
             resolveWhereField,
         ),
+    }
+}
+
+export function createNonNullConstraintStatement(
+    item: NonNullConstraintSchemaItem,
+    dialect: SchemaDialect,
+): ConstraintSchemaStatement {
+    if (item.kind !== 'non-null') {
+        throw new Error(`expected non-null constraint item`)
+    }
+    if (!dialect.constraints.nonNull) {
+        throw new Error(`non-null constraints are not supported by ${dialect.name} schema dialect`)
+    }
+    const tableName = quoteIdentifier(item.tableName, dialect)
+    const physicalName = quoteIdentifier(item.physicalName, dialect)
+    const fieldName = quoteIdentifier(item.field, dialect)
+    if (dialect.name === 'sqlite') {
+        throw new Error(`post-recompute non-null constraints are not supported by sqlite schema dialect`)
+    }
+    return {
+        item,
+        sql: `ALTER TABLE ${tableName} ADD CONSTRAINT ${physicalName} CHECK (${fieldName} IS NOT NULL)`,
     }
 }

@@ -169,10 +169,7 @@ async updateFilteredEntityFlags(entityName: string, recordId: string, events?: R
 ```typescript
 // 在 RecordQueryAgent 中
 async createRecord(newRecordData: NewRecordData, reason: string, events?: RecordMutationEvent[]) {
-  // 开始事务
-  const transaction = await this.database.beginTransaction();
-  
-  try {
+  return this.storage.runInTransaction({ name: reason }, async () => {
     // 1. 创建主记录
     const record = await this.insertRecord(...);
     
@@ -184,15 +181,8 @@ async createRecord(newRecordData: NewRecordData, reason: string, events?: Record
       null, 
       true
     );
-    
-    // 3. 提交事务
-    await transaction.commit();
-    
     return record;
-  } catch (error) {
-    await transaction.rollback();
-    throw error;
-  }
+  });
 }
 ```
 

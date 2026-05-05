@@ -41,7 +41,7 @@ export class MysqlDB implements Database{
         maxIdentifierLength: 64,
         supportsCreateIndexIfNotExists: false,
         encodeLiteral: defaultEncodeLiteral,
-        constraints: { unique: false, filteredUnique: false },
+        constraints: { unique: false, filteredUnique: false, nonNull: false },
     }
     constructor(public database:string, public options: MysqlDBConfig = {}) {
         this.idSystem = new IDSystem(this)
@@ -72,6 +72,17 @@ export class MysqlDB implements Database{
 
         await this.idSystem.setup()
 
+    }
+    async openForSchemaRead() {
+        if (this.db) return
+        // Strict dry-run schema planning should not create databases or
+        // initialize framework tables such as _IDS_.
+        this.db = await mysql.createConnection({
+            ...this.options,
+            database: this.database
+        })
+        await this.db.connect()
+        await this.db.query(`SET sql_mode='ANSI_QUOTES'`)
     }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

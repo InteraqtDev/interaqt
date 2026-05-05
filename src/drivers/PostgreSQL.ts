@@ -106,7 +106,7 @@ export class PostgreSQLDB implements Database{
         maxIdentifierLength: 63,
         supportsCreateIndexIfNotExists: true,
         encodeLiteral: defaultEncodeLiteral,
-        constraints: { unique: true, filteredUnique: true },
+        constraints: { unique: true, filteredUnique: true, nonNull: true },
     }
     constructor(public database:string, public options: PostgreSQLDBConfig = {}) {
         this.idSystem = new IDSystem(this)
@@ -131,6 +131,21 @@ export class PostgreSQLDB implements Database{
         }
         await adminClient.end()
 
+        this.pool = new Pool({
+            ...this.options,
+            database: this.database
+        })
+
+        this.db = new Client({
+            ...this.options,
+            database: this.database
+        })
+    }
+    async openForSchemaRead() {
+        if (this.pool) return
+        // Strict dry-run schema planning must only connect to the target
+        // database. Database creation/drop and framework table setup belong to
+        // the normal open/setup paths.
         this.pool = new Pool({
             ...this.options,
             database: this.database

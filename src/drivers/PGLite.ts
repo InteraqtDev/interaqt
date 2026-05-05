@@ -35,7 +35,7 @@ export class PGLiteDB implements Database{
         maxIdentifierLength: 63,
         supportsCreateIndexIfNotExists: true,
         encodeLiteral: defaultEncodeLiteral,
-        constraints: { unique: true, filteredUnique: true },
+        constraints: { unique: true, filteredUnique: true, nonNull: true },
     }
     constructor(public database?:string, public options: PGLiteDBConfig = {}) {
         this.idSystem = new IDSystem(this)
@@ -62,6 +62,10 @@ export class PGLiteDB implements Database{
         }
 
         await this.idSystem.setup()
+    }
+    async openForSchemaRead() {
+        // PGLite is constructed with an open in-memory database. Avoid the
+        // normal open() path here because it initializes framework tables.
     }
     async setupInternalComputationState() {
         await this.scheme(`

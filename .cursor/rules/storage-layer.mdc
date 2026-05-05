@@ -56,7 +56,7 @@ Operators: `'='`, `'!='`, `'>'`, `'<'`, `'>='`, `'<='`, `'like'`, `'in'`, `'not 
 ## System Layer
 `System` wraps storage with transaction support:
 - `system.storage` — the underlying storage instance
-- `beginTransaction()`, `commitTransaction()`, `rollbackTransaction()`
+- `runInTransaction({ name, isolation }, fn)` — the only transaction boundary API
 - `listen(callback)` — subscribe to `RecordMutationEvent`
 
 `MonoSystem` is the standard implementation wrapping a `Database` driver.
@@ -64,5 +64,5 @@ Operators: `'='`, `'!='`, `'>'`, `'<'`, `'>='`, `'<='`, `'like'`, `'in'`, `'not 
 ## Database Drivers
 All implement the `Database` interface:
 - `open(forceDrop?)`, `close()`, `scheme()`, `query()`, `insert()`, `update()`, `delete()`
-- Optional: `beginTransaction()`, `commitTransaction()`, `rollbackTransaction()`
+- Optional: `runInTransaction({ name, isolation }, fn)` for drivers that need connection-bound transactions
 - Drivers: `SQLiteDB`, `PostgreSQLDB`, `PGLiteDB`, `MysqlDB`

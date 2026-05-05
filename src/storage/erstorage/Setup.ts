@@ -1,6 +1,6 @@
 import { EntityToTableMap, LinkMapItem, MapData, RecordAttribute, RecordMapItem, ValueAttribute } from "./EntityToTableMap.js";
 import { assert } from "../utils.js";
-import { ConstraintPredicate, ConstraintPredicateOperator, EntityInstance, RelationInstance, PropertyInstance, RefContainer, UniqueConstraintInstance } from "@core";
+import { ConstraintPredicate, ConstraintPredicateOperator, ConstraintInstance, EntityInstance, RelationInstance, NonNullConstraintInstance, PropertyInstance, RefContainer, UniqueConstraint, UniqueConstraintInstance } from "@core";
 import { ID_ATTR, ROW_ID_ATTR, Database } from "@runtime";
 import { isRelation } from "./util.js";
 import { MatchExpressionData, MatchExp } from "./MatchExp.js";
@@ -8,7 +8,7 @@ import { Entity, Property, Relation } from "@core";
 import { BoolExp } from "@core";
 import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
-import { ConstraintSchemaStatement, createUniqueConstraintStatement, getSchemaDialect } from "./SchemaDialect.js";
+import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, getSchemaDialect } from "./SchemaDialect.js";
 
 // Define the types we need
 
@@ -32,7 +32,7 @@ export type TableData = {
 
 export type MergeLinks = string[]
 
-export type ConstraintSchemaItem = {
+export type UniqueConstraintSchemaItem = {
     kind: 'unique',
     constraintName: string,
     physicalName: string,
@@ -43,6 +43,19 @@ export type ConstraintSchemaItem = {
     where?: ConstraintPredicate,
     violationCode?: string,
 }
+
+export type NonNullConstraintSchemaItem = {
+    kind: 'non-null',
+    constraintName: string,
+    physicalName: string,
+    recordName: string,
+    tableName: string,
+    property: string,
+    field: string,
+    violationCode?: string,
+}
+
+export type ConstraintSchemaItem = UniqueConstraintSchemaItem | NonNullConstraintSchemaItem
 
 
 export class DBSetup {
@@ -128,7 +141,10 @@ export class DBSetup {
         if (!records.length) return
 
         // CAUTION 有合并的情况的话，里面一定有 entity，只用 entity 的名字。除非TableName 始终只用其中 的 entity 名字
-        const entities = records.filter(recordName => !this.map.records[recordName].isRelation )
+        const entities = records.filter(recordName => {
+            const record = this.map.records[recordName]
+            return !record.isRelation && !record.isFilteredEntity && !record.isFilteredRelation
+        })
         const newTableName = entities.length ? entities.join('_') : originTableName
 
         this.tableToRecordsMap.delete(originTableName)
@@ -1053,7 +1069,7 @@ ${Object.values(this.tables[tableName].columns).map(column => {
         })
     }
 
-    private validateConstraintRecord(recordName: string, constraint: UniqueConstraintInstance) {
+    private validateUniqueConstraintRecord(recordName: string, constraint: UniqueConstraintInstance) {
         const record = this.map.records[recordName]
         if (!record) throw new Error(`constraint "${constraint.name}" references unknown record "${recordName}"`)
         if (record.isFilteredEntity === true || record.isFilteredRelation === true) {
@@ -1066,11 +1082,20 @@ ${Object.values(this.tables[tableName].columns).map(column => {
         this.validateConstraintPredicate(recordName, constraint)
     }
 
+    private validateNonNullConstraintRecord(recordName: string, constraint: NonNullConstraintInstance) {
+        const record = this.map.records[recordName]
+        if (!record) throw new Error(`constraint "${constraint.name}" references unknown record "${recordName}"`)
+        if (record.isFilteredEntity === true || record.isFilteredRelation === true) {
+            throw new Error(`constraint "${constraint.name}" on filtered record "${recordName}" is not supported yet`)
+        }
+        this.resolveConstraintField(recordName, constraint.property)
+    }
+
     private buildConstraints() {
         const logicalNames = new Set<string>()
-        const allRecords: Array<{ recordName: string, constraints?: UniqueConstraintInstance[] }> = [
-            ...this.entities.map(entity => ({ recordName: entity.name, constraints: entity.constraints as UniqueConstraintInstance[] | undefined })),
-            ...this.relations.map(relation => ({ recordName: relation.name!, constraints: relation.constraints as UniqueConstraintInstance[] | undefined })),
+        const allRecords: Array<{ recordName: string, constraints?: ConstraintInstance[] }> = [
+            ...this.entities.map(entity => ({ recordName: entity.name, constraints: entity.constraints as ConstraintInstance[] | undefined })),
+            ...this.relations.map(relation => ({ recordName: relation.name!, constraints: relation.constraints as ConstraintInstance[] | undefined })),
         ]
 
         for (const { recordName, constraints } of allRecords) {
@@ -1079,20 +1104,34 @@ ${Object.values(this.tables[tableName].columns).map(column => {
                     throw new Error(`duplicate constraint name "${constraint.name}"`)
                 }
                 logicalNames.add(constraint.name)
-                this.validateConstraintRecord(recordName, constraint)
-
-                const fields = constraint.properties.map(property => this.resolveConstraintField(recordName, property))
-                this.constraintSchemaItems.push({
-                    kind: 'unique',
-                    constraintName: constraint.name,
-                    physicalName: this.buildPhysicalConstraintName(recordName, constraint.name),
-                    recordName,
-                    tableName: this.map.records[recordName].table,
-                    properties: [...constraint.properties],
-                    fields,
-                    where: constraint.where,
-                    violationCode: constraint.violationCode,
-                })
+                if (UniqueConstraint.is(constraint)) {
+                    this.validateUniqueConstraintRecord(recordName, constraint)
+                    const fields = constraint.properties.map(property => this.resolveConstraintField(recordName, property))
+                    this.constraintSchemaItems.push({
+                        kind: 'unique',
+                        constraintName: constraint.name,
+                        physicalName: this.buildPhysicalConstraintName(recordName, constraint.name),
+                        recordName,
+                        tableName: this.map.records[recordName].table,
+                        properties: [...constraint.properties],
+                        fields,
+                        where: constraint.where,
+                        violationCode: constraint.violationCode,
+                    })
+                } else {
+                    const nonNullConstraint = constraint as NonNullConstraintInstance
+                    this.validateNonNullConstraintRecord(recordName, nonNullConstraint)
+                    this.constraintSchemaItems.push({
+                        kind: 'non-null',
+                        constraintName: nonNullConstraint.name,
+                        physicalName: this.buildPhysicalConstraintName(recordName, nonNullConstraint.name),
+                        recordName,
+                        tableName: this.map.records[recordName].table,
+                        property: nonNullConstraint.property,
+                        field: this.resolveConstraintField(recordName, nonNullConstraint.property),
+                        violationCode: nonNullConstraint.violationCode,
+                    })
+                }
             }
         }
     }
@@ -1100,11 +1139,14 @@ ${Object.values(this.tables[tableName].columns).map(column => {
     createConstraintSQL(): ConstraintSchemaStatement[] {
         const dialect = getSchemaDialect(this.database)
         return this.constraintSchemaItems.map(item => {
-            return createUniqueConstraintStatement(
-                item,
-                dialect,
-                property => item.fields[item.properties.indexOf(property)] || this.resolveConstraintField(item.recordName, property)
-            )
+            if (item.kind === 'unique') {
+                return createUniqueConstraintStatement(
+                    item,
+                    dialect,
+                    property => item.fields[item.properties.indexOf(property)] || this.resolveConstraintField(item.recordName, property)
+                )
+            }
+            return createNonNullConstraintStatement(item, dialect)
         })
     }
 
@@ -1137,9 +1179,12 @@ ${Object.values(this.tables[tableName].columns).map(column => {
             prefix = originalName.substring(0, 6).toLowerCase()
         }
 
-        // Generate field name with auto-increment number
-        const shortName = `${prefix}_${this.fieldCounter}`
-        this.fieldCounter++
+        let shortName = `${prefix}_${this.stableHash(originalName).slice(0, 8)}`
+        let collisionIndex = 1
+        while (this.usedFieldNames.has(shortName)) {
+            shortName = `${prefix}_${this.stableHash(`${originalName}:${collisionIndex}`).slice(0, 8)}`
+            collisionIndex++
+        }
 
         this.fieldNameMap.set(originalName, shortName)
         this.usedFieldNames.add(shortName)

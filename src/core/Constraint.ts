@@ -23,12 +23,24 @@ export interface UniqueConstraintInstance extends IInstance {
   violationCode?: string;
 }
 
-export type ConstraintInstance = UniqueConstraintInstance;
+export interface NonNullConstraintInstance extends IInstance {
+  name: string;
+  property: string;
+  violationCode?: string;
+}
+
+export type ConstraintInstance = UniqueConstraintInstance | NonNullConstraintInstance;
 
 export interface UniqueConstraintCreateArgs {
   name: string;
   properties: string[];
   where?: ConstraintPredicate;
+  violationCode?: string;
+}
+
+export interface NonNullConstraintCreateArgs {
+  name: string;
+  property: string;
   violationCode?: string;
 }
 
@@ -132,6 +144,92 @@ export class UniqueConstraint implements UniqueConstraintInstance {
 
   static parse(json: string): UniqueConstraintInstance {
     const data: SerializedData<UniqueConstraintCreateArgs> = JSON.parse(json);
+    return this.create(data.public, data.options);
+  }
+}
+
+export class NonNullConstraint implements NonNullConstraintInstance {
+  public uuid: string;
+  public _type = 'NonNullConstraint';
+  public _options?: { uuid?: string };
+  public name: string;
+  public property: string;
+  public violationCode?: string;
+
+  constructor(args: NonNullConstraintCreateArgs, options?: { uuid?: string }) {
+    this._options = options;
+    this.uuid = generateUUID(options);
+    this.name = args.name;
+    this.property = args.property;
+    this.violationCode = args.violationCode;
+  }
+
+  static isKlass = true as const;
+  static displayName = 'NonNullConstraint';
+  static instances: NonNullConstraintInstance[] = [];
+
+  static public = {
+    name: {
+      type: 'string' as const,
+      required: true as const,
+      constraints: {
+        nameFormat: ({name}: { name: string }) => validNameFormatExp.test(name)
+      }
+    },
+    property: {
+      type: 'string' as const,
+      required: true as const,
+    },
+    violationCode: {
+      type: 'string' as const,
+      required: false as const,
+    }
+  };
+
+  static create(args: NonNullConstraintCreateArgs, options?: { uuid?: string }): NonNullConstraintInstance {
+    const instance = new NonNullConstraint(args, options);
+    const existing = this.instances.find(i => i.uuid === instance.uuid);
+    if (existing) {
+      throw new Error(`duplicate uuid in options ${instance.uuid}, NonNullConstraint`);
+    }
+    this.instances.push(instance);
+    return instance;
+  }
+
+  static stringify(instance: NonNullConstraintInstance): string {
+    const args: NonNullConstraintCreateArgs = {
+      name: instance.name,
+      property: instance.property,
+      violationCode: instance.violationCode,
+    };
+
+    const data: SerializedData<NonNullConstraintCreateArgs> = {
+      type: 'NonNullConstraint',
+      options: instance._options,
+      uuid: instance.uuid,
+      public: args
+    };
+    return JSON.stringify(data);
+  }
+
+  static clone(instance: NonNullConstraintInstance): NonNullConstraintInstance {
+    return this.create({
+      name: instance.name,
+      property: instance.property,
+      violationCode: instance.violationCode,
+    });
+  }
+
+  static is(obj: unknown): obj is NonNullConstraintInstance {
+    return obj !== null && typeof obj === 'object' && '_type' in obj && (obj as IInstance)._type === 'NonNullConstraint';
+  }
+
+  static check(data: unknown): boolean {
+    return this.is(data);
+  }
+
+  static parse(json: string): NonNullConstraintInstance {
+    const data: SerializedData<NonNullConstraintCreateArgs> = JSON.parse(json);
     return this.create(data.public, data.options);
   }
 }

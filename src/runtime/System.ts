@@ -5,6 +5,7 @@ import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
 import type { AttributeQueryData, ConstraintSchemaItem, MatchExpressionData, SchemaDialect } from "@storage";
 import { TransactionCapability, TransactionIsolation, TransactionOptions } from "./transaction.js";
+import type { MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 export type SystemCallback = (...arg: unknown[]) => unknown
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
@@ -45,11 +46,36 @@ export type StorageSchemaRecordItem = {
     isRelation: boolean,
     isFiltered: boolean,
     attributes: readonly string[],
+    resolvedBaseRecordName?: string,
+    resolvedMatchExpression?: MatchExpressionData,
+    attributeDetails?: readonly StorageSchemaAttributeItem[],
 }
 
 export type StorageSchemaTableItem = {
     tableName: string,
     columns: readonly string[],
+    columnDetails?: readonly StorageSchemaColumnItem[],
+}
+
+export type StorageSchemaAttributeItem = {
+    name: string,
+    kind: 'value' | 'record',
+    tableName?: string,
+    fieldName?: string,
+    type?: string,
+    fieldType?: string,
+    collection?: boolean,
+    computed?: boolean,
+    linkName?: string,
+    sourceField?: string,
+    targetField?: string,
+    resolvedBaseRecordName?: string,
+}
+
+export type StorageSchemaColumnItem = {
+    columnName: string,
+    fieldType: string,
+    ownerRecords: readonly string[],
 }
 
 export type StorageSchemaMetadata = {
@@ -133,6 +159,17 @@ export interface System {
     storage: Storage
     logger: SystemLogger
     setup: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], install?: boolean) => Promise<void>
+    migrateSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<void>
+    prepareMigrationSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<MigrationSchemaPlan>
+    applyMigrationSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
+    verifyMigrationSchema?: (plan: MigrationSchemaPlan) => Promise<void>
+    applyMigrationPostSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
+    hasExistingData?: () => Promise<boolean>
+    beginMigration?: (modelHash: string) => Promise<MigrationRunState>
+    updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>
+    finishMigration?: (migrationId: string, status: 'succeeded' | 'failed', error?: unknown) => Promise<void>
+    readMigrationManifest?: () => Promise<MigrationManifest | undefined>
+    writeMigrationManifest?: (manifest: MigrationManifest) => Promise<void>
 }
 
 export type EntityIdRef = {
@@ -165,6 +202,7 @@ export type SchemaDialectConfig = {
 // FIXME 这里应该继承自 storage？
 export type Database = {
     open: (forceDrop?:boolean) => Promise<void>
+    openForSchemaRead?: () => Promise<void>
     logger: DatabaseLogger
     schemaDialect?: SchemaDialectConfig
     scheme: (sql:string, name?:string) => Promise<unknown>

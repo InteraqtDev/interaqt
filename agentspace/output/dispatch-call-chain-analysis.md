@@ -15,13 +15,13 @@
 ```
 外部调用 controller.dispatch(interaction, args)
   → Controller.dispatch()                     [src/runtime/Controller.ts:264]
-    → beginTransaction
+    → runInTransaction
     → eventSource.guard.call(this, args)       [条件/用户/payload 校验]
     → eventSource.mapEventData(args)           [构造事件数据]
     → storage.create(eventSource.entity.name!) [写入事件记录]
     → eventSource.resolve.call(this, args)     [GetAction 数据查询]
     → eventSource.afterDispatch(...)           [后处理]
-    → commitTransaction
+    → commit
     → runRecordChangeSideEffects               [执行副作用]
 ```
 
@@ -34,7 +34,7 @@ Activity 交互走的路径：
 ```
 外部调用 activityManager.callActivityInteraction(activityName, interactionName, activityId, args)
   → ActivityManager.callActivityInteraction()  [src/builtins/interaction/activity/ActivityManager.ts:154]
-    → beginTransaction                         [ActivityManager 自己管理事务]
+    → runInTransaction                         [ActivityManager 需要统一 callback 事务]
     → ActivityCall.callInteraction()           [src/builtins/interaction/activity/ActivityCall.ts:325]
       → InteractionCall.check()                [src/builtins/interaction/activity/InteractionCall.ts:375]
         → checkCondition()                     [独立实现的条件校验]
@@ -43,7 +43,7 @@ Activity 交互走的路径：
       → InteractionCall.call()                 [src/builtins/interaction/activity/InteractionCall.ts:389]
         → saveEvent()                          [直接 storage.create('_Interaction_', event)]
         → retrieveData()                       [独立实现的数据查询]
-    → commitTransaction / rollbackTransaction
+    → commit / rollback
 ```
 
 完全绕过了 `Controller.dispatch()`。
@@ -98,9 +98,9 @@ async saveEvent(interactionEvent: InteractionEvent) {
 
 ```typescript
 async callInteraction(interactionName, interactionEventArgs) {
-    await this.controller.system.storage.beginTransaction(...)
+    await this.controller.system.storage.runInTransaction(...)
     result = await interactionCall.call(interactionEventArgs)  // 旧链路
-    // 自己管理 commit/rollback
+    // callback 内自动 commit/rollback
 }
 ```
 
