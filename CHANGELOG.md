@@ -1,5 +1,13 @@
 
 
+## [1.5.0](https://github.com/InteraqtDev/interaqt/compare/v1.4.0...v1.5.0) (2026-05-06)
+
+
+### Features
+
+* add data migration phase 1 support ([8143a1b](https://github.com/InteraqtDev/interaqt/commit/8143a1b69147e4a275367915130e48e00f60cc23))
+* add two-step migration review ([8c14e1b](https://github.com/InteraqtDev/interaqt/commit/8c14e1bf646ea3d80e6048de39817dbdbe5864b1))
+
 ## [1.4.0](https://github.com/InteraqtDev/interaqt/compare/v1.3.0...v1.4.0) (2026-05-02)
 
 
