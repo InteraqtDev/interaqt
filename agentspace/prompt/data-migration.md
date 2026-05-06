@@ -48,4 +48,4 @@ interaqt 是响应式的数据描述，理论上只要数据有声明 computatio
 
 ### 追加任务2
 深度理解并执行 `agentspace/output/data-migration-phase15-two-step-review-implementation-plan.md`。注意：
-1. 完成后要进行完整的测试。确保一切正常。
+1. 完成后要进行完整的测试。确保所有 data-migration 代码 100% 测试覆盖，一切正常。

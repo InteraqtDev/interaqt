@@ -165,7 +165,7 @@ export interface System {
     verifyMigrationSchema?: (plan: MigrationSchemaPlan) => Promise<void>
     applyMigrationPostSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
     hasExistingData?: () => Promise<boolean>
-    beginMigration?: (modelHash: string) => Promise<MigrationRunState>
+    beginMigration?: (modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount?: number) => Promise<MigrationRunState>
     updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>
     finishMigration?: (migrationId: string, status: 'succeeded' | 'failed', error?: unknown) => Promise<void>
     readMigrationManifest?: () => Promise<MigrationManifest | undefined>

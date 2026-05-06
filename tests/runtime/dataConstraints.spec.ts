@@ -309,11 +309,7 @@ describe("data constraints", () => {
     const secondSystem = new MonoSystem(db);
     const secondController = new Controller({ system: secondSystem, entities: [ConstrainedDirtyRecord], relations: [] });
 
-    await expect(secondController.setup(false)).rejects.toMatchObject({
-      name: "ConstraintSetupError",
-      constraintName: "ConstraintDirtyRecord_key_unique",
-      recordName: "ConstraintDirtyRecord",
-    });
+    await expect(secondController.setup(false)).rejects.toThrow(/Model manifest mismatch/);
 
     await secondSystem.destroy();
   });

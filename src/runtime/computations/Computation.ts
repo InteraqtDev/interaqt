@@ -255,8 +255,6 @@ export interface DataBasedComputation {
     getInitialValue?: (...args: any[]) => unknown
     useLastValue?: boolean
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    migrationCompute?: (...args: any[]) => Promise<ComputationResult|unknown>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createStateData?: (...args: any[]) => Promise<Record<string, unknown>>
@@ -287,8 +285,6 @@ export interface EventBasedComputation {
     useLastValue?: boolean
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getInitialValue?: (...args: any[]) => unknown
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    migrationCompute?: (...args: any[]) => Promise<ComputationResult|unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     computeDirtyRecords?: (...args: any[]) => Promise<Record<string, unknown>[]|undefined>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

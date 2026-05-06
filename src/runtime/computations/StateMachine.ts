@@ -21,13 +21,9 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     eventDeps: {[key: string]: EventDep} = {}
     useMutationEvent: boolean = true
     initialState: StateNodeInstance
-    migrationCompute?: (...args: any[]) => Promise<unknown>
     constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.initialState = this.args.initialState
-        if (this.args.migrationCompute) {
-            this.migrationCompute = async (...args: any[]) => this.args.migrationCompute!.call(this.controller, ...args)
-        }
         // 从所有 transfer 中构建 eventDeps
         // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
         // 因为可能有多个 transfer 都是同样的 trigger。
@@ -72,14 +68,10 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
     initialState: StateNodeInstance
     dataContext: PropertyDataContext
     useMutationEvent: boolean = true
-    migrationCompute?: (...args: any[]) => Promise<unknown>
     constructor(public controller: Controller, public args: StateMachineInstance, dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.initialState = this.args.initialState
         this.dataContext = dataContext as PropertyDataContext
-        if (this.args.migrationCompute) {
-            this.migrationCompute = async (...args: any[]) => this.args.migrationCompute!.call(this.controller, ...args)
-        }
         // 从所有 transfer 中构建 eventDeps
         // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
         // 因为可能有多个 transfer 都是同样的 trigger。

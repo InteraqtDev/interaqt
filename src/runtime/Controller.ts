@@ -21,16 +21,21 @@ import { NestedDispatchError, RequireSerializableRetry, runWithTransactionRetry 
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
     buildAffectedRebuildPlan,
+    buildMigrationDiff,
+    assertDestructiveScopeAllowed,
     createPlanBlockingMessages,
     createMigrationManifest,
-    getChangedComputations,
+    getChangedComputationsFromApprovedDiff,
     getDestructiveDeletionScope,
     getNewFilteredDataContexts,
     getRecomputeBlockingChanges,
     getStorageBlockingChanges,
+    GenerateMigrationDiffOptions,
+    hashMigrationDiff,
     MIGRATION_MANIFEST_CURRENT_KEY,
     MIGRATION_MANIFEST_CONCEPT,
     MigrationBaselineError,
+    MigrationDiffFile,
     MigrationOptions,
     MigrationPhase,
     MigrationRunState,
@@ -40,6 +45,7 @@ import {
     recomputeChangedComputations,
     recomputeFilteredMemberships,
     SetupOptions,
+    validateApprovedDiff,
     writeMigrationManifest,
 } from "./migration.js";
 
@@ -208,7 +214,10 @@ export class Controller {
         const install = typeof options === 'boolean' ? options : options?.install === true
         const migrateOptions = typeof options === 'object' ? options.migrate : undefined
         if (migrateOptions) {
-            await this.migrate(migrateOptions === true ? {} : migrateOptions)
+            if (migrateOptions === true) {
+                throw new Error('setup({ migrate: true }) is no longer supported. Generate and approve a migration diff, then call setup({ migrate: { approvedDiff } }).')
+            }
+            await this.migrate(migrateOptions)
             return
         }
 
@@ -225,7 +234,7 @@ export class Controller {
             const nextManifest = createMigrationManifest(this, schemaPlan.schema)
             const previousManifest = await readMigrationManifest(this)
             if (previousManifest && previousManifest.modelHash !== nextManifest.modelHash) {
-                throw new Error(`Model manifest mismatch. Call controller.migrate() before normal setup. Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`)
+                throw new Error(`Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`)
             }
             if (!previousManifest && await this.system.hasExistingData?.()) {
                 throw new MigrationBaselineError('Existing database has no migration manifest. Call controller.createMigrationBaseline() before normal setup or migration.')
@@ -260,32 +269,86 @@ export class Controller {
         return manifest
     }
 
-    async migrate(options: MigrationOptions = {}): Promise<MigrationPlan> {
-        const migrationOptions: MigrationOptions = { mode: 'compute', ...options }
+    private async prepareMigrationContext(options: { includeFunctionText?: boolean } = {}) {
         const states = this.scheduler.createStates()
         const migrationSystem = this.system as System & {
             prepareMigrationSchema: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<MigrationSchemaPlan>
+        }
+        assert(typeof migrationSystem.prepareMigrationSchema === 'function', 'Current system does not support schema migration planning')
+        const schemaPlan = await migrationSystem.prepareMigrationSchema(this.entities, this.relations, states)
+        const previousManifest = await readMigrationManifest(this)
+        if (!previousManifest) {
+            throw new MigrationBaselineError('Migration baseline manifest not found. Run setup(true) with the current framework first or createMigrationBaseline().')
+        }
+        const nextManifest = createMigrationManifest(this, schemaPlan.schema, { includeFunctionText: options.includeFunctionText === true })
+        return { states, migrationSystem, schemaPlan, previousManifest, nextManifest }
+    }
+
+    private async buildCurrentMigrationDiff(
+        schemaPlan: MigrationSchemaPlan,
+        previousManifest: ReturnType<typeof createMigrationManifest>,
+        nextManifest: ReturnType<typeof createMigrationManifest>,
+        options: GenerateMigrationDiffOptions = {},
+    ): Promise<MigrationDiffFile> {
+        const provisionalChangedComputations = nextManifest.computations.filter(next =>
+            !previousManifest.computations.some(previous => previous.id === next.id && previous.signature === next.signature)
+        )
+        const changedDataContexts = getNewFilteredDataContexts(previousManifest, nextManifest)
+        const provisionalRebuildPlan = buildAffectedRebuildPlan(
+            previousManifest,
+            nextManifest,
+            provisionalChangedComputations,
+            changedDataContexts,
+            { outputChangedIds: new Set(provisionalChangedComputations.map(item => item.id)) },
+        )
+        const storageBlockingChanges = getStorageBlockingChanges(previousManifest, nextManifest)
+        const destructiveScopes = options.includeDestructiveScope === true
+            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest)
+            : []
+        const safety = {
+            blockingChanges: [
+                ...schemaPlan.blockingChanges,
+                ...storageBlockingChanges,
+            ],
+            destructiveScopes,
+        }
+        const diff = buildMigrationDiff(previousManifest, nextManifest, schemaPlan, safety)
+        return diff
+    }
+
+    async generateMigrationDiff(options: GenerateMigrationDiffOptions = {}): Promise<MigrationDiffFile> {
+        const { schemaPlan, previousManifest, nextManifest } = await this.prepareMigrationContext({
+            includeFunctionText: options.includeFunctionText === true,
+        })
+        return this.buildCurrentMigrationDiff(schemaPlan, previousManifest, nextManifest, options)
+    }
+
+    async migrate(options: MigrationOptions = {}): Promise<MigrationPlan> {
+        const migrationOptions: MigrationOptions = { ...options }
+        const context = await this.prepareMigrationContext()
+        const migrationSystem = context.migrationSystem as System & {
             applyMigrationSchema: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
             verifyMigrationSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
             applyMigrationPostSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
-            beginMigration?: (modelHash: string) => Promise<MigrationRunState>
+            beginMigration?: (modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount?: number) => Promise<MigrationRunState>
             updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>
             finishMigration?: (migrationId: string, status: 'succeeded' | 'failed', error?: unknown) => Promise<void>
             isMigrationOperationComplete?: (migrationId: string | undefined, operationKey: string) => Promise<boolean>
             markMigrationOperationComplete?: (migrationId: string | undefined, operationKey: string) => Promise<void>
         }
-        assert(typeof migrationSystem.prepareMigrationSchema === 'function', 'Current system does not support schema migration planning')
         assert(typeof migrationSystem.applyMigrationSchema === 'function', 'Current system does not support schema migration application')
-        const schemaPlan = await migrationSystem.prepareMigrationSchema(this.entities, this.relations, states)
-
-        const previousManifest = await readMigrationManifest(this)
-        if (!previousManifest) {
-            throw new MigrationBaselineError('Migration baseline manifest not found. Run setup(true) with the current framework first or createMigrationBaseline().')
-        }
-        const nextManifest = createMigrationManifest(this, schemaPlan.schema)
-        const changedComputations = getChangedComputations(previousManifest, nextManifest)
+        const { schemaPlan, previousManifest, nextManifest } = context
+        const expectedDiff = await this.buildCurrentMigrationDiff(schemaPlan, previousManifest, nextManifest, { includeDestructiveScope: false })
+        validateApprovedDiff(migrationOptions.approvedDiff, previousManifest, nextManifest, migrationOptions.handlers, expectedDiff)
+        const approvedDiff = migrationOptions.approvedDiff!
+        const approvedDiffHash = hashMigrationDiff(approvedDiff)
+        const approvedPlanning = getChangedComputationsFromApprovedDiff(previousManifest, nextManifest, approvedDiff)
+        const changedComputations = approvedPlanning.changedComputations
         const changedDataContexts = getNewFilteredDataContexts(previousManifest, nextManifest)
-        const rebuildPlan = buildAffectedRebuildPlan(previousManifest, nextManifest, changedComputations, changedDataContexts)
+        const rebuildPlan = buildAffectedRebuildPlan(previousManifest, nextManifest, changedComputations, changedDataContexts, {
+            outputChangedIds: approvedPlanning.outputChangedIds,
+            stateOnlyIds: approvedPlanning.stateOnlyIds,
+        })
         const storageBlockingChanges = getStorageBlockingChanges(previousManifest, nextManifest)
         const recomputeBlockingChanges = getRecomputeBlockingChanges(
             this,
@@ -296,10 +359,12 @@ export class Controller {
         const allBlockingChanges = [
             ...schemaPlan.blockingChanges,
             ...storageBlockingChanges,
+            ...approvedPlanning.blocking,
             ...recomputeBlockingChanges,
         ]
         const blockingChanges = createPlanBlockingMessages(allBlockingChanges)
-        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan)
+        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, previousManifest)
+        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
         const plan: MigrationPlan = {
             mode: 'compute',
             dryRun: migrationOptions.dryRun === true,
@@ -314,7 +379,7 @@ export class Controller {
             },
             blockingChanges,
             deletionScope,
-            hints: migrationOptions.hints,
+            approvedDiffHash,
         }
 
         if (plan.dryRun) return plan
@@ -328,7 +393,12 @@ export class Controller {
             return order.indexOf(phase) >= order.indexOf(target)
         }
         try {
-            migrationRun = await migrationSystem.beginMigration?.(nextManifest.modelHash)
+            migrationRun = await migrationSystem.beginMigration?.(
+                nextManifest.modelHash,
+                approvedDiffHash,
+                approvedDiff.summary,
+                approvedDiff.decisions.length,
+            )
             const phase = migrationRun?.phase || 'pending'
             if (!reached(phase, 'schema-applied')) {
                 await migrationSystem.applyMigrationSchema(schemaPlan, migrationRun?.id)
@@ -338,7 +408,7 @@ export class Controller {
                 await this.system.storage.runInTransaction({ name: 'migration recompute', isolation: 'SERIALIZABLE' }, async () => {
                     if (!reached(phase, 'computation-applied')) {
                         const filteredEvents = await recomputeFilteredMemberships(this, previousManifest, nextManifest)
-                        await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents)
+                        await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents, previousManifest)
                         if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'computation-applied')
                     }
                     if (!reached(phase, 'constraints-applied')) {
@@ -346,7 +416,7 @@ export class Controller {
                         await migrationSystem.applyMigrationPostSchema?.(schemaPlan, migrationRun?.id)
                         if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'constraints-applied')
                     }
-                    const manifestOperationKey = `manifest:current:${nextManifest.modelHash}`
+                    const manifestOperationKey = `manifest:current:${nextManifest.modelHash}:${approvedDiffHash}`
                     const manifestAlreadyWritten = await migrationSystem.isMigrationOperationComplete?.(migrationRun?.id, manifestOperationKey)
                     if (!manifestAlreadyWritten) {
                         await writeMigrationManifest(this, nextManifest)

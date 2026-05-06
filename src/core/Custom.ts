@@ -12,7 +12,6 @@ export interface CustomInstance extends IInstance {
   incrementalPatchCompute?: Function;
   createState?: Function;
   getInitialValue?: Function;
-  migrationCompute?: Function;
   /**
    * Runs inside the retryable transaction attempt when async task results are
    * applied. Keep it deterministic and free of irreversible external IO.
@@ -35,7 +34,6 @@ export interface CustomCreateArgs {
   incrementalPatchCompute?: Function;
   createState?: Function;
   getInitialValue?: Function;
-  migrationCompute?: Function;
   asyncReturn?: Function;
   useLastValue?: boolean;
   concurrency?: CustomConcurrency;
@@ -52,7 +50,6 @@ export class Custom implements CustomInstance {
   public incrementalPatchCompute?: Function;
   public createState?: Function;
   public getInitialValue?: Function;
-  public migrationCompute?: Function;
   public asyncReturn?: Function;
   public useLastValue?: boolean;
   public concurrency?: CustomConcurrency;
@@ -67,7 +64,6 @@ export class Custom implements CustomInstance {
     this.incrementalPatchCompute = args.incrementalPatchCompute;
     this.createState = args.createState;
     this.getInitialValue = args.getInitialValue;
-    this.migrationCompute = args.migrationCompute;
     this.asyncReturn = args.asyncReturn;
     this.useLastValue = args.useLastValue;
     if (args.concurrency !== undefined && args.concurrency !== 'serializable' && args.concurrency !== 'atomic-safe') {
@@ -117,11 +113,6 @@ export class Custom implements CustomInstance {
       collection: false as const,
       required: false as const
     },
-    migrationCompute: {
-      type: 'function' as const,
-      collection: false as const,
-      required: false as const
-    },
     asyncReturn: {
       type: 'function' as const,
       collection: false as const,
@@ -162,7 +153,6 @@ export class Custom implements CustomInstance {
     if (instance.incrementalPatchCompute !== undefined) args.incrementalPatchCompute = stringifyAttribute(instance.incrementalPatchCompute);
     if (instance.createState !== undefined) args.createState = stringifyAttribute(instance.createState);
     if (instance.getInitialValue !== undefined) args.getInitialValue = stringifyAttribute(instance.getInitialValue);
-    if (instance.migrationCompute !== undefined) args.migrationCompute = stringifyAttribute(instance.migrationCompute);
     if (instance.asyncReturn !== undefined) args.asyncReturn = stringifyAttribute(instance.asyncReturn);
     if (instance.useLastValue !== undefined) args.useLastValue = instance.useLastValue;
     if (instance.concurrency !== undefined) args.concurrency = instance.concurrency;
@@ -185,7 +175,6 @@ export class Custom implements CustomInstance {
       incrementalPatchCompute: instance.incrementalPatchCompute,
       createState: instance.createState,
       getInitialValue: instance.getInitialValue,
-      migrationCompute: instance.migrationCompute,
       asyncReturn: instance.asyncReturn,
       useLastValue: instance.useLastValue,
       concurrency: instance.concurrency
@@ -205,7 +194,7 @@ export class Custom implements CustomInstance {
     const args = { ...data.public } as Record<string, unknown>;
     
     // 反序列化函数
-    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'migrationCompute', 'asyncReturn'];
+    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'asyncReturn'];
     functionFields.forEach(field => {
       if (typeof args[field] === 'string' && args[field].startsWith('func::')) {
         args[field] = new Function('return ' + args[field].substring(6))();

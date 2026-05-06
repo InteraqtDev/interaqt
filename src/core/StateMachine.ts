@@ -6,14 +6,12 @@ export interface StateMachineInstance extends IInstance {
   states: StateNodeInstance[];
   transfers: StateTransferInstance[];
   initialState: StateNodeInstance;
-  migrationCompute?: Function;
 }
 
 export interface StateMachineCreateArgs {
   states: StateNodeInstance[];
   transfers: StateTransferInstance[];
   initialState: StateNodeInstance;
-  migrationCompute?: Function;
 }
 
 export class StateMachine implements StateMachineInstance {
@@ -23,7 +21,6 @@ export class StateMachine implements StateMachineInstance {
   public states: StateNodeInstance[];
   public transfers: StateTransferInstance[];
   public initialState: StateNodeInstance;
-  public migrationCompute?: Function;
   
   constructor(args: StateMachineCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -31,7 +28,6 @@ export class StateMachine implements StateMachineInstance {
     this.states = args.states;
     this.transfers = args.transfers;
     this.initialState = args.initialState;
-    this.migrationCompute = args.migrationCompute;
   }
   
   // 静态属性和方法
@@ -54,11 +50,6 @@ export class StateMachine implements StateMachineInstance {
       type: 'StateNode' as const,
       collection: false as const,
       required: true as const
-    },
-    migrationCompute: {
-      type: 'function' as const,
-      collection: false as const,
-      required: false as const
     }
   };
   
@@ -81,9 +72,6 @@ export class StateMachine implements StateMachineInstance {
       transfers: instance.transfers,
       initialState: instance.initialState
     };
-    if (instance.migrationCompute !== undefined) {
-      args.migrationCompute = (`func::${instance.migrationCompute.toString()}` as unknown) as Function;
-    }
     const data: SerializedData<StateMachineCreateArgs> = {
       type: 'StateMachine',
       options: instance._options,
@@ -97,8 +85,7 @@ export class StateMachine implements StateMachineInstance {
     return this.create({
       states: instance.states,
       transfers: instance.transfers,
-      initialState: instance.initialState,
-      migrationCompute: instance.migrationCompute
+      initialState: instance.initialState
     });
   }
   
@@ -112,9 +99,6 @@ export class StateMachine implements StateMachineInstance {
   
   static parse(json: string): StateMachineInstance {
     const data: SerializedData<StateMachineCreateArgs> = JSON.parse(json);
-    if (typeof data.public.migrationCompute === 'string' && (data.public.migrationCompute as string).startsWith('func::')) {
-      data.public.migrationCompute = new Function('return ' + (data.public.migrationCompute as string).substring(6))();
-    }
     return this.create(data.public, data.options);
   }
 } 

@@ -1105,6 +1105,10 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_manifest" (
 CREATE TABLE IF NOT EXISTS "__interaqt_migration_log" (
     "id" TEXT PRIMARY KEY,
     "modelHash" TEXT NOT NULL,
+    "approvedDiffHash" TEXT NULL,
+    "approvedDiffSummary" TEXT NULL,
+    "decisionCount" INTEGER NOT NULL DEFAULT 0,
+    "reviewedAt" TEXT NULL,
     "phase" TEXT NOT NULL DEFAULT 'pending',
     "status" TEXT NOT NULL,
     "error" TEXT NULL,
@@ -1116,6 +1120,19 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_log" (
         } catch {
             // Some drivers do not support ADD COLUMN IF NOT EXISTS; fresh schemas
             // already have the column and legacy duplicate-column failures are safe.
+        }
+        for (const columnDDL of [
+            `"approvedDiffHash" TEXT NULL`,
+            `"approvedDiffSummary" TEXT NULL`,
+            `"decisionCount" INTEGER NOT NULL DEFAULT 0`,
+            `"reviewedAt" TEXT NULL`,
+        ]) {
+            try {
+                await this.db.scheme(`ALTER TABLE "__interaqt_migration_log" ADD COLUMN IF NOT EXISTS ${columnDDL}`, 'setup migration log review column')
+            } catch {
+                // Drivers without IF NOT EXISTS either already have the column or
+                // are using the fresh schema above.
+            }
         }
         await this.db.scheme(`
 CREATE TABLE IF NOT EXISTS "__interaqt_migration_lock" (
@@ -1179,7 +1196,7 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         return false
     }
 
-    async beginMigration(modelHash: string): Promise<MigrationRunState> {
+    async beginMigration(modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount = 0): Promise<MigrationRunState> {
         await this.ensureMigrationManifestTable()
         const dialect = getSchemaDialect(this.db).name
         const existing = await this.db.query<{ migrationId: string }>(
@@ -1194,9 +1211,9 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         }
         const resumable = await this.db.query<{ id: string, phase: MigrationPhase, status: string }>(
             dialect === 'mysql'
-                ? `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = ? AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`
-                : `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = $1 AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`,
-            [modelHash],
+                ? `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = ? AND COALESCE("approvedDiffHash", '') = ? AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`
+                : `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = $1 AND COALESCE("approvedDiffHash", '') = $2 AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`,
+            [modelHash, approvedDiffHash || ''],
             'read resumable migration'
         )
         if (resumable[0]) {
@@ -1208,12 +1225,14 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         }
         const migrationId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
         const now = new Date().toISOString()
+        const summary = approvedDiffSummary === undefined ? null : JSON.stringify(approvedDiffSummary).replace(/'/g, "''")
+        const escapedDiffHash = (approvedDiffHash || '').replace(/'/g, "''")
         await this.db.scheme(
             `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', '${migrationId}')`,
             'acquire migration lock'
         )
         await this.db.scheme(
-            `INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', 'pending', 'pending', '${now}', '${now}')`,
+            `INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "approvedDiffSummary", "decisionCount", "reviewedAt", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', '${escapedDiffHash}', ${summary === null ? 'NULL' : `'${summary}'`}, ${decisionCount}, '${now}', 'pending', 'pending', '${now}', '${now}')`,
             'write migration log pending'
         )
         return { id: migrationId, phase: 'pending' }

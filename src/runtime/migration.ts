@@ -25,12 +25,195 @@ export class AsyncMigrationComputationError extends MigrationError {}
 export class DestructiveComputedOutputError extends MigrationError {}
 export class AmbiguousComputationSignatureError extends MigrationError {}
 
+export type MigrationIdentity = {
+    key: string;
+    kind: "entity" | "relation" | "property" | "dictionary" | "computation";
+    namePath: string;
+    uuid?: string;
+};
+
+export type ComputationFunctionSignature = {
+    hasFunction: boolean;
+    hash?: string;
+    text?: string;
+    callbackPaths: string[];
+};
+
+export type MigrationDiffSummary = {
+    changeCount: number;
+    requiredDecisionCount: number;
+    blockingChangeCount: number;
+};
+
+export type MigrationChange =
+    | {
+        kind: "computation";
+        id: string;
+        dataContext: string;
+        computationType: string;
+        changeType: "added" | "removed" | "changed" | "state-only" | "possibly-changed" | "unchanged";
+        detected: {
+            dataDepsChanged?: boolean;
+            eventDepsChanged?: boolean;
+            outputSignatureChanged?: boolean;
+            stateSignatureChanged?: boolean;
+            functionTextChanged?: boolean;
+            functionHash?: string;
+            previousFunctionHash?: string;
+            hasFunction?: boolean;
+            hasClosureRisk?: boolean;
+            needsEventRebuildHandler?: boolean;
+            needsAsyncCompletionHandler?: boolean;
+        };
+        recommendation: "rebuild" | "ignore" | "needs-review" | "blocked";
+        reason: string;
+    }
+    | {
+        kind: "storage";
+        id: string;
+        changeType: "added" | "removed" | "changed" | "blocked";
+        dataContext: string;
+        reason: string;
+    }
+    | {
+        kind: "record";
+        id: string;
+        changeType: "added" | "removed" | "changed";
+        dataContext: string;
+        reason: string;
+    }
+    | {
+        kind: "property";
+        id: string;
+        changeType: "added" | "removed" | "changed";
+        dataContext: string;
+        reason: string;
+    }
+    | {
+        kind: "relation";
+        id: string;
+        changeType: "added" | "removed" | "changed";
+        dataContext: string;
+        reason: string;
+    }
+    | {
+        kind: "dictionary";
+        id: string;
+        changeType: "added" | "removed" | "changed" | "unchanged";
+        dataContext: string;
+        reason: string;
+    };
+
+export type MigrationDecisionRequirement =
+    | {
+        kind: "computation";
+        id: string;
+        dataContext: string;
+        recommendedDecision: "changed" | "unchanged" | "state-only" | "unrebuildable";
+        reason: string;
+    }
+    | {
+        kind: "event-rebuild-handler";
+        dataContext: string;
+        reason: string;
+    }
+    | {
+        kind: "async-completion-handler";
+        dataContext: string;
+        reason: string;
+    }
+    | {
+        kind: "destructive-scope";
+        dataContext: string;
+        recordName?: string;
+        ids: string[];
+        reason: string;
+    };
+
+export type MigrationDecision =
+    | {
+        kind: "computation";
+        id: string;
+        dataContext: string;
+        decision: "changed" | "unchanged" | "state-only" | "unrebuildable";
+        reason: string;
+    }
+    | {
+        kind: "event-rebuild-handler";
+        dataContext: string;
+        handlerRef: string;
+        reason: string;
+    }
+    | {
+        kind: "async-completion-handler";
+        dataContext: string;
+        handlerRef: string;
+        reason: string;
+    }
+    | {
+        kind: "destructive-scope";
+        dataContext: string;
+        recordName?: string;
+        ids: string[];
+        reason: string;
+    }
+    | {
+        kind: "rename-candidate-reviewed";
+        from: string;
+        to: string;
+        decision: "not-accepted" | "accepted-for-future-primitive";
+        reason: string;
+    };
+
+export type MigrationSafetyReview = {
+    blockingChanges: StorageBlockingChange[];
+    destructiveScopes: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>;
+};
+
+export type MigrationDiffFile = {
+    kind: "interaqt-migration-diff";
+    version: 2;
+    status: "generated" | "approved";
+    fromModelHash: string;
+    toModelHash: string;
+    generatedAt: string;
+    generatorVersion: string;
+    summary: MigrationDiffSummary;
+    changes: MigrationChange[];
+    requiredDecisions: MigrationDecisionRequirement[];
+    decisions: MigrationDecision[];
+    safety: MigrationSafetyReview;
+};
+
+export type GenerateMigrationDiffOptions = {
+    includeFunctionText?: boolean;
+    includeDestructiveScope?: boolean;
+};
+
+export type MigrationEventRebuildHandler = (context: {
+    controller: Controller;
+    dataContext: DataContext;
+    record?: Record<string, unknown>;
+    mutationEvent?: RecordMutationEvent;
+}) => unknown | Promise<unknown>;
+
+export type MigrationAsyncCompletionHandler = (context: {
+    controller: Controller;
+    dataContext: DataContext;
+    record?: Record<string, unknown>;
+    args: unknown;
+    result: ComputationResultAsync;
+}) => unknown | Promise<unknown>;
+
+export type MigrationHandlers = {
+    eventRebuild?: Record<string, MigrationEventRebuildHandler>;
+    asyncCompletion?: Record<string, MigrationAsyncCompletionHandler>;
+};
+
 export type MigrationOptions = {
-    mode?: "compute";
     dryRun?: boolean;
-    hints?: unknown[];
-    allowDestructiveCleanup?: boolean;
-    destructiveScope?: Array<{ dataContext: string; recordName?: string; ids?: string[] }>;
+    approvedDiff?: MigrationDiffFile;
+    handlers?: MigrationHandlers;
 };
 
 export type SetupOptions = {
@@ -40,6 +223,7 @@ export type SetupOptions = {
 
 export type ComputationManifest = {
     id: string;
+    identity: MigrationIdentity;
     type: string;
     dataContext: string;
     outputRecord?: string;
@@ -48,6 +232,7 @@ export type ComputationManifest = {
     eventDeps: Array<{ recordName: string; type: string; phase?: unknown }>;
     stateKeys: string[];
     boundStates: BoundStateManifest[];
+    asyncReturn: boolean;
     owner?: "exclusive" | "shared" | "unknown";
     ownershipProof?: {
         kind: "computed-output";
@@ -58,6 +243,8 @@ export type ComputationManifest = {
     };
     outputSignature: string;
     stateSignature: string;
+    structuralSignature: string;
+    functionSignature?: ComputationFunctionSignature;
     signature: string;
 };
 
@@ -70,15 +257,17 @@ export type BoundStateManifest = {
 };
 
 export type MigrationManifest = {
-    version: 1;
+    version: 2;
     frameworkVersion: string;
     modelHash: string;
     records: Array<{
         id: string;
+        identity: MigrationIdentity;
         name: string;
         kind: "entity" | "relation";
         properties: Array<{
             id: string;
+            identity: MigrationIdentity;
             name: string;
             type: string;
             collection: boolean;
@@ -87,12 +276,21 @@ export type MigrationManifest = {
     }>;
     relations: Array<{
         id: string;
+        identity: MigrationIdentity;
         name: string;
         source: string;
         target: string;
         sourceProperty?: string;
         targetProperty?: string;
         type: string;
+    }>;
+    dictionaries: Array<{
+        id: string;
+        identity: MigrationIdentity;
+        name: string;
+        type: string;
+        collection: boolean;
+        computed: boolean;
     }>;
     computations: ComputationManifest[];
     storage: StorageSchemaMetadata;
@@ -148,11 +346,15 @@ export type MigrationPlan = {
     schemaPlan?: Omit<MigrationSchemaPlan, "internal">;
     blockingChanges: string[];
     deletionScope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>;
-    hints?: unknown[];
+    approvedDiffHash?: string;
 };
 
 function hash(value: unknown) {
     return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+export function hashMigrationDiff(diff: MigrationDiffFile) {
+    return hash(diff);
 }
 
 function stableStringify(value: unknown): string {
@@ -167,9 +369,41 @@ function stableStringify(value: unknown): string {
     return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
 }
 
-function getInstanceId(instance: { uuid?: string; name?: string }, label: string) {
-    if (instance.uuid) return instance.uuid;
-    throw new AmbiguousComputationSignatureError(`Migration requires stable uuid for ${label} "${instance.name || "anonymous"}"`);
+function identityKey(identity: MigrationIdentity) {
+    return identity.namePath;
+}
+
+function createIdentity(kind: MigrationIdentity["kind"], namePath: string, uuid?: string): MigrationIdentity {
+    return {
+        key: namePath,
+        kind,
+        namePath,
+        uuid,
+    };
+}
+
+function stripIdentityUUID<T>(value: T): T {
+    if (value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(item => stripIdentityUUID(item)) as T;
+    const record = value as Record<string, unknown>;
+    const output: Record<string, unknown> = {};
+    for (const key of Object.keys(record)) {
+        if (key === "uuid" && "kind" in record && "namePath" in record && "key" in record) continue;
+        output[key] = stripIdentityUUID(record[key]);
+    }
+    return output as T;
+}
+
+function assertUniqueIdentities(identities: MigrationIdentity[]) {
+    const seen = new Map<string, MigrationIdentity>();
+    for (const identity of identities) {
+        const key = `${identity.kind}:${identity.namePath}`;
+        const existing = seen.get(key);
+        if (existing) {
+            throw new AmbiguousComputationSignatureError(`Migration identity is ambiguous for ${identity.namePath}`);
+        }
+        seen.set(key, identity);
+    }
 }
 
 export function dataContextPath(dataContext: DataContext): string {
@@ -180,8 +414,7 @@ export function dataContextPath(dataContext: DataContext): string {
 }
 
 export function computationManifestId(computation: { args: { uuid?: string }; dataContext: DataContext }) {
-    if (computation.args.uuid) return computation.args.uuid;
-    throw new AmbiguousComputationSignatureError(`Migration requires stable uuid for computation ${dataContextPath(computation.dataContext)}`);
+    return `computation:${dataContextPath(computation.dataContext)}:${computation.constructor?.name || computation.args.constructor?.name || "UnknownComputation"}`;
 }
 
 function serializeDataDeps(computation: Partial<DataBasedComputation>) {
@@ -243,15 +476,35 @@ function hasFunctionDeep(value: unknown, seen = new WeakSet<object>(), isRoot = 
     return Object.values(record).some(item => hasFunctionDeep(item, seen, false));
 }
 
-function assertVersionedUserFunctions(computation: { args: Record<string, unknown>; dataContext: DataContext }) {
-    const hasFunction = hasFunctionDeep(computation.args);
-    const hasVersion = computation.args.version !== undefined || computation.args.migrationKey !== undefined;
-    if (hasFunction && !hasVersion) {
-        throw new Error(`Migration requires explicit version or migrationKey for function-based computation ${dataContextPath(computation.dataContext)}`);
+function collectFunctionText(value: unknown, path = "args", seen = new WeakSet<object>()): Array<{ path: string; text: string }> {
+    if (typeof value === "function") {
+        return [{ path, text: value.toString() }];
     }
+    if (value === null || typeof value !== "object") return [];
+    if (seen.has(value)) return [];
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    if (typeof record._type === "string" && ["Entity", "Relation", "Property", "Dictionary", "StateNode", "StateTransfer"].includes(record._type)) {
+        return [];
+    }
+    if (Array.isArray(value)) {
+        return value.flatMap((item, index) => collectFunctionText(item, `${path}[${index}]`, seen));
+    }
+    return Object.keys(record).sort().flatMap(key => collectFunctionText(record[key], `${path}.${key}`, seen));
 }
 
-function createComputationManifest(computation: Computation): ComputationManifest {
+function createFunctionSignature(args: Record<string, unknown>, includeText = false): ComputationFunctionSignature | undefined {
+    const functions = collectFunctionText(args);
+    if (!functions.length && !hasFunctionDeep(args)) return undefined;
+    return {
+        hasFunction: functions.length > 0,
+        hash: hash(functions.map(item => ({ path: item.path, text: item.text }))),
+        text: includeText ? functions.map(item => `// ${item.path}\n${item.text}`).join("\n\n") : undefined,
+        callbackPaths: functions.map(item => item.path),
+    };
+}
+
+function createComputationManifest(computation: Computation, includeFunctionText = false): ComputationManifest {
     const args = computation.args as Record<string, unknown>;
     const deps = serializeDataDeps(computation as Partial<DataBasedComputation>);
     const eventDeps = serializeEventDeps(computation as Partial<EventBasedComputation>);
@@ -260,11 +513,12 @@ function createComputationManifest(computation: Computation): ComputationManifes
     const id = computationManifestId(computation);
     const dataContext = dataContextPath(computation.dataContext);
     const outputRecord = computation.dataContext.type === "entity" || computation.dataContext.type === "relation" ? computation.dataContext.id.name : undefined;
+    const type = computation.constructor?.name || String(args._type || args.constructor?.name || "UnknownComputation");
+    const identity = createIdentity("computation", id, computation.args.uuid);
+    const functionSignature = createFunctionSignature(args, includeFunctionText);
     const outputSignature = hash({
-        type: computation.constructor?.name || args._type || args.constructor?.name,
+        type,
         dataContext,
-        version: args.version,
-        migrationKey: args.migrationKey,
         dataDeps: deps,
         eventDeps,
         hasCompute: typeof (computation as DataBasedComputation).compute === "function",
@@ -272,11 +526,25 @@ function createComputationManifest(computation: Computation): ComputationManifes
         hasIncrementalPatchCompute: typeof computation.incrementalPatchCompute === "function",
     });
     const stateSignature = hash({ stateKeys, boundStates });
-    const signature = hash({ outputSignature, stateSignature });
+    const structuralSignature = hash({
+        type,
+        dataContext,
+        outputRecord,
+        outputProperty: computation.dataContext.type === "property" ? computation.dataContext.id.name : undefined,
+        deps,
+        eventDeps,
+        callbackPaths: functionSignature?.callbackPaths || [],
+        hasFunction: functionSignature?.hasFunction === true,
+        hasCompute: typeof (computation as DataBasedComputation).compute === "function",
+        hasIncrementalCompute: typeof computation.incrementalCompute === "function",
+        hasIncrementalPatchCompute: typeof computation.incrementalPatchCompute === "function",
+    });
+    const signature = hash({ structuralSignature, stateSignature, functionHash: functionSignature?.hash });
 
     return {
         id,
-        type: computation.constructor?.name || String(args._type || args.constructor?.name || "UnknownComputation"),
+        identity,
+        type,
         dataContext,
         outputRecord,
         outputProperty: computation.dataContext.type === "property" ? computation.dataContext.id.name : undefined,
@@ -284,6 +552,7 @@ function createComputationManifest(computation: Computation): ComputationManifes
         eventDeps,
         stateKeys,
         boundStates,
+        asyncReturn: typeof (computation as DataBasedComputation).asyncReturn === "function",
         owner: computation.dataContext.type === "entity" || computation.dataContext.type === "relation" ? "exclusive" : undefined,
         ownershipProof: outputRecord ? {
             kind: "computed-output",
@@ -294,56 +563,102 @@ function createComputationManifest(computation: Computation): ComputationManifes
         } : undefined,
         outputSignature,
         stateSignature,
+        structuralSignature,
+        functionSignature,
         signature,
     };
 }
 
-export function createMigrationManifest(controller: Controller, storageSchema: StorageSchemaMetadata = controller.system.storage.schema): MigrationManifest {
+export function createMigrationManifest(controller: Controller, storageSchema: StorageSchemaMetadata = controller.system.storage.schema, options: { includeFunctionText?: boolean } = {}): MigrationManifest {
     const records = [
-        ...controller.entities.map(entity => ({
-            id: getInstanceId(entity, "entity"),
+        ...controller.entities.map(entity => {
+            const identity = createIdentity("entity", `entity:${entity.name}`, entity.uuid);
+            return ({
+            id: identityKey(identity),
+            identity,
             name: entity.name,
             kind: "entity" as const,
-            properties: (entity.properties || []).map(property => ({
-                id: getInstanceId(property, `${entity.name}.${property.name}`),
+            properties: (entity.properties || []).map(property => {
+                const propertyIdentity = createIdentity("property", `property:${entity.name}.${property.name}`, property.uuid);
+                return ({
+                id: identityKey(propertyIdentity),
+                identity: propertyIdentity,
                 name: property.name,
                 type: property.type,
                 collection: property.collection === true,
                 computed: !!property.computation,
-            })),
-        })),
-        ...controller.relations.map(relation => ({
-            id: getInstanceId(relation, "relation"),
+            });
+            }),
+        });
+        }),
+        ...controller.relations.map(relation => {
+            const identity = createIdentity("relation", `relation:${relation.name}`, relation.uuid);
+            return ({
+            id: identityKey(identity),
+            identity,
             name: relation.name!,
             kind: "relation" as const,
-            properties: (relation.properties || []).map(property => ({
-                id: getInstanceId(property, `${relation.name}.${property.name}`),
+            properties: (relation.properties || []).map(property => {
+                const propertyIdentity = createIdentity("property", `property:${relation.name}.${property.name}`, property.uuid);
+                return ({
+                id: identityKey(propertyIdentity),
+                identity: propertyIdentity,
                 name: property.name,
                 type: property.type,
                 collection: property.collection === true,
                 computed: !!property.computation,
-            })),
-        })),
+            });
+            }),
+        });
+        }),
     ];
-    const relations = controller.relations.map(relation => ({
-        id: getInstanceId(relation, "relation"),
+    const relations = controller.relations.map(relation => {
+        const identity = createIdentity("relation", `relation:${relation.name}`, relation.uuid);
+        return ({
+        id: identityKey(identity),
+        identity,
         name: relation.name!,
         source: relation.source.name!,
         target: relation.target.name!,
         sourceProperty: relation.sourceProperty,
         targetProperty: relation.targetProperty,
         type: relation.type,
-    }));
+    });
+    });
+    const dictionaries = controller.dict.map(dictionary => {
+        const identity = createIdentity("dictionary", `dictionary:${dictionary.name}`, dictionary.uuid);
+        return {
+            id: identityKey(identity),
+            identity,
+            name: dictionary.name,
+            type: dictionary.type,
+            collection: dictionary.collection === true,
+            computed: !!dictionary.computation,
+        };
+    });
     const computations = Array.from(controller.scheduler.computationsHandles.values())
-        .map(createComputationManifest);
-    const model = { records, relations, computations, storage: storageSchema };
+        .map(computation => createComputationManifest(computation, options.includeFunctionText === true));
+    assertUniqueIdentities([
+        ...records.flatMap(record => [record.identity, ...record.properties.map(property => property.identity)]),
+        ...dictionaries.map(dictionary => dictionary.identity),
+        ...computations.map(computation => computation.identity),
+    ]);
+    const hashComputations = computations.map(computation => ({
+        ...computation,
+        functionSignature: computation.functionSignature ? {
+            ...computation.functionSignature,
+            text: undefined,
+        } : undefined,
+    }));
+    const model = stripIdentityUUID({ records, relations, dictionaries, computations: hashComputations, storage: storageSchema });
 
     return {
-        version: 1,
+        version: 2,
         frameworkVersion: "1",
         modelHash: hash(model),
         records,
         relations,
+        dictionaries,
         computations,
         storage: storageSchema,
     };
@@ -355,6 +670,462 @@ export function getChangedComputations(oldManifest: MigrationManifest, newManife
         const oldItem = oldById.get(item.id);
         return !oldItem || oldItem.signature !== item.signature;
     });
+}
+
+function requirementKey(requirement: MigrationDecisionRequirement) {
+    if (requirement.kind === "computation") return `${requirement.kind}:${requirement.id}`;
+    const recordName = requirement.kind === "destructive-scope" ? requirement.recordName || "" : "";
+    return `${requirement.kind}:${requirement.dataContext}:${recordName}`;
+}
+
+function decisionKey(decision: MigrationDecision) {
+    if (decision.kind === "computation") return `${decision.kind}:${decision.id}`;
+    if (decision.kind === "rename-candidate-reviewed") return `${decision.kind}:${decision.from}:${decision.to}`;
+    const recordName = decision.kind === "destructive-scope" ? decision.recordName || "" : "";
+    return `${decision.kind}:${decision.dataContext}:${recordName}`;
+}
+
+function changeKey(change: MigrationChange) {
+    if (change.kind === "computation") return `computation:${change.id}`;
+    if (change.kind === "dictionary") return `dictionary:${change.id}`;
+    if (change.kind === "record") return `record:${change.id}`;
+    if (change.kind === "property") return `property:${change.id}`;
+    if (change.kind === "relation") return `relation:${change.id}`;
+    return `storage:${change.dataContext}`;
+}
+
+function hasDecision(diff: MigrationDiffFile | undefined, predicate: (decision: MigrationDecision) => boolean) {
+    return (diff?.decisions || []).some(predicate);
+}
+
+function getDecision(diff: MigrationDiffFile | undefined, predicate: (decision: MigrationDecision) => boolean) {
+    return (diff?.decisions || []).find(predicate);
+}
+
+function handlerForDecision<THandler>(handlers: Record<string, THandler> | undefined, handlerRef: string | undefined) {
+    return handlerRef ? handlers?.[handlerRef] : undefined;
+}
+
+function getEventRebuildHandler(options: MigrationOptions | undefined, dataContext: string) {
+    const decision = getDecision(options?.approvedDiff, item => item.kind === "event-rebuild-handler" && item.dataContext === dataContext) as Extract<MigrationDecision, { kind: "event-rebuild-handler" }> | undefined;
+    return handlerForDecision(options?.handlers?.eventRebuild, decision?.handlerRef);
+}
+
+function getAsyncCompletionHandler(options: MigrationOptions | undefined, dataContext: string) {
+    const decision = getDecision(options?.approvedDiff, item => item.kind === "async-completion-handler" && item.dataContext === dataContext) as Extract<MigrationDecision, { kind: "async-completion-handler" }> | undefined;
+    return handlerForDecision(options?.handlers?.asyncCompletion, decision?.handlerRef);
+}
+
+function computationDecision(diff: MigrationDiffFile, id: string) {
+    return diff.decisions.find((decision): decision is Extract<MigrationDecision, { kind: "computation" }> =>
+        decision.kind === "computation" && decision.id === id
+    );
+}
+
+export function buildMigrationDiff(
+    previousManifest: MigrationManifest,
+    nextManifest: MigrationManifest,
+    schemaPlan: MigrationSchemaPlan,
+    safety: MigrationSafetyReview,
+): MigrationDiffFile {
+    const changes: MigrationChange[] = [];
+    const requiredDecisions: MigrationDecisionRequirement[] = [];
+    const oldById = new Map(previousManifest.computations.map(item => [item.id, item]));
+    const newById = new Map(nextManifest.computations.map(item => [item.id, item]));
+    const oldRecords = new Map(previousManifest.records.map(item => [item.id, item]));
+    const newRecords = new Map(nextManifest.records.map(item => [item.id, item]));
+    const oldRelations = new Map(previousManifest.relations.map(item => [item.id, item]));
+    const newRelations = new Map(nextManifest.relations.map(item => [item.id, item]));
+    const oldDictionaries = new Map((previousManifest.dictionaries || []).map(item => [item.id, item]));
+    const newDictionaries = new Map((nextManifest.dictionaries || []).map(item => [item.id, item]));
+
+    for (const oldRecord of previousManifest.records) {
+        if (!newRecords.has(oldRecord.id)) {
+            changes.push({
+                kind: "record",
+                id: oldRecord.id,
+                changeType: "removed",
+                dataContext: `${oldRecord.kind}:${oldRecord.name}`,
+                reason: `${oldRecord.kind} no longer exists in the new model`,
+            });
+        }
+    }
+
+    for (const record of nextManifest.records) {
+        const old = oldRecords.get(record.id);
+        if (!old) {
+            changes.push({
+                kind: "record",
+                id: record.id,
+                changeType: "added",
+                dataContext: `${record.kind}:${record.name}`,
+                reason: `${record.kind} was added`,
+            });
+        } else if (old.kind !== record.kind || old.name !== record.name) {
+            changes.push({
+                kind: "record",
+                id: record.id,
+                changeType: "changed",
+                dataContext: `${record.kind}:${record.name}`,
+                reason: "record kind or name changed",
+            });
+        }
+
+        const oldProperties = new Map((old?.properties || []).map(property => [property.id, property]));
+        const newProperties = new Map(record.properties.map(property => [property.id, property]));
+        for (const oldProperty of old?.properties || []) {
+            if (!newProperties.has(oldProperty.id)) {
+                changes.push({
+                    kind: "property",
+                    id: oldProperty.id,
+                    changeType: "removed",
+                    dataContext: `property:${old?.name}.${oldProperty.name}`,
+                    reason: "property no longer exists in the new model",
+                });
+            }
+        }
+        for (const property of record.properties) {
+            const oldProperty = oldProperties.get(property.id);
+            if (!oldProperty) {
+                changes.push({
+                    kind: "property",
+                    id: property.id,
+                    changeType: "added",
+                    dataContext: `property:${record.name}.${property.name}`,
+                    reason: "property was added",
+                });
+            } else if (
+                oldProperty.name !== property.name ||
+                oldProperty.type !== property.type ||
+                oldProperty.collection !== property.collection ||
+                oldProperty.computed !== property.computed
+            ) {
+                changes.push({
+                    kind: "property",
+                    id: property.id,
+                    changeType: "changed",
+                    dataContext: `property:${record.name}.${property.name}`,
+                    reason: "property name, type, collection, or computed flag changed",
+                });
+            }
+        }
+    }
+
+    for (const oldRelation of previousManifest.relations) {
+        if (!newRelations.has(oldRelation.id)) {
+            changes.push({
+                kind: "relation",
+                id: oldRelation.id,
+                changeType: "removed",
+                dataContext: `relation:${oldRelation.name}`,
+                reason: "relation no longer exists in the new model",
+            });
+        }
+    }
+
+    for (const relation of nextManifest.relations) {
+        const old = oldRelations.get(relation.id);
+        if (!old) {
+            changes.push({
+                kind: "relation",
+                id: relation.id,
+                changeType: "added",
+                dataContext: `relation:${relation.name}`,
+                reason: "relation was added",
+            });
+        } else if (
+            old.name !== relation.name ||
+            old.source !== relation.source ||
+            old.target !== relation.target ||
+            old.sourceProperty !== relation.sourceProperty ||
+            old.targetProperty !== relation.targetProperty ||
+            old.type !== relation.type
+        ) {
+            changes.push({
+                kind: "relation",
+                id: relation.id,
+                changeType: "changed",
+                dataContext: `relation:${relation.name}`,
+                reason: "relation endpoints, properties, or type changed",
+            });
+        }
+    }
+
+    for (const oldDictionary of previousManifest.dictionaries || []) {
+        if (!newDictionaries.has(oldDictionary.id)) {
+            changes.push({
+                kind: "dictionary",
+                id: oldDictionary.id,
+                changeType: "removed",
+                dataContext: `global:${oldDictionary.name}`,
+                reason: "dictionary no longer exists in the new model",
+            });
+        }
+    }
+
+    for (const dictionary of nextManifest.dictionaries || []) {
+        const old = oldDictionaries.get(dictionary.id);
+        let changeType: Extract<MigrationChange, { kind: "dictionary" }>["changeType"] = "unchanged";
+        let reason = "dictionary is unchanged";
+        if (!old) {
+            changeType = "added";
+            reason = "dictionary was added";
+        } else if (old.type !== dictionary.type || old.collection !== dictionary.collection || old.computed !== dictionary.computed) {
+            changeType = "changed";
+            reason = "dictionary type, collection, or computed flag changed";
+        }
+        if (changeType !== "unchanged") {
+            changes.push({
+                kind: "dictionary",
+                id: dictionary.id,
+                changeType,
+                dataContext: `global:${dictionary.name}`,
+                reason,
+            });
+        }
+    }
+
+    for (const oldComputation of previousManifest.computations) {
+        if (!newById.has(oldComputation.id)) {
+            changes.push({
+                kind: "computation",
+                id: oldComputation.id,
+                dataContext: oldComputation.dataContext,
+                computationType: oldComputation.type,
+                changeType: "removed",
+                detected: {},
+                recommendation: "ignore",
+                reason: "computation no longer exists in the new model",
+            });
+        }
+    }
+
+    for (const computation of nextManifest.computations) {
+        const old = oldById.get(computation.id);
+        const detected = {
+            dataDepsChanged: old ? !isEqualValue(old.deps, computation.deps) : true,
+            eventDepsChanged: old ? !isEqualValue(old.eventDeps, computation.eventDeps) : true,
+            outputSignatureChanged: old ? old.outputSignature !== computation.outputSignature : true,
+            stateSignatureChanged: old ? old.stateSignature !== computation.stateSignature : true,
+            functionTextChanged: old ? old.functionSignature?.hash !== computation.functionSignature?.hash : computation.functionSignature?.hasFunction === true,
+            functionHash: computation.functionSignature?.hash,
+            previousFunctionHash: old?.functionSignature?.hash,
+            hasFunction: computation.functionSignature?.hasFunction === true,
+            hasClosureRisk: computation.functionSignature?.hasFunction === true,
+            needsEventRebuildHandler: computation.eventDeps.length > 0,
+            needsAsyncCompletionHandler: computation.asyncReturn,
+        };
+        let changeType: Extract<MigrationChange, { kind: "computation" }>["changeType"] = "unchanged";
+        let recommendation: Extract<MigrationChange, { kind: "computation" }>["recommendation"] = "ignore";
+        let recommendedDecision: Extract<MigrationDecisionRequirement, { kind: "computation" }>["recommendedDecision"] = "unchanged";
+        let reason = "computation is structurally unchanged";
+
+        if (!old) {
+            changeType = "added";
+            recommendation = "rebuild";
+            recommendedDecision = "changed";
+            reason = "new computation requires approved rebuild";
+        } else if (old.structuralSignature !== computation.structuralSignature) {
+            changeType = "changed";
+            recommendation = "needs-review";
+            recommendedDecision = "changed";
+            reason = "computation structure changed";
+        } else if (old.stateSignature !== computation.stateSignature && old.outputSignature === computation.outputSignature) {
+            changeType = "state-only";
+            recommendation = "needs-review";
+            recommendedDecision = "state-only";
+            reason = "computation state changed without output structure changes";
+        } else if (old.functionSignature?.hash !== computation.functionSignature?.hash) {
+            changeType = "possibly-changed";
+            recommendation = "needs-review";
+            recommendedDecision = "changed";
+            reason = "function text changed and requires human semantic review";
+        } else if (computation.functionSignature?.hasFunction) {
+            recommendation = "needs-review";
+            reason = "function callback has closure risk and requires human review";
+        }
+
+        changes.push({
+            kind: "computation",
+            id: computation.id,
+            dataContext: computation.dataContext,
+            computationType: computation.type,
+            changeType,
+            detected,
+            recommendation,
+            reason,
+        });
+
+        if (recommendation !== "ignore") {
+            requiredDecisions.push({
+                kind: "computation",
+                id: computation.id,
+                dataContext: computation.dataContext,
+                recommendedDecision,
+                reason,
+            });
+        }
+        if (detected.needsEventRebuildHandler) {
+            requiredDecisions.push({
+                kind: "event-rebuild-handler",
+                dataContext: computation.dataContext,
+                reason: "event-based computation needs an external migration rebuild handler",
+            });
+        }
+        if (detected.needsAsyncCompletionHandler) {
+            requiredDecisions.push({
+                kind: "async-completion-handler",
+                dataContext: computation.dataContext,
+                reason: "async computation needs an external migration completion handler",
+            });
+        }
+    }
+
+    for (const operation of schemaPlan.preRecomputeDDL) {
+        changes.push({
+            kind: "storage",
+            id: operation.logicalPath || operation.description,
+            changeType: "added",
+            dataContext: operation.logicalPath || operation.tableName || operation.description,
+            reason: operation.description,
+        });
+    }
+    for (const change of safety.blockingChanges) {
+        changes.push({
+            kind: "storage",
+            id: change.logicalPath,
+            changeType: "blocked",
+            dataContext: change.logicalPath,
+            reason: change.reason,
+        });
+    }
+    for (const scope of safety.destructiveScopes) {
+        requiredDecisions.push({
+            kind: "destructive-scope",
+            dataContext: scope.dataContext,
+            recordName: scope.recordName,
+            ids: scope.ids || [],
+            reason: scope.reason,
+        });
+    }
+
+    const uniqueRequirements = Array.from(new Map(requiredDecisions.map(item => [requirementKey(item), item])).values());
+    return {
+        kind: "interaqt-migration-diff",
+        version: 2,
+        status: "generated",
+        fromModelHash: previousManifest.modelHash,
+        toModelHash: nextManifest.modelHash,
+        generatedAt: new Date().toISOString(),
+        generatorVersion: "phase-1.5",
+        summary: {
+            changeCount: changes.length,
+            requiredDecisionCount: uniqueRequirements.length,
+            blockingChangeCount: safety.blockingChanges.length,
+        },
+        changes,
+        requiredDecisions: uniqueRequirements,
+        decisions: [],
+        safety,
+    };
+}
+
+export function validateApprovedDiff(
+    approvedDiff: MigrationDiffFile | undefined,
+    previousManifest: MigrationManifest,
+    nextManifest: MigrationManifest,
+    handlers: MigrationHandlers | undefined,
+    expectedDiff?: MigrationDiffFile,
+) {
+    if (!approvedDiff) {
+        throw new MigrationError("Migration requires an approved diff. Call controller.generateMigrationDiff(), review it, set status to 'approved', then pass it as migrate({ approvedDiff }).");
+    }
+    if (approvedDiff.kind !== "interaqt-migration-diff" || approvedDiff.version !== 2) {
+        throw new MigrationError("Invalid migration approvedDiff kind or version");
+    }
+    if (approvedDiff.status !== "approved") {
+        throw new MigrationError("Migration approvedDiff must have status 'approved'");
+    }
+    if (approvedDiff.fromModelHash !== previousManifest.modelHash || approvedDiff.toModelHash !== nextManifest.modelHash) {
+        throw new MigrationError("Migration approvedDiff is stale: model hash does not match current database and code");
+    }
+    const expectedReview = expectedDiff || approvedDiff;
+    const requirementKeys = new Set(expectedReview.requiredDecisions.map(requirementKey));
+    const changeKeys = new Set(expectedReview.changes.map(changeKey));
+    const decisionKeys = new Set<string>();
+    for (const decision of approvedDiff.decisions) {
+        const key = decisionKey(decision);
+        if (decisionKeys.has(key)) {
+            throw new MigrationError(`Duplicate migration decision: ${key}`);
+        }
+        decisionKeys.add(key);
+        if (decision.kind === "computation" && !changeKeys.has(`computation:${decision.id}`)) {
+            throw new MigrationError(`Migration decision references a computation that is not present in the approved diff: ${decision.id}`);
+        }
+        if (decision.kind === "event-rebuild-handler") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration event rebuild decision does not match a required review item: ${decision.dataContext}`);
+            }
+            if (!handlers?.eventRebuild?.[decision.handlerRef]) {
+                throw new MigrationError(`Missing migration event rebuild handler '${decision.handlerRef}' for ${decision.dataContext}`);
+            }
+        }
+        if (decision.kind === "async-completion-handler") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration async completion decision does not match a required review item: ${decision.dataContext}`);
+            }
+            if (!handlers?.asyncCompletion?.[decision.handlerRef]) {
+                throw new MigrationError(`Missing migration async completion handler '${decision.handlerRef}' for ${decision.dataContext}`);
+            }
+        }
+        if (decision.kind === "rename-candidate-reviewed") {
+            throw new MigrationError(`Migration rename candidate decision does not match any Phase 1.5 executable review item: ${decision.from} -> ${decision.to}`);
+        }
+    }
+    for (const requirement of expectedReview.requiredDecisions) {
+        if (!decisionKeys.has(requirementKey(requirement))) {
+            throw new MigrationError(`Missing migration decision for required review item: ${requirementKey(requirement)}`);
+        }
+    }
+    const validComputationIds = new Set(nextManifest.computations.map(item => item.id));
+    for (const decision of approvedDiff.decisions) {
+        if (decision.kind === "computation" && !validComputationIds.has(decision.id)) {
+            throw new MigrationError(`Migration decision references unknown computation: ${decision.id}`);
+        }
+    }
+}
+
+export function getChangedComputationsFromApprovedDiff(previousManifest: MigrationManifest, nextManifest: MigrationManifest, approvedDiff: MigrationDiffFile) {
+    const changedComputations: ComputationManifest[] = [];
+    const outputChangedIds = new Set<string>();
+    const stateOnlyIds = new Set<string>();
+    const newById = new Map(nextManifest.computations.map(item => [item.id, item]));
+    for (const decision of approvedDiff.decisions) {
+        if (decision.kind !== "computation") continue;
+        const computation = newById.get(decision.id);
+        if (!computation) continue;
+        if (decision.decision === "unrebuildable") {
+            continue;
+        }
+        if (decision.decision === "changed" || decision.decision === "state-only") {
+            changedComputations.push(computation);
+        }
+        if (decision.decision === "changed") {
+            outputChangedIds.add(decision.id);
+        }
+        if (decision.decision === "state-only") {
+            stateOnlyIds.add(decision.id);
+        }
+    }
+    for (const computation of nextManifest.computations) {
+        if (!previousManifest.computations.some(item => item.id === computation.id) && !changedComputations.some(item => item.id === computation.id)) {
+            throw new MigrationError(`New computation requires approved changed decision: ${computation.id}`);
+        }
+    }
+    const blocking = approvedDiff.decisions
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "computation" }> => decision.kind === "computation" && decision.decision === "unrebuildable")
+        .map(decision => ({ kind: "unrebuildable-computation" as const, logicalPath: decision.dataContext, reason: decision.reason }));
+    return { changedComputations, outputChangedIds, stateOnlyIds, blocking };
 }
 
 function computationById(controller: Controller) {
@@ -423,7 +1194,13 @@ function eventDepNodes(eventDep: { recordName: string; type: string }, manifest:
     return nodes;
 }
 
-export function buildAffectedRebuildPlan(oldManifest: MigrationManifest, newManifest: MigrationManifest, changedComputations: ComputationManifest[], changedDataContexts: string[] = []): ComputationRebuildItem[] {
+export function buildAffectedRebuildPlan(
+    oldManifest: MigrationManifest,
+    newManifest: MigrationManifest,
+    changedComputations: ComputationManifest[],
+    changedDataContexts: string[] = [],
+    options: { outputChangedIds?: Set<string>; stateOnlyIds?: Set<string> } = {},
+): ComputationRebuildItem[] {
     const byOutput = new Map(newManifest.computations.map(item => [outputNode(item), item]));
     const oldById = new Map(oldManifest.computations.map(item => [item.id, item]));
     const dependents = new Map<string, Set<string>>();
@@ -447,7 +1224,7 @@ export function buildAffectedRebuildPlan(oldManifest: MigrationManifest, newMani
     const outputChangedNodes = changedComputations
         .filter(item => {
             const old = oldById.get(item.id);
-            return !old || old.outputSignature !== item.outputSignature;
+            return options.outputChangedIds?.has(item.id) || !old || old.outputSignature !== item.outputSignature;
         })
         .map(item => outputNode(item));
     const queue = [...outputChangedNodes, ...changedDataContexts];
@@ -495,15 +1272,16 @@ export function buildAffectedRebuildPlan(oldManifest: MigrationManifest, newMani
     return ordered.map(id => {
         const computation = newManifest.computations.find(item => item.id === id)!;
         const old = oldById.get(id);
-        const outputChanged = !old || old.outputSignature !== computation.outputSignature;
+        const stateOnly = options.stateOnlyIds?.has(id) === true;
+        const outputChanged = options.outputChangedIds?.has(id) || !old || old.outputSignature !== computation.outputSignature;
         const stateChanged = !old || old.stateSignature !== computation.stateSignature;
         const seed = changedComputations.some(item => item.id === id);
         return {
             computationId: id,
             dataContext: computation.dataContext,
-            rebuildState: stateChanged && computation.boundStates.length > 0,
-            rebuildOutput: outputChanged || !seed,
-            propagateOutputEvents: outputChanged || !seed,
+            rebuildState: (stateOnly || stateChanged) && computation.boundStates.length > 0,
+            rebuildOutput: stateOnly ? false : outputChanged || !seed,
+            propagateOutputEvents: stateOnly ? false : outputChanged || !seed,
             isSeed: seed,
         };
     });
@@ -611,13 +1389,11 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
         if (!rebuildIds.has(computationId)) continue;
 
         const dataContext = dataContextPath(computation.dataContext);
-        if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !options.allowDestructiveCleanup) {
-            blockingChanges.push({ kind: "destructive-computed-output", logicalPath: dataContext, reason: "destructive computed output requires allowDestructiveCleanup" });
+        if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContext)) {
+            blockingChanges.push({ kind: "destructive-computed-output", logicalPath: dataContext, reason: "destructive computed output requires an approved destructive-scope decision" });
         }
-        const migrationAsync = (computation as unknown as { migrationAsync?: Function, args?: { migrationAsync?: Function } }).migrationAsync ||
-            (computation as unknown as { args?: { migrationAsync?: Function } }).args?.migrationAsync;
-        if ((computation as DataBasedComputation).asyncReturn && !migrationAsync) {
-            blockingChanges.push({ kind: "async-computation", logicalPath: dataContext, reason: "ordinary async task completion is not a migration completion contract" });
+        if ((computation as DataBasedComputation).asyncReturn && !getAsyncCompletionHandler(options, dataContext)) {
+            blockingChanges.push({ kind: "async-computation", logicalPath: dataContext, reason: "async computation requires an approved async-completion-handler decision and runtime handler" });
         }
         if ((computation.dataContext.type === "entity" || computation.dataContext.type === "relation") && !(computation as DataBasedComputation).compute) {
             blockingChanges.push({ kind: "unrebuildable-computation", logicalPath: dataContext, reason: "entity/relation output lacks a full compute contract" });
@@ -629,30 +1405,40 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
                 reason: "entity/relation output replacement requires exclusive output ownership proof in the previous manifest",
             });
         }
-        if (typeof (computation as EventBasedComputation).eventDeps === "object" && !(computation as unknown as { migrationCompute?: Function }).migrationCompute && !(computation as DataBasedComputation).compute) {
-            blockingChanges.push({ kind: "unrebuildable-computation", logicalPath: dataContext, reason: "event-based computation requires explicit migrationCompute contract" });
-        }
-        try {
-            assertVersionedUserFunctions({
-                args: (computation as DataBasedComputation).args as Record<string, unknown>,
-                dataContext: computation.dataContext,
-            });
-        } catch (error) {
-            blockingChanges.push({ kind: "unrebuildable-computation", logicalPath: dataContext, reason: error instanceof Error ? error.message : String(error) });
+        if (typeof (computation as EventBasedComputation).eventDeps === "object" && !(computation as DataBasedComputation).compute && !getEventRebuildHandler(options, dataContext)) {
+            blockingChanges.push({ kind: "unrebuildable-computation", logicalPath: dataContext, reason: "event-based computation requires an approved event-rebuild-handler decision and runtime handler" });
         }
     }
     return blockingChanges;
 }
 
-export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[]) {
+export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest) {
     const handles = computationById(controller);
     const scope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }> = [];
+    const readExistingRecords = async (recordName: string) => {
+        const queryHandle = (controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle;
+        if (queryHandle) {
+            return controller.system.storage.find(recordName, undefined, undefined, ["*"]);
+        }
+        if (!oldManifest) return undefined;
+        const record = oldManifest.storage.records.find(item => item.recordName === recordName);
+        const tableName = record?.tableName;
+        const attrs = (record?.attributeDetails || []).filter(attr => attr.kind === "value" && attr.fieldName);
+        if (!record || !tableName || attrs.length === 0) return undefined;
+        const db = (controller.system.storage as unknown as { db?: { query?: Function } }).db ||
+            (controller.system as unknown as { db?: { query?: Function } }).db;
+        if (typeof db?.query !== "function") return undefined;
+        const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const select = attrs
+            .map(attr => `${quote(attr.fieldName!)} AS ${quote(attr.name)}`)
+            .join(", ");
+        return db.query(`SELECT ${select} FROM ${quote(tableName)}`, []);
+    };
     for (const item of rebuildPlan) {
         const computation = handles.get(item.computationId);
         if (computation?.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME) {
             const hostName = computation.dataContext.host.name!;
-            const queryHandle = (controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle;
-            const records = queryHandle ? await controller.system.storage.find(hostName, undefined, undefined, ["*"]) : undefined;
+            const records = await readExistingRecords(hostName);
             const ids: string[] = [];
             if (records && typeof (computation as DataBasedComputation).compute === "function") {
                 for (const record of records) {
@@ -671,18 +1457,48 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
                 reason: "hard deletion computed property may delete host records whose recomputed value is true",
             });
         }
+        if (
+            (computation?.dataContext.type === "entity" || computation?.dataContext.type === "relation") &&
+            oldManifest?.storage.records.some(record => record.recordName === computation.dataContext.id.name) &&
+            typeof (computation as DataBasedComputation).compute === "function"
+        ) {
+            if (!(controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle) continue;
+            const recordName = computation.dataContext.id.name!;
+            const sourceKey = (computation.state as any)?.sourceRecordId?.key;
+            const indexKey = (computation.state as any)?.transformIndex?.key;
+            if (!sourceKey || !indexKey) continue;
+            const result = await (computation as DataBasedComputation).compute(await controller.scheduler.resolveDataDeps(computation as DataBasedComputation));
+            if (!Array.isArray(result)) continue;
+            const nextKeys = new Set(result.map(item => `${item[sourceKey]}:${item[indexKey]}`));
+            const existing = await readExistingRecords(recordName) as Record<string, unknown>[] || [];
+            const staleIds = existing
+                .filter(record => !nextKeys.has(`${record[sourceKey]}:${record[indexKey]}`))
+                .map(record => String(record.id));
+            if (staleIds.length) {
+                scope.push({
+                    dataContext: dataContextPath(computation.dataContext),
+                    recordName,
+                    ids: staleIds,
+                    count: staleIds.length,
+                    reason: "transform recompute would delete stale derived output records",
+                });
+            }
+        }
     }
     return scope;
 }
 
-function assertDestructiveScopeAllowed(options: MigrationOptions, actualScope: Array<{ dataContext: string; recordName?: string; ids?: string[] }>) {
-    if (!actualScope.length) return;
-    if (!options.allowDestructiveCleanup) {
-        throw new DestructiveComputedOutputError("Destructive migration requires allowDestructiveCleanup");
-    }
-    const expected = options.destructiveScope || [];
+export function assertDestructiveScopeAllowed(options: MigrationOptions, actualScope: Array<{ dataContext: string; recordName?: string; ids?: string[] }>) {
+    const expected = (options.approvedDiff?.decisions || [])
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "destructive-scope" }> => decision.kind === "destructive-scope");
     const key = (item: { dataContext: string; recordName?: string }) => `${item.dataContext}:${item.recordName || ""}`;
     const expectedByKey = new Map(expected.map(item => [key(item), [...(item.ids || [])].sort().join(",")]));
+    const actualKeys = new Set(actualScope.map(key));
+    for (const item of expected) {
+        if (!actualKeys.has(key(item))) {
+            throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
+        }
+    }
     for (const item of actualScope) {
         const actualIds = [...(item.ids || [])].sort().join(",");
         if (expectedByKey.get(key(item)) !== actualIds) {
@@ -730,13 +1546,12 @@ function isEqualValue(a: unknown, b: unknown) {
     return stableStringify(a) === stableStringify(b);
 }
 
-async function resolveMigrationAsyncResult(controller: Controller, computation: Computation, result: ComputationResultAsync, record?: Record<string, unknown>) {
-    const migrationAsync = (computation as unknown as { migrationAsync?: Function, args?: { migrationAsync?: Function } }).migrationAsync ||
-        (computation as unknown as { args?: { migrationAsync?: Function } }).args?.migrationAsync;
-    if (!migrationAsync) {
+async function resolveMigrationAsyncResult(controller: Controller, computation: Computation, result: ComputationResultAsync, record?: Record<string, unknown>, options: MigrationOptions = {}) {
+    const handler = getAsyncCompletionHandler(options, dataContextPath(computation.dataContext));
+    if (!handler) {
         throw new AsyncMigrationComputationError(`Migration cannot treat async task creation as completion for ${dataContextPath(computation.dataContext)}`);
     }
-    return migrationAsync.call(controller, {
+    return handler({
         controller,
         dataContext: computation.dataContext,
         record,
@@ -745,10 +1560,10 @@ async function resolveMigrationAsyncResult(controller: Controller, computation: 
     });
 }
 
-async function writeComputationResult(controller: Controller, computation: Computation, result: unknown, record?: Record<string, unknown>) {
+async function writeComputationResult(controller: Controller, computation: Computation, result: unknown, record?: Record<string, unknown>, options: MigrationOptions = {}) {
     if (result instanceof ComputationResultSkip) return undefined;
     if (result instanceof ComputationResultAsync) {
-        result = await resolveMigrationAsyncResult(controller, computation, result, record);
+        result = await resolveMigrationAsyncResult(controller, computation, result, record, options);
     }
     if (result instanceof ComputationResultResolved) {
         throw new AsyncMigrationComputationError(`Migration requires direct final output, not asyncReturn resolution, for ${dataContextPath(computation.dataContext)}`);
@@ -759,10 +1574,10 @@ async function writeComputationResult(controller: Controller, computation: Compu
     return createMutationEventForOutput(computation.dataContext, result, previous, record);
 }
 
-async function writeComputationPatch(controller: Controller, computation: Computation, patch: ComputationResultPatch | ComputationResultPatch[] | unknown, record?: Record<string, unknown>) {
+async function writeComputationPatch(controller: Controller, computation: Computation, patch: ComputationResultPatch | ComputationResultPatch[] | unknown, record?: Record<string, unknown>, options: MigrationOptions = {}) {
     if (patch instanceof ComputationResultSkip || patch === undefined) return [];
     if (patch instanceof ComputationResultAsync) {
-        patch = await resolveMigrationAsyncResult(controller, computation, patch, record);
+        patch = await resolveMigrationAsyncResult(controller, computation, patch, record, options);
     }
     if (patch instanceof ComputationResultResolved) {
         throw new AsyncMigrationComputationError(`Migration requires direct final output for ${dataContextPath(computation.dataContext)}`);
@@ -771,7 +1586,7 @@ async function writeComputationPatch(controller: Controller, computation: Comput
     const events: RecordMutationEvent[] = [];
     for (const item of patches) {
         if (!item || typeof item !== "object" || !("type" in item)) {
-            const event = await writeComputationResult(controller, computation, item, record);
+            const event = await writeComputationResult(controller, computation, item, record, options);
             if (event) events.push(event);
             continue;
         }
@@ -818,15 +1633,11 @@ function createMutationEventForOutput(dataContext: DataContext, result: unknown,
     return undefined;
 }
 
-async function recomputeTransformOutput(controller: Controller, computation: DataBasedComputation, allowDestructiveCleanup = false) {
+async function recomputeTransformOutput(controller: Controller, computation: DataBasedComputation, options: MigrationOptions = {}) {
     if (computation.dataContext.type !== "entity" && computation.dataContext.type !== "relation") return [];
-    if (!allowDestructiveCleanup) {
-        // Entity/relation Transform owns its derived output. Replacing it is safe only
-        // because the manifest marks computed entity/relation outputs as exclusive.
-    }
     let result = await computation.compute(await controller.scheduler.resolveDataDeps(computation));
     if (result instanceof ComputationResultAsync) {
-        result = await resolveMigrationAsyncResult(controller, computation as unknown as Computation, result);
+        result = await resolveMigrationAsyncResult(controller, computation as unknown as Computation, result, undefined, options);
     }
     if (!Array.isArray(result)) {
         throw new UnrebuildableComputationError(`Entity/relation migration compute must return an array for ${dataContextPath(computation.dataContext)}`);
@@ -855,8 +1666,13 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
         }
     }
     for (const stale of existingByKey.values()) {
-        if (!allowDestructiveCleanup) {
-            throw new DestructiveComputedOutputError(`Migration would delete stale derived ${recordName} record ${stale.id}; run dryRun to inspect scope before allowDestructiveCleanup`);
+        const decision = getDecision(options.approvedDiff, item =>
+            item.kind === "destructive-scope" &&
+            item.dataContext === dataContextPath(computation.dataContext) &&
+            item.recordName === recordName
+        ) as Extract<MigrationDecision, { kind: "destructive-scope" }> | undefined;
+        if (!decision?.ids.map(String).includes(String(stale.id))) {
+            throw new DestructiveComputedOutputError(`Migration would delete stale derived ${recordName} record ${stale.id}; approve destructive scope before executing`);
         }
         await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", stale.id] }));
         events.push({ recordName, type: "delete", record: stale });
@@ -864,8 +1680,8 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
     return events;
 }
 
-export async function recomputeChangedComputations(controller: Controller, rebuildPlan: ComputationRebuildItem[], options: MigrationOptions = {}, initialEvents: RecordMutationEvent[] = []) {
-    assertDestructiveScopeAllowed(options, await getDestructiveDeletionScope(controller, rebuildPlan));
+export async function recomputeChangedComputations(controller: Controller, rebuildPlan: ComputationRebuildItem[], options: MigrationOptions = {}, initialEvents: RecordMutationEvent[] = [], oldManifest?: MigrationManifest) {
+    assertDestructiveScopeAllowed(options, await getDestructiveDeletionScope(controller, rebuildPlan, oldManifest));
     const scheduler = new MigrationScheduler(controller, rebuildPlan, options, initialEvents);
     return scheduler.run();
 }
@@ -891,11 +1707,10 @@ class MigrationScheduler {
         const computation = this.handles.get(item.computationId);
         if (!computation) continue;
 
-        if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !this.options.allowDestructiveCleanup) {
-            throw new DestructiveComputedOutputError(`Migration refuses to recompute destructive property ${dataContextPath(computation.dataContext)} without allowDestructiveCleanup`);
+        if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
+            throw new DestructiveComputedOutputError(`Migration refuses to recompute destructive property ${dataContextPath(computation.dataContext)} without approved destructive scope`);
         }
-        const migrationCompute = (computation as unknown as { migrationCompute?: Function }).migrationCompute;
-        if (typeof (computation as DataBasedComputation).compute !== "function" && typeof migrationCompute !== "function") {
+        if (typeof (computation as DataBasedComputation).compute !== "function" && !getEventRebuildHandler(this.options, dataContextPath(computation.dataContext))) {
             throw new UnrebuildableComputationError(`Migration requires full compute support for ${dataContextPath(computation.dataContext)}`);
         }
 
@@ -931,30 +1746,30 @@ class MigrationScheduler {
     }
 
     private async runFullRecompute(computation: Computation) {
-        const migrationCompute = (computation as unknown as { migrationCompute?: Function }).migrationCompute;
-        if (migrationCompute) {
+        const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
+        if (eventRebuildHandler && typeof (computation as DataBasedComputation).compute !== "function") {
             if (computation.dataContext.type === "property") {
                 const hostName = computation.dataContext.host.name!;
                 const records = await this.controller.system.storage.find(hostName, undefined, undefined, ["*"]);
                 const events: RecordMutationEvent[] = [];
                 for (const record of records) {
-                    const result = await migrationCompute.call(this.controller, { controller: this.controller, dataContext: computation.dataContext, record });
-                    const event = await writeComputationResult(this.controller, computation, result, record);
+                    const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, record });
+                    const event = await writeComputationResult(this.controller, computation, result, record, this.options);
                     if (event) events.push(event);
                 }
                 return events;
             }
-            const result = await migrationCompute.call(this.controller, { controller: this.controller, dataContext: computation.dataContext });
-            const event = await writeComputationResult(this.controller, computation, result);
+            const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext });
+            const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);
             return event ? [event] : [];
         }
         if (computation.dataContext.type === "global") {
             const dataDeps = await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation);
-            const event = await writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute(dataDeps));
+            const event = await writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute(dataDeps), undefined, this.options);
             return event ? [event] : [];
         }
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
-            return recomputeTransformOutput(this.controller, computation as DataBasedComputation, this.options.allowDestructiveCleanup);
+            return recomputeTransformOutput(this.controller, computation as DataBasedComputation, this.options);
         }
 
         const hostName = computation.dataContext.host.name!;
@@ -965,7 +1780,7 @@ class MigrationScheduler {
                 await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation, record),
                 record,
             );
-            const event = await writeComputationResult(this.controller, computation, result, record);
+            const event = await writeComputationResult(this.controller, computation, result, record, this.options);
             if (event) events.push(event);
         }
         return events;
@@ -994,12 +1809,12 @@ class MigrationScheduler {
                 .filter(source => source.computation === computation);
             for (const source of sourceMaps) {
                 if (!("dataDep" in source)) {
-                    const migrationCompute = (computation as unknown as { migrationCompute?: Function }).migrationCompute;
-                    if (!migrationCompute) {
-                        throw new UnrebuildableComputationError(`Event-based migration requires explicit migrationCompute for ${dataContextPath(computation.dataContext)}`);
+                    const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
+                    if (!eventRebuildHandler) {
+                        throw new UnrebuildableComputationError(`Event-based migration requires an approved event rebuild handler for ${dataContextPath(computation.dataContext)}`);
                     }
-                    const result = await migrationCompute.call(this.controller, { controller: this.controller, mutationEvent });
-                    const event = await writeComputationResult(this.controller, computation, result);
+                    const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, mutationEvent });
+                    const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);
                     if (event) events.push(event);
                     continue;
                 }
@@ -1019,10 +1834,10 @@ class MigrationScheduler {
             result = await computation.incrementalPatchCompute(undefined, mutationEvent, record, dataDeps);
             if (result instanceof ComputationResultFullRecompute) {
                 result = await computation.compute(dataDeps, record);
-                const event = await writeComputationResult(this.controller, computation, result, record);
+                const event = await writeComputationResult(this.controller, computation, result, record, this.options);
                 return event ? [event] : [];
             }
-            return writeComputationPatch(this.controller, computation, result, record);
+            return writeComputationPatch(this.controller, computation, result, record, this.options);
         }
         if (computation.incrementalCompute) {
             const lastValue = computation.useLastValue ? await this.controller.retrieveLastValue(computation.dataContext, record) : undefined;
@@ -1033,7 +1848,7 @@ class MigrationScheduler {
         } else {
             result = await computation.compute(dataDeps, record);
         }
-        const event = await writeComputationResult(this.controller, computation, result, record);
+        const event = await writeComputationResult(this.controller, computation, result, record, this.options);
         return event ? [event] : [];
     }
 }

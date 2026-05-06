@@ -8,6 +8,7 @@ import {
   MonoSystem,
   Property,
   createMigrationManifest,
+  hashMigrationDiff,
   readMigrationManifest,
 } from "interaqt";
 import { PostgreSQLDB } from "@drivers";
@@ -19,6 +20,51 @@ const dbOptions = {
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
 };
+
+async function approveGeneratedMigrationDiff(controller: Controller) {
+  const diff = await controller.generateMigrationDiff({ includeDestructiveScope: true });
+  return {
+    ...diff,
+    status: "approved" as const,
+    decisions: [
+      ...diff.decisions,
+      ...diff.requiredDecisions.map(requirement => {
+        if (requirement.kind === "computation") {
+          return {
+            kind: "computation" as const,
+            id: requirement.id,
+            dataContext: requirement.dataContext,
+            decision: requirement.recommendedDecision,
+            reason: "approved by PostgreSQL migration test",
+          };
+        }
+        if (requirement.kind === "event-rebuild-handler") {
+          return {
+            kind: "event-rebuild-handler" as const,
+            dataContext: requirement.dataContext,
+            handlerRef: requirement.dataContext,
+            reason: "approved by PostgreSQL migration test",
+          };
+        }
+        if (requirement.kind === "async-completion-handler") {
+          return {
+            kind: "async-completion-handler" as const,
+            dataContext: requirement.dataContext,
+            handlerRef: requirement.dataContext,
+            reason: "approved by PostgreSQL migration test",
+          };
+        }
+        return {
+          kind: "destructive-scope" as const,
+          dataContext: requirement.dataContext,
+          recordName: requirement.recordName,
+          ids: requirement.ids,
+          reason: "approved by PostgreSQL migration test",
+        };
+      }),
+    ],
+  };
+}
 
 describeIfPostgres("PostgreSQL migration integration", () => {
   test("runs compute migration against real PostgreSQL and persists manifest", async () => {
@@ -41,7 +87,6 @@ describeIfPostgres("PostgreSQL migration integration", () => {
       dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
       compute: async (_deps: any, record: any) => record.price * 2,
     }, { uuid: "pg-migration-double-price-computation" });
-    (doublePrice as any).migrationKey = "v1";
     const ProductV2 = new Entity({
       name: "PgMigrationProduct",
       properties: [
@@ -52,7 +97,8 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     const systemV2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     systemV2.conceptClass = KlassByName;
     const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
-    const plan = await controllerV2.migrate();
+    const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+    const plan = await controllerV2.migrate({ approvedDiff });
 
     expect(plan.changedComputations.map(item => item.dataContext)).toEqual(["property:PgMigrationProduct.doublePrice"]);
     const migrated = await systemV2.storage.findOne("PgMigrationProduct", MatchExp.atom({ key: "id", value: ["=", product.id] }), undefined, ["*"]);
@@ -86,19 +132,21 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     const systemV2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     systemV2.conceptClass = KlassByName;
     const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
-    const dryRunPlan = await controllerV2.migrate({ dryRun: true });
+    const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+    const dryRunPlan = await controllerV2.migrate({ approvedDiff, dryRun: true });
     const firstOperation = dryRunPlan.schemaPlan!.preRecomputeDDL[0];
     await (systemV2 as any).db.scheme(firstOperation.sql!);
 
     const states = controllerV2.scheduler.createStates();
     const schemaPlan = await (systemV2 as any).prepareMigrationSchema(controllerV2.entities, controllerV2.relations, states);
     const modelHash = createMigrationManifest(controllerV2, schemaPlan.schema).modelHash;
+    const approvedDiffHash = hashMigrationDiff(approvedDiff);
     const migrationId = "pg-operation-resume-migration";
     const operationKey = `schema:0:${firstOperation.kind}:${firstOperation.tableName || ""}:${firstOperation.columnName || ""}:${firstOperation.logicalPath || ""}:${firstOperation.sql || firstOperation.description}`;
-    await (systemV2 as any).db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', 'pending', 'failed', 'now', 'now')`);
+    await (systemV2 as any).db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', '${approvedDiffHash}', 'pending', 'failed', 'now', 'now')`);
     await (systemV2 as any).db.scheme(`INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES ('${migrationId}', '${operationKey.replace(/'/g, "''")}', 'succeeded')`);
 
-    await controllerV2.migrate();
+    await controllerV2.migrate({ approvedDiff });
 
     const dbHandle = (systemV2 as unknown as { db: PostgreSQLDB }).db;
     const columns = await dbHandle.query<{ column_name: string }>(

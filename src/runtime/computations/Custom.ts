@@ -24,12 +24,10 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   incrementalPatchComputeCallback?: Function
   createStateCallback?: Function
   getInitialValueCallback?: Function
-  migrationComputeCallback?: Function
   asyncReturnCallback?: Function
 
   incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>
   incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>
-  migrationCompute?: (...args: any[]) => Promise<ComputationResult|any>
   asyncReturn?: (...args: any[]) => Promise<ComputationResult|any>
 
   constructor(public controller: Controller, public args: CustomInstance, public dataContext: DataContext) {
@@ -99,17 +97,6 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     }
     if (args.getInitialValue) {
       this.getInitialValueCallback = args.getInitialValue;
-    }
-    if (args.migrationCompute) {
-      this.migrationComputeCallback = args.migrationCompute;
-      this.migrationCompute = async (...args: any[]): Promise<ComputationResult|any> => {
-        const context = {
-          controller: this.controller,
-          state: this.state,
-          getState: (key: string) => this.state[key]
-        };
-        return await this.migrationComputeCallback!.call(context, ...args);
-      }
     }
     if (args.asyncReturn) {
       this.asyncReturnCallback = args.asyncReturn;

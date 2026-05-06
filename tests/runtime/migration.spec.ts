@@ -1,8 +1,154 @@
 import { describe, expect, test } from "vitest";
-import { Controller, ComputationResult, Count, Custom, Dictionary, Entity, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, createMigrationManifest, readMigrationManifest, writeMigrationManifest } from "interaqt";
+import { Controller, ComputationResult, Count, Custom, Dictionary, Entity, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, createMigrationManifest, hashMigrationDiff, readMigrationManifest, writeMigrationManifest } from "interaqt";
 import { PGLiteDB } from "@drivers";
 
+async function approveGeneratedMigrationDiff(controller: Controller, options: {
+    includeFunctionText?: boolean;
+    includeDestructiveScope?: boolean;
+    eventHandlers?: Record<string, string>;
+    asyncHandlers?: Record<string, string>;
+    computationDecisions?: Record<string, "changed" | "unchanged" | "state-only" | "unrebuildable">;
+} = {}) {
+    const diff = await controller.generateMigrationDiff({
+        includeFunctionText: options.includeFunctionText ?? true,
+        includeDestructiveScope: options.includeDestructiveScope ?? true,
+    });
+    const decisions = [
+        ...diff.decisions,
+        ...diff.requiredDecisions.map(requirement => {
+            if (requirement.kind === "computation") {
+                return {
+                    kind: "computation" as const,
+                    id: requirement.id,
+                    dataContext: requirement.dataContext,
+                    decision: options.computationDecisions?.[requirement.id] || requirement.recommendedDecision,
+                    reason: "approved by migration test",
+                };
+            }
+            if (requirement.kind === "event-rebuild-handler") {
+                return {
+                    kind: "event-rebuild-handler" as const,
+                    dataContext: requirement.dataContext,
+                    handlerRef: options.eventHandlers?.[requirement.dataContext] || requirement.dataContext,
+                    reason: "approved by migration test",
+                };
+            }
+            if (requirement.kind === "async-completion-handler") {
+                return {
+                    kind: "async-completion-handler" as const,
+                    dataContext: requirement.dataContext,
+                    handlerRef: options.asyncHandlers?.[requirement.dataContext] || requirement.dataContext,
+                    reason: "approved by migration test",
+                };
+            }
+            return {
+                kind: "destructive-scope" as const,
+                dataContext: requirement.dataContext,
+                recordName: requirement.recordName,
+                ids: requirement.ids,
+                reason: "approved by migration test",
+            };
+        }),
+    ];
+    return {
+        ...diff,
+        status: "approved" as const,
+        decisions,
+    };
+}
+
+async function migrateWithApproval(controller: Controller, options: Parameters<Controller["migrate"]>[0] = {}) {
+    const approvedDiff = options.approvedDiff || await approveGeneratedMigrationDiff(controller);
+    return controller.migrate({ ...options, approvedDiff });
+}
+
+async function dryRunWithApproval(controller: Controller, options: Parameters<Controller["migrate"]>[0] = {}) {
+    return migrateWithApproval(controller, { ...options, dryRun: true });
+}
+
 describe("Data migration phase 1", () => {
+    test("generateMigrationDiff and approvedDiff validation enforce two-step review", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationReviewProduct",
+            properties: [new Property({ name: "price", type: "number" })],
+        });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [ProductV1], relations: [] });
+        await controllerV1.setup(true);
+        await systemV1.storage.create("MigrationReviewProduct", { price: 2 });
+        const baselineHash = (await readMigrationManifest(controllerV1))!.modelHash;
+        const ProductV1Again = new Entity({
+            name: "MigrationReviewProduct",
+            properties: [new Property({ name: "price", type: "number" })],
+        });
+        expect(createMigrationManifest(new Controller({ system: systemV1, entities: [ProductV1Again], relations: [] })).modelHash).toBe(baselineHash);
+
+        const doublePrice = new Custom({
+            name: "MigrationReviewDouble",
+            dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+            compute: async (_deps: any, record: any) => record.price * 2,
+        });
+        const ProductV2 = new Entity({
+            name: "MigrationReviewProduct",
+            properties: [
+                new Property({ name: "price", type: "number" }),
+                new Property({ name: "doublePrice", type: "number", computation: doublePrice }),
+            ],
+        });
+        const ReviewCategory = new Entity({
+            name: "MigrationReviewCategory",
+            properties: [new Property({ name: "name", type: "string" })],
+        });
+        const ProductCategory = new Relation({
+            source: ProductV2,
+            sourceProperty: "categories",
+            target: ReviewCategory,
+            targetProperty: "products",
+            name: "MigrationReviewProductCategory",
+            type: "n:n",
+        });
+        const reviewDict = new Dictionary({
+            name: "migrationReviewDict",
+            type: "number",
+            collection: false,
+        });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, ReviewCategory], relations: [ProductCategory], dict: [reviewDict] });
+
+        await expect(controllerV2.migrate()).rejects.toThrow(/approved diff/);
+        const diff = await controllerV2.generateMigrationDiff({ includeFunctionText: true });
+        expect(diff.changes.some(change => change.kind === "record" && change.dataContext === "entity:MigrationReviewCategory")).toBe(true);
+        expect(diff.changes.some(change => change.kind === "property" && change.dataContext === "property:MigrationReviewProduct.doublePrice")).toBe(true);
+        expect(diff.changes.some(change => change.kind === "relation" && change.dataContext === "relation:MigrationReviewProductCategory")).toBe(true);
+        expect(diff.changes.some(change => change.kind === "dictionary" && change.dataContext === "global:migrationReviewDict")).toBe(true);
+        expect(diff.requiredDecisions.some(item => item.kind === "computation" && item.dataContext === "property:MigrationReviewProduct.doublePrice")).toBe(true);
+        const computationChange = diff.changes.find(change => change.kind === "computation" && change.dataContext === "property:MigrationReviewProduct.doublePrice");
+        expect(computationChange?.kind === "computation" ? computationChange.detected.functionHash : undefined).toBeTruthy();
+
+        const missingDecision = { ...diff, status: "approved" as const, decisions: [] };
+        await expect(controllerV2.migrate({ approvedDiff: missingDecision })).rejects.toThrow(/Missing migration decision/);
+        await expect(controllerV2.migrate({ approvedDiff: { ...missingDecision, requiredDecisions: [] } })).rejects.toThrow(/Missing migration decision/);
+
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        await expect(controllerV2.migrate({
+            approvedDiff: { ...approvedDiff, toModelHash: "stale" },
+        })).rejects.toThrow(/stale/);
+        await expect(controllerV2.migrate({
+            approvedDiff: {
+                ...approvedDiff,
+                decisions: [
+                    ...approvedDiff.decisions,
+                    { kind: "rename-candidate-reviewed" as const, from: "A", to: "B", decision: "not-accepted" as const, reason: "extra" },
+                ],
+            },
+        })).rejects.toThrow(/rename candidate/);
+
+        await db.close();
+    });
+
     test("setup(false) rejects model changes when a migration manifest exists", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
@@ -118,7 +264,7 @@ describe("Data migration phase 1", () => {
             entities: [UserV2, TaskV2],
             relations: [OwnsTaskV2],
         });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.changedComputations).toHaveLength(1);
         const migratedAlice = await systemV2.storage.findOne("MigrationUser", MatchExp.atom({ key: "id", value: ["=", alice.id] }), undefined, ["*"]);
@@ -176,7 +322,7 @@ describe("Data migration phase 1", () => {
             relations: [],
             dict: [productCount],
         });
-        await controllerV2.migrate();
+        await migrateWithApproval(controllerV2);
 
         expect(await systemV2.storage.dict.get("migrationGlobalProductCount")).toBe(2);
         await db.close();
@@ -204,12 +350,11 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
-        const hints = [{ kind: "from", target: "MigrationDryRunProduct.price", source: "legacyPrice" }];
-        const plan = await controllerV2.migrate({ dryRun: true, hints });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await controllerV2.migrate({ approvedDiff, dryRun: true });
 
         expect(plan.schemaPlan?.preRecomputeDDL.some(operation => operation.kind === "add-column")).toBe(true);
-        expect(plan.hints).toEqual(hints);
-        const columns = await db.query<{ column_name: string }>(
+                const columns = await db.query<{ column_name: string }>(
             `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
             ["MigrationDryRunProduct"],
         );
@@ -268,7 +413,6 @@ describe("Data migration phase 1", () => {
             compute: async () => ComputationResult.async({}),
             asyncReturn: async () => 1,
         }, { uuid: "migration-async-custom" });
-        (asyncComputation as any).migrationKey = "v1";
         const asyncDict = new Dictionary({
             name: "migrationAsyncValue",
             type: "number",
@@ -279,16 +423,16 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [asyncDict] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const diff = await controllerV2.generateMigrationDiff();
         const beforeFailureManifest = await readMigrationManifest(controllerV2);
 
-        expect(plan.blockingChanges.join("\n")).toMatch(/async-computation/);
-        await expect(controllerV2.migrate()).rejects.toThrow(/blocking changes/);
+        expect(diff.requiredDecisions.some(item => item.kind === "async-completion-handler" && item.dataContext === "global:migrationAsyncValue")).toBe(true);
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/Missing migration async completion handler/);
         expect((await readMigrationManifest(controllerV2))!.modelHash).toBe(beforeFailureManifest!.modelHash);
         await db.close();
     });
 
-    test("migrationAsync contract resolves async computation before success", async () => {
+    test("async completion handler resolves async computation before success", async () => {
         const db = new PGLiteDB();
         const SourceV1 = new Entity({
             name: "MigrationAsyncContractSource",
@@ -307,8 +451,6 @@ describe("Data migration phase 1", () => {
             compute: async () => ComputationResult.async({ finalValue: 7 }),
             asyncReturn: async () => 1,
         }, { uuid: "migration-async-contract-custom" });
-        (asyncComputation as any).migrationKey = "v1";
-        (asyncComputation as any).migrationAsync = async ({ args }: any) => args.finalValue;
         const asyncDict = new Dictionary({
             name: "migrationAsyncContractValue",
             type: "number",
@@ -318,7 +460,20 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [asyncDict] });
-        const plan = await controllerV2.migrate();
+        await expect(migrateWithApproval(controllerV2, {
+            handlers: {
+                asyncCompletion: {
+                    "global:migrationAsyncContractValue": async () => ComputationResult.resolved(7),
+                },
+            },
+        })).rejects.toThrow(/direct final output|asyncReturn resolution/);
+        const plan = await migrateWithApproval(controllerV2, {
+            handlers: {
+                asyncCompletion: {
+                    "global:migrationAsyncContractValue": async ({ args }: any) => args.finalValue,
+                },
+            },
+        });
 
         expect(plan.blockingChanges).toHaveLength(0);
         expect(await systemV2.storage.dict.get("migrationAsyncContractValue")).toBe(7);
@@ -341,7 +496,6 @@ describe("Data migration phase 1", () => {
             name: "MigrationDeleteCustom",
             compute: async () => true,
         }, { uuid: "migration-delete-custom" });
-        (deleteComputation as any).migrationKey = "v1";
         const UserV2 = new Entity({
             name: "MigrationDeleteUser",
             properties: [
@@ -352,9 +506,10 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const diff = await controllerV2.generateMigrationDiff({ includeDestructiveScope: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
-        expect(plan.blockingChanges.join("\n")).toMatch(/destructive-computed-output/);
+        expect(diff.requiredDecisions.some(item => item.kind === "destructive-scope")).toBe(true);
         expect(plan.deletionScope).toHaveLength(1);
         expect(plan.deletionScope[0].recordName).toBe("MigrationDeleteUser");
         const users = await systemV1.storage.find("MigrationDeleteUser", undefined, undefined, ["id"]);
@@ -377,7 +532,6 @@ describe("Data migration phase 1", () => {
             name: "MigrationDeleteScopeCustom",
             compute: async () => true,
         }, { uuid: "migration-delete-scope-custom" });
-        (deleteComputation as any).migrationKey = "v1";
         const UserV2 = new Entity({
             name: "MigrationDeleteScopeUser",
             properties: [
@@ -388,11 +542,16 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2], relations: [] });
-        await expect(controllerV2.migrate({ allowDestructiveCleanup: true, destructiveScope: [] })).rejects.toThrow(/scope mismatch/);
-        await controllerV2.migrate({
-            allowDestructiveCleanup: true,
-            destructiveScope: [{ dataContext: "property:MigrationDeleteScopeUser._isDeleted_", recordName: "MigrationDeleteScopeUser", ids: [String(user.id)] }],
-        });
+        const wrongDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const wrongScopeDiff = {
+            ...wrongDiff,
+            decisions: wrongDiff.decisions.map(decision => decision.kind === "destructive-scope"
+                ? { ...decision, ids: [] }
+                : decision),
+        };
+        await expect(migrateWithApproval(controllerV2, { approvedDiff: wrongScopeDiff, dryRun: true })).rejects.toThrow(/scope mismatch/);
+        await expect(migrateWithApproval(controllerV2, { approvedDiff: wrongScopeDiff })).rejects.toThrow(/scope mismatch/);
+        await migrateWithApproval(controllerV2);
         const remaining = await systemV2.storage.find("MigrationDeleteScopeUser", undefined, undefined, ["id"]);
         expect(remaining).toHaveLength(0);
         await db.close();
@@ -421,7 +580,6 @@ describe("Data migration phase 1", () => {
                 return { discounted: item.price / 2 };
             },
         }, { uuid: "migration-transform-computation" });
-        (transform as any).migrationKey = "v1";
         const Discount = new Entity({
             name: "MigrationDiscount",
             properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-discount-value" })],
@@ -431,7 +589,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, Discount], relations: [] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.schemaPlan?.postRecomputeDDL.some(operation => operation.description.includes("transform unique index"))).toBe(true);
         const discounts = await systemV2.storage.find("MigrationDiscount", undefined, undefined, ["discounted"]);
@@ -455,7 +613,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => ({ discounted: item.price }),
         }, { uuid: "migration-transform-change-computation" });
-        (transformV1 as any).migrationKey = "v1";
         const DiscountV1 = new Entity({
             name: "MigrationTransformChangeDiscount",
             properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-transform-change-discounted" })],
@@ -486,7 +643,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => ({ discounted: item.price * 2 }),
         }, { uuid: "migration-transform-change-computation" });
-        (transformV2 as any).migrationKey = "v2";
         const DiscountV2 = new Entity({
             name: "MigrationTransformChangeDiscount",
             properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-transform-change-discounted" })],
@@ -504,7 +660,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, DiscountV2], relations: [], dict: [discountSumV2] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationTransformChangeSum");
         expect(await systemV2.storage.dict.get("migrationTransformChangeSum")).toBe(60);
@@ -522,7 +678,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => [{ value: item.price }, { value: item.price + 1 }],
         }, { uuid: "migration-transform-delete-computation" });
-        (transformV1 as any).migrationKey = "v1";
         const OutputV1 = new Entity({
             name: "MigrationTransformDeleteOutput",
             properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-transform-delete-output-value" })],
@@ -543,7 +698,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => [{ value: item.price * 2 }],
         }, { uuid: "migration-transform-delete-computation" });
-        (transformV2 as any).migrationKey = "v2";
         const OutputV2 = new Entity({
             name: "MigrationTransformDeleteOutput",
             properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-transform-delete-output-value" })],
@@ -552,8 +706,18 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, OutputV2], relations: [] });
-        await expect(controllerV2.migrate()).rejects.toThrow(/delete stale derived/);
-        await controllerV2.migrate({ allowDestructiveCleanup: true });
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/scope mismatch|delete stale derived/);
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const dryRunPlan = await controllerV2.migrate({ approvedDiff, dryRun: true });
+        const approvedScope = dryRunPlan.deletionScope.find(scope => scope.dataContext === "entity:MigrationTransformDeleteOutput");
+        await migrateWithApproval(controllerV2, {
+            approvedDiff: {
+                ...approvedDiff,
+                decisions: approvedDiff.decisions.map(decision => decision.kind === "destructive-scope" && decision.dataContext === "entity:MigrationTransformDeleteOutput"
+                    ? { ...decision, ids: approvedScope?.ids || [], reason: "approved stale transform cleanup" }
+                    : decision),
+            },
+        });
 
         const outputs = await systemV2.storage.find("MigrationTransformDeleteOutput", undefined, undefined, ["value"]);
         expect(outputs.map(output => output.value)).toEqual([20]);
@@ -571,7 +735,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => ({ discounted: item.price / 2 }),
         }, { uuid: "migration-ownership-transform" });
-        (transformV1 as any).migrationKey = "v1";
         const DiscountV1 = new Entity({
             name: "MigrationOwnershipDiscount",
             properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-ownership-discount-value" })],
@@ -583,7 +746,7 @@ describe("Data migration phase 1", () => {
         await controllerV1.setup(true);
         const manifest = await readMigrationManifest(controllerV1);
         const tampered = structuredClone(manifest!);
-        const transformManifest = tampered.computations.find(computation => computation.id === "migration-ownership-transform")!;
+        const transformManifest = tampered.computations.find(computation => computation.dataContext === "entity:MigrationOwnershipDiscount")!;
         delete transformManifest.ownershipProof;
         await writeMigrationManifest(controllerV1, tampered);
 
@@ -596,7 +759,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => ({ discounted: item.price / 4 }),
         }, { uuid: "migration-ownership-transform" });
-        (transformV2 as any).migrationKey = "v2";
         const DiscountV2 = new Entity({
             name: "MigrationOwnershipDiscount",
             properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-ownership-discount-value" })],
@@ -605,10 +767,10 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, DiscountV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.blockingChanges.join("\n")).toMatch(/exclusive output ownership proof/);
-        await expect(controllerV2.migrate()).rejects.toThrow(/exclusive output ownership proof/);
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/exclusive output ownership proof/);
         await db.close();
     });
 
@@ -636,7 +798,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["id", "price"],
             callback: (item: any) => ({ discounted: item.price }),
         }, { uuid: "migration-fact-takeover-transform" });
-        (transform as any).migrationKey = "v1";
         const DiscountV2 = new Entity({
             name: "MigrationFactTakeoverDiscount",
             properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-fact-takeover-discount-value" })],
@@ -645,7 +806,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, DiscountV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.blockingChanges.join("\n")).toMatch(/exclusive output ownership proof/);
         await db.close();
@@ -680,7 +841,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, AdultUser], relations: [] });
-        await controllerV2.migrate();
+        await migrateWithApproval(controllerV2);
 
         const adults = await systemV2.storage.find("MigrationAdultUser", undefined, undefined, ["age"]);
         expect(adults).toHaveLength(1);
@@ -717,7 +878,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductAgain], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.blockingChanges.join("\n")).toMatch(/physical-path-move/);
         await db.close();
@@ -772,7 +933,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserAgain, TaskAgain], relations: [OwnsTaskAgain] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.blockingChanges.join("\n")).toMatch(/MigrationPhysicalRelationOwnsTask\.source/);
         expect(plan.blockingChanges.join("\n")).toMatch(/physical-path-move/);
@@ -806,7 +967,6 @@ describe("Data migration phase 1", () => {
             name: "MigrationRelationComputedScore",
             compute: async (_deps: any, record: any) => record.id ? 10 : 0,
         }, { uuid: "migration-relation-computed-score-computation" });
-        (relationScore as any).migrationKey = "v1";
         const UserV2 = new Entity({
             name: "MigrationRelationComputedUser",
             properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-computed-user-name" })],
@@ -830,7 +990,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, ProfileV2], relations: [ProfileOwnerV2] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
         const relationRecord = plan.schemaPlan!.schema.records.find(record => record.recordName === "MigrationRelationComputedProfileOwner")!;
         const scoreAttribute = relationRecord.attributeDetails!.find(attribute => attribute.name === "score")!;
         const addScoreColumn = plan.schemaPlan!.preRecomputeDDL.find(operation => operation.columnName === scoreAttribute.fieldName);
@@ -863,7 +1023,8 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await controllerV2.migrate({ approvedDiff, dryRun: true });
 
         expect(plan.blockingChanges.join("\n")).toMatch(/fact attribute was removed/);
         expect(plan.blockingChanges.join("\n")).toMatch(/fact attribute type/);
@@ -891,7 +1052,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { records: { type: "records", source: SourceV2, attributeQuery: ["value"] } },
             compute: async ({ records }: any) => records.reduce((total: number, record: any) => total + record.value, 0),
         }, { uuid: "migration-graph-sum-computation" });
-        (sumComputation as any).migrationKey = "v1";
         const sumDict = new Dictionary({
             name: "migrationGraphSum",
             type: "number",
@@ -903,7 +1063,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { sum: { type: "global", source: sumDict } },
             compute: async ({ sum }: any) => sum * 2,
         }, { uuid: "migration-graph-double-computation" });
-        (doubleComputation as any).migrationKey = "v1";
         const doubleDict = new Dictionary({
             name: "migrationGraphDouble",
             type: "number",
@@ -914,7 +1073,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [sumDict, doubleDict] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(item => item.dataContext)).toEqual(["global:migrationGraphSum", "global:migrationGraphDouble"]);
         expect(await systemV2.storage.dict.get("migrationGraphSum")).toBe(5);
@@ -938,13 +1097,11 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
             compute: async (_deps: any, record: any) => record.base * 2,
         }, { uuid: "migration-property-chain-a-computation" });
-        (itemA as any).migrationKey = "v1";
         const itemB = new Custom({
             name: "MigrationPropertyChainB",
             dataDeps: { current: { type: "property", attributeQuery: ["a"] } },
             compute: async (_deps: any, record: any) => record.a + 1,
         }, { uuid: "migration-property-chain-b-computation" });
-        (itemB as any).migrationKey = "v1";
         const ItemV2 = new Entity({
             name: "MigrationPropertyChainItem",
             properties: [
@@ -956,7 +1113,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ItemV2], relations: [] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toEqual([
             "property:MigrationPropertyChainItem.a",
@@ -982,7 +1139,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["active"],
             callback: (task: any) => task.active === true,
         }, { uuid: "migration-relation-aggregate-count-computation" });
-        (activeTaskCountV1 as any).migrationKey = "stable";
         const UserV1 = new Entity({
             name: "MigrationRelationAggregateUser",
             properties: [
@@ -1014,7 +1170,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["status"] } },
             compute: async (_deps: any, record: any) => record.status === "open",
         }, { uuid: "migration-relation-aggregate-active-computation" });
-        (activeComputation as any).migrationKey = "v2";
         const TaskV2 = new Entity({
             name: "MigrationRelationAggregateTask",
             properties: [
@@ -1027,7 +1182,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: ["active"],
             callback: (task: any) => task.active === true,
         }, { uuid: "migration-relation-aggregate-count-computation" });
-        (activeTaskCountV2 as any).migrationKey = "stable";
         const UserV2 = new Entity({
             name: "MigrationRelationAggregateUser",
             properties: [
@@ -1046,7 +1200,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toEqual([
             "property:MigrationRelationAggregateTask.active",
@@ -1072,7 +1226,6 @@ describe("Data migration phase 1", () => {
             compute: async () => 0,
             incrementalCompute: async (lastValue: number) => lastValue,
         }, { uuid: "migration-event-shape-probe-computation" });
-        (probeV1 as any).migrationKey = "stable-probe";
         const UserV1 = new Entity({
             name: "MigrationEventShapeUser",
             properties: [
@@ -1100,7 +1253,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["status"] } },
             compute: async (_deps: any, record: any) => record.status === "open",
         }, { uuid: "migration-event-shape-active-computation" });
-        (activeComputation as any).migrationKey = "v2";
         const TaskV2 = new Entity({
             name: "MigrationEventShapeTask",
             properties: [
@@ -1121,7 +1273,6 @@ describe("Data migration phase 1", () => {
                 return lastValue;
             },
         }, { uuid: "migration-event-shape-probe-computation" });
-        (probeV2 as any).migrationKey = "stable-probe";
         const UserV2 = new Entity({
             name: "MigrationEventShapeUser",
             properties: [
@@ -1140,7 +1291,15 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2] });
-        await controllerV2.migrate();
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        await migrateWithApproval(controllerV2, {
+            approvedDiff: {
+                ...approvedDiff,
+                decisions: approvedDiff.decisions.map(decision => decision.kind === "computation" && decision.dataContext === "property:MigrationEventShapeUser.probe"
+                    ? { ...decision, decision: "unchanged" as const }
+                    : decision),
+            },
+        });
 
         expect(sawRelationEventShape).toBe(true);
         await db.close();
@@ -1164,7 +1323,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: [["comments", { attributeQuery: ["flagged"] }]],
             callback: (task: any) => (task.comments || []).some((comment: any) => comment.flagged === true),
         }, { uuid: "migration-deep-user-count-computation" });
-        (flaggedTaskCountV1 as any).migrationKey = "stable";
         const UserV1 = new Entity({
             name: "MigrationDeepUser",
             properties: [
@@ -1208,7 +1366,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["status"] } },
             compute: async (_deps: any, record: any) => record.status === "flagged",
         }, { uuid: "migration-deep-flagged-computation" });
-        (flaggedComputation as any).migrationKey = "v2";
         const CommentV2 = new Entity({
             name: "MigrationDeepComment",
             properties: [
@@ -1225,7 +1382,6 @@ describe("Data migration phase 1", () => {
             attributeQuery: [["comments", { attributeQuery: ["flagged"] }]],
             callback: (task: any) => (task.comments || []).some((comment: any) => comment.flagged === true),
         }, { uuid: "migration-deep-user-count-computation" });
-        (flaggedTaskCountV2 as any).migrationKey = "stable";
         const UserV2 = new Entity({
             name: "MigrationDeepUser",
             properties: [
@@ -1252,7 +1408,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2, CommentV2], relations: [UserTaskV2, TaskCommentV2] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("property:MigrationDeepUser.flaggedTaskCount");
         const migrated = await systemV2.storage.findOne("MigrationDeepUser", MatchExp.atom({ key: "id", value: ["=", user.id] }), undefined, ["*"]);
@@ -1290,7 +1446,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, SeniorUser], relations: [], dict: [seniorCount] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toContain("global:migrationSeniorUserCount");
         expect(await systemV2.storage.dict.get("migrationSeniorUserCount")).toBe(1);
@@ -1356,7 +1512,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2, HighOwnsTask], dict: [highRelationCount] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toContain("global:migrationHighRelationCount");
         expect(await systemV2.storage.dict.get("migrationHighRelationCount")).toBe(1);
@@ -1388,13 +1544,16 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [AccountV2], relations: [] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.schemaPlan?.postRecomputeDDL.some(operation => operation.kind === "create-constraint")).toBe(true);
         await expect(systemV2.storage.create("MigrationConstraintAccount", { email: "a@example.com" })).rejects.toThrow();
-        const logs = await db.query<{ status: string, phase: string }>(`SELECT "status", "phase" FROM "__interaqt_migration_log" ORDER BY "updatedAt" DESC LIMIT 1`, []);
+        const logs = await db.query<{ status: string, phase: string, approvedDiffHash: string, approvedDiffSummary: string, decisionCount: number }>(`SELECT "status", "phase", "approvedDiffHash", "approvedDiffSummary", "decisionCount" FROM "__interaqt_migration_log" ORDER BY "updatedAt" DESC LIMIT 1`, []);
         expect(logs[0].status).toBe("succeeded");
         expect(logs[0].phase).toBe("manifest-written");
+        expect(logs[0].approvedDiffHash).toBe(plan.approvedDiffHash);
+        expect(JSON.parse(logs[0].approvedDiffSummary)).toHaveProperty("changeCount");
+        expect(Number(logs[0].decisionCount)).toBeGreaterThanOrEqual(0);
         const operationLogs = await db.query<{ operationKey: string }>(
             `SELECT "operationKey" FROM "__interaqt_migration_operation_log" WHERE "operationKey" LIKE 'verification:%' OR "operationKey" LIKE 'manifest:%'`,
             [],
@@ -1430,10 +1589,11 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [AccountV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await controllerV2.migrate({ approvedDiff, dryRun: true });
 
         expect(plan.schemaPlan?.verificationDDL.some(operation => operation.kind === "verify")).toBe(true);
-        await expect(controllerV2.migrate()).rejects.toThrow(/Migration verification failed/);
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/Migration verification failed/);
         await db.close();
     });
 
@@ -1455,7 +1615,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["email"] } },
             compute: async () => null,
         }, { uuid: "migration-non-null-custom" });
-        (badComputation as any).migrationKey = "v1";
         const AccountV2 = new Entity({
             name: "MigrationNonNullAccount",
             properties: [
@@ -1469,10 +1628,10 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [AccountV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.schemaPlan?.verificationDDL.some(operation => operation.logicalPath === "MigrationNonNullAccount.normalizedEmail")).toBe(true);
-        await expect(controllerV2.migrate()).rejects.toThrow(/Migration verification failed/);
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/Migration verification failed/);
         await db.close();
     });
 
@@ -1495,7 +1654,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["email"] } },
             compute: async (_deps: any, record: any) => record.email.toLowerCase(),
         }, { uuid: "migration-computed-unique-normalize" });
-        (normalizedEmail as any).migrationKey = "v1";
         const AccountV2 = new Entity({
             name: "MigrationComputedUniqueAccount",
             properties: [
@@ -1509,12 +1667,12 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [AccountV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.schemaPlan?.preRecomputeDDL.some(operation => operation.kind === "add-column" && operation.logicalPath === undefined)).toBe(true);
         expect(plan.schemaPlan?.verificationDDL.some(operation => operation.logicalPath === "MigrationComputedUniqueAccount.normalizedEmail")).toBe(true);
         expect(plan.schemaPlan?.postRecomputeDDL.some(operation => operation.logicalPath === "MigrationComputedUniqueAccount.normalizedEmail")).toBe(true);
-        await expect(controllerV2.migrate()).rejects.toThrow(/Migration verification failed for MigrationComputedUniqueAccount\.normalizedEmail/);
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/Migration verification failed for MigrationComputedUniqueAccount\.normalizedEmail/);
         await db.close();
     });
 
@@ -1544,11 +1702,11 @@ describe("Data migration phase 1", () => {
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [AccountV2], relations: [] });
 
-        await expect(controllerV2.migrate({ dryRun: true })).rejects.toThrow(/post-recompute unique constraints are not supported/);
+        await expect(dryRunWithApproval(controllerV2)).rejects.toThrow(/post-recompute unique constraints are not supported/);
         await db.close();
     });
 
-    test("function-based changed computations without migrationKey are blocked", async () => {
+    test("function-based changed computations require diff review without migrationKey", async () => {
         const db = new PGLiteDB();
         const SourceV1 = new Entity({
             name: "MigrationFunctionSource",
@@ -1576,13 +1734,13 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [dict] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const diff = await controllerV2.generateMigrationDiff({ includeFunctionText: true });
 
-        expect(plan.blockingChanges.join("\n")).toMatch(/version or migrationKey/);
+        expect(diff.requiredDecisions.some(item => item.kind === "computation" && item.dataContext === "global:migrationFunctionValue")).toBe(true);
         await db.close();
     });
 
-    test("nested function semantics without migrationKey are blocked", async () => {
+    test("nested function semantics require diff review without migrationKey", async () => {
         const db = new PGLiteDB();
         const SourceV1 = new Entity({
             name: "MigrationNestedFunctionSource",
@@ -1614,13 +1772,13 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [dict] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const diff = await controllerV2.generateMigrationDiff({ includeFunctionText: true });
 
-        expect(plan.blockingChanges.join("\n")).toMatch(/version or migrationKey/);
+        expect(diff.requiredDecisions.some(item => item.kind === "computation" && item.dataContext === "global:migrationNestedFunctionCount")).toBe(true);
         await db.close();
     });
 
-    test("event-based computations without migrationCompute are blocked", async () => {
+    test("event-based computations without external rebuild handler are blocked", async () => {
         const db = new PGLiteDB();
         const TicketV1 = new Entity({
             name: "MigrationEventTicket",
@@ -1643,7 +1801,6 @@ describe("Data migration phase 1", () => {
             ],
             initialState: open,
         }, { uuid: "migration-event-state-machine" });
-        (stateMachine as any).migrationKey = "v1";
         const TicketV2 = new Entity({
             name: "MigrationEventTicket",
             properties: [
@@ -1654,9 +1811,10 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [TicketV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const diff = await controllerV2.generateMigrationDiff();
 
-        expect(plan.blockingChanges.join("\n")).toMatch(/event-based computation requires explicit migrationCompute/);
+        expect(diff.requiredDecisions.some(item => item.kind === "event-rebuild-handler" && item.dataContext === "property:MigrationEventTicket.status")).toBe(true);
+        await expect(dryRunWithApproval(controllerV2)).rejects.toThrow(/Missing migration event rebuild handler/);
         await db.close();
     });
 
@@ -1674,9 +1832,7 @@ describe("Data migration phase 1", () => {
                 }, { uuid: "migration-eventdeps-transfer" }),
             ],
             initialState: openV1,
-            migrationCompute: async () => "open",
         }, { uuid: "migration-eventdeps-machine" });
-        (stateMachineV1 as any).migrationKey = "stable";
         const TicketV1 = new Entity({
             name: "MigrationEventDepsTicket",
             properties: [
@@ -1693,7 +1849,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["title"] } },
             compute: async (_deps: any, record: any) => record.title.length > 0,
         }, { uuid: "migration-eventdeps-flag-computation" });
-        (flagComputation as any).migrationKey = "v1";
         const openV2 = new StateNode({ name: "open" }, { uuid: "migration-eventdeps-open" });
         const closedV2 = new StateNode({ name: "closed" }, { uuid: "migration-eventdeps-closed" });
         const stateMachineV2 = new StateMachine({
@@ -1706,9 +1861,7 @@ describe("Data migration phase 1", () => {
                 }, { uuid: "migration-eventdeps-transfer" }),
             ],
             initialState: openV2,
-            migrationCompute: async () => "open",
         }, { uuid: "migration-eventdeps-machine" });
-        (stateMachineV2 as any).migrationKey = "stable";
         const TicketV2 = new Entity({
             name: "MigrationEventDepsTicket",
             properties: [
@@ -1720,13 +1873,19 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [TicketV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const plan = await dryRunWithApproval(controllerV2, {
+            handlers: {
+                eventRebuild: {
+                    "property:MigrationEventDepsTicket.status": async () => "open",
+                },
+            },
+        });
 
         expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("property:MigrationEventDepsTicket.status");
         await db.close();
     });
 
-    test("StateMachine migrationCompute contract is executed when provided", async () => {
+    test("StateMachine event rebuild handler is executed when provided", async () => {
         const db = new PGLiteDB();
         const TicketV1 = new Entity({
             name: "MigrationStateMachineContractTicket",
@@ -1749,9 +1908,7 @@ describe("Data migration phase 1", () => {
                 }, { uuid: "migration-sm-contract-transfer" }),
             ],
             initialState: open,
-            migrationCompute: async () => "migrated",
         }, { uuid: "migration-sm-contract-machine" });
-        (stateMachine as any).migrationKey = "v1";
         const TicketV2 = new Entity({
             name: "MigrationStateMachineContractTicket",
             properties: [
@@ -1762,14 +1919,27 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [TicketV2], relations: [] });
-        await controllerV2.migrate();
+        await expect(migrateWithApproval(controllerV2, {
+            handlers: {
+                eventRebuild: {
+                    "property:MigrationStateMachineContractTicket.status": async () => ComputationResult.resolved("migrated"),
+                },
+            },
+        })).rejects.toThrow(/direct final output|asyncReturn resolution/);
+        await migrateWithApproval(controllerV2, {
+            handlers: {
+                eventRebuild: {
+                    "property:MigrationStateMachineContractTicket.status": async () => "migrated",
+                },
+            },
+        });
 
         const migrated = await systemV2.storage.findOne("MigrationStateMachineContractTicket", MatchExp.atom({ key: "id", value: ["=", ticket.id] }), undefined, ["*"]);
         expect(migrated.status).toBe("migrated");
         await db.close();
     });
 
-    test("custom migrationCompute contract is executed when provided", async () => {
+    test("custom full compute contract is executed during migration", async () => {
         const db = new PGLiteDB();
         const TicketV1 = new Entity({
             name: "MigrationEventContractTicket",
@@ -1785,9 +1955,8 @@ describe("Data migration phase 1", () => {
         }, { uuid: "migration-event-contract-ticket" });
         const migrationOnly = new Custom({
             name: "MigrationEventContractCustom",
-            migrationCompute: async () => 42,
+            compute: async () => 42,
         }, { uuid: "migration-event-contract-custom" });
-        (migrationOnly as any).migrationKey = "v1";
         const dict = new Dictionary({
             name: "migrationEventContractValue",
             type: "number",
@@ -1797,7 +1966,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [TicketV2], relations: [], dict: [dict] });
-        await controllerV2.migrate();
+        await migrateWithApproval(controllerV2);
 
         expect(await systemV2.storage.dict.get("migrationEventContractValue")).toBe(42);
         await db.close();
@@ -1812,7 +1981,6 @@ describe("Data migration phase 1", () => {
             },
             compute: async () => 1,
         }, { uuid: "migration-state-only-custom" });
-        (stateV1 as any).migrationKey = "stable-output";
         const dictV1 = new Dictionary({
             name: "migrationStateOnlyValue",
             type: "number",
@@ -1831,7 +1999,6 @@ describe("Data migration phase 1", () => {
             },
             compute: async () => 1,
         }, { uuid: "migration-state-only-custom" });
-        (stateV2 as any).migrationKey = "stable-output";
         const dictV2 = new Dictionary({
             name: "migrationStateOnlyValue",
             type: "number",
@@ -1841,7 +2008,7 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [], relations: [], dict: [dictV2] });
-        const plan = await controllerV2.migrate();
+        const plan = await migrateWithApproval(controllerV2);
 
         expect(plan.rebuildPlan[0]).toMatchObject({ rebuildState: true, rebuildOutput: false, propagateOutputEvents: false });
         expect(await systemV2.storage.dict.get("migrationStateOnlyValue")).toBeUndefined();
@@ -1858,7 +2025,6 @@ describe("Data migration phase 1", () => {
             },
             compute: async () => 1,
         }, { uuid: "migration-state-only-no-downstream-source" });
-        (stateV1 as any).migrationKey = "stable-output";
         const sourceDictV1 = new Dictionary({
             name: "migrationStateOnlyNoDownstreamSource",
             type: "number",
@@ -1870,7 +2036,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { source: { type: "global", source: sourceDictV1 } },
             compute: async ({ source }: any) => source + 1,
         }, { uuid: "migration-state-only-no-downstream-computation" });
-        (downstreamV1 as any).migrationKey = "stable-downstream";
         const downstreamDictV1 = new Dictionary({
             name: "migrationStateOnlyNoDownstream",
             type: "number",
@@ -1889,7 +2054,6 @@ describe("Data migration phase 1", () => {
             },
             compute: async () => 1,
         }, { uuid: "migration-state-only-no-downstream-source" });
-        (stateV2 as any).migrationKey = "stable-output";
         const sourceDictV2 = new Dictionary({
             name: "migrationStateOnlyNoDownstreamSource",
             type: "number",
@@ -1904,7 +2068,6 @@ describe("Data migration phase 1", () => {
                 return source + 1;
             },
         }, { uuid: "migration-state-only-no-downstream-computation" });
-        (downstreamV2 as any).migrationKey = "stable-downstream";
         const downstreamDictV2 = new Dictionary({
             name: "migrationStateOnlyNoDownstream",
             type: "number",
@@ -1914,7 +2077,15 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [], relations: [], dict: [sourceDictV2, downstreamDictV2] });
-        const plan = await controllerV2.migrate();
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await migrateWithApproval(controllerV2, {
+            approvedDiff: {
+                ...approvedDiff,
+                decisions: approvedDiff.decisions.map(decision => decision.kind === "computation" && decision.dataContext === "global:migrationStateOnlyNoDownstream"
+                    ? { ...decision, decision: "unchanged" as const }
+                    : decision),
+            },
+        });
 
         expect(plan.rebuildPlan.map(item => item.dataContext)).toEqual(["global:migrationStateOnlyNoDownstreamSource"]);
         expect(downstreamCalls).toBe(0);
@@ -1946,8 +2117,8 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [], dict: [countDict] });
-        await controllerV2.migrate();
-        const secondPlan = await controllerV2.migrate({ dryRun: true });
+        await migrateWithApproval(controllerV2);
+        const secondPlan = await dryRunWithApproval(controllerV2);
 
         expect(secondPlan.changedComputations).toHaveLength(0);
         expect(secondPlan.rebuildPlan).toHaveLength(0);
@@ -1970,7 +2141,6 @@ describe("Data migration phase 1", () => {
             dataDeps: { current: { type: "property", attributeQuery: ["name"] } },
             compute: async (_deps: any, record: any) => record.name.length,
         }, { uuid: "migration-side-effect-computation" });
-        (computeLength as any).migrationKey = "v1";
         const UserV2 = new Entity({
             name: "MigrationSideEffectUser",
             properties: [
@@ -1989,9 +2159,45 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [UserV2], relations: [], recordMutationSideEffects: [sideEffect] });
-        await controllerV2.migrate();
+        await migrateWithApproval(controllerV2);
 
         expect(sideEffectCalls).toBe(0);
+        await db.close();
+    });
+
+    test("migration resume ignores failed runs with a different approved diff hash", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationDiffHashResumeProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-diffhash-resume-name" })],
+        }, { uuid: "migration-diffhash-resume-product" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1], relations: [] }).setup(true);
+
+        const ProductV2 = new Entity({
+            name: "MigrationDiffHashResumeProduct",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-diffhash-resume-name" }),
+                new Property({ name: "tag", type: "string" }, { uuid: "migration-diffhash-resume-tag" }),
+            ],
+        }, { uuid: "migration-diffhash-resume-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const states = controllerV2.scheduler.createStates();
+        const schemaPlan = await (systemV2 as any).prepareMigrationSchema(controllerV2.entities, controllerV2.relations, states);
+        const modelHash = createMigrationManifest(controllerV2, schemaPlan.schema).modelHash;
+        await db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "phase", "status", "createdAt", "updatedAt") VALUES ('wrong-diff-resume-migration', '${modelHash}', 'different-approved-diff', 'schema-applied', 'failed', 'now', 'now')`);
+
+        await controllerV2.migrate({ approvedDiff });
+
+        const columns = await db.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
+            ["MigrationDiffHashResumeProduct"],
+        );
+        expect(columns.map(column => column.column_name)).toContain(schemaPlan.preRecomputeDDL[0].columnName);
         await db.close();
     });
 
@@ -2015,7 +2221,8 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await controllerV2.migrate({ approvedDiff, dryRun: true });
         for (const operation of plan.schemaPlan!.preRecomputeDDL) {
             if (operation.sql) await db.scheme(operation.sql);
         }
@@ -2023,8 +2230,8 @@ describe("Data migration phase 1", () => {
         const schemaPlan = await (systemV2 as any).prepareMigrationSchema(controllerV2.entities, controllerV2.relations, states);
         const modelHash = createMigrationManifest(controllerV2, schemaPlan.schema).modelHash;
         const migrationId = "resume-migration";
-        await db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', 'schema-applied', 'failed', 'now', 'now')`);
-        await controllerV2.migrate();
+        await db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', '${hashMigrationDiff(approvedDiff)}', 'schema-applied', 'failed', 'now', 'now')`);
+        await controllerV2.migrate({ approvedDiff });
 
         const columns = await db.query<{ column_name: string }>(
             `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
@@ -2055,7 +2262,8 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
-        const plan = await controllerV2.migrate({ dryRun: true });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await controllerV2.migrate({ approvedDiff, dryRun: true });
         const firstOperation = plan.schemaPlan!.preRecomputeDDL[0];
         await db.scheme(firstOperation.sql!);
 
@@ -2064,9 +2272,9 @@ describe("Data migration phase 1", () => {
         const modelHash = createMigrationManifest(controllerV2, schemaPlan.schema).modelHash;
         const migrationId = "operation-resume-migration";
         const operationKey = `schema:0:${firstOperation.kind}:${firstOperation.tableName || ""}:${firstOperation.columnName || ""}:${firstOperation.logicalPath || ""}:${firstOperation.sql || firstOperation.description}`;
-        await db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', 'pending', 'failed', 'now', 'now')`);
+        await db.scheme(`INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', '${hashMigrationDiff(approvedDiff)}', 'pending', 'failed', 'now', 'now')`);
         await db.scheme(`INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES ('${migrationId}', '${operationKey.replace(/'/g, "''")}', 'succeeded')`);
-        await controllerV2.migrate();
+        await controllerV2.migrate({ approvedDiff });
 
         const columns = await db.query<{ column_name: string }>(
             `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1`,
