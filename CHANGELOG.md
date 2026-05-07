@@ -1,5 +1,12 @@
 
 
+## [1.5.4](https://github.com/InteraqtDev/interaqt/compare/v1.5.3...v1.5.4) (2026-05-07)
+
+
+### Bug Fixes
+
+* require rebuild handlers for non-computable migrations ([0966a16](https://github.com/InteraqtDev/interaqt/commit/0966a16ea109b4c4afba1adc08a579dd0c602405))
+
 ## [1.5.3](https://github.com/InteraqtDev/interaqt/compare/v1.5.2...v1.5.3) (2026-05-07)
 
 
