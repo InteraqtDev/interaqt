@@ -1,5 +1,12 @@
 
 
+## [1.5.3](https://github.com/InteraqtDev/interaqt/compare/v1.5.2...v1.5.3) (2026-05-07)
+
+
+### Bug Fixes
+
+* accept reviewed event rebuild decisions ([775ad5c](https://github.com/InteraqtDev/interaqt/commit/775ad5cb3d728e854873376a7a6a65ec4b845a03))
+
 ## [1.5.1](https://github.com/InteraqtDev/interaqt/compare/v1.5.0...vnull) (2026-05-07)
 
 
