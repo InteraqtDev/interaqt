@@ -20,6 +20,7 @@ import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { NestedDispatchError, RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
+    addMissingRebuildHandlerRequirements,
     buildAffectedRebuildPlan,
     buildMigrationDiff,
     assertDestructiveScopeAllowed,
@@ -313,7 +314,7 @@ export class Controller {
             destructiveScopes,
         }
         const diff = buildMigrationDiff(previousManifest, nextManifest, schemaPlan, safety)
-        return diff
+        return addMissingRebuildHandlerRequirements(diff, this, provisionalRebuildPlan)
     }
 
     async generateMigrationDiff(options: GenerateMigrationDiffOptions = {}): Promise<MigrationDiffFile> {

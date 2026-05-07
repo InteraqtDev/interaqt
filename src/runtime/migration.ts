@@ -1030,6 +1030,28 @@ export function buildMigrationDiff(
     };
 }
 
+export function addMissingRebuildHandlerRequirements(diff: MigrationDiffFile, controller: Controller, rebuildPlan: ComputationRebuildItem[]) {
+    const handles = computationById(controller);
+    const requirements = new Map(diff.requiredDecisions.map(requirement => [requirementKey(requirement), requirement]));
+    for (const item of rebuildPlan) {
+        if (!item.rebuildOutput) continue;
+        const computation = handles.get(item.computationId);
+        if (!computation || typeof (computation as DataBasedComputation).compute === "function") continue;
+        const requirement: MigrationDecisionRequirement = {
+            kind: "event-rebuild-handler",
+            dataContext: item.dataContext,
+            reason: "computation without full compute support needs an external migration rebuild handler",
+        };
+        requirements.set(requirementKey(requirement), requirement);
+    }
+    diff.requiredDecisions = Array.from(requirements.values());
+    diff.summary = {
+        ...diff.summary,
+        requiredDecisionCount: diff.requiredDecisions.length,
+    };
+    return diff;
+}
+
 export function validateApprovedDiff(
     approvedDiff: MigrationDiffFile | undefined,
     previousManifest: MigrationManifest,

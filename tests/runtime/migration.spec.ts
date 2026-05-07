@@ -2603,6 +2603,68 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("StateMachine without transfers generates and accepts an event rebuild handler decision", async () => {
+        const db = new PGLiteDB();
+        const ProbeV1 = new Entity({
+            name: "MigrationProbeNoTransfer",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-probe-no-transfer-name" }),
+            ],
+        }, { uuid: "migration-probe-no-transfer" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProbeV1], relations: [] }).setup(true);
+        const alpha = await systemV1.storage.create("MigrationProbeNoTransfer", { name: "Alpha" });
+        const longer = await systemV1.storage.create("MigrationProbeNoTransfer", { name: "LongerName" });
+
+        const draft = new StateNode({
+            name: "current_lifecycle",
+            computeValue() {
+                return "draft";
+            },
+        }, { uuid: "migration-probe-no-transfer-draft" });
+        const lifecycle = new StateMachine({
+            states: [draft],
+            initialState: draft,
+            transfers: [],
+        }, { uuid: "migration-probe-no-transfer-lifecycle-computation" });
+        const ProbeV2 = new Entity({
+            name: "MigrationProbeNoTransfer",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-probe-no-transfer-name" }),
+                new Property({ name: "lifecycle", type: "string", computation: lifecycle }, { uuid: "migration-probe-no-transfer-lifecycle" }),
+            ],
+        }, { uuid: "migration-probe-no-transfer" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProbeV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.requiredDecisions.some(requirement =>
+            requirement.kind === "event-rebuild-handler" &&
+            requirement.dataContext === "property:MigrationProbeNoTransfer.lifecycle"
+        )).toBe(true);
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            eventHandlers: {
+                "property:MigrationProbeNoTransfer.lifecycle": "migrationProbeLifecycleDraft",
+            },
+        });
+        await controllerV2.migrate({
+            approvedDiff,
+            handlers: {
+                eventRebuild: {
+                    migrationProbeLifecycleDraft: async () => "draft",
+                },
+            },
+        });
+
+        const migratedAlpha = await systemV2.storage.findOne("MigrationProbeNoTransfer", MatchExp.atom({ key: "id", value: ["=", alpha.id] }), undefined, ["*"]);
+        const migratedLonger = await systemV2.storage.findOne("MigrationProbeNoTransfer", MatchExp.atom({ key: "id", value: ["=", longer.id] }), undefined, ["*"]);
+        expect(migratedAlpha.lifecycle).toBe("draft");
+        expect(migratedLonger.lifecycle).toBe("draft");
+        await db.close();
+    });
+
     test("StateMachine event rebuild decisions remain valid when regenerated expected diff omits the handler requirement", async () => {
         const db = new PGLiteDB();
         const ProbeV1 = new Entity({
