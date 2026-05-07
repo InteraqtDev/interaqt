@@ -1,5 +1,19 @@
 
 
+## [1.5.1](https://github.com/InteraqtDev/interaqt/compare/v1.5.0...vnull) (2026-05-07)
+
+
+### Bug Fixes
+
+* harden data migration safety gates ([f002598](https://github.com/InteraqtDev/interaqt/commit/f002598ad2a23bbe9e3ebc80942b42ecdafdad9c))
+
+## [1.5.1](https://github.com/InteraqtDev/interaqt/compare/v1.5.0...v1.5.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* harden data migration safety gates ([f002598](https://github.com/InteraqtDev/interaqt/commit/f002598ad2a23bbe9e3ebc80942b42ecdafdad9c))
+
 ## [1.5.0](https://github.com/InteraqtDev/interaqt/compare/v1.4.0...v1.5.0) (2026-05-06)
 
 
