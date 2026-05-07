@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, createMigrationManifest, hashMigrationDiff, readMigrationManifest, writeMigrationManifest } from "interaqt";
+import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, createMigrationManifest, hashMigrationDiff, readMigrationManifest, validateApprovedDiff, writeMigrationManifest } from "interaqt";
 import { PGLiteDB } from "@drivers";
 
 async function approveGeneratedMigrationDiff(controller: Controller, options: {
@@ -2600,6 +2600,63 @@ describe("Data migration phase 1", () => {
 
         const migrated = await systemV2.storage.findOne("MigrationStateMachineContractTicket", MatchExp.atom({ key: "id", value: ["=", ticket.id] }), undefined, ["*"]);
         expect(migrated.status).toBe("migrated");
+        await db.close();
+    });
+
+    test("StateMachine event rebuild decisions remain valid when regenerated expected diff omits the handler requirement", async () => {
+        const db = new PGLiteDB();
+        const ProbeV1 = new Entity({
+            name: "MigrationProbe",
+            properties: [new Property({ name: "title", type: "string" }, { uuid: "migration-probe-title" })],
+        }, { uuid: "migration-probe" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProbeV1], relations: [] }).setup(true);
+
+        const open = new StateNode({ name: "open" }, { uuid: "migration-probe-open" });
+        const closed = new StateNode({ name: "closed" }, { uuid: "migration-probe-closed" });
+        const lifecycle = new StateMachine({
+            states: [open, closed],
+            transfers: [
+                new StateTransfer({
+                    trigger: { recordName: "MigrationProbe", type: "update" },
+                    current: open,
+                    next: closed,
+                }, { uuid: "migration-probe-transfer" }),
+            ],
+            initialState: open,
+        }, { uuid: "migration-probe-lifecycle-computation" });
+        const ProbeV2 = new Entity({
+            name: "MigrationProbe",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-probe-title" }),
+                new Property({ name: "lifecycle", type: "string", computation: lifecycle }, { uuid: "migration-probe-lifecycle" }),
+            ],
+        }, { uuid: "migration-probe" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProbeV2], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            eventHandlers: {
+                "property:MigrationProbe.lifecycle": "probeLifecycleHandler",
+            },
+        });
+        const generatedDiff = await controllerV2.generateMigrationDiff();
+        const expectedDiffMissingEventRequirement = {
+            ...generatedDiff,
+            requiredDecisions: generatedDiff.requiredDecisions.filter(requirement =>
+                !(requirement.kind === "event-rebuild-handler" && requirement.dataContext === "property:MigrationProbe.lifecycle")
+            ),
+        };
+        const context = await (controllerV2 as any).prepareMigrationContext();
+
+        expect(() => validateApprovedDiff(
+            approvedDiff,
+            context.previousManifest,
+            context.nextManifest,
+            { eventRebuild: { probeLifecycleHandler: async () => "open" } },
+            expectedDiffMissingEventRequirement,
+        )).not.toThrow();
         await db.close();
     });
 

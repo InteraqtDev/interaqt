@@ -1050,7 +1050,11 @@ export function validateApprovedDiff(
         throw new MigrationError("Migration approvedDiff is stale: model hash does not match current database and code");
     }
     const expectedReview = expectedDiff || approvedDiff;
-    const requirementKeys = new Set(expectedReview.requiredDecisions.map(requirementKey));
+    const approvedRequirementKeys = new Set(approvedDiff.requiredDecisions.map(requirementKey));
+    const requirementKeys = new Set([
+        ...expectedReview.requiredDecisions.map(requirementKey),
+        ...approvedRequirementKeys,
+    ]);
     const changeKeys = new Set(expectedReview.changes.map(changeKey));
     const decisionKeys = new Set<string>();
     for (const decision of approvedDiff.decisions) {
