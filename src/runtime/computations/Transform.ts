@@ -58,6 +58,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
             const returnRecord = await this.transformCallback.call(this.controller, record)
             const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             transformedRecords.forEach((transformedRecord, index)=> {
+                if (!transformedRecord) return
                 result.push({
                     ...transformedRecord,
                     [this.state.sourceRecordId.key]: record.id,

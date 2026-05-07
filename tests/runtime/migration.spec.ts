@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Controller, ComputationResult, Count, Custom, Dictionary, Entity, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, createMigrationManifest, hashMigrationDiff, readMigrationManifest, writeMigrationManifest } from "interaqt";
+import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, createMigrationManifest, hashMigrationDiff, readMigrationManifest, writeMigrationManifest } from "interaqt";
 import { PGLiteDB } from "@drivers";
 
 async function approveGeneratedMigrationDiff(controller: Controller, options: {
@@ -432,6 +432,40 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("deleting async computed property reports unsupported internal task cleanup", async () => {
+        const db = new PGLiteDB();
+        const asyncNameCode = new Custom({
+            name: "MigrationAsyncDeleteNameCode",
+            compute: async () => ComputationResult.async({ value: "A" }),
+            asyncReturn: async () => "A",
+        }, { uuid: "migration-async-delete-name-code-computation" });
+        const ProbeV1 = new Entity({
+            name: "MigrationAsyncDeleteProbe",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-async-delete-name" }),
+                new Property({ name: "asyncNameCode", type: "string", computation: asyncNameCode }, { uuid: "migration-async-delete-name-code" }),
+            ],
+        }, { uuid: "migration-async-delete-probe" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProbeV1], relations: [] }).setup(true);
+
+        const ProbeV2 = new Entity({
+            name: "MigrationAsyncDeleteProbe",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-async-delete-name" }),
+            ],
+        }, { uuid: "migration-async-delete-probe" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProbeV2], relations: [] });
+        const plan = await dryRunWithApproval(controllerV2);
+
+        expect(plan.blockingChanges.join("\n")).toMatch(/_ASYNC_TASK__MigrationAsyncDeleteProbe_asyncNameCode/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/async task record cleanup is not supported/);
+        await db.close();
+    });
+
     test("async completion handler resolves async computation before success", async () => {
         const db = new PGLiteDB();
         const SourceV1 = new Entity({
@@ -721,6 +755,175 @@ describe("Data migration phase 1", () => {
 
         const outputs = await systemV2.storage.find("MigrationTransformDeleteOutput", undefined, undefined, ["value"]);
         expect(outputs.map(output => output.value)).toEqual([20]);
+        await db.close();
+    });
+
+    test("event-based Transform dry-run requires an external rebuild handler", async () => {
+        const db = new PGLiteDB();
+        const SourceV1 = new Entity({
+            name: "MigrationEventTransformSource",
+            properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-event-transform-source-value" })],
+        }, { uuid: "migration-event-transform-source" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [SourceV1], relations: [] }).setup(true);
+
+        const SourceV2 = new Entity({
+            name: "MigrationEventTransformSource",
+            properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-event-transform-source-value" })],
+        }, { uuid: "migration-event-transform-source" });
+        const eventTransform = new Transform({
+            eventDeps: {
+                sourceUpdated: { recordName: "MigrationEventTransformSource", type: "update" },
+            },
+            callback: (event: any) => ({ value: event.record?.value ?? 0 }),
+        }, { uuid: "migration-event-transform-computation" });
+        const Output = new Entity({
+            name: "MigrationEventTransformOutput",
+            properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-event-transform-output-value" })],
+            computation: eventTransform,
+        }, { uuid: "migration-event-transform-output" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2, Output], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.requiredDecisions.some(item => item.kind === "event-rebuild-handler" && item.dataContext === "entity:MigrationEventTransformOutput")).toBe(true);
+        await expect(dryRunWithApproval(controllerV2)).rejects.toThrow(/Missing migration event rebuild handler/);
+        await db.close();
+    });
+
+    test("migrate rebuilds added Transform relation output from existing relation records", async () => {
+        const db = new PGLiteDB();
+        const UserV1 = new Entity({
+            name: "MigrationRelationTransformUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-transform-user-name" })],
+        }, { uuid: "migration-relation-transform-user" });
+        const TaskV1 = new Entity({
+            name: "MigrationRelationTransformTask",
+            properties: [new Property({ name: "status", type: "string" }, { uuid: "migration-relation-transform-task-status" })],
+        }, { uuid: "migration-relation-transform-task" });
+        const OwnsTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "tasks",
+            target: TaskV1,
+            targetProperty: "owner",
+            name: "MigrationRelationTransformOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-transform-owns-task" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1], relations: [OwnsTaskV1] }).setup(true);
+        const user = await systemV1.storage.create("MigrationRelationTransformUser", { name: "Alice" });
+        const openTask = await systemV1.storage.create("MigrationRelationTransformTask", { status: "open" });
+        const closedTask = await systemV1.storage.create("MigrationRelationTransformTask", { status: "closed" });
+        await systemV1.storage.addRelationByNameById("MigrationRelationTransformOwnsTask", user.id, openTask.id);
+        await systemV1.storage.addRelationByNameById("MigrationRelationTransformOwnsTask", user.id, closedTask.id);
+
+        const UserV2 = new Entity({
+            name: "MigrationRelationTransformUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-transform-user-name" })],
+        }, { uuid: "migration-relation-transform-user" });
+        const TaskV2 = new Entity({
+            name: "MigrationRelationTransformTask",
+            properties: [new Property({ name: "status", type: "string" }, { uuid: "migration-relation-transform-task-status" })],
+        }, { uuid: "migration-relation-transform-task" });
+        const OwnsTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "tasks",
+            target: TaskV2,
+            targetProperty: "owner",
+            name: "MigrationRelationTransformOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-transform-owns-task" });
+        const transform = new Transform({
+            record: OwnsTaskV2,
+            attributeQuery: [
+                ["source", { attributeQuery: ["id"] }],
+                ["target", { attributeQuery: ["id", "status"] }],
+            ],
+            callback: (relation: any) => relation.target.status === "open"
+                ? { source: relation.source, target: relation.target }
+                : null,
+        }, { uuid: "migration-relation-transform-computation" });
+        const OpenTask = new Relation({
+            source: UserV2,
+            sourceProperty: "openTasks",
+            target: TaskV2,
+            targetProperty: "openOwner",
+            name: "MigrationRelationTransformOpenTask",
+            type: "1:n",
+            computation: transform,
+        }, { uuid: "migration-relation-transform-open-task" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2, OpenTask] });
+        const plan = await migrateWithApproval(controllerV2);
+
+        expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toContain("relation:MigrationRelationTransformOpenTask");
+        const migratedUser = await systemV2.storage.findOne(
+            "MigrationRelationTransformUser",
+            MatchExp.atom({ key: "id", value: ["=", user.id] }),
+            undefined,
+            [["openTasks", { attributeQuery: ["id", "status"] }]],
+        );
+        expect(migratedUser.openTasks).toHaveLength(1);
+        expect(migratedUser.openTasks[0].id).toBe(openTask.id);
+        await db.close();
+    });
+
+    test("non-Transform entity and relation output computations are blocked in dry-run", async () => {
+        const db = new PGLiteDB();
+        const UserV1 = new Entity({
+            name: "MigrationCustomOutputUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-output-user-name" })],
+        }, { uuid: "migration-custom-output-user" });
+        const TaskV1 = new Entity({
+            name: "MigrationCustomOutputTask",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-output-task-name" })],
+        }, { uuid: "migration-custom-output-task" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1], relations: [] }).setup(true);
+
+        const UserV2 = new Entity({
+            name: "MigrationCustomOutputUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-output-user-name" })],
+        }, { uuid: "migration-custom-output-user" });
+        const TaskV2 = new Entity({
+            name: "MigrationCustomOutputTask",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-output-task-name" })],
+        }, { uuid: "migration-custom-output-task" });
+        const customEntity = new Custom({
+            name: "MigrationCustomOutputEntityComputation",
+            compute: async () => [{ label: "derived" }],
+        }, { uuid: "migration-custom-output-entity-computation" });
+        const DerivedEntity = new Entity({
+            name: "MigrationCustomOutputDerived",
+            properties: [new Property({ name: "label", type: "string" }, { uuid: "migration-custom-output-derived-label" })],
+            computation: customEntity,
+        }, { uuid: "migration-custom-output-derived" });
+        const customRelation = new Custom({
+            name: "MigrationCustomOutputRelationComputation",
+            compute: async () => [],
+        }, { uuid: "migration-custom-output-relation-computation" });
+        const DerivedRelation = new Relation({
+            source: UserV2,
+            sourceProperty: "derivedTasks",
+            target: TaskV2,
+            targetProperty: "derivedUsers",
+            name: "MigrationCustomOutputDerivedRelation",
+            type: "n:n",
+            computation: customRelation,
+        }, { uuid: "migration-custom-output-derived-relation" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2, DerivedEntity], relations: [DerivedRelation] });
+        const plan = await dryRunWithApproval(controllerV2);
+
+        expect(plan.blockingChanges.join("\n")).toMatch(/entity:MigrationCustomOutputDerived/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/relation:MigrationCustomOutputDerivedRelation/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/data-based Transform with sourceRecordId and transformIndex/);
         await db.close();
     });
 
@@ -1031,6 +1234,68 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("dry-run explicitly blocks removed fact entities", async () => {
+        const db = new PGLiteDB();
+        const Kept = new Entity({
+            name: "MigrationEntityDeleteKept",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-entity-delete-kept-name" })],
+        }, { uuid: "migration-entity-delete-kept" });
+        const Throwaway = new Entity({
+            name: "MigrationEntityDeleteThrowaway",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-entity-delete-throwaway-name" })],
+        }, { uuid: "migration-entity-delete-throwaway" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [Kept, Throwaway], relations: [] }).setup(true);
+
+        const KeptV2 = new Entity({
+            name: "MigrationEntityDeleteKept",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-entity-delete-kept-name" })],
+        }, { uuid: "migration-entity-delete-kept" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [KeptV2], relations: [] });
+        const plan = await dryRunWithApproval(controllerV2);
+
+        expect(plan.blockingChanges.join("\n")).toMatch(/unsupported-destructive-schema-change: MigrationEntityDeleteThrowaway/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/fact record was removed/);
+        await db.close();
+    });
+
+    test("dry-run reports computed property deletion physical cleanup as unsupported", async () => {
+        const db = new PGLiteDB();
+        const nameCode = new Custom({
+            name: "MigrationComputedDeleteNameCode",
+            dataDeps: { current: { type: "property", attributeQuery: ["name"] } },
+            compute: async (_deps: any, record: any) => record.name.toUpperCase(),
+        }, { uuid: "migration-computed-delete-name-code-computation" });
+        const ProbeV1 = new Entity({
+            name: "MigrationComputedDeleteProbe",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-computed-delete-name" }),
+                new Property({ name: "nameCode", type: "string", computation: nameCode }, { uuid: "migration-computed-delete-name-code" }),
+            ],
+        }, { uuid: "migration-computed-delete-probe" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProbeV1], relations: [] }).setup(true);
+
+        const ProbeV2 = new Entity({
+            name: "MigrationComputedDeleteProbe",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-computed-delete-name" }),
+            ],
+        }, { uuid: "migration-computed-delete-probe" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProbeV2], relations: [] });
+        const plan = await dryRunWithApproval(controllerV2);
+
+        expect(plan.blockingChanges.join("\n")).toMatch(/MigrationComputedDeleteProbe\.nameCode/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/computed attribute physical cleanup is not supported/);
+        await db.close();
+    });
+
     test("migrate recomputes downstream global computations in dependency order", async () => {
         const db = new PGLiteDB();
         const SourceV1 = new Entity({
@@ -1122,6 +1387,405 @@ describe("Data migration phase 1", () => {
         const migrated = await systemV2.storage.findOne("MigrationPropertyChainItem", MatchExp.atom({ key: "id", value: ["=", item.id] }), undefined, ["*"]);
         expect(migrated.a).toBe(6);
         expect(migrated.b).toBe(7);
+        await db.close();
+    });
+
+    test("migrates added global built-in aggregate computations", async () => {
+        const cases = [
+            {
+                key: "Average",
+                type: "number",
+                createComputation: (Source: Entity) => new Average({
+                    record: Source,
+                    attributeQuery: ["value"],
+                }, { uuid: "migration-builtin-global-average-computation" }),
+                expected: 15,
+            },
+            {
+                key: "WeightedSummation",
+                type: "number",
+                createComputation: (Source: Entity) => new WeightedSummation({
+                    record: Source,
+                    attributeQuery: ["value"],
+                    callback: (item: any) => ({ weight: 2, value: item.value }),
+                }, { uuid: "migration-builtin-global-weighted-computation" }),
+                expected: 60,
+            },
+            {
+                key: "Any",
+                type: "boolean",
+                createComputation: (Source: Entity) => new Any({
+                    record: Source,
+                    attributeQuery: ["value"],
+                    callback: (item: any) => item.value > 15,
+                }, { uuid: "migration-builtin-global-any-computation" }),
+                expected: true,
+            },
+            {
+                key: "Every",
+                type: "boolean",
+                createComputation: (Source: Entity) => new Every({
+                    record: Source,
+                    attributeQuery: ["value"],
+                    callback: (item: any) => item.value >= 10,
+                    notEmpty: true,
+                }, { uuid: "migration-builtin-global-every-computation" }),
+                expected: true,
+            },
+        ];
+
+        for (const item of cases) {
+            const db = new PGLiteDB();
+            const SourceV1 = new Entity({
+                name: `MigrationBuiltinGlobal${item.key}Source`,
+                properties: [
+                    new Property({ name: "value", type: "number" }, { uuid: `migration-builtin-global-${item.key}-value` }),
+                ],
+            }, { uuid: `migration-builtin-global-${item.key}-source` });
+            const systemV1 = new MonoSystem(db);
+            systemV1.conceptClass = KlassByName;
+            await new Controller({ system: systemV1, entities: [SourceV1], relations: [] }).setup(true);
+            await systemV1.storage.create(`MigrationBuiltinGlobal${item.key}Source`, { value: 10 });
+            await systemV1.storage.create(`MigrationBuiltinGlobal${item.key}Source`, { value: 20 });
+
+            const SourceV2 = new Entity({
+                name: `MigrationBuiltinGlobal${item.key}Source`,
+                properties: [
+                    new Property({ name: "value", type: "number" }, { uuid: `migration-builtin-global-${item.key}-value` }),
+                ],
+            }, { uuid: `migration-builtin-global-${item.key}-source` });
+            const dictName = `migrationBuiltinGlobal${item.key}Value`;
+            const dict = new Dictionary({
+                name: dictName,
+                type: item.type,
+                collection: false,
+                computation: item.createComputation(SourceV2),
+            }, { uuid: `migration-builtin-global-${item.key}-dict` });
+            const systemV2 = new MonoSystem(db);
+            systemV2.conceptClass = KlassByName;
+            const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [dict] });
+            const plan = await migrateWithApproval(controllerV2);
+
+            expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toContain(`global:${dictName}`);
+            expect(await systemV2.storage.dict.get(dictName)).toBe(item.expected);
+            await db.close();
+        }
+    });
+
+    test("approved changed and unchanged decisions control built-in global aggregate rebuilds", async () => {
+        const cases = [
+            {
+                key: "Average",
+                type: "number",
+                createInitial: (Source: Entity) => new Average({ record: Source, attributeQuery: ["value"] }, { uuid: "migration-builtin-review-average-computation" }),
+                createChanged: (Source: Entity) => new Average({ record: Source, attributeQuery: ["bonus"] }, { uuid: "migration-builtin-review-average-computation" }),
+                initial: 15,
+                changed: 150,
+            },
+            {
+                key: "WeightedSummation",
+                type: "number",
+                createInitial: (Source: Entity) => new WeightedSummation({
+                    record: Source,
+                    attributeQuery: ["value", "bonus"],
+                    callback: (item: any) => ({ weight: 1, value: item.value }),
+                }, { uuid: "migration-builtin-review-weighted-computation" }),
+                createChanged: (Source: Entity) => new WeightedSummation({
+                    record: Source,
+                    attributeQuery: ["value", "bonus"],
+                    callback: (item: any) => ({ weight: 2, value: item.bonus }),
+                }, { uuid: "migration-builtin-review-weighted-computation" }),
+                initial: 30,
+                changed: 600,
+            },
+            {
+                key: "Any",
+                type: "boolean",
+                createInitial: (Source: Entity) => new Any({
+                    record: Source,
+                    attributeQuery: ["value", "bonus"],
+                    callback: (item: any) => item.value > 15,
+                }, { uuid: "migration-builtin-review-any-computation" }),
+                createChanged: (Source: Entity) => new Any({
+                    record: Source,
+                    attributeQuery: ["value", "bonus"],
+                    callback: (item: any) => item.bonus > 250,
+                }, { uuid: "migration-builtin-review-any-computation" }),
+                initial: true,
+                changed: false,
+            },
+            {
+                key: "Every",
+                type: "boolean",
+                createInitial: (Source: Entity) => new Every({
+                    record: Source,
+                    attributeQuery: ["value", "bonus"],
+                    callback: (item: any) => item.value >= 10,
+                    notEmpty: true,
+                }, { uuid: "migration-builtin-review-every-computation" }),
+                createChanged: (Source: Entity) => new Every({
+                    record: Source,
+                    attributeQuery: ["value", "bonus"],
+                    callback: (item: any) => item.bonus > 150,
+                    notEmpty: true,
+                }, { uuid: "migration-builtin-review-every-computation" }),
+                initial: true,
+                changed: false,
+            },
+        ];
+
+        for (const item of cases) {
+            for (const decision of ["changed", "unchanged"] as const) {
+                const db = new PGLiteDB();
+                const SourceV1 = new Entity({
+                    name: `MigrationBuiltinReview${item.key}Source${decision}`,
+                    properties: [
+                        new Property({ name: "value", type: "number" }, { uuid: `migration-builtin-review-${item.key}-${decision}-value` }),
+                        new Property({ name: "bonus", type: "number" }, { uuid: `migration-builtin-review-${item.key}-${decision}-bonus` }),
+                    ],
+                }, { uuid: `migration-builtin-review-${item.key}-${decision}-source` });
+                const dictName = `migrationBuiltinReview${item.key}Value${decision}`;
+                const dictV1 = new Dictionary({
+                    name: dictName,
+                    type: item.type,
+                    collection: false,
+                    computation: item.createInitial(SourceV1),
+                }, { uuid: `migration-builtin-review-${item.key}-${decision}-dict` });
+                const systemV1 = new MonoSystem(db);
+                systemV1.conceptClass = KlassByName;
+                await new Controller({ system: systemV1, entities: [SourceV1], relations: [], dict: [dictV1] }).setup(true);
+                await systemV1.storage.create(`MigrationBuiltinReview${item.key}Source${decision}`, { value: 10, bonus: 100 });
+                await systemV1.storage.create(`MigrationBuiltinReview${item.key}Source${decision}`, { value: 20, bonus: 200 });
+                expect(await systemV1.storage.dict.get(dictName)).toBe(item.initial);
+
+                const SourceV2 = new Entity({
+                    name: `MigrationBuiltinReview${item.key}Source${decision}`,
+                    properties: [
+                        new Property({ name: "value", type: "number" }, { uuid: `migration-builtin-review-${item.key}-${decision}-value` }),
+                        new Property({ name: "bonus", type: "number" }, { uuid: `migration-builtin-review-${item.key}-${decision}-bonus` }),
+                    ],
+                }, { uuid: `migration-builtin-review-${item.key}-${decision}-source` });
+                const dictV2 = new Dictionary({
+                    name: dictName,
+                    type: item.type,
+                    collection: false,
+                    computation: item.createChanged(SourceV2),
+                }, { uuid: `migration-builtin-review-${item.key}-${decision}-dict` });
+                const systemV2 = new MonoSystem(db);
+                systemV2.conceptClass = KlassByName;
+                const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [dictV2] });
+                const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+                const reviewedDiff = {
+                    ...approvedDiff,
+                    decisions: approvedDiff.decisions.map(itemDecision => itemDecision.kind === "computation" && itemDecision.dataContext === `global:${dictName}`
+                        ? { ...itemDecision, decision }
+                        : itemDecision),
+                };
+                const plan = await migrateWithApproval(controllerV2, { approvedDiff: reviewedDiff });
+
+                if (decision === "changed") {
+                    expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toContain(`global:${dictName}`);
+                    expect(await systemV2.storage.dict.get(dictName)).toBe(item.changed);
+                } else {
+                    expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).not.toContain(`global:${dictName}`);
+                    expect(await systemV2.storage.dict.get(dictName)).toBe(item.initial);
+                }
+                await db.close();
+            }
+        }
+    });
+
+    test("migrates added relation property aggregate built-ins", async () => {
+        const db = new PGLiteDB();
+        const TaskV1 = new Entity({
+            name: "MigrationBuiltinRelationTask",
+            properties: [
+                new Property({ name: "score", type: "number" }, { uuid: "migration-builtin-relation-task-score" }),
+                new Property({ name: "weight", type: "number" }, { uuid: "migration-builtin-relation-task-weight" }),
+                new Property({ name: "priority", type: "string" }, { uuid: "migration-builtin-relation-task-priority" }),
+                new Property({ name: "done", type: "boolean" }, { uuid: "migration-builtin-relation-task-done" }),
+            ],
+        }, { uuid: "migration-builtin-relation-task" });
+        const UserV1 = new Entity({
+            name: "MigrationBuiltinRelationUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-builtin-relation-user-name" })],
+        }, { uuid: "migration-builtin-relation-user" });
+        const OwnsTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "tasks",
+            target: TaskV1,
+            targetProperty: "owner",
+            name: "MigrationBuiltinRelationOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-builtin-relation-owns-task" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1], relations: [OwnsTaskV1] }).setup(true);
+        const user = await systemV1.storage.create("MigrationBuiltinRelationUser", { name: "Alice" });
+        const task1 = await systemV1.storage.create("MigrationBuiltinRelationTask", { score: 10, weight: 1, priority: "low", done: true });
+        const task2 = await systemV1.storage.create("MigrationBuiltinRelationTask", { score: 20, weight: 2, priority: "high", done: true });
+        await systemV1.storage.addRelationByNameById("MigrationBuiltinRelationOwnsTask", user.id, task1.id);
+        await systemV1.storage.addRelationByNameById("MigrationBuiltinRelationOwnsTask", user.id, task2.id);
+
+        const TaskV2 = new Entity({
+            name: "MigrationBuiltinRelationTask",
+            properties: [
+                new Property({ name: "score", type: "number" }, { uuid: "migration-builtin-relation-task-score" }),
+                new Property({ name: "weight", type: "number" }, { uuid: "migration-builtin-relation-task-weight" }),
+                new Property({ name: "priority", type: "string" }, { uuid: "migration-builtin-relation-task-priority" }),
+                new Property({ name: "done", type: "boolean" }, { uuid: "migration-builtin-relation-task-done" }),
+            ],
+        }, { uuid: "migration-builtin-relation-task" });
+        const avgScore = new Average({
+            property: "tasks",
+            attributeQuery: ["score"],
+        }, { uuid: "migration-builtin-relation-average-computation" });
+        const weightedScore = new WeightedSummation({
+            property: "tasks",
+            attributeQuery: ["score", "weight"],
+            callback: (task: any) => ({ value: task.score, weight: task.weight }),
+        }, { uuid: "migration-builtin-relation-weighted-computation" });
+        const hasHighPriority = new Any({
+            property: "tasks",
+            attributeQuery: ["priority"],
+            callback: (task: any) => task.priority === "high",
+        }, { uuid: "migration-builtin-relation-any-computation" });
+        const allDone = new Every({
+            property: "tasks",
+            attributeQuery: ["done"],
+            callback: (task: any) => task.done === true,
+            notEmpty: true,
+        }, { uuid: "migration-builtin-relation-every-computation" });
+        const UserV2 = new Entity({
+            name: "MigrationBuiltinRelationUser",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-builtin-relation-user-name" }),
+                new Property({ name: "avgScore", type: "number", computation: avgScore }, { uuid: "migration-builtin-relation-user-avg" }),
+                new Property({ name: "weightedScore", type: "number", computation: weightedScore }, { uuid: "migration-builtin-relation-user-weighted" }),
+                new Property({ name: "hasHighPriority", type: "boolean", computation: hasHighPriority }, { uuid: "migration-builtin-relation-user-any" }),
+                new Property({ name: "allDone", type: "boolean", computation: allDone }, { uuid: "migration-builtin-relation-user-every" }),
+            ],
+        }, { uuid: "migration-builtin-relation-user" });
+        const OwnsTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "tasks",
+            target: TaskV2,
+            targetProperty: "owner",
+            name: "MigrationBuiltinRelationOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-builtin-relation-owns-task" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2] });
+        const plan = await migrateWithApproval(controllerV2);
+
+        expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toEqual([
+            "property:MigrationBuiltinRelationUser.avgScore",
+            "property:MigrationBuiltinRelationUser.weightedScore",
+            "property:MigrationBuiltinRelationUser.hasHighPriority",
+            "property:MigrationBuiltinRelationUser.allDone",
+        ]);
+        const migrated = await systemV2.storage.findOne("MigrationBuiltinRelationUser", MatchExp.atom({ key: "id", value: ["=", user.id] }), undefined, ["*"]);
+        expect(migrated.avgScore).toBe(15);
+        expect(migrated.weightedScore).toBe(50);
+        expect(migrated.hasHighPriority).toBe(true);
+        expect(migrated.allDone).toBe(true);
+        await db.close();
+    });
+
+    test("migrates added RealTime global and property computations", async () => {
+        const db = new PGLiteDB();
+        const SourceV1 = new Entity({
+            name: "MigrationRealTimeSource",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-realtime-source-name" })],
+        }, { uuid: "migration-realtime-source" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [SourceV1], relations: [] }).setup(true);
+        const source = await systemV1.storage.create("MigrationRealTimeSource", { name: "A" });
+
+        const globalClock = new RealTime({
+            callback: async (now: Expression) => now.subtract(now).add(1),
+            nextRecomputeTime: () => 1000,
+        }, { uuid: "migration-realtime-global-computation" });
+        const clockDict = new Dictionary({
+            name: "migrationRealTimeGlobal",
+            type: "number",
+            collection: false,
+            computation: globalClock,
+        }, { uuid: "migration-realtime-global-dict" });
+        const propertyClock = new RealTime({
+            attributeQuery: ["name"],
+            callback: async (now: Expression) => now.subtract(now).add(2),
+            nextRecomputeTime: () => 1000,
+        }, { uuid: "migration-realtime-property-computation" });
+        const SourceV2 = new Entity({
+            name: "MigrationRealTimeSource",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-realtime-source-name" }),
+                new Property({ name: "clockValue", type: "number", computation: propertyClock }, { uuid: "migration-realtime-source-clock" }),
+            ],
+        }, { uuid: "migration-realtime-source" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [clockDict] });
+        const plan = await migrateWithApproval(controllerV2);
+
+        expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toEqual([
+            "global:migrationRealTimeGlobal",
+            "property:MigrationRealTimeSource.clockValue",
+        ]);
+        expect(await systemV2.storage.dict.get("migrationRealTimeGlobal")).toBe(1);
+        const migrated = await systemV2.storage.findOne("MigrationRealTimeSource", MatchExp.atom({ key: "id", value: ["=", source.id] }), undefined, ["*"]);
+        expect(migrated.clockValue).toBe(2);
+        await db.close();
+    });
+
+    test("global StateMachine migration uses approved event rebuild handler", async () => {
+        const db = new PGLiteDB();
+        const SourceV1 = new Entity({
+            name: "MigrationGlobalStateMachineSource",
+            properties: [new Property({ name: "title", type: "string" }, { uuid: "migration-global-sm-source-title" })],
+        }, { uuid: "migration-global-sm-source" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [SourceV1], relations: [] }).setup(true);
+
+        const SourceV2 = new Entity({
+            name: "MigrationGlobalStateMachineSource",
+            properties: [new Property({ name: "title", type: "string" }, { uuid: "migration-global-sm-source-title" })],
+        }, { uuid: "migration-global-sm-source" });
+        const idle = new StateNode({ name: "idle" }, { uuid: "migration-global-sm-idle" });
+        const active = new StateNode({ name: "active" }, { uuid: "migration-global-sm-active" });
+        const machine = new StateMachine({
+            states: [idle, active],
+            transfers: [
+                new StateTransfer({
+                    trigger: { recordName: "MigrationGlobalStateMachineSource", type: "update" },
+                    current: idle,
+                    next: active,
+                }, { uuid: "migration-global-sm-transfer" }),
+            ],
+            initialState: idle,
+        }, { uuid: "migration-global-sm-computation" });
+        const dict = new Dictionary({
+            name: "migrationGlobalStateMachine",
+            type: "string",
+            collection: false,
+            computation: machine,
+        }, { uuid: "migration-global-sm-dict" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2], relations: [], dict: [dict] });
+        await migrateWithApproval(controllerV2, {
+            handlers: {
+                eventRebuild: {
+                    "global:migrationGlobalStateMachine": async () => "migrated",
+                },
+            },
+        });
+
+        expect(await systemV2.storage.dict.get("migrationGlobalStateMachine")).toBe("migrated");
         await db.close();
     });
 

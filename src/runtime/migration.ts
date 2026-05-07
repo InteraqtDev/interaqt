@@ -1297,13 +1297,21 @@ export function getStorageBlockingChanges(oldManifest: MigrationManifest, newMan
     const newRecords = new Map(newManifest.storage.records.map(record => [record.recordName, record]));
     const oldLogicalRecords = new Map(oldManifest.records.map(record => [record.name, record]));
     const newLogicalRecords = new Map(newManifest.records.map(record => [record.name, record]));
+    const isAsyncTaskRecord = (recordName: string) => recordName.startsWith("_ASYNC_TASK__");
+    const isComputedOutputRecord = (recordName: string) =>
+        oldManifest.computations.some(computation => computation.outputRecord === recordName);
     for (const oldRecord of oldManifest.storage.records) {
         if (!newRecords.has(oldRecord.recordName) && !oldRecord.isFiltered) {
+            const reason = isAsyncTaskRecord(oldRecord.recordName)
+                ? "framework-generated async task record cleanup is not supported by compute-route schema migration"
+                : isComputedOutputRecord(oldRecord.recordName)
+                    ? "computed output record physical cleanup is not supported by compute-route schema migration"
+                    : "fact record was removed from the new schema";
             blocking.push({
                 kind: "unsupported-destructive-schema-change",
                 logicalPath: oldRecord.recordName,
                 oldPhysicalPath: oldRecord.tableName,
-                reason: "fact record was removed from the new schema",
+                reason,
             });
         }
     }
@@ -1329,12 +1337,15 @@ export function getStorageBlockingChanges(oldManifest: MigrationManifest, newMan
         };
         for (const oldAttr of oldRecord.attributeDetails || []) {
             const newAttr = newAttrs.get(oldAttr.name);
-            if (!newAttr && !oldAttr.name.startsWith("_") && !isComputed(oldRecord.recordName, oldAttr.name, oldManifest)) {
+            if (!newAttr && !oldAttr.name.startsWith("_")) {
+                const oldComputed = isComputed(oldRecord.recordName, oldAttr.name, oldManifest);
                 blocking.push({
                     kind: "unsupported-destructive-schema-change",
                     logicalPath: `${oldRecord.recordName}.${oldAttr.name}`,
                     oldPhysicalPath: physicalPath(oldAttr.tableName, oldAttr.fieldName || oldAttr.sourceField || oldAttr.targetField),
-                    reason: "fact attribute was removed from the new schema",
+                    reason: oldComputed
+                        ? "computed attribute physical cleanup is not supported by compute-route schema migration"
+                        : "fact attribute was removed from the new schema",
                 });
             }
         }
@@ -1398,6 +1409,17 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
         if ((computation.dataContext.type === "entity" || computation.dataContext.type === "relation") && !(computation as DataBasedComputation).compute) {
             blockingChanges.push({ kind: "unrebuildable-computation", logicalPath: dataContext, reason: "entity/relation output lacks a full compute contract" });
         }
+        if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
+            const sourceKey = (computation.state as any)?.sourceRecordId?.key;
+            const indexKey = (computation.state as any)?.transformIndex?.key;
+            if (!sourceKey || !indexKey || typeof (computation as EventBasedComputation).eventDeps === "object") {
+                blockingChanges.push({
+                    kind: "unrebuildable-computation",
+                    logicalPath: dataContext,
+                    reason: "entity/relation output migration requires a data-based Transform with sourceRecordId and transformIndex state",
+                });
+            }
+        }
         if ((computation.dataContext.type === "entity" || computation.dataContext.type === "relation") && oldManifest && !hasExclusiveOutputOwnershipProof(oldManifest, computationId, dataContext, computation.dataContext.id.name)) {
             blockingChanges.push({
                 kind: "destructive-computed-output",
@@ -1405,7 +1427,7 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
                 reason: "entity/relation output replacement requires exclusive output ownership proof in the previous manifest",
             });
         }
-        if (typeof (computation as EventBasedComputation).eventDeps === "object" && !(computation as DataBasedComputation).compute && !getEventRebuildHandler(options, dataContext)) {
+        if (typeof (computation as EventBasedComputation).eventDeps === "object" && !getEventRebuildHandler(options, dataContext)) {
             blockingChanges.push({ kind: "unrebuildable-computation", logicalPath: dataContext, reason: "event-based computation requires an approved event-rebuild-handler decision and runtime handler" });
         }
     }
