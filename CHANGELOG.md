@@ -1,5 +1,7 @@
 
 
+## [1.5.6](https://github.com/InteraqtDev/interaqt/compare/v1.5.5...v1.5.6) (2026-05-14)
+
 ## [1.5.5](https://github.com/InteraqtDev/interaqt/compare/v1.5.4...v1.5.5) (2026-05-14)
 
 
