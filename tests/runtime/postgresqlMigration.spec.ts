@@ -86,6 +86,15 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
             reason: "approved by PostgreSQL migration test",
           };
         }
+        if (requirement.kind === "empty-fact-record-removal") {
+          return {
+            kind: "empty-fact-record-removal" as const,
+            recordName: requirement.recordName,
+            tableName: requirement.tableName,
+            expectedCount: requirement.expectedCount,
+            reason: "approved by PostgreSQL migration test",
+          };
+        }
         return {
           kind: "destructive-scope" as const,
           dataContext: requirement.dataContext,
@@ -105,6 +114,15 @@ async function tableColumns(system: MonoSystem, tableName: string) {
     [tableName],
   );
   return columns.map(column => column.column_name);
+}
+
+async function tableExists(system: MonoSystem, tableName: string) {
+  const dbHandle = (system as unknown as { db: PostgreSQLDB }).db;
+  const rows = await dbHandle.query<{ exists: number }>(
+    `SELECT 1 AS "exists" FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1`,
+    [tableName],
+  );
+  return rows.length > 0;
 }
 
 describeIfPostgres("PostgreSQL migration integration", () => {
@@ -406,6 +424,7 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     systemV1.conceptClass = KlassByName;
     await new Controller({ system: systemV1, entities: [SourceV1, Throwaway], relations: [] }).setup(true);
     await systemV1.storage.create("PgSafetySource", { name: "A" });
+    await systemV1.storage.create("PgSafetyThrowaway", { name: "must block" });
     await systemV1.destroy();
 
     const SourceV2 = new Entity({
@@ -472,6 +491,43 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     expect(blocking).toMatch(/unsupported-destructive-schema-change: PgSafetyThrowaway/);
     expect(blocking).toMatch(/entity:PgSafetyUnsafeOutput/);
     expect(blocking).toMatch(/data-based Transform with sourceRecordId and transformIndex/);
+    await systemV2.destroy();
+  });
+
+  test("drops approved empty fact tables on PostgreSQL", async () => {
+    const database = `${process.env.INTERAQT_POSTGRES_DATABASE!}_empty_fact_cleanup`;
+    const ProductV1 = new Entity({
+      name: "PgEmptyFactProduct",
+      properties: [new Property({ name: "name", type: "string" }, { uuid: "pg-empty-fact-product-name" })],
+    }, { uuid: "pg-empty-fact-product" });
+    const RetiredV1 = new Entity({
+      name: "PgEmptyFactRetired",
+      properties: [new Property({ name: "note", type: "string" }, { uuid: "pg-empty-fact-retired-note" })],
+    }, { uuid: "pg-empty-fact-retired" });
+    const systemV1 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    systemV1.conceptClass = KlassByName;
+    await new Controller({ system: systemV1, entities: [ProductV1, RetiredV1], relations: [] }).setup(true);
+    expect(await tableExists(systemV1, "PgEmptyFactRetired")).toBe(true);
+    await systemV1.destroy();
+
+    const ProductV2 = new Entity({
+      name: "PgEmptyFactProduct",
+      properties: [new Property({ name: "name", type: "string" }, { uuid: "pg-empty-fact-product-name" })],
+    }, { uuid: "pg-empty-fact-product" });
+    const systemV2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    systemV2.conceptClass = KlassByName;
+    const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+    const diff = await controllerV2.generateMigrationDiff();
+    expect(diff.requiredDecisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "empty-fact-record-removal", recordName: "PgEmptyFactRetired", expectedCount: 0 }),
+    ]));
+    const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+    const plan = await controllerV2.migrate({ approvedDiff });
+
+    expect(plan.schemaPlan?.postRecomputeDDL).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "drop-empty-fact-table", logicalPath: "PgEmptyFactRetired" }),
+    ]));
+    expect(await tableExists(systemV2, "PgEmptyFactRetired")).toBe(false);
     await systemV2.destroy();
   });
 

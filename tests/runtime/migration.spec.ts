@@ -56,6 +56,15 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
                     reason: "approved by migration test",
                 };
             }
+            if (requirement.kind === "empty-fact-record-removal") {
+                return {
+                    kind: "empty-fact-record-removal" as const,
+                    recordName: requirement.recordName,
+                    tableName: requirement.tableName,
+                    expectedCount: requirement.expectedCount,
+                    reason: "approved by migration test",
+                };
+            }
             return {
                 kind: "destructive-scope" as const,
                 dataContext: requirement.dataContext,
@@ -1527,6 +1536,296 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("legacy minified computation ids are normalized to stable semantic ids", async () => {
+        const db = new PGLiteDB();
+        const Product = new Entity({
+            name: "MigrationLegacyComputationProduct",
+            properties: [
+                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-computation-price" }),
+                new Property({
+                    name: "doublePrice",
+                    type: "number",
+                    computation: new Custom({
+                        name: "MigrationLegacyComputationDouble",
+                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                        compute: async (_deps: any, record: any) => record.price * 2,
+                    }, { uuid: "migration-legacy-computation-double" }),
+                }, { uuid: "migration-legacy-computation-double-price" }),
+            ],
+        }, { uuid: "migration-legacy-computation-product" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [Product], relations: [] });
+        await controllerV1.setup(true);
+
+        const manifest = await readMigrationManifest(controllerV1);
+        const tampered = structuredClone(manifest!);
+        const computation = tampered.computations.find(item => item.dataContext === "property:MigrationLegacyComputationProduct.doublePrice")!;
+        computation.id = "computation:property:MigrationLegacyComputationProduct.doublePrice:Gr";
+        computation.identity = {
+            ...computation.identity,
+            key: computation.id,
+            namePath: computation.id,
+        };
+        computation.type = "Gr";
+        tampered.modelHash = "legacy-minified-computation-model-hash";
+        await writeMigrationManifest(controllerV1, tampered);
+
+        const ProductAgain = new Entity({
+            name: "MigrationLegacyComputationProduct",
+            properties: [
+                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-computation-price" }),
+                new Property({
+                    name: "doublePrice",
+                    type: "number",
+                    computation: new Custom({
+                        name: "MigrationLegacyComputationDouble",
+                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                        compute: async (_deps: any, record: any) => record.price * 2,
+                    }, { uuid: "migration-legacy-computation-double" }),
+                }, { uuid: "migration-legacy-computation-double-price" }),
+            ],
+        }, { uuid: "migration-legacy-computation-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductAgain], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.changes.filter(change => change.kind === "computation")).toHaveLength(1);
+        expect(diff.changes.find(change => change.kind === "computation")).toMatchObject({
+            kind: "computation",
+            changeType: "unchanged",
+            recommendation: "needs-review",
+        });
+        expect(diff.requiredDecisions.filter(item => item.kind === "computation")).toHaveLength(1);
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                [diff.requiredDecisions.find(item => item.kind === "computation")!.id]: "unchanged",
+            },
+        });
+        const plan = await controllerV2.migrate({ dryRun: true, approvedDiff });
+        expect(plan.changedComputations).toHaveLength(0);
+        expect(plan.rebuildPlan).toHaveLength(0);
+        await db.close();
+    });
+
+    test("legacy computation ids are not normalized when function hash changed", async () => {
+        const db = new PGLiteDB();
+        const Product = new Entity({
+            name: "MigrationLegacyChangedFunctionProduct",
+            properties: [
+                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-changed-function-price" }),
+                new Property({
+                    name: "doublePrice",
+                    type: "number",
+                    computation: new Custom({
+                        name: "MigrationLegacyChangedFunctionDouble",
+                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                        compute: async (_deps: any, record: any) => record.price * 2,
+                    }, { uuid: "migration-legacy-changed-function-double" }),
+                }, { uuid: "migration-legacy-changed-function-double-price" }),
+            ],
+        }, { uuid: "migration-legacy-changed-function-product" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [Product], relations: [] });
+        await controllerV1.setup(true);
+
+        const manifest = await readMigrationManifest(controllerV1);
+        const tampered = structuredClone(manifest!);
+        const computation = tampered.computations.find(item => item.dataContext === "property:MigrationLegacyChangedFunctionProduct.doublePrice")!;
+        computation.id = "computation:property:MigrationLegacyChangedFunctionProduct.doublePrice:Gr";
+        computation.identity = {
+            ...computation.identity,
+            key: computation.id,
+            namePath: computation.id,
+        };
+        computation.type = "Gr";
+        computation.functionSignature = {
+            ...computation.functionSignature!,
+            hash: "legacy-different-function-hash",
+        };
+        tampered.modelHash = "legacy-changed-function-model-hash";
+        await writeMigrationManifest(controllerV1, tampered);
+
+        const ProductAgain = new Entity({
+            name: "MigrationLegacyChangedFunctionProduct",
+            properties: [
+                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-changed-function-price" }),
+                new Property({
+                    name: "doublePrice",
+                    type: "number",
+                    computation: new Custom({
+                        name: "MigrationLegacyChangedFunctionDouble",
+                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                        compute: async (_deps: any, record: any) => record.price * 2,
+                    }, { uuid: "migration-legacy-changed-function-double" }),
+                }, { uuid: "migration-legacy-changed-function-double-price" }),
+            ],
+        }, { uuid: "migration-legacy-changed-function-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductAgain], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.changes.filter(change => change.kind === "computation")).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "computation", id: "computation:property:MigrationLegacyChangedFunctionProduct.doublePrice:Gr", changeType: "removed" }),
+            expect.objectContaining({ kind: "computation", id: "computation:property:MigrationLegacyChangedFunctionProduct.doublePrice:Custom", changeType: "added" }),
+        ]));
+        await db.close();
+    });
+
+    test("approved empty fact record removal drops the retired table", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationEmptyFactProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-empty-fact-product-name" })],
+        }, { uuid: "migration-empty-fact-product" });
+        const EmptyFactV1 = new Entity({
+            name: "MigrationEmptyFactRetired",
+            properties: [new Property({ name: "note", type: "string" }, { uuid: "migration-empty-fact-retired-note" })],
+        }, { uuid: "migration-empty-fact-retired" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1, EmptyFactV1], relations: [] }).setup(true);
+
+        const ProductV2 = new Entity({
+            name: "MigrationEmptyFactProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-empty-fact-product-name" })],
+        }, { uuid: "migration-empty-fact-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.requiredDecisions).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "empty-fact-record-removal", recordName: "MigrationEmptyFactRetired", expectedCount: 0 }),
+        ]));
+        expect(diff.safety.blockingChanges.some(change => change.logicalPath === "MigrationEmptyFactRetired")).toBe(false);
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const plan = await controllerV2.migrate({ approvedDiff });
+        expect(plan.schemaPlan?.postRecomputeDDL).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "drop-empty-fact-table", logicalPath: "MigrationEmptyFactRetired" }),
+        ]));
+        const tables = await (systemV2.storage as any).getExistingTables();
+        expect(tables.has("MigrationEmptyFactRetired")).toBe(false);
+        await db.close();
+    });
+
+    test("empty fact record removal fails if the approved table becomes non-empty before execution", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationEmptyFactRecheckProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-empty-fact-recheck-product-name" })],
+        }, { uuid: "migration-empty-fact-recheck-product" });
+        const EmptyFactV1 = new Entity({
+            name: "MigrationEmptyFactRecheckRetired",
+            properties: [new Property({ name: "note", type: "string" }, { uuid: "migration-empty-fact-recheck-note" })],
+        }, { uuid: "migration-empty-fact-recheck-retired" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1, EmptyFactV1], relations: [] }).setup(true);
+
+        const ProductV2 = new Entity({
+            name: "MigrationEmptyFactRecheckProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-empty-fact-recheck-product-name" })],
+        }, { uuid: "migration-empty-fact-recheck-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const originalApplyMigrationSchema = (systemV2 as any).applyMigrationSchema.bind(systemV2);
+        (systemV2 as any).applyMigrationSchema = async (...args: any[]) => {
+            await originalApplyMigrationSchema(...args);
+            await systemV1.storage.create("MigrationEmptyFactRecheckRetired", { note: "late write" });
+        };
+
+        await expect(controllerV2.migrate({ approvedDiff })).rejects.toThrow(/Empty fact record removal count mismatch/);
+        const tables = await (systemV1.storage as any).getExistingTables();
+        expect(tables.has("MigrationEmptyFactRecheckRetired")).toBe(true);
+        await db.close();
+    });
+
+    test("empty fact records on shared physical tables remain blocked", async () => {
+        const db = new PGLiteDB();
+        const UserV1 = new Entity({
+            name: "MigrationSharedTableUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-shared-table-user-name" })],
+        }, { uuid: "migration-shared-table-user" });
+        const ProfileV1 = new Entity({
+            name: "MigrationSharedTableProfile",
+            properties: [new Property({ name: "level", type: "number" }, { uuid: "migration-shared-table-profile-level" })],
+        }, { uuid: "migration-shared-table-profile" });
+        const ProfileOwnerV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "profile",
+            target: ProfileV1,
+            targetProperty: "owner",
+            name: "MigrationSharedTableProfileOwner",
+            type: "1:1",
+            isTargetReliance: true,
+        }, { uuid: "migration-shared-table-profile-owner" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, ProfileV1], relations: [ProfileOwnerV1] }).setup(true);
+
+        const manifest = await readMigrationManifest(new Controller({ system: systemV1, entities: [UserV1, ProfileV1], relations: [ProfileOwnerV1] }));
+        const relationRecord = manifest!.storage.records.find(record => record.recordName === "MigrationSharedTableProfileOwner")!;
+        const sharedRecord = manifest!.storage.records.find(record => record.recordName !== relationRecord.recordName && record.tableName === relationRecord.tableName);
+        expect(sharedRecord).toBeTruthy();
+
+        const UserV2 = new Entity({
+            name: "MigrationSharedTableUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-shared-table-user-name" })],
+        }, { uuid: "migration-shared-table-user" });
+        const ProfileV2 = new Entity({
+            name: "MigrationSharedTableProfile",
+            properties: [new Property({ name: "level", type: "number" }, { uuid: "migration-shared-table-profile-level" })],
+        }, { uuid: "migration-shared-table-profile" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, ProfileV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.requiredDecisions.some(item => item.kind === "empty-fact-record-removal")).toBe(false);
+        expect(diff.safety.blockingChanges).toEqual(expect.arrayContaining([
+            expect.objectContaining({ logicalPath: "MigrationSharedTableProfileOwner", reason: "fact record was removed from the new schema" }),
+        ]));
+        await db.close();
+    });
+
+    test("non-empty removed fact records remain destructive blocking changes", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationNonEmptyFactProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-non-empty-fact-product-name" })],
+        }, { uuid: "migration-non-empty-fact-product" });
+        const RetiredFactV1 = new Entity({
+            name: "MigrationNonEmptyFactRetired",
+            properties: [new Property({ name: "note", type: "string" }, { uuid: "migration-non-empty-fact-retired-note" })],
+        }, { uuid: "migration-non-empty-fact-retired" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1, RetiredFactV1], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationNonEmptyFactRetired", { note: "keep" });
+
+        const ProductV2 = new Entity({
+            name: "MigrationNonEmptyFactProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-non-empty-fact-product-name" })],
+        }, { uuid: "migration-non-empty-fact-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+
+        expect(diff.requiredDecisions.some(item => item.kind === "empty-fact-record-removal")).toBe(false);
+        expect(diff.safety.blockingChanges).toEqual(expect.arrayContaining([
+            expect.objectContaining({ logicalPath: "MigrationNonEmptyFactRetired", reason: "fact record was removed from the new schema" }),
+        ]));
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/fact record was removed from the new schema/);
+        await db.close();
+    });
+
     test("dry-run reports destructive fact property removal and type changes", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
@@ -1570,6 +1869,7 @@ describe("Data migration phase 1", () => {
         const systemV1 = new MonoSystem(db);
         systemV1.conceptClass = KlassByName;
         await new Controller({ system: systemV1, entities: [Kept, Throwaway], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationEntityDeleteThrowaway", { name: "not empty" });
 
         const KeptV2 = new Entity({
             name: "MigrationEntityDeleteKept",

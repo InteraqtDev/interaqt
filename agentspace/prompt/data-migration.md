@@ -87,3 +87,18 @@ interaqt 是响应式的数据描述，理论上只要数据有声明 computatio
 
 ### 追加任务4
 你深度理解 Task 3 和 `agentspace/output/data-migration-handwritten-to-controlled-plan.md`，然后 review 测试用例，看是否覆盖了足够的 “已有数据的实体/关系/属性转为 computation 控制”的场景。如果不够，立刻进行补充并验证通过。这个功能会非常常用，一定要进行非常完整的测试。
+
+### 追加任务5
+已经完成了 Task 3，但在完成时出现了 bug 记录在了 `agentspace/prompt/interaqt-1.5.6-migration-blockers.md` 中，你来先深入分析文档中每一个阻塞点。指出：
+1. 是否和当前框架有关。
+  1.1. 如果无关，为什么无关，如何解决。
+  1.2. 如果和框架有关应该如何修复，你为什么没有在本地测试中覆盖到这个场景。
+
+把你的分析写成一个独立文档。
+
+### 追加任务6
+理解`agentspace/prompt/interaqt-1.5.6-migration-blockers.md`，然后按照 `agentspace/output/interaqt-1.5.6-migration-blockers-analysis.md` 的结论开始执行修复。
+
+注意：
+1. 一定要遵守上面的注意事项
+2. 新增的代码一定要进行 100% 的测试覆盖。我们这是框架能力，要非常严谨。

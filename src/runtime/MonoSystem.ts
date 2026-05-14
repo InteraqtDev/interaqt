@@ -36,8 +36,8 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { createUniqueIndexSQL, getSchemaDialect } from "@storage";
-import type { AdditiveDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
+import { createUniqueIndexSQL, getSchemaDialect, quoteIdentifier } from "@storage";
+import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
     return encodeURI(JSON.stringify(value))
@@ -290,8 +290,10 @@ class MonoStorage implements Storage{
         }
     }
 
-    private migrationOperationKey(phase: string, operation: AdditiveDDLOperation, index: number) {
-        return `${phase}:${index}:${operation.kind}:${operation.tableName || ''}:${operation.columnName || ''}:${operation.logicalPath || ''}:${operation.sql || operation.description}`
+    private migrationOperationKey(phase: string, operation: MigrationDDLOperation, index: number) {
+        const columnName = 'columnName' in operation ? operation.columnName || '' : ''
+        const sql = 'sql' in operation ? operation.sql || '' : ''
+        return `${phase}:${index}:${operation.kind}:${operation.tableName || ''}:${columnName}:${operation.logicalPath || ''}:${sql || operation.description}`
     }
 
     async isMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
@@ -324,12 +326,17 @@ class MonoStorage implements Storage{
         )
     }
 
-    private async applyMigrationOperations(phase: string, operations: AdditiveDDLOperation[], migrationId?: string) {
+    private async applyMigrationOperations(phase: string, operations: MigrationDDLOperation[], migrationId?: string) {
         for (const [index, operation] of operations.entries()) {
-            if (!operation.sql) continue
+            const sql = 'sql' in operation && operation.sql
+                ? operation.sql
+                : operation.kind === 'drop-empty-fact-table'
+                ? `DROP TABLE IF EXISTS ${quoteIdentifier(operation.tableName, getSchemaDialect(this.db))}`
+                : undefined
+            if (!sql) continue
             const operationKey = this.migrationOperationKey(phase, operation, index)
             if (await this.isMigrationOperationComplete(migrationId, operationKey)) continue
-            await this.db.scheme(operation.sql, operation.description)
+            await this.db.scheme(sql, operation.description)
             await this.markMigrationOperationComplete(migrationId, operationKey)
         }
     }

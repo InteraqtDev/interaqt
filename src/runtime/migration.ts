@@ -3,7 +3,7 @@ import type { Computation, ComputationResultPatch, DataBasedComputation, DataCon
 import { ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip } from "./computations/Computation.js";
 import type { RecordMutationEvent, StorageSchemaMetadata, System } from "./System.js";
 import { DICTIONARY_RECORD } from "./System.js";
-import { EntityQueryHandle, EntityToTableMap, LINK_SYMBOL, MatchExp } from "@storage";
+import { EntityQueryHandle, EntityToTableMap, getSchemaDialect, LINK_SYMBOL, MatchExp, quoteIdentifier } from "@storage";
 import { createHash } from "node:crypto";
 import { ComputationSourceMapManager, type DataBasedEntityEventsSourceMap, type EntityEventSourceMap, type EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 
@@ -95,6 +95,14 @@ export type MigrationChange =
         reason: string;
     }
     | {
+        kind: "empty-fact-record-removal";
+        id: string;
+        recordName: string;
+        tableName: string;
+        expectedCount: 0;
+        reason: string;
+    }
+    | {
         kind: "record";
         id: string;
         changeType: "added" | "removed" | "changed";
@@ -160,6 +168,13 @@ export type MigrationDecisionRequirement =
         recordName?: string;
         ids: string[];
         reason: string;
+    }
+    | {
+        kind: "empty-fact-record-removal";
+        recordName: string;
+        tableName: string;
+        expectedCount: 0;
+        reason: string;
     };
 
 export type MigrationDecision =
@@ -200,6 +215,13 @@ export type MigrationDecision =
         dataContext: string;
         recordName?: string;
         ids: string[];
+        reason: string;
+    }
+    | {
+        kind: "empty-fact-record-removal";
+        recordName: string;
+        tableName: string;
+        expectedCount: 0;
         reason: string;
     }
     | {
@@ -350,6 +372,20 @@ export type AdditiveDDLOperation = {
     description: string;
 };
 
+export type DestructiveCleanupOperation = {
+    kind: "drop-empty-fact-table";
+    tableName: string;
+    logicalPath: string;
+    description: string;
+    precondition: {
+        kind: "empty-table";
+        recordName: string;
+        expectedCount: 0;
+    };
+};
+
+export type MigrationDDLOperation = AdditiveDDLOperation | DestructiveCleanupOperation;
+
 export type StorageBlockingChange = {
     kind: "physical-path-move" | "unsupported-destructive-schema-change" | "unrebuildable-computation" | "destructive-computed-output" | "async-computation";
     logicalPath: string;
@@ -361,7 +397,7 @@ export type StorageBlockingChange = {
 export type MigrationSchemaPlan = {
     schema: StorageSchemaMetadata;
     preRecomputeDDL: AdditiveDDLOperation[];
-    postRecomputeDDL: AdditiveDDLOperation[];
+    postRecomputeDDL: MigrationDDLOperation[];
     verificationDDL: AdditiveDDLOperation[];
     blockingChanges: StorageBlockingChange[];
     internal?: unknown;
@@ -439,6 +475,18 @@ function stripIdentityUUID<T>(value: T): T {
     return output as T;
 }
 
+function stripUndefinedDeep<T>(value: T): T {
+    if (value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
+    const record = value as Record<string, unknown>;
+    const output: Record<string, unknown> = {};
+    for (const key of Object.keys(record)) {
+        if (record[key] === undefined) continue;
+        output[key] = stripUndefinedDeep(record[key]);
+    }
+    return output as T;
+}
+
 function assertUniqueIdentities(identities: MigrationIdentity[]) {
     const seen = new Map<string, MigrationIdentity>();
     for (const identity of identities) {
@@ -458,8 +506,19 @@ export function dataContextPath(dataContext: DataContext): string {
     return `${dataContext.type}:${dataContext.id.name}`;
 }
 
-export function computationManifestId(computation: { args: { uuid?: string }; dataContext: DataContext }) {
-    return `computation:${dataContextPath(computation.dataContext)}:${computation.constructor?.name || computation.args.constructor?.name || "UnknownComputation"}`;
+function computationSemanticType(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { _type?: string; constructor?: { displayName?: string; name?: string } } }) {
+    return computation.constructor?.computationType?.displayName ||
+        computation.constructor?.computationType?.name ||
+        computation.args._type ||
+        computation.args.constructor?.displayName ||
+        computation.args.constructor?.name ||
+        computation.constructor?.displayName ||
+        computation.constructor?.name ||
+        "UnknownComputation";
+}
+
+export function computationManifestId(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { uuid?: string; _type?: string; constructor?: { displayName?: string; name?: string } }; dataContext: DataContext }) {
+    return `computation:${dataContextPath(computation.dataContext)}:${computationSemanticType(computation)}`;
 }
 
 function serializeDataDeps(computation: Partial<DataBasedComputation>) {
@@ -558,7 +617,7 @@ function createComputationManifest(computation: Computation, includeFunctionText
     const id = computationManifestId(computation);
     const dataContext = dataContextPath(computation.dataContext);
     const outputRecord = computation.dataContext.type === "entity" || computation.dataContext.type === "relation" ? computation.dataContext.id.name : undefined;
-    const type = computation.constructor?.name || String(args._type || args.constructor?.name || "UnknownComputation");
+    const type = computationSemanticType(computation);
     const identity = createIdentity("computation", id, computation.args.uuid);
     const functionSignature = createFunctionSignature(args, includeFunctionText);
     const outputSignature = hash({
@@ -717,9 +776,82 @@ export function getChangedComputations(oldManifest: MigrationManifest, newManife
     });
 }
 
+function normalizeComputationOwnershipProof(computation: ComputationManifest, ownerComputationId: string): ComputationManifest["ownershipProof"] {
+    if (!computation.ownershipProof) return undefined;
+    return {
+        ...computation.ownershipProof,
+        ownerComputationId,
+    };
+}
+
+function hasSameSemanticComputationShape(oldComputation: ComputationManifest, nextComputation: ComputationManifest) {
+    const oldFunctionHash = oldComputation.functionSignature?.hash;
+    const nextFunctionHash = nextComputation.functionSignature?.hash;
+    const hasStableUuid = oldComputation.identity.uuid !== undefined &&
+        oldComputation.identity.uuid === nextComputation.identity.uuid;
+    const hasMatchingFunctionHash = oldFunctionHash !== undefined && oldFunctionHash === nextFunctionHash;
+    if (!hasStableUuid && !hasMatchingFunctionHash) return false;
+    if (oldFunctionHash !== nextFunctionHash) return false;
+    return oldComputation.dataContext === nextComputation.dataContext &&
+        oldComputation.outputRecord === nextComputation.outputRecord &&
+        oldComputation.outputProperty === nextComputation.outputProperty &&
+        oldComputation.asyncReturn === nextComputation.asyncReturn &&
+        oldComputation.owner === nextComputation.owner &&
+        isEqualValue(stripUndefinedDeep(oldComputation.deps), stripUndefinedDeep(nextComputation.deps)) &&
+        isEqualValue(stripUndefinedDeep(oldComputation.eventDeps), stripUndefinedDeep(nextComputation.eventDeps)) &&
+        isEqualValue(stripUndefinedDeep(oldComputation.stateKeys), stripUndefinedDeep(nextComputation.stateKeys)) &&
+        isEqualValue(stripUndefinedDeep(oldComputation.boundStates), stripUndefinedDeep(nextComputation.boundStates)) &&
+        oldComputation.functionSignature?.hasFunction === nextComputation.functionSignature?.hasFunction &&
+        isEqualValue(oldComputation.functionSignature?.callbackPaths || [], nextComputation.functionSignature?.callbackPaths || []);
+}
+
+function normalizeLegacyComputationManifest(oldComputation: ComputationManifest, nextComputation: ComputationManifest): ComputationManifest {
+    const stateSignature = oldComputation.stateSignature;
+    const structuralSignature = nextComputation.structuralSignature;
+    return {
+        ...oldComputation,
+        id: nextComputation.id,
+        identity: {
+            ...oldComputation.identity,
+            key: nextComputation.id,
+            namePath: nextComputation.id,
+        },
+        type: nextComputation.type,
+        outputSignature: nextComputation.outputSignature,
+        stateSignature,
+        structuralSignature,
+        signature: hash({ structuralSignature, stateSignature, functionHash: oldComputation.functionSignature?.hash }),
+        ownershipProof: normalizeComputationOwnershipProof(oldComputation, nextComputation.id),
+    };
+}
+
+export function normalizePreviousComputationManifest(previousManifest: MigrationManifest, nextManifest: MigrationManifest): MigrationManifest {
+    const nextById = new Map(nextManifest.computations.map(item => [item.id, item]));
+    const usedNextIds = new Set<string>();
+    const normalizedComputations = previousManifest.computations.map(oldComputation => {
+        const sameId = nextById.get(oldComputation.id);
+        if (sameId) {
+            usedNextIds.add(sameId.id);
+            return oldComputation;
+        }
+        const semanticMatch = nextManifest.computations.find(nextComputation =>
+            !usedNextIds.has(nextComputation.id) &&
+            hasSameSemanticComputationShape(oldComputation, nextComputation)
+        );
+        if (!semanticMatch) return oldComputation;
+        usedNextIds.add(semanticMatch.id);
+        return normalizeLegacyComputationManifest(oldComputation, semanticMatch);
+    });
+    return {
+        ...previousManifest,
+        computations: normalizedComputations,
+    };
+}
+
 function requirementKey(requirement: MigrationDecisionRequirement) {
     if (requirement.kind === "computation") return `${requirement.kind}:${requirement.id}`;
     const recordName = requirement.kind === "destructive-scope" ? requirement.recordName || "" : "";
+    if (requirement.kind === "empty-fact-record-removal") return `${requirement.kind}:${requirement.recordName}`;
     return `${requirement.kind}:${requirement.dataContext}:${recordName}`;
 }
 
@@ -727,12 +859,14 @@ function decisionKey(decision: MigrationDecision) {
     if (decision.kind === "computation") return `${decision.kind}:${decision.id}`;
     if (decision.kind === "rename-candidate-reviewed") return `${decision.kind}:${decision.from}:${decision.to}`;
     const recordName = decision.kind === "destructive-scope" ? decision.recordName || "" : "";
+    if (decision.kind === "empty-fact-record-removal") return `${decision.kind}:${decision.recordName}`;
     return `${decision.kind}:${decision.dataContext}:${recordName}`;
 }
 
 function changeKey(change: MigrationChange) {
     if (change.kind === "computation") return `computation:${change.id}`;
     if (change.kind === "computation-takeover") return `computation-takeover:${change.dataContext}`;
+    if (change.kind === "empty-fact-record-removal") return `empty-fact-record-removal:${change.recordName}`;
     if (change.kind === "dictionary") return `dictionary:${change.id}`;
     if (change.kind === "record") return `record:${change.id}`;
     if (change.kind === "property") return `property:${change.id}`;
@@ -809,6 +943,138 @@ function takeoverTargetType(dataContext: string): "property" | "entity" | "relat
 }
 
 type MigrationReadHandle = Pick<EntityQueryHandle, "find">;
+
+function dbQuery(controller: Controller) {
+    return (controller.system.storage as unknown as { db?: { query?: Function } }).db ||
+        (controller.system as unknown as { db?: { query?: Function } }).db;
+}
+
+async function readStorageRecordCount(controller: Controller, tableName: string) {
+    const db = dbQuery(controller);
+    if (typeof db?.query !== "function") {
+        throw new MigrationError(`Cannot verify empty fact record removal because database query is unavailable for table ${tableName}`);
+    }
+    const rows = await db.query(`SELECT COUNT(*) AS ${quoteIdentifier("count", getSchemaDialect(db as never))} FROM ${quoteIdentifier(tableName, getSchemaDialect(db as never))}`, []);
+    const count = (rows[0] as { count?: number | string | bigint } | undefined)?.count ?? 0;
+    return Number(count);
+}
+
+async function readOldStorageRecordCount(controller: Controller, previousManifest: MigrationManifest, recordName: string) {
+    const oldRecord = previousManifest.storage.records.find(record => record.recordName === recordName);
+    if (!oldRecord?.tableName) {
+        throw new MigrationError(`Cannot find old storage record for empty fact record removal: ${recordName}`);
+    }
+    return readStorageRecordCount(controller, oldRecord.tableName);
+}
+
+function canReviewEmptyFactRecordRemoval(previousManifest: MigrationManifest, nextManifest: MigrationManifest, recordName: string) {
+    const oldRecord = previousManifest.storage.records.find(record => record.recordName === recordName);
+    if (!oldRecord?.tableName || oldRecord.isFiltered) return false;
+    const oldTableRecords = previousManifest.storage.records.filter(record => record.tableName === oldRecord.tableName);
+    const newTableRecords = nextManifest.storage.records.filter(record => record.tableName === oldRecord.tableName);
+    return oldTableRecords.length === 1 && newTableRecords.length === 0;
+}
+
+function isRemovedFactRecordBlocking(change: StorageBlockingChange) {
+    return change.kind === "unsupported-destructive-schema-change" &&
+        change.reason === "fact record was removed from the new schema" &&
+        change.oldPhysicalPath !== undefined;
+}
+
+export async function addEmptyFactRecordRemovalReview(
+    controller: Controller,
+    diff: MigrationDiffFile,
+    previousManifest: MigrationManifest,
+    nextManifest: MigrationManifest,
+) {
+    const removedEmptyFactRecordNames = new Set<string>();
+    const changes = new Map(diff.changes.map(change => [changeKey(change), change]));
+    const requirements = new Map(diff.requiredDecisions.map(requirement => [requirementKey(requirement), requirement]));
+
+    for (const blockingChange of diff.safety.blockingChanges) {
+        if (!isRemovedFactRecordBlocking(blockingChange)) continue;
+        const recordName = blockingChange.logicalPath;
+        if (nextManifest.storage.records.some(record => record.recordName === recordName)) continue;
+        if (!canReviewEmptyFactRecordRemoval(previousManifest, nextManifest, recordName)) continue;
+        const count = await readOldStorageRecordCount(controller, previousManifest, recordName);
+        if (count !== 0) continue;
+        const tableName = blockingChange.oldPhysicalPath!;
+        removedEmptyFactRecordNames.add(recordName);
+        const reason = "empty fact record was removed from the new schema and requires explicit approval before cleanup";
+        changes.set(`empty-fact-record-removal:${recordName}`, {
+            kind: "empty-fact-record-removal",
+            id: `empty-fact-record-removal:${recordName}`,
+            recordName,
+            tableName,
+            expectedCount: 0,
+            reason,
+        });
+        requirements.set(`empty-fact-record-removal:${recordName}`, {
+            kind: "empty-fact-record-removal",
+            recordName,
+            tableName,
+            expectedCount: 0,
+            reason,
+        });
+    }
+
+    if (!removedEmptyFactRecordNames.size) return diff;
+
+    diff.changes = Array.from(changes.values());
+    diff.requiredDecisions = Array.from(requirements.values());
+    diff.safety = {
+        ...diff.safety,
+        blockingChanges: diff.safety.blockingChanges.filter(change => !removedEmptyFactRecordNames.has(change.logicalPath)),
+    };
+    diff.summary = {
+        ...diff.summary,
+        changeCount: diff.changes.length,
+        requiredDecisionCount: diff.requiredDecisions.length,
+        blockingChangeCount: diff.safety.blockingChanges.length,
+    };
+    return diff;
+}
+
+export async function getApprovedEmptyFactRecordRemovals(controller: Controller, approvedDiff: MigrationDiffFile | undefined, previousManifest: MigrationManifest) {
+    const removals = (approvedDiff?.decisions || [])
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "empty-fact-record-removal" }> => decision.kind === "empty-fact-record-removal");
+    const approved = new Set<string>();
+    for (const removal of removals) {
+        if (removal.expectedCount !== 0) {
+            throw new MigrationError(`Invalid empty fact record removal expectedCount for ${removal.recordName}`);
+        }
+        const oldRecord = previousManifest.storage.records.find(record => record.recordName === removal.recordName);
+        if (!oldRecord || oldRecord.tableName !== removal.tableName) {
+            throw new MigrationError(`Empty fact record removal decision does not match previous manifest: ${removal.recordName}`);
+        }
+        const count = await readStorageRecordCount(controller, oldRecord.tableName);
+        if (count !== 0) {
+            throw new DestructiveComputedOutputError(`Empty fact record removal count mismatch for ${removal.recordName}`);
+        }
+        approved.add(removal.recordName);
+    }
+    return approved;
+}
+
+export async function assertApprovedEmptyFactRecordRemovalsStillEmpty(controller: Controller, approvedDiff: MigrationDiffFile | undefined, previousManifest: MigrationManifest) {
+    await getApprovedEmptyFactRecordRemovals(controller, approvedDiff, previousManifest);
+}
+
+export function createEmptyFactRecordRemovalOperations(previousManifest: MigrationManifest, recordNames: Set<string>): DestructiveCleanupOperation[] {
+    return previousManifest.storage.records
+        .filter(record => recordNames.has(record.recordName))
+        .map(record => ({
+            kind: "drop-empty-fact-table" as const,
+            tableName: record.tableName,
+            logicalPath: record.recordName,
+            description: `migration drop empty fact table ${record.tableName}`,
+            precondition: {
+                kind: "empty-table" as const,
+                recordName: record.recordName,
+                expectedCount: 0 as const,
+            },
+        }));
+}
 
 export function createMigrationReadHandle(controller: Controller, schemaPlan: MigrationSchemaPlan): MigrationReadHandle | undefined {
     const dbSetup = (schemaPlan.internal as { dbSetup?: { map: ConstructorParameters<typeof EntityToTableMap>[0]; aliasManager?: ConstructorParameters<typeof EntityToTableMap>[1] } } | undefined)?.dbSetup;
@@ -1364,6 +1630,16 @@ export function validateApprovedDiff(
             }
             if (!handlers?.asyncCompletion?.[decision.handlerRef]) {
                 throw new MigrationError(`Missing migration async completion handler '${decision.handlerRef}' for ${decision.dataContext}`);
+            }
+        }
+        if (decision.kind === "empty-fact-record-removal") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration empty fact record removal decision does not match a required review item: ${decision.recordName}`);
+            }
+            const previousRecord = previousManifest.storage.records.find(record => record.recordName === decision.recordName);
+            const nextRecord = nextManifest.storage.records.find(record => record.recordName === decision.recordName);
+            if (!previousRecord || nextRecord || previousRecord.tableName !== decision.tableName || decision.expectedCount !== 0 || !canReviewEmptyFactRecordRemoval(previousManifest, nextManifest, decision.recordName)) {
+                throw new MigrationError(`Invalid empty fact record removal decision for ${decision.recordName}`);
             }
         }
         if (decision.kind === "rename-candidate-reviewed") {
