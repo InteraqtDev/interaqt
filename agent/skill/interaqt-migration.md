@@ -13,7 +13,7 @@ Phase 1.5 uses a two-step review workflow:
 1. Generate a structured diff with `controller.generateMigrationDiff()`.
 2. Review the diff, set `status: "approved"`, add explicit decisions, then execute `controller.migrate({ approvedDiff })`.
 
-Migration supports additive schema changes, changed/new computation recompute, downstream propagation, filtered membership rebuild, destructive-scope review, and post-backfill constraint verification.
+Migration supports additive schema changes, changed/new computation recompute, downstream propagation, filtered membership rebuild, destructive-scope review, post-backfill constraint verification, and explicit fact-to-computation takeover.
 
 Phase 1.5 does not guess or execute rename/copy/merge/split primitives. Rename candidates may be recorded for review, but compute-route migration will still obey physical layout and destructive-change safety gates.
 
@@ -135,6 +135,22 @@ const approvedDiff = {
       }
     }
 
+    if (item.kind === 'computation-takeover') {
+      return {
+        kind: 'computation-takeover' as const,
+        dataContext: item.dataContext,
+        computationId: item.computationId,
+        targetType: item.targetType,
+        previousAuthority: item.previousAuthority,
+        nextAuthority: item.nextAuthority,
+        oldDataStrategy: item.oldDataStrategy,
+        expectedExistingCount: item.expectedExistingCount,
+        expectedHostCount: item.expectedHostCount,
+        destructiveScopeRef: item.destructiveScopeRef,
+        reason: 'legacy fact output may be discarded and rebuilt by computation',
+      }
+    }
+
     return {
       kind: 'destructive-scope' as const,
       dataContext: item.dataContext,
@@ -217,6 +233,48 @@ New computations must be approved as `changed`.
 
 ---
 
+## Fact-to-Computation Takeover
+
+Use `computation-takeover` when an existing fact property, entity, or relation becomes controlled by a computation with the same data context.
+
+Supported first-phase strategy:
+
+```typescript
+{
+  kind: 'computation-takeover',
+  dataContext: 'property:Ticket.status',
+  computationId: 'computation:property:Ticket.status:Custom',
+  targetType: 'property',
+  previousAuthority: 'fact',
+  nextAuthority: 'computation',
+  oldDataStrategy: 'discard-and-rebuild',
+  expectedExistingCount: 128,
+  expectedHostCount: 128,
+  reason: 'status is now derived from durable ticket facts',
+}
+```
+
+Rules:
+
+- Takeover is never implicit. The diff must contain a required `computation-takeover` item and the approved diff must contain the matching decision.
+- The old fact value is discarded as authority. interaqt does not map, merge, rename, copy, or replay old handwritten values.
+- The same computation must also have a `kind: 'computation'` decision with `decision: 'changed'`.
+- Property takeover recomputes every host record, including hosts whose old value was `null` or missing.
+- Property `ComputationResult.skip()` means `null` only for nullable properties. It fails for non-null properties instead of preserving old handwritten data.
+- Entity and relation takeover additionally require a matching `destructive-scope` decision with exact ids. Execution re-reads the ids and fails if they changed after review.
+- Entity and relation output migration is still limited to data-based `Transform` outputs with stable `sourceRecordId` and `transformIndex` state. Non-`Transform` output computations remain blocked.
+- `StateMachine` property takeover is blocked in this phase because bound state cannot yet be rebuilt consistently from old fact values.
+
+Review checklist for takeover:
+
+- Confirm the target really changed from fact authority to computation authority.
+- Confirm the old data may be discarded.
+- Confirm `expectedExistingCount` and, for properties, `expectedHostCount`.
+- For entity/relation takeover, inspect and approve the exact destructive ids.
+- Run dry-run after approval; do not reuse a stale approval if counts or ids changed.
+
+---
+
 ## Event and Async Handlers
 
 Event-based computations without full compute support require external rebuild handlers.
@@ -263,6 +321,7 @@ Approved diff cannot bypass core safety gates:
 - Fact physical path moves remain blocked.
 - Fact destructive schema changes remain blocked.
 - Entity/relation output replacement still needs previous manifest ownership proof.
+- Fact-to-computation takeover requires explicit `computation-takeover` approval and, for entity/relation targets, exact destructive-scope approval.
 - Async computations require an approved async completion decision and runtime handler.
 - Event-based computations without full compute require an approved event rebuild decision and runtime handler.
 - Destructive computed output requires exact approved ids.
@@ -333,6 +392,18 @@ A fact record/property/relation moved physical storage location. Phase 1.5 will 
 
 Migration would delete computed output or host records. Inspect `diff.safety.destructiveScopes` and dry-run `deletionScope`, then approve exact ids only when intended.
 
+### `Migration computation takeover requires an approved changed computation decision`
+
+A takeover decision only authorizes discarding old fact output. It does not replace the normal computation review decision. Add a matching `kind: 'computation'` decision with `decision: 'changed'`.
+
+### `Computation takeover count mismatch` / `host count mismatch` / `destructive scope mismatch`
+
+The database changed after the diff was reviewed. Generate a fresh diff, review the new counts or ids, and approve again.
+
+### `StateMachine computation takeover requires a state rebuild handler`
+
+This phase does not support converting handwritten properties to `StateMachine` control because bound state cannot yet be rebuilt safely.
+
 ---
 
 ## Safe Migration Checklist
@@ -340,6 +411,8 @@ Migration would delete computed output or host records. Inspect `diff.safety.des
 - [ ] Run `controller.generateMigrationDiff({ includeDestructiveScope: true })`.
 - [ ] Review logical model changes, storage changes, function hashes/text, required decisions, and safety output.
 - [ ] Add one explicit decision for every required decision.
+- [ ] For fact-to-computation takeover, approve both `computation-takeover` and the matching `computation: changed` decision.
+- [ ] For entity/relation takeover, approve the exact destructive ids and rerun dry-run if the database changed.
 - [ ] Provide runtime handlers for event rebuild and async completion decisions.
 - [ ] Run `controller.migrate({ approvedDiff, dryRun: true, handlers })`.
 - [ ] Confirm `blockingChanges` is empty and `rebuildPlan` is expected.
