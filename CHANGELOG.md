@@ -1,5 +1,12 @@
 
 
+## [1.5.7](https://github.com/InteraqtDev/interaqt/compare/v1.5.6...v1.5.7) (2026-05-14)
+
+
+### Bug Fixes
+
+* stabilize migration computation identity ([fd6d5e3](https://github.com/InteraqtDev/interaqt/commit/fd6d5e3da1d83844cbc48299bb4d2c8694c1fb55))
+
 ## [1.5.6](https://github.com/InteraqtDev/interaqt/compare/v1.5.5...v1.5.6) (2026-05-14)
 
 ## [1.5.5](https://github.com/InteraqtDev/interaqt/compare/v1.5.4...v1.5.5) (2026-05-14)
