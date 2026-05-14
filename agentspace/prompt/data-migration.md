@@ -55,3 +55,35 @@ interaqt 是响应式的数据描述，理论上只要数据有声明 computatio
 1. 如果 bug 真实存在，就进行修复，并确保测试覆盖通过。
 2. 如果 bug 不存在，要支持文档为什么错了。
 注意：本机安装了 postgres，如果需要 postgres，找一个闲置端口启动即可。
+
+
+## Task 3 支持"手写转为受控"
+我当前项立刻支持一个新场景：
+允许将原本没有 computation 的字段/实体/关系转为 computation 控制的。如果已有数据，那么就清理掉完全重建。暂时不支持旧数据迁移策略，留一个口子未来支持。
+我现在觉得 `agentspace/output/migration-eventsource-computation-takeover.md` 中的方案太复杂了，不是这个阶段来做的。你来写一个新的方案文档。注意：不要引用任何旧方案的内容，旧方案只是帮助你理解这个问题场景的。
+
+### 追加任务1
+你深度理解 Task 3 ，然后 review `agentspace/output/data-migration-handwritten-to-controlled-plan.md` 中的方案，看看有没有：
+1. 致命错误
+2. 违反上面注意事项的地方
+3. 和原本目标、设计冲突的地方
+把 review 结果写成一个独立的新的文档。
+
+### 追加任务2
+你深度理解 Task 3 和原计划 `agentspace/output/data-migration-handwritten-to-controlled-plan.md` ，然后逐条 review `agentspace/output/data-migration-handwritten-to-controlled-plan-review.md` 中指出的问题。如果：
+1. 意见正确，就修正原文档。
+2. 意见不正确，要支持为什么
+
+注意：
+1. 对任何意见都要辩证思考、到代码中深度求证，不能盲目相信
+2. 修改过程也要遵守上面的注意事项。
+
+### 追加任务3
+你深度理解 Task 3 并开始实施 `agentspace/output/data-migration-handwritten-to-controlled-plan.md`
+
+注意：
+1. 一定要遵守上面的注意事项
+2. 新增的代码一定要进行 100% 的测试覆盖。我们这是框架能力，要非常严谨。
+
+### 追加任务4
+你深度理解 Task 3 和 `agentspace/output/data-migration-handwritten-to-controlled-plan.md`，然后 review 测试用例，看是否覆盖了足够的 “已有数据的实体/关系/属性转为 computation 控制”的场景。如果不够，立刻进行补充并验证通过。这个功能会非常常用，一定要进行非常完整的测试。

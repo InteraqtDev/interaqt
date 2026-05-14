@@ -41,6 +41,21 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
                     reason: "approved by migration test",
                 };
             }
+            if (requirement.kind === "computation-takeover") {
+                return {
+                    kind: "computation-takeover" as const,
+                    dataContext: requirement.dataContext,
+                    computationId: requirement.computationId,
+                    targetType: requirement.targetType,
+                    previousAuthority: requirement.previousAuthority,
+                    nextAuthority: requirement.nextAuthority,
+                    oldDataStrategy: requirement.oldDataStrategy,
+                    expectedExistingCount: requirement.expectedExistingCount,
+                    expectedHostCount: requirement.expectedHostCount,
+                    destructiveScopeRef: requirement.destructiveScopeRef,
+                    reason: "approved by migration test",
+                };
+            }
             return {
                 kind: "destructive-scope" as const,
                 dataContext: requirement.dataContext,
@@ -927,6 +942,82 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("fact entity and relation takeover to non-Transform output computations remains blocked", async () => {
+        const db = new PGLiteDB();
+        const UserV1 = new Entity({
+            name: "MigrationCustomTakeoverUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-takeover-user-name" })],
+        }, { uuid: "migration-custom-takeover-user" });
+        const TaskV1 = new Entity({
+            name: "MigrationCustomTakeoverTask",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-takeover-task-name" })],
+        }, { uuid: "migration-custom-takeover-task" });
+        const DerivedEntityV1 = new Entity({
+            name: "MigrationCustomTakeoverDerived",
+            properties: [new Property({ name: "label", type: "string" }, { uuid: "migration-custom-takeover-derived-label" })],
+        }, { uuid: "migration-custom-takeover-derived" });
+        const DerivedRelationV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "derivedTasks",
+            target: TaskV1,
+            targetProperty: "derivedUsers",
+            name: "MigrationCustomTakeoverDerivedRelation",
+            type: "n:n",
+        }, { uuid: "migration-custom-takeover-derived-relation" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1, DerivedEntityV1], relations: [DerivedRelationV1] }).setup(true);
+        const user = await systemV1.storage.create("MigrationCustomTakeoverUser", { name: "Alice" });
+        const task = await systemV1.storage.create("MigrationCustomTakeoverTask", { name: "T1" });
+        await systemV1.storage.create("MigrationCustomTakeoverDerived", { label: "legacy" });
+        await systemV1.storage.addRelationByNameById("MigrationCustomTakeoverDerivedRelation", user.id, task.id);
+
+        const UserV2 = new Entity({
+            name: "MigrationCustomTakeoverUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-takeover-user-name" })],
+        }, { uuid: "migration-custom-takeover-user" });
+        const TaskV2 = new Entity({
+            name: "MigrationCustomTakeoverTask",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-custom-takeover-task-name" })],
+        }, { uuid: "migration-custom-takeover-task" });
+        const customEntity = new Custom({
+            name: "MigrationCustomTakeoverEntityComputation",
+            compute: async () => [{ label: "derived" }],
+        }, { uuid: "migration-custom-takeover-entity-computation" });
+        const DerivedEntityV2 = new Entity({
+            name: "MigrationCustomTakeoverDerived",
+            properties: [new Property({ name: "label", type: "string" }, { uuid: "migration-custom-takeover-derived-label" })],
+            computation: customEntity,
+        }, { uuid: "migration-custom-takeover-derived" });
+        const customRelation = new Custom({
+            name: "MigrationCustomTakeoverRelationComputation",
+            compute: async () => [],
+        }, { uuid: "migration-custom-takeover-relation-computation" });
+        const DerivedRelationV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "derivedTasks",
+            target: TaskV2,
+            targetProperty: "derivedUsers",
+            name: "MigrationCustomTakeoverDerivedRelation",
+            type: "n:n",
+            computation: customRelation,
+        }, { uuid: "migration-custom-takeover-derived-relation" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2, DerivedEntityV2], relations: [DerivedRelationV2] });
+        const diff = await controllerV2.generateMigrationDiff({ includeDestructiveScope: true });
+        expect(diff.requiredDecisions).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "computation-takeover", dataContext: "entity:MigrationCustomTakeoverDerived" }),
+            expect.objectContaining({ kind: "computation-takeover", dataContext: "relation:MigrationCustomTakeoverDerivedRelation" }),
+        ]));
+
+        const plan = await dryRunWithApproval(controllerV2);
+        expect(plan.blockingChanges.join("\n")).toMatch(/entity:MigrationCustomTakeoverDerived/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/relation:MigrationCustomTakeoverDerivedRelation/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/data-based Transform with sourceRecordId and transformIndex/);
+        await db.close();
+    });
+
     test("entity output replacement requires previous manifest ownership proof", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
@@ -977,7 +1068,7 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
-    test("existing fact records cannot be taken over by a new computed entity output", async () => {
+    test("existing fact records require explicit takeover approval before becoming computed entity output", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
             name: "MigrationFactTakeoverProduct",
@@ -990,6 +1081,7 @@ describe("Data migration phase 1", () => {
         const systemV1 = new MonoSystem(db);
         systemV1.conceptClass = KlassByName;
         await new Controller({ system: systemV1, entities: [ProductV1, DiscountV1], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationFactTakeoverProduct", { price: 20 });
         await systemV1.storage.create("MigrationFactTakeoverDiscount", { discounted: 10 });
 
         const ProductV2 = new Entity({
@@ -1009,9 +1101,240 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, DiscountV2], relations: [] });
-        const plan = await dryRunWithApproval(controllerV2);
+        const diff = await controllerV2.generateMigrationDiff({ includeDestructiveScope: true });
+        expect(diff.requiredDecisions.some(item => item.kind === "computation-takeover" && item.dataContext === "entity:MigrationFactTakeoverDiscount")).toBe(true);
+        await expect(controllerV2.migrate({
+            dryRun: true,
+            approvedDiff: {
+                ...diff,
+                status: "approved",
+                decisions: diff.requiredDecisions
+                    .filter(item => item.kind !== "computation-takeover")
+                    .flatMap((requirement): any[] => {
+                        if (requirement.kind === "computation") {
+                            return [{ kind: "computation" as const, id: requirement.id, dataContext: requirement.dataContext, decision: requirement.recommendedDecision, reason: "approved without takeover" }];
+                        }
+                        if (requirement.kind === "destructive-scope") {
+                            return [{ kind: "destructive-scope" as const, dataContext: requirement.dataContext, recordName: requirement.recordName, ids: requirement.ids, reason: "approved without takeover" }];
+                        }
+                        return [];
+                    }),
+            },
+        })).rejects.toThrow(/Missing migration decision.*computation-takeover/);
 
-        expect(plan.blockingChanges.join("\n")).toMatch(/exclusive output ownership proof/);
+        await migrateWithApproval(controllerV2);
+        const outputs = await systemV2.storage.find("MigrationFactTakeoverDiscount", undefined, undefined, ["discounted"]);
+        expect(outputs.map(item => item.discounted)).toEqual([20]);
+        await db.close();
+    });
+
+    test("entity takeover fails when approved destructive scope no longer matches execution state", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationEntityTakeoverScopeProduct",
+            properties: [new Property({ name: "price", type: "number" }, { uuid: "migration-entity-takeover-scope-product-price" })],
+        }, { uuid: "migration-entity-takeover-scope-product" });
+        const DiscountV1 = new Entity({
+            name: "MigrationEntityTakeoverScopeDiscount",
+            properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-entity-takeover-scope-discount-value" })],
+        }, { uuid: "migration-entity-takeover-scope-discount" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1, DiscountV1], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationEntityTakeoverScopeProduct", { price: 20 });
+        await systemV1.storage.create("MigrationEntityTakeoverScopeDiscount", { discounted: 10 });
+
+        const ProductV2 = new Entity({
+            name: "MigrationEntityTakeoverScopeProduct",
+            properties: [new Property({ name: "price", type: "number" }, { uuid: "migration-entity-takeover-scope-product-price" })],
+        }, { uuid: "migration-entity-takeover-scope-product" });
+        const transform = new Transform({
+            record: ProductV2,
+            attributeQuery: ["id", "price"],
+            callback: (item: any) => ({ discounted: item.price }),
+        }, { uuid: "migration-entity-takeover-scope-transform" });
+        const DiscountV2 = new Entity({
+            name: "MigrationEntityTakeoverScopeDiscount",
+            properties: [new Property({ name: "discounted", type: "number" }, { uuid: "migration-entity-takeover-scope-discount-value" })],
+            computation: transform,
+        }, { uuid: "migration-entity-takeover-scope-discount" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, DiscountV2], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        await systemV1.storage.create("MigrationEntityTakeoverScopeDiscount", { discounted: 99 });
+
+        await expect(controllerV2.migrate({ approvedDiff })).rejects.toThrow(/Computation takeover count mismatch|destructive scope mismatch/);
+        await db.close();
+    });
+
+    test("existing fact relation links are cleared before computed relation takeover rebuilds", async () => {
+        const db = new PGLiteDB();
+        const UserV1 = new Entity({
+            name: "MigrationRelationTakeoverUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-takeover-user-name" })],
+        }, { uuid: "migration-relation-takeover-user" });
+        const TaskV1 = new Entity({
+            name: "MigrationRelationTakeoverTask",
+            properties: [new Property({ name: "status", type: "string" }, { uuid: "migration-relation-takeover-task-status" })],
+        }, { uuid: "migration-relation-takeover-task" });
+        const OwnsTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "tasks",
+            target: TaskV1,
+            targetProperty: "owner",
+            name: "MigrationRelationTakeoverOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-takeover-owns-task" });
+        const OpenTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "openTasks",
+            target: TaskV1,
+            targetProperty: "openOwner",
+            name: "MigrationRelationTakeoverOpenTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-takeover-open-task" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1], relations: [OwnsTaskV1, OpenTaskV1] }).setup(true);
+        const user = await systemV1.storage.create("MigrationRelationTakeoverUser", { name: "u" });
+        const openTask = await systemV1.storage.create("MigrationRelationTakeoverTask", { status: "open" });
+        const closedTask = await systemV1.storage.create("MigrationRelationTakeoverTask", { status: "closed" });
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverOwnsTask", user.id, openTask.id);
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverOwnsTask", user.id, closedTask.id);
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverOpenTask", user.id, closedTask.id);
+
+        const UserV2 = new Entity({
+            name: "MigrationRelationTakeoverUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-takeover-user-name" })],
+        }, { uuid: "migration-relation-takeover-user" });
+        const TaskV2 = new Entity({
+            name: "MigrationRelationTakeoverTask",
+            properties: [new Property({ name: "status", type: "string" }, { uuid: "migration-relation-takeover-task-status" })],
+        }, { uuid: "migration-relation-takeover-task" });
+        const OwnsTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "tasks",
+            target: TaskV2,
+            targetProperty: "owner",
+            name: "MigrationRelationTakeoverOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-takeover-owns-task" });
+        const transform = new Transform({
+            record: OwnsTaskV2,
+            attributeQuery: [
+                ["source", { attributeQuery: ["id"] }],
+                ["target", { attributeQuery: ["id", "status"] }],
+            ],
+            callback: (relation: any) => relation.target.status === "open"
+                ? { source: relation.source, target: relation.target }
+                : null,
+        }, { uuid: "migration-relation-takeover-transform" });
+        const OpenTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "openTasks",
+            target: TaskV2,
+            targetProperty: "openOwner",
+            name: "MigrationRelationTakeoverOpenTask",
+            type: "1:n",
+            computation: transform,
+        }, { uuid: "migration-relation-takeover-open-task" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2, OpenTaskV2] });
+        const diff = await controllerV2.generateMigrationDiff({ includeDestructiveScope: true });
+        expect(diff.requiredDecisions.some(item => item.kind === "computation-takeover" && item.dataContext === "relation:MigrationRelationTakeoverOpenTask")).toBe(true);
+        await migrateWithApproval(controllerV2);
+
+        const migratedUser = await systemV2.storage.findOne(
+            "MigrationRelationTakeoverUser",
+            MatchExp.atom({ key: "id", value: ["=", user.id] }),
+            undefined,
+            [["openTasks", { attributeQuery: ["id", "status"] }]],
+        );
+        expect(migratedUser.openTasks).toHaveLength(1);
+        expect(migratedUser.openTasks[0].id).toBe(openTask.id);
+        await db.close();
+    });
+
+    test("relation takeover fails when approved destructive scope no longer matches execution links", async () => {
+        const db = new PGLiteDB();
+        const UserV1 = new Entity({
+            name: "MigrationRelationTakeoverScopeUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-takeover-scope-user-name" })],
+        }, { uuid: "migration-relation-takeover-scope-user" });
+        const TaskV1 = new Entity({
+            name: "MigrationRelationTakeoverScopeTask",
+            properties: [new Property({ name: "status", type: "string" }, { uuid: "migration-relation-takeover-scope-task-status" })],
+        }, { uuid: "migration-relation-takeover-scope-task" });
+        const OwnsTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "tasks",
+            target: TaskV1,
+            targetProperty: "owner",
+            name: "MigrationRelationTakeoverScopeOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-takeover-scope-owns-task" });
+        const OpenTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "openTasks",
+            target: TaskV1,
+            targetProperty: "openOwner",
+            name: "MigrationRelationTakeoverScopeOpenTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-takeover-scope-open-task" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1], relations: [OwnsTaskV1, OpenTaskV1] }).setup(true);
+        const user = await systemV1.storage.create("MigrationRelationTakeoverScopeUser", { name: "u" });
+        const openTask = await systemV1.storage.create("MigrationRelationTakeoverScopeTask", { status: "open" });
+        const closedTask = await systemV1.storage.create("MigrationRelationTakeoverScopeTask", { status: "closed" });
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverScopeOwnsTask", user.id, openTask.id);
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverScopeOwnsTask", user.id, closedTask.id);
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverScopeOpenTask", user.id, closedTask.id);
+
+        const UserV2 = new Entity({
+            name: "MigrationRelationTakeoverScopeUser",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-takeover-scope-user-name" })],
+        }, { uuid: "migration-relation-takeover-scope-user" });
+        const TaskV2 = new Entity({
+            name: "MigrationRelationTakeoverScopeTask",
+            properties: [new Property({ name: "status", type: "string" }, { uuid: "migration-relation-takeover-scope-task-status" })],
+        }, { uuid: "migration-relation-takeover-scope-task" });
+        const OwnsTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "tasks",
+            target: TaskV2,
+            targetProperty: "owner",
+            name: "MigrationRelationTakeoverScopeOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-relation-takeover-scope-owns-task" });
+        const transform = new Transform({
+            record: OwnsTaskV2,
+            attributeQuery: [
+                ["source", { attributeQuery: ["id"] }],
+                ["target", { attributeQuery: ["id", "status"] }],
+            ],
+            callback: (relation: any) => relation.target.status === "open"
+                ? { source: relation.source, target: relation.target }
+                : null,
+        }, { uuid: "migration-relation-takeover-scope-transform" });
+        const OpenTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "openTasks",
+            target: TaskV2,
+            targetProperty: "openOwner",
+            name: "MigrationRelationTakeoverScopeOpenTask",
+            type: "1:n",
+            computation: transform,
+        }, { uuid: "migration-relation-takeover-scope-open-task" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2, OpenTaskV2] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        await systemV1.storage.addRelationByNameById("MigrationRelationTakeoverScopeOpenTask", user.id, openTask.id);
+
+        await expect(controllerV2.migrate({ approvedDiff })).rejects.toThrow(/Computation takeover count mismatch|destructive scope mismatch/);
         await db.close();
     });
 
@@ -1387,6 +1710,410 @@ describe("Data migration phase 1", () => {
         const migrated = await systemV2.storage.findOne("MigrationPropertyChainItem", MatchExp.atom({ key: "id", value: ["=", item.id] }), undefined, ["*"]);
         expect(migrated.a).toBe(6);
         expect(migrated.b).toBe(7);
+        await db.close();
+    });
+
+    test("fact property takeover overwrites old values and recomputes downstream even when upstream value is unchanged", async () => {
+        const db = new PGLiteDB();
+        const ItemV1 = new Entity({
+            name: "MigrationPropertyTakeoverItem",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-property-takeover-base" }),
+                new Property({ name: "a", type: "number" }, { uuid: "migration-property-takeover-a" }),
+                new Property({ name: "b", type: "number" }, { uuid: "migration-property-takeover-b" }),
+            ],
+        }, { uuid: "migration-property-takeover-item" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ItemV1], relations: [] }).setup(true);
+        const item = await systemV1.storage.create("MigrationPropertyTakeoverItem", { base: 3, a: 6, b: 0 });
+
+        const itemA = new Custom({
+            name: "MigrationPropertyTakeoverA",
+            dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
+            compute: async (_deps: any, record: any) => record.base * 2,
+        }, { uuid: "migration-property-takeover-a-computation" });
+        const itemB = new Custom({
+            name: "MigrationPropertyTakeoverB",
+            dataDeps: { current: { type: "property", attributeQuery: ["a"] } },
+            compute: async (_deps: any, record: any) => record.a + 1,
+        }, { uuid: "migration-property-takeover-b-computation" });
+        const ItemV2 = new Entity({
+            name: "MigrationPropertyTakeoverItem",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-property-takeover-base" }),
+                new Property({ name: "a", type: "number", computation: itemA }, { uuid: "migration-property-takeover-a" }),
+                new Property({ name: "b", type: "number", computation: itemB }, { uuid: "migration-property-takeover-b" }),
+            ],
+        }, { uuid: "migration-property-takeover-item" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ItemV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.requiredDecisions.some(requirement => requirement.kind === "computation-takeover" && requirement.dataContext === "property:MigrationPropertyTakeoverItem.a")).toBe(true);
+        const plan = await migrateWithApproval(controllerV2);
+
+        expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toContain("property:MigrationPropertyTakeoverItem.b");
+        const migrated = await systemV2.storage.findOne("MigrationPropertyTakeoverItem", MatchExp.atom({ key: "id", value: ["=", item.id] }), undefined, ["*"]);
+        expect(migrated.a).toBe(6);
+        expect(migrated.b).toBe(7);
+        const logs = await db.query<{ approvedDiffSummary: string }>(`SELECT "approvedDiffSummary" FROM "__interaqt_migration_log" ORDER BY "updatedAt" DESC LIMIT 1`, []);
+        expect(JSON.parse(logs[0].approvedDiffSummary).computationTakeovers).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                dataContext: "property:MigrationPropertyTakeoverItem.a",
+                targetType: "property",
+                expectedExistingCount: 1,
+                expectedHostCount: 1,
+            }),
+        ]));
+        await db.close();
+    });
+
+    test("property takeover fails when approved counts no longer match execution state", async () => {
+        const db = new PGLiteDB();
+        const ItemV1 = new Entity({
+            name: "MigrationPropertyTakeoverCountItem",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-property-takeover-count-base" }),
+                new Property({ name: "computed", type: "number" }, { uuid: "migration-property-takeover-count-computed" }),
+            ],
+        }, { uuid: "migration-property-takeover-count-item" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ItemV1], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationPropertyTakeoverCountItem", { base: 1, computed: 1 });
+
+        const computed = new Custom({
+            name: "MigrationPropertyTakeoverCountComputed",
+            dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
+            compute: async (_deps: any, record: any) => record.base,
+        }, { uuid: "migration-property-takeover-count-computation" });
+        const ItemV2 = new Entity({
+            name: "MigrationPropertyTakeoverCountItem",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-property-takeover-count-base" }),
+                new Property({ name: "computed", type: "number", computation: computed }, { uuid: "migration-property-takeover-count-computed" }),
+            ],
+        }, { uuid: "migration-property-takeover-count-item" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ItemV2], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        await systemV1.storage.create("MigrationPropertyTakeoverCountItem", { base: 2, computed: 2 });
+
+        await expect(controllerV2.migrate({ approvedDiff })).rejects.toThrow(/Computation takeover count mismatch|host count mismatch/);
+        await db.close();
+    });
+
+    test("property takeover recomputes host records even when old fact value is missing", async () => {
+        const db = new PGLiteDB();
+        const ItemV1 = new Entity({
+            name: "MigrationPropertyTakeoverMissingValue",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-property-takeover-missing-base" }),
+                new Property({ name: "computed", type: "number" }, { uuid: "migration-property-takeover-missing-computed" }),
+            ],
+        }, { uuid: "migration-property-takeover-missing-item" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ItemV1], relations: [] }).setup(true);
+        const first = await systemV1.storage.create("MigrationPropertyTakeoverMissingValue", { base: 1, computed: 10 });
+        const second = await systemV1.storage.create("MigrationPropertyTakeoverMissingValue", { base: 2 });
+
+        const computed = new Custom({
+            name: "MigrationPropertyTakeoverMissingComputed",
+            dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
+            compute: async (_deps: any, record: any) => record.base * 10,
+        }, { uuid: "migration-property-takeover-missing-computation" });
+        const ItemV2 = new Entity({
+            name: "MigrationPropertyTakeoverMissingValue",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-property-takeover-missing-base" }),
+                new Property({ name: "computed", type: "number", computation: computed }, { uuid: "migration-property-takeover-missing-computed" }),
+            ],
+        }, { uuid: "migration-property-takeover-missing-item" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ItemV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.requiredDecisions).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                kind: "computation-takeover",
+                dataContext: "property:MigrationPropertyTakeoverMissingValue.computed",
+                expectedExistingCount: 1,
+                expectedHostCount: 2,
+            }),
+        ]));
+
+        await migrateWithApproval(controllerV2);
+        const migrated = await systemV2.storage.find("MigrationPropertyTakeoverMissingValue", undefined, undefined, ["id", "computed"]);
+        const valuesById = new Map(migrated.map(item => [item.id, item.computed]));
+        expect(valuesById.get(first.id)).toBe(10);
+        expect(valuesById.get(second.id)).toBe(20);
+        await db.close();
+    });
+
+    test("property takeover converts skip to null only for nullable properties", async () => {
+        const db = new PGLiteDB();
+        const NullableV1 = new Entity({
+            name: "MigrationTakeoverSkipNullable",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-takeover-skip-nullable-base" }),
+                new Property({ name: "value", type: "number" }, { uuid: "migration-takeover-skip-nullable-value" }),
+            ],
+        }, { uuid: "migration-takeover-skip-nullable" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [NullableV1], relations: [] }).setup(true);
+        const record = await systemV1.storage.create("MigrationTakeoverSkipNullable", { base: 1, value: 10 });
+
+        const skipValue = new Custom({
+            name: "MigrationTakeoverSkipNullableValue",
+            dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
+            compute: async () => ComputationResult.skip(),
+        }, { uuid: "migration-takeover-skip-nullable-computation" });
+        const NullableV2 = new Entity({
+            name: "MigrationTakeoverSkipNullable",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-takeover-skip-nullable-base" }),
+                new Property({ name: "value", type: "number", computation: skipValue }, { uuid: "migration-takeover-skip-nullable-value" }),
+            ],
+        }, { uuid: "migration-takeover-skip-nullable" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [NullableV2], relations: [] });
+        await migrateWithApproval(controllerV2);
+
+        const migrated = await systemV2.storage.findOne("MigrationTakeoverSkipNullable", MatchExp.atom({ key: "id", value: ["=", record.id] }), undefined, ["*"]);
+        expect(migrated.value ?? null).toBeNull();
+        await db.close();
+    });
+
+    test("property takeover compute cannot read the old target value from the record input", async () => {
+        const db = new PGLiteDB();
+        const ItemV1 = new Entity({
+            name: "MigrationTakeoverInputBoundary",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-takeover-input-boundary-base" }),
+                new Property({ name: "value", type: "number" }, { uuid: "migration-takeover-input-boundary-value" }),
+            ],
+        }, { uuid: "migration-takeover-input-boundary" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ItemV1], relations: [] }).setup(true);
+        const record = await systemV1.storage.create("MigrationTakeoverInputBoundary", { base: 1, value: 10 });
+
+        const controlledValue = new Custom({
+            name: "MigrationTakeoverInputBoundaryValue",
+            dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
+            compute: async (_deps: any, computeRecord: any) => computeRecord.value ?? 99,
+        }, { uuid: "migration-takeover-input-boundary-computation" });
+        const ItemV2 = new Entity({
+            name: "MigrationTakeoverInputBoundary",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-takeover-input-boundary-base" }),
+                new Property({ name: "value", type: "number", computation: controlledValue }, { uuid: "migration-takeover-input-boundary-value" }),
+            ],
+        }, { uuid: "migration-takeover-input-boundary" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ItemV2], relations: [] });
+        await migrateWithApproval(controllerV2);
+
+        const migrated = await systemV2.storage.findOne("MigrationTakeoverInputBoundary", MatchExp.atom({ key: "id", value: ["=", record.id] }), undefined, ["*"]);
+        expect(migrated.value).toBe(99);
+        await db.close();
+    });
+
+    test("property takeover fails fast when skip would preserve a non-null old value", async () => {
+        const db = new PGLiteDB();
+        const RequiredV1 = new Entity({
+            name: "MigrationTakeoverSkipRequired",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-takeover-skip-required-base" }),
+                new Property({ name: "value", type: "number" }, { uuid: "migration-takeover-skip-required-value" }),
+            ],
+        }, { uuid: "migration-takeover-skip-required" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [RequiredV1], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationTakeoverSkipRequired", { base: 1, value: 10 });
+
+        const skipValue = new Custom({
+            name: "MigrationTakeoverSkipRequiredValue",
+            dataDeps: { current: { type: "property", attributeQuery: ["base"] } },
+            compute: async () => ComputationResult.skip(),
+        }, { uuid: "migration-takeover-skip-required-computation" });
+        const RequiredV2 = new Entity({
+            name: "MigrationTakeoverSkipRequired",
+            properties: [
+                new Property({ name: "base", type: "number" }, { uuid: "migration-takeover-skip-required-base" }),
+                new Property({ name: "value", type: "number", computation: skipValue }, { uuid: "migration-takeover-skip-required-value" }),
+            ],
+            constraints: [
+                new NonNullConstraint({ name: "takeover_skip_value_required", property: "value" }, { uuid: "migration-takeover-skip-required-constraint" }),
+            ],
+        }, { uuid: "migration-takeover-skip-required" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [RequiredV2], relations: [] });
+
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/cannot keep old value for non-null property/);
+        await db.close();
+    });
+
+    test("fact property takeover matrix covers built-in property computations", async () => {
+        const db = new PGLiteDB();
+        const TaskV1 = new Entity({
+            name: "MigrationTakeoverMatrixTask",
+            properties: [
+                new Property({ name: "score", type: "number" }, { uuid: "migration-takeover-matrix-task-score" }),
+                new Property({ name: "weight", type: "number" }, { uuid: "migration-takeover-matrix-task-weight" }),
+                new Property({ name: "priority", type: "string" }, { uuid: "migration-takeover-matrix-task-priority" }),
+                new Property({ name: "done", type: "boolean" }, { uuid: "migration-takeover-matrix-task-done" }),
+            ],
+        }, { uuid: "migration-takeover-matrix-task" });
+        const UserV1 = new Entity({
+            name: "MigrationTakeoverMatrixUser",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-takeover-matrix-user-name" }),
+                new Property({ name: "taskCount", type: "number" }, { uuid: "migration-takeover-matrix-user-count" }),
+                new Property({ name: "scoreSum", type: "number" }, { uuid: "migration-takeover-matrix-user-sum" }),
+                new Property({ name: "avgScore", type: "number" }, { uuid: "migration-takeover-matrix-user-avg" }),
+                new Property({ name: "weightedScore", type: "number" }, { uuid: "migration-takeover-matrix-user-weighted" }),
+                new Property({ name: "hasHighPriority", type: "boolean" }, { uuid: "migration-takeover-matrix-user-any" }),
+                new Property({ name: "allDone", type: "boolean" }, { uuid: "migration-takeover-matrix-user-every" }),
+                new Property({ name: "clockValue", type: "number" }, { uuid: "migration-takeover-matrix-user-realtime" }),
+            ],
+        }, { uuid: "migration-takeover-matrix-user" });
+        const OwnsTaskV1 = new Relation({
+            source: UserV1,
+            sourceProperty: "tasks",
+            target: TaskV1,
+            targetProperty: "owner",
+            name: "MigrationTakeoverMatrixOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-takeover-matrix-owns-task" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [UserV1, TaskV1], relations: [OwnsTaskV1] }).setup(true);
+        const user = await systemV1.storage.create("MigrationTakeoverMatrixUser", {
+            name: "Alice",
+            taskCount: 999,
+            scoreSum: 999,
+            avgScore: 999,
+            weightedScore: 999,
+            hasHighPriority: false,
+            allDone: false,
+            clockValue: 999,
+        });
+        const task1 = await systemV1.storage.create("MigrationTakeoverMatrixTask", { score: 10, weight: 1, priority: "low", done: true });
+        const task2 = await systemV1.storage.create("MigrationTakeoverMatrixTask", { score: 20, weight: 2, priority: "high", done: true });
+        await systemV1.storage.addRelationByNameById("MigrationTakeoverMatrixOwnsTask", user.id, task1.id);
+        await systemV1.storage.addRelationByNameById("MigrationTakeoverMatrixOwnsTask", user.id, task2.id);
+
+        const TaskV2 = new Entity({
+            name: "MigrationTakeoverMatrixTask",
+            properties: [
+                new Property({ name: "score", type: "number" }, { uuid: "migration-takeover-matrix-task-score" }),
+                new Property({ name: "weight", type: "number" }, { uuid: "migration-takeover-matrix-task-weight" }),
+                new Property({ name: "priority", type: "string" }, { uuid: "migration-takeover-matrix-task-priority" }),
+                new Property({ name: "done", type: "boolean" }, { uuid: "migration-takeover-matrix-task-done" }),
+            ],
+        }, { uuid: "migration-takeover-matrix-task" });
+        const UserV2 = new Entity({
+            name: "MigrationTakeoverMatrixUser",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-takeover-matrix-user-name" }),
+                new Property({
+                    name: "taskCount",
+                    type: "number",
+                    computation: new Count({ property: "tasks" }, { uuid: "migration-takeover-matrix-count-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-count" }),
+                new Property({
+                    name: "scoreSum",
+                    type: "number",
+                    computation: new Summation({ property: "tasks", attributeQuery: ["score"] }, { uuid: "migration-takeover-matrix-sum-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-sum" }),
+                new Property({
+                    name: "avgScore",
+                    type: "number",
+                    computation: new Average({ property: "tasks", attributeQuery: ["score"] }, { uuid: "migration-takeover-matrix-avg-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-avg" }),
+                new Property({
+                    name: "weightedScore",
+                    type: "number",
+                    computation: new WeightedSummation({
+                        property: "tasks",
+                        attributeQuery: ["score", "weight"],
+                        callback: (task: any) => ({ value: task.score, weight: task.weight }),
+                    }, { uuid: "migration-takeover-matrix-weighted-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-weighted" }),
+                new Property({
+                    name: "hasHighPriority",
+                    type: "boolean",
+                    computation: new Any({
+                        property: "tasks",
+                        attributeQuery: ["priority"],
+                        callback: (task: any) => task.priority === "high",
+                    }, { uuid: "migration-takeover-matrix-any-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-any" }),
+                new Property({
+                    name: "allDone",
+                    type: "boolean",
+                    computation: new Every({
+                        property: "tasks",
+                        attributeQuery: ["done"],
+                        callback: (task: any) => task.done === true,
+                        notEmpty: true,
+                    }, { uuid: "migration-takeover-matrix-every-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-every" }),
+                new Property({
+                    name: "clockValue",
+                    type: "number",
+                    computation: new RealTime({
+                        attributeQuery: ["name"],
+                        callback: async (now: Expression) => now.subtract(now).add(2),
+                        nextRecomputeTime: () => 1000,
+                    }, { uuid: "migration-takeover-matrix-realtime-computation" }),
+                }, { uuid: "migration-takeover-matrix-user-realtime" }),
+            ],
+        }, { uuid: "migration-takeover-matrix-user" });
+        const OwnsTaskV2 = new Relation({
+            source: UserV2,
+            sourceProperty: "tasks",
+            target: TaskV2,
+            targetProperty: "owner",
+            name: "MigrationTakeoverMatrixOwnsTask",
+            type: "1:n",
+        }, { uuid: "migration-takeover-matrix-owns-task" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [UserV2, TaskV2], relations: [OwnsTaskV2] });
+        const diff = await controllerV2.generateMigrationDiff();
+        const takeoverContexts = diff.requiredDecisions
+            .filter(requirement => requirement.kind === "computation-takeover")
+            .map(requirement => requirement.dataContext);
+        expect(takeoverContexts).toEqual(expect.arrayContaining([
+            "property:MigrationTakeoverMatrixUser.taskCount",
+            "property:MigrationTakeoverMatrixUser.scoreSum",
+            "property:MigrationTakeoverMatrixUser.avgScore",
+            "property:MigrationTakeoverMatrixUser.weightedScore",
+            "property:MigrationTakeoverMatrixUser.hasHighPriority",
+            "property:MigrationTakeoverMatrixUser.allDone",
+            "property:MigrationTakeoverMatrixUser.clockValue",
+        ]));
+
+        const plan = await migrateWithApproval(controllerV2);
+        expect(plan.rebuildPlan.map(rebuild => rebuild.dataContext)).toEqual(expect.arrayContaining(takeoverContexts));
+        const migrated = await systemV2.storage.findOne("MigrationTakeoverMatrixUser", MatchExp.atom({ key: "id", value: ["=", user.id] }), undefined, ["*"]);
+        expect(migrated.taskCount).toBe(2);
+        expect(migrated.scoreSum).toBe(30);
+        expect(migrated.avgScore).toBe(15);
+        expect(migrated.weightedScore).toBe(50);
+        expect(migrated.hasHighPriority).toBe(true);
+        expect(migrated.allDone).toBe(true);
+        expect(migrated.clockValue).toBe(2);
         await db.close();
     });
 
@@ -2479,6 +3206,56 @@ describe("Data migration phase 1", () => {
 
         expect(diff.requiredDecisions.some(item => item.kind === "event-rebuild-handler" && item.dataContext === "property:MigrationEventTicket.status")).toBe(true);
         await expect(dryRunWithApproval(controllerV2)).rejects.toThrow(/Missing migration event rebuild handler/);
+        await db.close();
+    });
+
+    test("StateMachine fact property takeover is blocked until state rebuild handlers exist", async () => {
+        const db = new PGLiteDB();
+        const TicketV1 = new Entity({
+            name: "MigrationStateMachineTakeoverTicket",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-sm-takeover-title" }),
+                new Property({ name: "status", type: "string" }, { uuid: "migration-sm-takeover-status" }),
+            ],
+        }, { uuid: "migration-sm-takeover-ticket" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [TicketV1], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationStateMachineTakeoverTicket", { title: "A", status: "legacy" });
+
+        const open = new StateNode({ name: "open" }, { uuid: "migration-sm-takeover-open" });
+        const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-takeover-closed" });
+        const stateMachine = new StateMachine({
+            states: [open, closed],
+            transfers: [
+                new StateTransfer({
+                    trigger: { recordName: "MigrationStateMachineTakeoverTicket", type: "update" },
+                    current: open,
+                    next: closed,
+                }, { uuid: "migration-sm-takeover-transfer" }),
+            ],
+            initialState: open,
+        }, { uuid: "migration-sm-takeover-machine" });
+        const TicketV2 = new Entity({
+            name: "MigrationStateMachineTakeoverTicket",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-sm-takeover-title" }),
+                new Property({ name: "status", type: "string", computation: stateMachine }, { uuid: "migration-sm-takeover-status" }),
+            ],
+        }, { uuid: "migration-sm-takeover-ticket" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [TicketV2], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.requiredDecisions.some(requirement => requirement.kind === "computation-takeover" && requirement.dataContext === "property:MigrationStateMachineTakeoverTicket.status")).toBe(true);
+
+        await expect(migrateWithApproval(controllerV2, {
+            handlers: {
+                eventRebuild: {
+                    "property:MigrationStateMachineTakeoverTicket.status": async () => "open",
+                },
+            },
+        })).rejects.toThrow(/StateMachine computation takeover requires a state rebuild handler/);
         await db.close();
     });
 

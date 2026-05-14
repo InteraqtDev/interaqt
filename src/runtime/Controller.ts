@@ -20,11 +20,14 @@ import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { NestedDispatchError, RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
+    addComputationTakeoverReview,
     addMissingRebuildHandlerRequirements,
+    assertComputationTakeoverAllowed,
+    assertDestructiveScopeAllowed,
     buildAffectedRebuildPlan,
     buildMigrationDiff,
-    assertDestructiveScopeAllowed,
     createPlanBlockingMessages,
+    createMigrationReadHandle,
     createMigrationManifest,
     getChangedComputationsFromApprovedDiff,
     getDestructiveDeletionScope,
@@ -313,7 +316,8 @@ export class Controller {
             ],
             destructiveScopes,
         }
-        const diff = buildMigrationDiff(previousManifest, nextManifest, schemaPlan, safety)
+        const readHandle = createMigrationReadHandle(this, schemaPlan)
+        const diff = await addComputationTakeoverReview(this, buildMigrationDiff(previousManifest, nextManifest, schemaPlan, safety), previousManifest, nextManifest, readHandle)
         return addMissingRebuildHandlerRequirements(diff, this, provisionalRebuildPlan)
     }
 
@@ -366,6 +370,8 @@ export class Controller {
         const blockingChanges = createPlanBlockingMessages(allBlockingChanges)
         const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, previousManifest)
         assertDestructiveScopeAllowed(migrationOptions, deletionScope)
+        const readHandle = createMigrationReadHandle(this, schemaPlan)
+        await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest, readHandle)
         const plan: MigrationPlan = {
             mode: 'compute',
             dryRun: migrationOptions.dryRun === true,
@@ -409,6 +415,7 @@ export class Controller {
                 await this.system.storage.runInTransaction({ name: 'migration recompute', isolation: 'SERIALIZABLE' }, async () => {
                     if (!reached(phase, 'computation-applied')) {
                         const filteredEvents = await recomputeFilteredMemberships(this, previousManifest, nextManifest)
+                        await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest)
                         await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents, previousManifest)
                         if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'computation-applied')
                     }

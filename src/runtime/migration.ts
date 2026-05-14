@@ -3,7 +3,7 @@ import type { Computation, ComputationResultPatch, DataBasedComputation, DataCon
 import { ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip } from "./computations/Computation.js";
 import type { RecordMutationEvent, StorageSchemaMetadata, System } from "./System.js";
 import { DICTIONARY_RECORD } from "./System.js";
-import { LINK_SYMBOL, MatchExp } from "@storage";
+import { EntityQueryHandle, EntityToTableMap, LINK_SYMBOL, MatchExp } from "@storage";
 import { createHash } from "node:crypto";
 import { ComputationSourceMapManager, type DataBasedEntityEventsSourceMap, type EntityEventSourceMap, type EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 
@@ -43,6 +43,13 @@ export type MigrationDiffSummary = {
     changeCount: number;
     requiredDecisionCount: number;
     blockingChangeCount: number;
+    computationTakeovers?: Array<{
+        dataContext: string;
+        computationId: string;
+        targetType: "property" | "entity" | "relation";
+        expectedExistingCount: number;
+        expectedHostCount?: number;
+    }>;
 };
 
 export type MigrationChange =
@@ -66,6 +73,18 @@ export type MigrationChange =
             needsAsyncCompletionHandler?: boolean;
         };
         recommendation: "rebuild" | "ignore" | "needs-review" | "blocked";
+        reason: string;
+    }
+    | {
+        kind: "computation-takeover";
+        id: string;
+        dataContext: string;
+        computationId: string;
+        targetType: "property" | "entity" | "relation";
+        previousAuthority: "fact";
+        nextAuthority: "computation";
+        expectedExistingCount: number;
+        expectedHostCount?: number;
         reason: string;
     }
     | {
@@ -113,6 +132,19 @@ export type MigrationDecisionRequirement =
         reason: string;
     }
     | {
+        kind: "computation-takeover";
+        dataContext: string;
+        computationId: string;
+        targetType: "property" | "entity" | "relation";
+        previousAuthority: "fact";
+        nextAuthority: "computation";
+        oldDataStrategy: "discard-and-rebuild";
+        expectedExistingCount: number;
+        expectedHostCount?: number;
+        destructiveScopeRef?: string;
+        reason: string;
+    }
+    | {
         kind: "event-rebuild-handler";
         dataContext: string;
         reason: string;
@@ -136,6 +168,19 @@ export type MigrationDecision =
         id: string;
         dataContext: string;
         decision: "changed" | "unchanged" | "state-only" | "unrebuildable";
+        reason: string;
+    }
+    | {
+        kind: "computation-takeover";
+        dataContext: string;
+        computationId: string;
+        targetType: "property" | "entity" | "relation";
+        previousAuthority: "fact";
+        nextAuthority: "computation";
+        oldDataStrategy: "discard-and-rebuild";
+        expectedExistingCount: number;
+        expectedHostCount?: number;
+        destructiveScopeRef?: string;
         reason: string;
     }
     | {
@@ -687,6 +732,7 @@ function decisionKey(decision: MigrationDecision) {
 
 function changeKey(change: MigrationChange) {
     if (change.kind === "computation") return `computation:${change.id}`;
+    if (change.kind === "computation-takeover") return `computation-takeover:${change.dataContext}`;
     if (change.kind === "dictionary") return `dictionary:${change.id}`;
     if (change.kind === "record") return `record:${change.id}`;
     if (change.kind === "property") return `property:${change.id}`;
@@ -720,6 +766,176 @@ function computationDecision(diff: MigrationDiffFile, id: string) {
     return diff.decisions.find((decision): decision is Extract<MigrationDecision, { kind: "computation" }> =>
         decision.kind === "computation" && decision.id === id
     );
+}
+
+function takeoverDecision(diff: MigrationDiffFile | undefined, dataContext: string) {
+    return diff?.decisions.find((decision): decision is Extract<MigrationDecision, { kind: "computation-takeover" }> =>
+        decision.kind === "computation-takeover" && decision.dataContext === dataContext
+    );
+}
+
+function isFactToComputationTakeover(previousManifest: MigrationManifest, nextManifest: MigrationManifest, computation: ComputationManifest) {
+    const dataContext = computation.dataContext;
+    if (dataContext.startsWith("property:")) {
+        const match = dataContext.match(/^property:([^.]*)\.([^.]*)$/);
+        if (!match) return false;
+        const [, hostName, propertyName] = match;
+        const oldRecord = previousManifest.records.find(record => record.name === hostName);
+        const nextRecord = nextManifest.records.find(record => record.name === hostName);
+        const oldProperty = oldRecord?.properties.find(property => property.name === propertyName);
+        const nextProperty = nextRecord?.properties.find(property => property.name === propertyName);
+        return oldProperty?.computed === false && nextProperty?.computed === true;
+    }
+    if (dataContext.startsWith("entity:") || dataContext.startsWith("relation:")) {
+        const [targetType, recordName] = dataContext.split(":") as ["entity" | "relation", string];
+        const oldRecord = previousManifest.records.find(record => record.kind === targetType && record.name === recordName);
+        const nextRecord = nextManifest.records.find(record => record.kind === targetType && record.name === recordName);
+        if (!oldRecord || !nextRecord) return false;
+        const oldComputedOwner = previousManifest.computations.some(item => item.dataContext === dataContext);
+        const nextComputedOwner = nextManifest.computations.some(item =>
+            item.id === computation.id &&
+            item.dataContext === dataContext &&
+            item.ownershipProof?.kind === "computed-output"
+        );
+        return !oldComputedOwner && nextComputedOwner;
+    }
+    return false;
+}
+
+function takeoverTargetType(dataContext: string): "property" | "entity" | "relation" {
+    if (dataContext.startsWith("property:")) return "property";
+    if (dataContext.startsWith("entity:")) return "entity";
+    return "relation";
+}
+
+type MigrationReadHandle = Pick<EntityQueryHandle, "find">;
+
+export function createMigrationReadHandle(controller: Controller, schemaPlan: MigrationSchemaPlan): MigrationReadHandle | undefined {
+    const dbSetup = (schemaPlan.internal as { dbSetup?: { map: ConstructorParameters<typeof EntityToTableMap>[0]; aliasManager?: ConstructorParameters<typeof EntityToTableMap>[1] } } | undefined)?.dbSetup;
+    if (!dbSetup) return undefined;
+    const db = (controller.system.storage as unknown as { db?: ConstructorParameters<typeof EntityQueryHandle>[1] }).db ||
+        (controller.system as unknown as { db?: ConstructorParameters<typeof EntityQueryHandle>[1] }).db;
+    if (!db) return undefined;
+    return new EntityQueryHandle(new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), db);
+}
+
+async function readManifestRecords(controller: Controller, manifest: MigrationManifest | undefined, recordName: string, attributes: string[], readHandle?: MigrationReadHandle) {
+    if (readHandle) {
+        return readHandle.find(recordName, undefined, undefined, attributes);
+    }
+    if ((controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle) {
+        return controller.system.storage.find(recordName, undefined, undefined, attributes);
+    }
+    if (manifest?.storage.records.some(item => item.recordName === recordName)) {
+        throw new MigrationError(`Cannot read migration takeover scope for ${recordName} before storage query handle is initialized`);
+    }
+    return [];
+}
+
+async function readTakeoverScope(controller: Controller, dataContext: string, manifest?: MigrationManifest, readHandle?: MigrationReadHandle) {
+    if (dataContext.startsWith("property:")) {
+        const match = dataContext.match(/^property:([^.]*)\.([^.]*)$/);
+        if (!match) throw new MigrationError(`Invalid property data context for computation takeover: ${dataContext}`);
+        const [, hostName, propertyName] = match;
+        const records = await readManifestRecords(controller, manifest, hostName, ["id", propertyName], readHandle);
+        return {
+            expectedExistingCount: records.filter(record => record[propertyName] !== undefined && record[propertyName] !== null).length,
+            expectedHostCount: records.length,
+        };
+    }
+    const [, recordName] = dataContext.split(":");
+    const records = await readManifestRecords(controller, manifest, recordName, ["id"], readHandle);
+    return {
+        expectedExistingCount: records.length,
+        ids: records.map(record => String(record.id)).sort(),
+    };
+}
+
+export async function addComputationTakeoverReview(
+    controller: Controller,
+    diff: MigrationDiffFile,
+    previousManifest: MigrationManifest,
+    nextManifest: MigrationManifest,
+    readHandle?: MigrationReadHandle,
+) {
+    const changes = new Map(diff.changes.map(change => [changeKey(change), change]));
+    const requirements = new Map(diff.requiredDecisions.map(requirement => [requirementKey(requirement), requirement]));
+    const destructiveScopes = new Map(diff.safety.destructiveScopes.map(scope => [`${scope.dataContext}:${scope.recordName || ""}`, scope]));
+
+    for (const computation of nextManifest.computations) {
+        if (!isFactToComputationTakeover(previousManifest, nextManifest, computation)) continue;
+        const targetType = takeoverTargetType(computation.dataContext);
+        const scope = await readTakeoverScope(controller, computation.dataContext, previousManifest, readHandle);
+        const requirement: Extract<MigrationDecisionRequirement, { kind: "computation-takeover" }> = {
+            kind: "computation-takeover",
+            dataContext: computation.dataContext,
+            computationId: computation.id,
+            targetType,
+            previousAuthority: "fact",
+            nextAuthority: "computation",
+            oldDataStrategy: "discard-and-rebuild",
+            expectedExistingCount: scope.expectedExistingCount,
+            expectedHostCount: scope.expectedHostCount,
+            destructiveScopeRef: targetType === "property" ? undefined : `${computation.dataContext}:${computation.outputRecord || computation.dataContext.split(":")[1]}`,
+            reason: `${computation.dataContext} changes from fact authority to computation authority and existing output must be discarded before rebuild`,
+        };
+        changes.set(`computation-takeover:${computation.dataContext}`, {
+            kind: "computation-takeover",
+            id: `computation-takeover:${computation.dataContext}`,
+            dataContext: computation.dataContext,
+            computationId: computation.id,
+            targetType,
+            previousAuthority: "fact",
+            nextAuthority: "computation",
+            expectedExistingCount: scope.expectedExistingCount,
+            expectedHostCount: scope.expectedHostCount,
+            reason: requirement.reason,
+        });
+        requirements.set(requirementKey(requirement), requirement);
+        if (targetType !== "property") {
+            const recordName = computation.outputRecord || computation.dataContext.split(":")[1];
+            const key = `${computation.dataContext}:${recordName}`;
+            if (!destructiveScopes.has(key)) {
+                const destructiveScope = {
+                    dataContext: computation.dataContext,
+                    recordName,
+                    ids: scope.ids || [],
+                    count: scope.expectedExistingCount,
+                    reason: "fact output records will be discarded during computation takeover",
+                };
+                destructiveScopes.set(key, destructiveScope);
+                requirements.set(requirementKey({ kind: "destructive-scope", ...destructiveScope }), {
+                    kind: "destructive-scope",
+                    dataContext: destructiveScope.dataContext,
+                    recordName: destructiveScope.recordName,
+                    ids: destructiveScope.ids,
+                    reason: destructiveScope.reason,
+                });
+            }
+        }
+    }
+
+    diff.changes = Array.from(changes.values());
+    diff.requiredDecisions = Array.from(requirements.values());
+    diff.safety = {
+        ...diff.safety,
+        destructiveScopes: Array.from(destructiveScopes.values()),
+    };
+    diff.summary = {
+        ...diff.summary,
+        changeCount: diff.changes.length,
+        requiredDecisionCount: diff.requiredDecisions.length,
+        computationTakeovers: diff.requiredDecisions
+            .filter((requirement): requirement is Extract<MigrationDecisionRequirement, { kind: "computation-takeover" }> => requirement.kind === "computation-takeover")
+            .map(requirement => ({
+                dataContext: requirement.dataContext,
+                computationId: requirement.computationId,
+                targetType: requirement.targetType,
+                expectedExistingCount: requirement.expectedExistingCount,
+                expectedHostCount: requirement.expectedHostCount,
+            })),
+    };
+    return diff;
 }
 
 export function buildMigrationDiff(
@@ -1088,6 +1304,52 @@ export function validateApprovedDiff(
         if (decision.kind === "computation" && !changeKeys.has(`computation:${decision.id}`)) {
             throw new MigrationError(`Migration decision references a computation that is not present in the approved diff: ${decision.id}`);
         }
+        if (decision.kind === "computation-takeover") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration computation takeover decision does not match a required review item: ${decision.dataContext}`);
+            }
+            if (decision.oldDataStrategy !== "discard-and-rebuild" || decision.previousAuthority !== "fact" || decision.nextAuthority !== "computation") {
+                throw new MigrationError(`Invalid computation takeover decision for ${decision.dataContext}`);
+            }
+            if (!Number.isInteger(decision.expectedExistingCount) || decision.expectedExistingCount < 0) {
+                throw new MigrationError(`Invalid computation takeover expectedExistingCount for ${decision.dataContext}`);
+            }
+            if (decision.expectedHostCount !== undefined && (!Number.isInteger(decision.expectedHostCount) || decision.expectedHostCount < 0)) {
+                throw new MigrationError(`Invalid computation takeover expectedHostCount for ${decision.dataContext}`);
+            }
+            const computation = nextManifest.computations.find(item => item.id === decision.computationId);
+            if (!computation || computation.dataContext !== decision.dataContext) {
+                throw new MigrationError(`Migration computation takeover references unknown output computation: ${decision.computationId}`);
+            }
+            if (takeoverTargetType(decision.dataContext) !== decision.targetType) {
+                throw new MigrationError(`Migration computation takeover target type does not match data context: ${decision.dataContext}`);
+            }
+            if (!isFactToComputationTakeover(previousManifest, nextManifest, computation)) {
+                throw new MigrationError(`Migration computation takeover can only discard previous fact output: ${decision.dataContext}`);
+            }
+            const computationReview = approvedDiff.decisions.find(item =>
+                item.kind === "computation" &&
+                item.id === decision.computationId &&
+                item.decision === "changed"
+            );
+            if (!computationReview) {
+                throw new MigrationError(`Migration computation takeover requires an approved changed computation decision: ${decision.computationId}`);
+            }
+            if (decision.targetType !== "property") {
+                const recordName = computation.outputRecord || decision.dataContext.split(":")[1];
+                const destructiveReview = approvedDiff.decisions.find(item =>
+                    item.kind === "destructive-scope" &&
+                    item.dataContext === decision.dataContext &&
+                    item.recordName === recordName
+                );
+                if (!destructiveReview) {
+                    throw new MigrationError(`Migration computation takeover requires an approved destructive-scope decision: ${decision.dataContext}`);
+                }
+            }
+            if (decision.targetType === "property" && computation.type.includes("StateMachine") && computation.boundStates.length > 0) {
+                throw new MigrationError(`StateMachine computation takeover requires a state rebuild handler, which is not supported in this migration phase: ${decision.dataContext}`);
+            }
+        }
         if (decision.kind === "event-rebuild-handler") {
             if (!requirementKeys.has(key)) {
                 throw new MigrationError(`Migration event rebuild decision does not match a required review item: ${decision.dataContext}`);
@@ -1418,6 +1680,12 @@ function hasExclusiveOutputOwnershipProof(oldManifest: MigrationManifest, comput
         oldComputation.ownershipProof.outputRecord === oldComputation.outputRecord;
 }
 
+function hasApprovedComputationTakeover(options: MigrationOptions, oldManifest: MigrationManifest | undefined, computationId: string, dataContext: string) {
+    const decision = takeoverDecision(options.approvedDiff, dataContext);
+    if (!decision || decision.computationId !== computationId || decision.oldDataStrategy !== "discard-and-rebuild") return false;
+    return oldManifest === undefined || oldManifest.computations.every(item => item.dataContext !== dataContext);
+}
+
 export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan: ComputationRebuildItem[], options: MigrationOptions = {}, oldManifest?: MigrationManifest) {
     const blockingChanges: StorageBlockingChange[] = [];
     const rebuildIds = new Set(rebuildPlan.map(item => item.computationId));
@@ -1446,7 +1714,12 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
                 });
             }
         }
-        if ((computation.dataContext.type === "entity" || computation.dataContext.type === "relation") && oldManifest && !hasExclusiveOutputOwnershipProof(oldManifest, computationId, dataContext, computation.dataContext.id.name)) {
+        if (
+            (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") &&
+            oldManifest &&
+            !hasExclusiveOutputOwnershipProof(oldManifest, computationId, dataContext, computation.dataContext.id.name) &&
+            !hasApprovedComputationTakeover(options, oldManifest, computationId, dataContext)
+        ) {
             blockingChanges.push({
                 kind: "destructive-computed-output",
                 logicalPath: dataContext,
@@ -1539,10 +1812,15 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
 export function assertDestructiveScopeAllowed(options: MigrationOptions, actualScope: Array<{ dataContext: string; recordName?: string; ids?: string[] }>) {
     const expected = (options.approvedDiff?.decisions || [])
         .filter((decision): decision is Extract<MigrationDecision, { kind: "destructive-scope" }> => decision.kind === "destructive-scope");
+    const takeoverContexts = new Set((options.approvedDiff?.decisions || [])
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "computation-takeover" }> => decision.kind === "computation-takeover")
+        .filter(decision => decision.targetType !== "property")
+        .map(decision => decision.dataContext));
     const key = (item: { dataContext: string; recordName?: string }) => `${item.dataContext}:${item.recordName || ""}`;
     const expectedByKey = new Map(expected.map(item => [key(item), [...(item.ids || [])].sort().join(",")]));
     const actualKeys = new Set(actualScope.map(key));
     for (const item of expected) {
+        if (takeoverContexts.has(item.dataContext)) continue;
         if (!actualKeys.has(key(item))) {
             throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
         }
@@ -1551,6 +1829,32 @@ export function assertDestructiveScopeAllowed(options: MigrationOptions, actualS
         const actualIds = [...(item.ids || [])].sort().join(",");
         if (expectedByKey.get(key(item)) !== actualIds) {
             throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
+        }
+    }
+}
+
+export async function assertComputationTakeoverAllowed(controller: Controller, options: MigrationOptions, oldManifest?: MigrationManifest, readHandle?: MigrationReadHandle) {
+    const decisions = (options.approvedDiff?.decisions || [])
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "computation-takeover" }> => decision.kind === "computation-takeover");
+    for (const decision of decisions) {
+        const actual = await readTakeoverScope(controller, decision.dataContext, oldManifest, readHandle);
+        if (actual.expectedExistingCount !== decision.expectedExistingCount) {
+            throw new DestructiveComputedOutputError(`Computation takeover count mismatch for ${decision.dataContext}`);
+        }
+        if (decision.expectedHostCount !== undefined && actual.expectedHostCount !== decision.expectedHostCount) {
+            throw new DestructiveComputedOutputError(`Computation takeover host count mismatch for ${decision.dataContext}`);
+        }
+        if (decision.targetType !== "property") {
+            const actualIds = [...(actual.ids || [])].sort().join(",");
+            const recordName = decision.dataContext.split(":")[1];
+            const scope = options.approvedDiff?.decisions.find(item =>
+                item.kind === "destructive-scope" &&
+                item.dataContext === decision.dataContext &&
+                item.recordName === recordName
+            ) as Extract<MigrationDecision, { kind: "destructive-scope" }> | undefined;
+            if (!scope || [...(scope.ids || [])].sort().join(",") !== actualIds) {
+                throw new DestructiveComputedOutputError(`Computation takeover destructive scope mismatch for ${decision.dataContext}`);
+            }
         }
     }
 }
@@ -1608,8 +1912,27 @@ async function resolveMigrationAsyncResult(controller: Controller, computation: 
     });
 }
 
-async function writeComputationResult(controller: Controller, computation: Computation, result: unknown, record?: Record<string, unknown>, options: MigrationOptions = {}) {
-    if (result instanceof ComputationResultSkip) return undefined;
+async function writeComputationResult(
+    controller: Controller,
+    computation: Computation,
+    result: unknown,
+    record?: Record<string, unknown>,
+    options: MigrationOptions = {},
+    writeOptions: { forceMutationEvent?: boolean; skipAsNull?: boolean } = {},
+) {
+    if (result instanceof ComputationResultSkip) {
+        if (!writeOptions.skipAsNull || computation.dataContext.type !== "property") return undefined;
+        const propertyContext = computation.dataContext;
+        const nonNull = controller.system.storage.schema.constraints.some(constraint =>
+            constraint.kind === "non-null" &&
+            constraint.recordName === propertyContext.host.name &&
+            constraint.property === propertyContext.id.name
+        );
+        if (nonNull) {
+            throw new MigrationError(`Computation takeover cannot keep old value for non-null property ${dataContextPath(computation.dataContext)} when computation returns skip`);
+        }
+        result = null;
+    }
     if (result instanceof ComputationResultAsync) {
         result = await resolveMigrationAsyncResult(controller, computation, result, record, options);
     }
@@ -1617,8 +1940,10 @@ async function writeComputationResult(controller: Controller, computation: Compu
         throw new AsyncMigrationComputationError(`Migration requires direct final output, not asyncReturn resolution, for ${dataContextPath(computation.dataContext)}`);
     }
     const previous = await controller.retrieveLastValue(computation.dataContext, record);
-    if (isEqualValue(previous, result)) return undefined;
-    await controller.applyResult(computation.dataContext, result, record);
+    if (!writeOptions.forceMutationEvent && isEqualValue(previous, result)) return undefined;
+    if (!isEqualValue(previous, result)) {
+        await controller.applyResult(computation.dataContext, result, record);
+    }
     return createMutationEventForOutput(computation.dataContext, result, previous, record);
 }
 
@@ -1681,6 +2006,22 @@ function createMutationEventForOutput(dataContext: DataContext, result: unknown,
     return undefined;
 }
 
+function stripPropertyFromInput<T>(value: T, propertyName: string, seen = new WeakSet<object>()): T {
+    if (value === null || typeof value !== "object") return value;
+    if (seen.has(value)) return value;
+    seen.add(value);
+    if (Array.isArray(value)) {
+        return value.map(item => stripPropertyFromInput(item, propertyName, seen)) as T;
+    }
+    const record = value as Record<string, unknown>;
+    const output: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(record)) {
+        if (key === propertyName) continue;
+        output[key] = stripPropertyFromInput(item, propertyName, seen);
+    }
+    return output as T;
+}
+
 async function recomputeTransformOutput(controller: Controller, computation: DataBasedComputation, options: MigrationOptions = {}) {
     if (computation.dataContext.type !== "entity" && computation.dataContext.type !== "relation") return [];
     let result = await computation.compute(await controller.scheduler.resolveDataDeps(computation));
@@ -1695,6 +2036,33 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
     const indexKey = (computation.state as any)?.transformIndex?.key;
     if (!sourceKey || !indexKey) {
         throw new UnrebuildableComputationError(`Transform migration requires sourceRecordId and transformIndex state for ${dataContextPath(computation.dataContext)}`);
+    }
+    const takeover = takeoverDecision(options.approvedDiff, dataContextPath(computation.dataContext));
+    if (takeover?.targetType === computation.dataContext.type) {
+        const decision = getDecision(options.approvedDiff, item =>
+            item.kind === "destructive-scope" &&
+            item.dataContext === dataContextPath(computation.dataContext) &&
+            item.recordName === recordName
+        ) as Extract<MigrationDecision, { kind: "destructive-scope" }> | undefined;
+        if (!decision) {
+            throw new DestructiveComputedOutputError(`Migration takeover requires approved destructive scope before clearing ${recordName}`);
+        }
+        const existing = await controller.system.storage.find(recordName, undefined, undefined, ["*"]);
+        const approvedIds = new Set(decision.ids.map(String));
+        const actualIds = new Set(existing.map(record => String(record.id)));
+        if (approvedIds.size !== actualIds.size || [...actualIds].some(id => !approvedIds.has(id))) {
+            throw new DestructiveComputedOutputError(`Migration takeover destructive scope mismatch for ${dataContextPath(computation.dataContext)}`);
+        }
+        const events: RecordMutationEvent[] = [];
+        for (const record of existing) {
+            await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", record.id] }));
+            events.push({ recordName, type: "delete", record });
+        }
+        for (const item of result) {
+            const created = await controller.system.storage.create(recordName, item);
+            events.push({ recordName, type: "create", record: created });
+        }
+        return events;
     }
     const existing = await controller.system.storage.find(recordName, undefined, undefined, ["*"]);
     const existingByKey = new Map(existing.map(record => [`${record[sourceKey]}:${record[indexKey]}`, record]));
@@ -1794,6 +2162,10 @@ class MigrationScheduler {
     }
 
     private async runFullRecompute(computation: Computation) {
+        const takeover = takeoverDecision(this.options.approvedDiff, dataContextPath(computation.dataContext));
+        const takeoverWriteOptions = takeover?.targetType === "property"
+            ? { forceMutationEvent: true, skipAsNull: true }
+            : {};
         const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
         if (eventRebuildHandler && typeof (computation as DataBasedComputation).compute !== "function") {
             if (computation.dataContext.type === "property") {
@@ -1801,8 +2173,11 @@ class MigrationScheduler {
                 const records = await this.controller.system.storage.find(hostName, undefined, undefined, ["*"]);
                 const events: RecordMutationEvent[] = [];
                 for (const record of records) {
-                    const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, record });
-                    const event = await writeComputationResult(this.controller, computation, result, record, this.options);
+                    const handlerRecord = takeover?.targetType === "property"
+                        ? stripPropertyFromInput(record, computation.dataContext.id.name)
+                        : record;
+                    const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, record: handlerRecord });
+                    const event = await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions);
                     if (event) events.push(event);
                 }
                 return events;
@@ -1824,11 +2199,18 @@ class MigrationScheduler {
         const records = await this.controller.system.storage.find(hostName, undefined, undefined, ["*"]);
         const events: RecordMutationEvent[] = [];
         for (const record of records) {
+            const dataDeps = await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation, record);
+            const computeRecord = takeover?.targetType === "property"
+                ? stripPropertyFromInput(record, computation.dataContext.id.name)
+                : record;
+            const computeDeps = takeover?.targetType === "property"
+                ? stripPropertyFromInput(dataDeps, computation.dataContext.id.name)
+                : dataDeps;
             const result = await (computation as DataBasedComputation).compute(
-                await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation, record),
-                record,
+                computeDeps,
+                computeRecord,
             );
-            const event = await writeComputationResult(this.controller, computation, result, record, this.options);
+            const event = await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions);
             if (event) events.push(event);
         }
         return events;

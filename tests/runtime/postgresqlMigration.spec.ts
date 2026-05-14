@@ -71,6 +71,21 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
             reason: "approved by PostgreSQL migration test",
           };
         }
+        if (requirement.kind === "computation-takeover") {
+          return {
+            kind: "computation-takeover" as const,
+            dataContext: requirement.dataContext,
+            computationId: requirement.computationId,
+            targetType: requirement.targetType,
+            previousAuthority: requirement.previousAuthority,
+            nextAuthority: requirement.nextAuthority,
+            oldDataStrategy: requirement.oldDataStrategy,
+            expectedExistingCount: requirement.expectedExistingCount,
+            expectedHostCount: requirement.expectedHostCount,
+            destructiveScopeRef: requirement.destructiveScopeRef,
+            reason: "approved by PostgreSQL migration test",
+          };
+        }
         return {
           kind: "destructive-scope" as const,
           dataContext: requirement.dataContext,
