@@ -1,5 +1,12 @@
 
 
+## [1.5.5](https://github.com/InteraqtDev/interaqt/compare/v1.5.4...v1.5.5) (2026-05-14)
+
+
+### Bug Fixes
+
+* support computation takeover migration ([c7fea53](https://github.com/InteraqtDev/interaqt/commit/c7fea538a5ea632772b2adc8f7406eb430119c96))
+
 ## [1.5.4](https://github.com/InteraqtDev/interaqt/compare/v1.5.3...v1.5.4) (2026-05-07)
 
 
