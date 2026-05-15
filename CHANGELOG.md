@@ -1,5 +1,12 @@
 
 
+## [1.5.8](https://github.com/InteraqtDev/interaqt/compare/v1.5.7...v1.5.8) (2026-05-15)
+
+
+### Features
+
+* add scoped sequence computation ([c820513](https://github.com/InteraqtDev/interaqt/commit/c8205133f850f7807471abc11ed772a4172be733))
+
 ## [1.5.7](https://github.com/InteraqtDev/interaqt/compare/v1.5.6...v1.5.7) (2026-05-14)
 
 
