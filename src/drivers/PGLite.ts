@@ -30,6 +30,14 @@ export class PGLiteDB implements Database{
             'PGLite uses MonoStorage fallback BEGIN/COMMIT; SERIALIZABLE is framework metadata for retry-path tests, not a production PostgreSQL isolation guarantee.'
         ],
     }
+    atomicSequenceCapability = {
+        requiresActiveTransaction: true as const,
+        transactional: true,
+        crossConnection: false,
+        crossProcess: false,
+        returning: true,
+        productionSafe: false,
+    }
     schemaDialect = {
         name: 'postgres' as const,
         maxIdentifierLength: 63,
@@ -76,6 +84,16 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
     "stringValue" TEXT NULL,
     "jsonValue" JSON NULL
 )`, 'setup computation state table')
+    }
+    async setupScopedSequenceState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
+    "sequenceName" TEXT NOT NULL,
+    "scopeKey" TEXT NOT NULL,
+    "scope" JSONB NOT NULL,
+    "lastValue" NUMERIC NOT NULL,
+    PRIMARY KEY ("sequenceName", "scopeKey")
+)`, 'setup scoped sequence table')
     }
     async query<T>(sql:string, params: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

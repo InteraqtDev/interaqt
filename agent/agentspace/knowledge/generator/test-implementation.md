@@ -182,6 +182,13 @@ type RecordMutationEvent = {
 - **Effects are useful for**: Getting auto-generated IDs, tracking all mutations in complex interactions, debugging what changed
 - **Storage queries are better for**: Verifying computed properties, checking related data, confirming final state
 
+**ScopedSequence testing:**
+- Create records through `controller.dispatch` / `controller.callInteraction`, not direct `storage.create`, so the post-create/pre-commit allocator runs.
+- Verify first value semantics (`initialValue + step`), independent scopes, manual value rejection, and uniqueness.
+- For rollback/delete behavior, assert the next successful allocation follows the documented transactional counter semantics.
+- For existing data migration, assert every existing scope is seeded to `MAX(serialNumber)` and the next allocation returns `max + step`.
+- For PostgreSQL release coverage, run `INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-scoped-sequence`.
+
 #### 🔴 IMPORTANT: Use Storage APIs for Verification
 When testing interactions, **directly use storage.find/findOne to verify results**. DO NOT create query interactions just for testing purposes:
 

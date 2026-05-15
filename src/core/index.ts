@@ -29,6 +29,7 @@ export * from "./Any.js";
 export * from "./Transform.js";
 export * from "./RealTime.js";
 export * from "./Custom.js";
+export * from "./ScopedSequence.js";
 export * from "./RealDictionary.js";
 export * from "./SideEffect.js";
 

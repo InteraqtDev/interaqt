@@ -83,11 +83,57 @@ Reactive computation is a **declarative way of defining data**:
 
 ### PostgreSQL Concurrency Guarantees
 
-Built-in computations such as Count, Summation, Average, Every, Any, WeightedSummation, StateMachine, and data-based Transform use atomic state updates, row locks, or unique indexes on PostgreSQL. They are safe when multiple Node.js processes share one PostgreSQL database.
+Built-in computations such as Count, Summation, Average, Every, Any, WeightedSummation, StateMachine, ScopedSequence, and data-based Transform use atomic state updates, row locks, unique indexes, or scoped sequence rows on PostgreSQL. They are safe when multiple Node.js processes share one PostgreSQL database.
 
 Custom computations are different because interaqt cannot inspect user callback logic. `Custom.create()` defaults to `concurrency: 'serializable'`, so the framework promotes the transaction to PostgreSQL `SERIALIZABLE` and retries on `40001` / `40P01`. Use `concurrency: 'atomic-safe'` only when the custom computation is explicitly written with atomic state, idempotent patches, or other safe primitives.
 
 Because retry replays the transaction attempt, `guard`, `mapEventData`, `resolve`, computation callbacks, `afterDispatch`, and `asyncReturn` must be deterministic and retry-safe. Put irreversible external IO in `postCommit` for interaction-specific effects or `recordMutationSideEffects` for mutation-driven effects; both run after the final commit.
+
+### Scoped Atomic Sequences
+
+Use `ScopedSequence` for per-scope serial numbers such as "next media number per project and prefix". This is a property computation, not a service call and not a `StateMachine(lastValue + 1)`.
+
+```typescript
+import { Entity, Property, ScopedSequence, UniqueConstraint } from 'interaqt'
+
+const assetSerial = ScopedSequence.create({
+  name: 'projectAssetSerial',
+  scope: [
+    { name: 'project', type: 'ref', base: Project, path: 'project' },
+    { name: 'prefix', type: 'string', path: 'prefix' },
+  ],
+})
+
+const Media = Entity.create({
+  name: 'Media',
+  properties: [
+    Property.create({ name: 'project', type: 'id' }),
+    Property.create({ name: 'prefix', type: 'string' }),
+    Property.create({
+      name: 'serialNumber',
+      type: 'number',
+      computation: assetSerial,
+    }),
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'uniqMediaProjectPrefixSerial',
+      properties: ['project', 'prefix', 'serialNumber'],
+    }),
+  ],
+})
+```
+
+Rules:
+
+- The host property must be `type: 'number'`.
+- Do not set a `defaultValue` on the same property. The allocator supplies the value after the create mutation and before commit.
+- Scope paths can only read stable primitive/ref values already present on the created record.
+- Missing or type-mismatched scope values are errors.
+- `allowManualValue: true` is for import/backfill and does not advance the counter.
+- Existing data migration should use `initializeFrom` to seed every scope with `MAX(serialNumber)`.
+- Keep the `UniqueConstraint`; the allocator prevents normal duplicates, and the constraint is the integrity backstop.
+- PostgreSQL is the production-safe cross-process driver for this feature.
 
 ### Core Principle: Data Existence
 

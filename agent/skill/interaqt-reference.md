@@ -35,7 +35,7 @@ Property.create(args: {
   collection?: boolean                // true for array types
   defaultValue?: Function             // Factory function returning default value
   computed?: (record: any) => any     // Computed from same-record fields (not persisted)
-  computation?: ComputationInstance   // Reactive: Count, Summation, WeightedSummation, Every, Any, StateMachine, Custom
+  computation?: ComputationInstance   // Reactive: Count, Summation, WeightedSummation, Every, Any, StateMachine, ScopedSequence, Custom
 }): PropertyInstance
 ```
 
@@ -43,7 +43,7 @@ Constraints:
 - `type` is REQUIRED — always specify it
 - `computed` is for same-record derivations only — NOT persisted
 - `computation` results ARE persisted and auto-updated
-- When using `computation`, provide `defaultValue`
+- Most aggregate/state computations need a `defaultValue`; `ScopedSequence` is an exception because the allocator supplies the value after create
 - NEVER use Transform on Property `computation` — Transform belongs on Entity/Relation `computation`
 
 ---
@@ -312,6 +312,69 @@ trigger: {
 
 ---
 
+## ScopedSequence.create
+
+```typescript
+ScopedSequence.create(args: {
+  name: string
+  scope: Array<
+    | { name: string, type: 'string' | 'number' | 'boolean', path: string }
+    | { name: string, type: 'ref', base: EntityInstance, path: string }
+  >
+  initialValue?: number       // Defaults to 0; first automatic value is initialValue + step
+  step?: number               // Positive integer, defaults to 1
+  allowManualValue?: boolean  // Defaults to false; only for import/backfill paths
+  initializeFrom?: {
+    record: EntityInstance
+    valuePath: string
+    scope: Array<{ name: string, path: string }>
+    aggregate: 'max'
+  }
+}): ScopedSequenceInstance
+```
+
+Use `ScopedSequence` when a `number` property needs a transactionally allocated, per-scope serial such as `{ project, prefix } -> 1, 2, 3`.
+
+```typescript
+const assetSerial = ScopedSequence.create({
+  name: 'projectAssetSerial',
+  scope: [
+    { name: 'project', type: 'ref', base: Project, path: 'project' },
+    { name: 'prefix', type: 'string', path: 'prefix' },
+  ],
+})
+
+const Media = Entity.create({
+  name: 'Media',
+  properties: [
+    Property.create({ name: 'project', type: 'id' }),
+    Property.create({ name: 'prefix', type: 'string' }),
+    Property.create({
+      name: 'serialNumber',
+      type: 'number',
+      computation: assetSerial,
+    }),
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'uniqProjectPrefixSerial',
+      properties: ['project', 'prefix', 'serialNumber'],
+    }),
+  ],
+})
+```
+
+Constraints:
+- Place only on `Property.computation`, and the property must be `type: 'number'`.
+- Do not add `defaultValue` or a non-null insert-time constraint to the same property. Allocation is post-create/pre-commit.
+- Scope paths read persisted values already present on the created record. Do not use relation traversal, queries, or values produced by another post-create computation.
+- Keep the database unique constraint for the same scope fields plus sequence property.
+- `allowManualValue: true` preserves imported values and does not advance the counter. Use `initializeFrom` during migration to seed counters from existing data.
+- Do not use `initializeFrom.match` for partial seeding of a sequence that will later allocate for all host rows; seed every existing scope that the property will cover.
+- PostgreSQL is the production-safe cross-connection driver. PGLite/SQLite are suitable for tests or single-process local use only.
+
+---
+
 ## Controller
 
 ```typescript
@@ -557,7 +620,7 @@ import {
 
   // Computations
   Count, Every, Any, Summation, WeightedSummation, Average,
-  Transform, StateMachine, StateNode, StateTransfer,
+  ScopedSequence, Transform, StateMachine, StateNode, StateTransfer,
   RealTime, Custom,
 
   // Math (for RealTime)

@@ -263,15 +263,16 @@ Before starting any checks, create a comprehensive checklist document in `docs/{
 - [ ] ERROR_CI_015: Test not checking all `ownerProperties` after entity creation
 - [ ] ERROR_CI_016: Test not verifying all `createdWithRelations` were created
 - [ ] ERROR_CI_017: StateMachine test not covering all StateTransfer transitions
-- [ ] ERROR_CI_018: Type check not run before running tests
-- [ ] ERROR_CI_019: Tests marked as completed but actually failing
-- [ ] ERROR_CI_020: Tests skipped with `.skip()` or `.todo()`
-- [ ] ERROR_CI_021: More than 10 fix attempts made without stopping
-- [ ] ERROR_CI_022: Error document not created in `docs/errors/` after repeated failures
-- [ ] ERROR_CI_023: `lastError` field not updated in implementation plan after failure
-- [ ] ERROR_CI_024: Item marked `completed: true` but tests still failing
-- [ ] ERROR_CI_025: **CRITICAL**: Computation uses mock/placeholder data instead of complete implementation
-- [ ] ERROR_CI_026: **CRITICAL**: Computation contains side effects (email, AI calls, etc.) that should be in integration
+- [ ] ERROR_CI_018: Scoped serial number implemented with StateMachine/Custom/raw SQL/max+1 instead of ScopedSequence
+- [ ] ERROR_CI_019: Type check not run before running tests
+- [ ] ERROR_CI_020: Tests marked as completed but actually failing
+- [ ] ERROR_CI_021: Tests skipped with `.skip()` or `.todo()`
+- [ ] ERROR_CI_022: More than 10 fix attempts made without stopping
+- [ ] ERROR_CI_023: Error document not created in `docs/errors/` after repeated failures
+- [ ] ERROR_CI_024: `lastError` field not updated in implementation plan after failure
+- [ ] ERROR_CI_025: Item marked `completed: true` but tests still failing
+- [ ] ERROR_CI_026: **CRITICAL**: Computation uses mock/placeholder data instead of complete implementation
+- [ ] ERROR_CI_027: **CRITICAL**: Computation contains side effects (email, AI calls, etc.) that should be in integration
 
 **Check Results**: [To be filled]
 

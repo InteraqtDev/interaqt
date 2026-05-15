@@ -1560,6 +1560,65 @@ const lastRecomputeTime = await system.storage.dict.get(lastRecomputeTimeKey);
 const nextRecomputeTime = await system.storage.dict.get(nextRecomputeTimeKey);
 ```
 
+### ScopedSequence.create()
+
+Create a transactional scoped sequence allocator for a number property. Use it for serial numbers that must be unique inside a declared business scope.
+
+**Syntax**
+```typescript
+ScopedSequence.create(config: ScopedSequenceConfig): ScopedSequenceInstance
+```
+
+**Parameters**
+- `config.name` (string, required): Sequence name, must match `/^[a-zA-Z0-9_]+$/`
+- `config.scope` (array, required): Ordered scope items:
+  - Primitive: `{ name, type: 'string' | 'number' | 'boolean', path }`
+  - Reference: `{ name, type: 'ref', base: EntityInstance, path }`
+- `config.initialValue` (number, optional): Defaults to `0`; first automatic allocation returns `initialValue + step`
+- `config.step` (positive integer, optional): Defaults to `1`
+- `config.allowManualValue` (boolean, optional): Defaults to `false`; if true, provided values are preserved and do not advance the counter
+- `config.initializeFrom` (optional): Migration seed declaration `{ record, valuePath, scope, aggregate: 'max' }`
+
+**Example**
+```typescript
+const assetSerial = ScopedSequence.create({
+    name: 'projectAssetSerial',
+    scope: [
+        { name: 'project', type: 'ref', base: Project, path: 'project' },
+        { name: 'prefix', type: 'string', path: 'prefix' }
+    ]
+})
+
+const Media = Entity.create({
+    name: 'Media',
+    properties: [
+        Property.create({ name: 'project', type: 'id' }),
+        Property.create({ name: 'prefix', type: 'string' }),
+        Property.create({
+            name: 'serialNumber',
+            type: 'number',
+            computation: assetSerial
+        })
+    ],
+    constraints: [
+        UniqueConstraint.create({
+            name: 'uniqMediaProjectPrefixSerial',
+            properties: ['project', 'prefix', 'serialNumber']
+        })
+    ]
+})
+```
+
+**Generation rules**
+- Only place `ScopedSequence` on `Property.computation`, and only when the property type is `number`.
+- Do not add `defaultValue` to the same property.
+- Do not use a non-null insert-time constraint for the sequence property; allocation is post-create/pre-commit.
+- Scope paths must read stable primitive/ref values already present on the created host record.
+- Do not use relation traversal, database queries, or another post-create computation as scope input.
+- Always add a `UniqueConstraint` over the scope fields plus the allocated property.
+- Do not generate `StateMachine`, `Custom`, raw SQL, or `max + 1` logic for scoped serial numbers.
+- For existing data, use `initializeFrom` to seed every existing scope with `MAX(valuePath)`. Do not partial-seed with `initializeFrom.match` unless the sequence will only ever allocate for that exact subset.
+
 ### Custom.create()
 
 Create custom computation with completely user-defined calculation logic.

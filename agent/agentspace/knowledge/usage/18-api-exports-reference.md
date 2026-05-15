@@ -32,6 +32,7 @@ import {
   Summation,
   WeightedSummation,
   Transform,
+  ScopedSequence,
   StateMachine,
   StateNode,
   StateTransfer,
@@ -154,6 +155,7 @@ import {
   Summation,
   WeightedSummation,
   Transform,
+  ScopedSequence,
   StateMachine,
   StateNode,
   StateTransfer
@@ -200,8 +202,10 @@ const controller = new Controller({
 
 4. **Filtered Entities**: Created using `Entity.create()` with `baseEntity` and `filterCondition`, not a separate import.
 
-5. **Database Drivers**: Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. 
+5. **Database Drivers**: Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. `ScopedSequence` is production-safe for cross-connection/cross-process allocation on PostgreSQL; PGLiteDB and SQLiteDB are local/test-level only for scoped sequence concurrency.
 
 6. **Transaction helpers**: `runWithTransactionRetry`, `isRetryableTransactionError`, and `isRequireSerializableRetry` are exported for advanced runtime integrations and tests. Most application code should use `Controller.dispatch()` or `system.storage.runInTransaction()` instead of calling retry helpers directly.
 
 7. **Constraint helpers**: `UniqueConstraint`, `ConstraintViolationError`, `ConstraintSetupError`, `findConstraintViolationError`, and `normalizeDatabaseError` are exported for schema-level uniqueness and stable duplicate handling.
+
+8. **Scoped serial allocation**: `ScopedSequence` is exported for number property computations that allocate per-scope serials. Always pair it with a `UniqueConstraint` over the scope fields plus the sequence property.

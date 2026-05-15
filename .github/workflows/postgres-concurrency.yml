@@ -38,3 +38,4 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run test:postgres-concurrency
+      - run: npm run test:postgres-scoped-sequence

@@ -16,6 +16,7 @@ import { Transform } from './Transform.js';
 import { RealTime } from './RealTime.js';
 import { SideEffect } from './SideEffect.js';
 import { Dictionary } from './RealDictionary.js';
+import { ScopedSequence } from './ScopedSequence.js';
 import { BoolAtomData, BoolExpressionData } from './BoolExp.js';
 
 const klassesToRegister = [
@@ -36,6 +37,7 @@ const klassesToRegister = [
   RealTime,
   SideEffect,
   Dictionary,
+  ScopedSequence,
   BoolAtomData,
   BoolExpressionData,
 ];

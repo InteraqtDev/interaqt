@@ -243,7 +243,7 @@ export interface DataBasedComputation {
     args: any
     state: {[key: string]: RecordBoundState<unknown>|GlobalBoundState<unknown>}
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    compute: (...args: any[]) => Promise<ComputationResult|unknown>
+    compute?: (...args: any[]) => Promise<ComputationResult|unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

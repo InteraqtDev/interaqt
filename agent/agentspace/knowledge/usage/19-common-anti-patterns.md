@@ -255,6 +255,44 @@ StateMachine.create({
 });
 ```
 
+### ❌ Using StateMachine or max+1 for Scoped Serial Numbers
+
+```javascript
+// ❌ WRONG: not safe across PostgreSQL connections
+Property.create({
+  name: 'serialNumber',
+  type: 'number',
+  computation: StateMachine.create({
+    // lastValue + 1 is per-record state logic, not a transactional scoped counter
+  })
+});
+
+// ❌ WRONG: "SELECT MAX(serialNumber) + 1" races under concurrency
+async function allocateSerial(projectId, prefix) {
+  const max = await db.query('select max(serialNumber) ...');
+  return max + 1;
+}
+```
+
+```javascript
+// ✅ CORRECT: declare the allocation as a property computation
+const serial = ScopedSequence.create({
+  name: 'projectAssetSerial',
+  scope: [
+    { name: 'project', type: 'ref', base: Project, path: 'project' },
+    { name: 'prefix', type: 'string', path: 'prefix' }
+  ]
+});
+
+Property.create({
+  name: 'serialNumber',
+  type: 'number',
+  computation: serial
+});
+```
+
+Always pair `ScopedSequence` with a `UniqueConstraint` over the scope fields plus the sequence property. For existing data, seed every scope through migration `initializeFrom`; do not partially seed a sequence that will later allocate for all host rows.
+
 ## 6. Testing Mistakes
 
 ### ❌ Using try-catch for Error Testing

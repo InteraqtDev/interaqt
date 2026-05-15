@@ -525,6 +525,63 @@ Create a custom computation when built-in computations are not expressive enough
 
 Custom callbacks may be replayed after retryable transaction failures. Do not perform irreversible external IO inside custom `compute`, `incrementalCompute`, `incrementalPatchCompute`, or `asyncReturn`; use `recordMutationSideEffects` for post-commit external work.
 
+### ScopedSequence.create()
+
+Create a transactional per-scope sequence allocator for a `number` property.
+
+**Syntax**
+```typescript
+ScopedSequence.create(config: ScopedSequenceConfig): KlassInstance<typeof ScopedSequence>
+```
+
+**Parameters**
+- `config.name` (string, required): Sequence name, must match `/^[a-zA-Z0-9_]+$/`
+- `config.scope` (array, required): Ordered scope items. Primitive items use `{ name, type: 'string' | 'number' | 'boolean', path }`; ref items use `{ name, type: 'ref', base: Entity, path }`
+- `config.initialValue` (number, optional): Defaults to `0`; first automatic allocation returns `initialValue + step`
+- `config.step` (positive integer, optional): Defaults to `1`
+- `config.allowManualValue` (boolean, optional): Defaults to `false`; when true, a provided value is preserved and does not advance the counter
+- `config.initializeFrom` (object, optional): Migration seed declaration using `{ record, valuePath, scope, aggregate: 'max' }`
+
+**Examples**
+```typescript
+const assetSerial = ScopedSequence.create({
+    name: 'projectAssetSerial',
+    scope: [
+        { name: 'project', type: 'ref', base: Project, path: 'project' },
+        { name: 'prefix', type: 'string', path: 'prefix' }
+    ],
+    initialValue: 0,
+    step: 1
+})
+
+const Media = Entity.create({
+    name: 'Media',
+    properties: [
+        Property.create({ name: 'project', type: 'id' }),
+        Property.create({ name: 'prefix', type: 'string' }),
+        Property.create({
+            name: 'serialNumber',
+            type: 'number',
+            computation: assetSerial
+        })
+    ],
+    constraints: [
+        UniqueConstraint.create({
+            name: 'uniqMediaProjectPrefixSerial',
+            properties: ['project', 'prefix', 'serialNumber']
+        })
+    ]
+})
+```
+
+**Important semantics**
+- `ScopedSequence` only belongs on `Property.computation`, and the property must be `type: 'number'`.
+- It is post-create/pre-commit, not an insert-time database default. Do not combine it with a non-null insert-time requirement.
+- Scope paths must read stable values already present on the newly created host record.
+- Keep a `UniqueConstraint` over scope fields plus the sequence property.
+- PostgreSQL is production-safe for cross-connection allocation; PGLite and SQLite are local/test-level only.
+- Existing data migrations must seed every future allocation scope. Do not use `initializeFrom.match` to seed only part of a sequence that will allocate for all host rows.
+
 ### StateMachine.create()
 
 Create state machine computation.

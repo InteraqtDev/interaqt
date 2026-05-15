@@ -14,6 +14,7 @@ import { AverageHandles } from "./computations/Average.js";
 import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
+import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
 import { SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
@@ -24,8 +25,10 @@ import {
     addEmptyFactRecordRemovalReview,
     assertApprovedEmptyFactRecordRemovalsStillEmpty,
     addMissingRebuildHandlerRequirements,
+    addScopedSequenceNoSeedReview,
     assertComputationTakeoverAllowed,
     assertDestructiveScopeAllowed,
+    assertScopedSequenceNoSeedDecisions,
     buildAffectedRebuildPlan,
     buildMigrationDiff,
     createEmptyFactRecordRemovalOperations,
@@ -37,6 +40,8 @@ import {
     getDestructiveDeletionScope,
     getNewFilteredDataContexts,
     getRecomputeBlockingChanges,
+    getScopedSequenceNoSeedOperations,
+    getScopedSequenceSeedOperations,
     getStorageBlockingChanges,
     GenerateMigrationDiffOptions,
     hashMigrationDiff,
@@ -53,6 +58,7 @@ import {
     readMigrationManifest,
     recomputeChangedComputations,
     recomputeFilteredMemberships,
+    seedScopedSequenceInitializers,
     SetupOptions,
     validateApprovedDiff,
     writeMigrationManifest,
@@ -204,6 +210,7 @@ export class Controller {
             ...RealTimeHandles,
             ...StateMachineHandles,
             ...CustomHandles,
+            ...ScopedSequenceHandles,
             ...computations
         ]
         
@@ -231,15 +238,16 @@ export class Controller {
         }
 
         const states = this.scheduler.createStates()
+        const internalRequirements = this.scheduler.createInternalSchemaRequirements()
         if (!install) {
             const migrationSystem = this.system as System & {
-                prepareMigrationSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<MigrationSchemaPlan>
+                prepareMigrationSchema?: System['prepareMigrationSchema']
             }
             const prepareMigrationSchema = migrationSystem.prepareMigrationSchema
             if (typeof prepareMigrationSchema !== 'function') {
                 throw new Error('Current system does not support migration manifest validation')
             }
-            const schemaPlan = await prepareMigrationSchema.call(migrationSystem, this.entities, this.relations, states)
+            const schemaPlan = await prepareMigrationSchema.call(migrationSystem, this.entities, this.relations, states, { internalRequirements })
             const nextManifest = createMigrationManifest(this, schemaPlan.schema)
             const previousManifest = await readMigrationManifest(this)
             if (previousManifest && previousManifest.modelHash !== nextManifest.modelHash) {
@@ -248,11 +256,11 @@ export class Controller {
             if (!previousManifest && await this.system.hasExistingData?.()) {
                 throw new MigrationBaselineError('Existing database has no migration manifest. Call controller.createMigrationBaseline() before normal setup or migration.')
             }
-            await this.system.setup(this.entities, this.relations, states, install)
+            await this.system.setup(this.entities, this.relations, states, { install, internalRequirements })
             await this.scheduler.setup(install)
             return
         }
-        await this.system.setup(this.entities, this.relations, states, install)
+        await this.system.setup(this.entities, this.relations, states, { install, internalRequirements })
         const nextManifest = createMigrationManifest(this)
         await this.scheduler.setup(install)
         if (install) {
@@ -262,11 +270,12 @@ export class Controller {
 
     async createMigrationBaseline() {
         const states = this.scheduler.createStates()
+        const internalRequirements = this.scheduler.createInternalSchemaRequirements()
         const migrationSystem = this.system as System & {
-            prepareMigrationSchema: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<MigrationSchemaPlan>
+            prepareMigrationSchema: NonNullable<System['prepareMigrationSchema']>
         }
         assert(typeof migrationSystem.prepareMigrationSchema === 'function', 'Current system does not support migration baseline')
-        const schemaPlan = await migrationSystem.prepareMigrationSchema(this.entities, this.relations, states)
+        const schemaPlan = await migrationSystem.prepareMigrationSchema(this.entities, this.relations, states, { internalRequirements })
         if (schemaPlan.preRecomputeDDL.length > 0 || schemaPlan.blockingChanges.length > 0) {
             throw new MigrationBaselineError('Cannot create migration baseline because current definitions do not match the existing schema', {
                 missingDDL: schemaPlan.preRecomputeDDL,
@@ -280,11 +289,12 @@ export class Controller {
 
     private async prepareMigrationContext(options: { includeFunctionText?: boolean } = {}) {
         const states = this.scheduler.createStates()
+        const internalRequirements = this.scheduler.createInternalSchemaRequirements()
         const migrationSystem = this.system as System & {
-            prepareMigrationSchema: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<MigrationSchemaPlan>
+            prepareMigrationSchema: NonNullable<System['prepareMigrationSchema']>
         }
         assert(typeof migrationSystem.prepareMigrationSchema === 'function', 'Current system does not support schema migration planning')
-        const schemaPlan = await migrationSystem.prepareMigrationSchema(this.entities, this.relations, states)
+        const schemaPlan = await migrationSystem.prepareMigrationSchema(this.entities, this.relations, states, { internalRequirements })
         const previousManifest = await readMigrationManifest(this)
         if (!previousManifest) {
             throw new MigrationBaselineError('Migration baseline manifest not found. Run setup(true) with the current framework first or createMigrationBaseline().')
@@ -325,7 +335,8 @@ export class Controller {
         const readHandle = createMigrationReadHandle(this, schemaPlan)
         const takeoverDiff = await addComputationTakeoverReview(this, buildMigrationDiff(planningPreviousManifest, nextManifest, schemaPlan, safety), planningPreviousManifest, nextManifest, readHandle)
         const cleanupDiff = await addEmptyFactRecordRemovalReview(this, takeoverDiff, planningPreviousManifest, nextManifest)
-        return addMissingRebuildHandlerRequirements(cleanupDiff, this, provisionalRebuildPlan)
+        const scopedSequenceDiff = await addScopedSequenceNoSeedReview(this, cleanupDiff, planningPreviousManifest, nextManifest, readHandle)
+        return addMissingRebuildHandlerRequirements(scopedSequenceDiff, this, provisionalRebuildPlan)
     }
 
     async generateMigrationDiff(options: GenerateMigrationDiffOptions = {}): Promise<MigrationDiffFile> {
@@ -355,6 +366,8 @@ export class Controller {
         validateApprovedDiff(migrationOptions.approvedDiff, planningPreviousManifest, nextManifest, migrationOptions.handlers, expectedDiff)
         const approvedDiff = migrationOptions.approvedDiff!
         const approvedDiffHash = hashMigrationDiff(approvedDiff)
+        const scopedSequenceSeedOperations = getScopedSequenceSeedOperations(approvedDiff)
+        const scopedSequenceNoSeedOperations = getScopedSequenceNoSeedOperations(approvedDiff)
         const approvedPlanning = getChangedComputationsFromApprovedDiff(planningPreviousManifest, nextManifest, approvedDiff)
         const changedComputations = approvedPlanning.changedComputations
         const changedDataContexts = getNewFilteredDataContexts(planningPreviousManifest, nextManifest)
@@ -390,11 +403,14 @@ export class Controller {
         assertDestructiveScopeAllowed(migrationOptions, deletionScope)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
         await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest, readHandle)
+        await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, planningPreviousManifest, readHandle)
         const plan: MigrationPlan = {
             mode: 'compute',
             dryRun: migrationOptions.dryRun === true,
             changedComputations,
             rebuildPlan,
+            scopedSequenceSeedOperations,
+            scopedSequenceNoSeedOperations,
             schemaPlan: {
                 schema: executionSchemaPlan.schema,
                 preRecomputeDDL: executionSchemaPlan.preRecomputeDDL,
@@ -435,6 +451,7 @@ export class Controller {
                         const filteredEvents = await recomputeFilteredMemberships(this, planningPreviousManifest, nextManifest)
                         await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest)
                         await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents, planningPreviousManifest)
+                        await seedScopedSequenceInitializers(this, approvedDiff, planningPreviousManifest)
                         if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'computation-applied')
                     }
                     if (!reached(phase, 'constraints-applied')) {

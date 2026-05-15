@@ -25,12 +25,67 @@ export type AtomicGlobalTarget = {
 
 export type AtomicTarget = AtomicRecordTarget | AtomicGlobalTarget
 
+export type AtomicSequenceScopeValue =
+    | string
+    | number
+    | boolean
+    | null
+    | { type: 'ref'; entity: string; id: string }
+
+export type AtomicSequenceScopeItem = {
+    name: string
+    type: 'string' | 'number' | 'boolean' | 'null' | 'ref'
+    value: AtomicSequenceScopeValue
+}
+
+export type AtomicSequenceScope = AtomicSequenceScopeItem[]
+
+export type AtomicSequenceTarget = {
+    sequenceName: string
+    scope: AtomicSequenceScope
+    initialValue: number
+    step: number
+}
+
+export type AtomicSequenceCapability = {
+    requiresActiveTransaction: true
+    transactional: boolean
+    crossConnection: boolean
+    crossProcess: boolean
+    returning: boolean
+    equivalentSafeReturning?: boolean
+    productionSafe: boolean
+}
+
+export type ScopedSequenceDeclarationManifest = {
+    computationId: string
+    hostRecord: string
+    property: string
+    sequenceName: string
+    scopeSignature?: string
+    allocationSignature?: string
+}
+
+export type InternalSchemaRequirement =
+    | {
+        kind: 'scoped-sequence-table'
+        declarations: ScopedSequenceDeclarationManifest[]
+    }
+
+export type SystemSchemaOptions = {
+    install?: boolean
+    internalRequirements?: InternalSchemaRequirement[]
+}
+
 export type AtomicStorage = {
     get<T>(target: AtomicTarget): Promise<T | null>
     increment(target: AtomicTarget, delta: number): Promise<number>
     replace<T>(target: AtomicTarget, value: T): Promise<{ oldValue: T | null, newValue: T }>
     compareAndSet<T>(target: AtomicTarget, expected: T, next: T, options?: { defaultValue?: T }): Promise<boolean>
     lockGlobal<T>(target: AtomicGlobalTarget): Promise<T | null>
+    nextSequenceValue(target: AtomicSequenceTarget): Promise<number>
+    seedSequenceValue(target: AtomicSequenceTarget & { value: number; mode?: 'max' | 'replace' }): Promise<void>
+    readSequenceValue(target: Pick<AtomicSequenceTarget, 'sequenceName' | 'scope'>): Promise<number | undefined>
     updateGlobalFields(
         target: AtomicGlobalTarget,
         deltas: Record<string, number>,
@@ -102,7 +157,7 @@ export type Storage = {
 
     get: (itemName: string, id: string, initialValue?: unknown) => Promise<unknown>
     set: (itemName: string, id: string, value: unknown, events?: RecordMutationEvent[]) => Promise<unknown>,
-    setup: (entities: EntityInstance[], relations: RelationInstance[], createTables?: boolean) => unknown
+    setup: (entities: EntityInstance[], relations: RelationInstance[], createTables?: boolean, options?: SystemSchemaOptions) => unknown
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spread params vary per implementation
     findOne: (entityName: string, ...arg: any[]) => Promise<EntityIdRef>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,9 +213,9 @@ export interface System {
     conceptClass: Map<string, unknown>
     storage: Storage
     logger: SystemLogger
-    setup: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], install?: boolean) => Promise<void>
-    migrateSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<void>
-    prepareMigrationSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[]) => Promise<MigrationSchemaPlan>
+    setup: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], options?: boolean | SystemSchemaOptions) => Promise<void>
+    migrateSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], options?: SystemSchemaOptions) => Promise<void>
+    prepareMigrationSchema?: (entities: EntityInstance[], relations: RelationInstance[], states: ComputationState[], options?: SystemSchemaOptions) => Promise<MigrationSchemaPlan>
     applyMigrationSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
     verifyMigrationSchema?: (plan: MigrationSchemaPlan) => Promise<void>
     applyMigrationPostSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
@@ -215,6 +270,8 @@ export type Database = {
     getPlaceholder?: () => (name?:string) => string,
     supportsSelectForUpdate?: boolean,
     setupInternalComputationState?: () => Promise<void>,
+    setupScopedSequenceState?: () => Promise<void>,
+    atomicSequenceCapability?: AtomicSequenceCapability,
     setupRecordSequences?: (records: Array<{ recordName: string, tableName: string, idField: string }>) => Promise<void>,
     mapToDBFieldType: (type: string, collection?: boolean) => string
     close: () => Promise<void>

@@ -9,6 +9,7 @@ export * from './Summation.js'
 export * from './Average.js'
 export * from './Computation.js'
 export * from './Custom.js'
+export * from './ScopedSequence.js'
 
 
 // Export all computation handles
@@ -22,3 +23,4 @@ export { AverageHandles } from './Average.js'
 export { RealTimeHandles } from './RealTime.js'
 export { StateMachineHandles } from './StateMachine.js'
 export { CustomHandles } from './Custom.js'
+export { ScopedSequenceHandles } from './ScopedSequence.js'

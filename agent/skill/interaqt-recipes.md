@@ -555,3 +555,123 @@ const successResult = await controller.dispatch(SharePost, {
 - **Condition on Interaction**: The `Condition.create` is attached to the Interaction's `conditions` field. The `content` function receives the event args and returns `true` to allow or `false` to reject. The `this` context is bound to the Controller, providing access to `this.system.storage` for database queries.
 - **`isRef: true`**: The payload contains only an ID reference. With `isRef: true`, the payload value is the entity ID directly (e.g., `payload: { post: draftPost.id }`).
 - **Error in result, not exception**: Condition failures return `{ error: { type: 'condition check failed' } }`, consistent with all interaqt error handling. Never use try-catch.
+
+---
+
+# Recipe: Scoped Media Serial Numbers
+
+## Scenario
+A media system needs `serialNumber` values that increment independently for each `(project, prefix)` pair, for example `Project A + img -> 1, 2, 3` and `Project A + video -> 1, 2`. This demonstrates `ScopedSequence` as a property computation.
+
+## Complete Implementation
+
+```typescript
+import {
+  Entity, Property, UniqueConstraint, ScopedSequence,
+  Interaction, Action, Payload, PayloadItem,
+  Transform, InteractionEventEntity,
+  Controller, MonoSystem, PGLiteDB, KlassByName, MatchExp
+} from 'interaqt'
+
+const Project = Entity.create({
+  name: 'Project',
+  properties: [
+    Property.create({ name: 'name', type: 'string' })
+  ]
+})
+
+const mediaSerial = ScopedSequence.create({
+  name: 'projectMediaSerial',
+  scope: [
+    { name: 'project', type: 'ref', base: Project, path: 'project' },
+    { name: 'prefix', type: 'string', path: 'prefix' },
+  ],
+})
+
+const Media = Entity.create({
+  name: 'Media',
+  properties: [
+    Property.create({ name: 'project', type: 'id' }),
+    Property.create({ name: 'prefix', type: 'string' }),
+    Property.create({ name: 'url', type: 'string' }),
+    Property.create({
+      name: 'serialNumber',
+      type: 'number',
+      computation: mediaSerial,
+    }),
+    Property.create({
+      name: 'displayName',
+      type: 'string',
+      computed: (record) => record.serialNumber
+        ? `${record.prefix}-${record.serialNumber}`
+        : record.prefix,
+    }),
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'uniqMediaProjectPrefixSerial',
+      properties: ['project', 'prefix', 'serialNumber'],
+    }),
+  ],
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: (event) => {
+      if (event.interactionName !== 'CreateMedia') return null
+      return {
+        project: event.payload.project,
+        prefix: event.payload.prefix,
+        url: event.payload.url,
+      }
+    }
+  })
+})
+
+const CreateMedia = Interaction.create({
+  name: 'CreateMedia',
+  action: Action.create({ name: 'createMedia' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'project', type: 'string', required: true }),
+      PayloadItem.create({ name: 'prefix', type: 'string', required: true }),
+      PayloadItem.create({ name: 'url', type: 'string', required: true }),
+    ]
+  })
+})
+
+const system = new MonoSystem(new PGLiteDB())
+system.conceptClass = KlassByName
+const controller = new Controller({
+  system,
+  entities: [Project, Media],
+  relations: [],
+  eventSources: [CreateMedia],
+  dict: [],
+})
+
+await controller.setup(true)
+
+await controller.dispatch(CreateMedia, {
+  user: { id: 'system' },
+  payload: { project: 'project-1', prefix: 'img', url: 'a.png' },
+})
+await controller.dispatch(CreateMedia, {
+  user: { id: 'system' },
+  payload: { project: 'project-1', prefix: 'img', url: 'b.png' },
+})
+
+const media = await system.storage.find(
+  'Media',
+  MatchExp.atom({ key: 'project', value: ['=', 'project-1'] }),
+  undefined,
+  ['id', 'project', 'prefix', 'serialNumber']
+)
+// img serials are [1, 2]
+```
+
+## Design Decisions
+- **ScopedSequence on `serialNumber`**: The serial is allocated per `{ project, prefix }` scope. This is safer than `max(serialNumber) + 1` and works across PostgreSQL controllers.
+- **Scope values are persisted fields**: `project` and `prefix` are present on the new `Media` record before `serialNumber` allocation.
+- **UniqueConstraint remains required**: The allocator provides the next value; the unique constraint is the database integrity backstop.
+- **No `defaultValue` on `serialNumber`**: Allocation is post-create/pre-commit.
+- **Migration note**: If existing media rows already have serials, declare `initializeFrom` on the `ScopedSequence` and seed every existing scope before enabling automatic allocation.

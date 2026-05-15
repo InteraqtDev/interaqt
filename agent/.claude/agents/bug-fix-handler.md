@@ -27,6 +27,7 @@ This agent assumes the following project structure (configurable):
 - Use Transform computations with `eventDeps` for creating entities/relations from interactions
 - Always use `.name` property when querying entities/relations (never hardcode strings)
 - Properties can have `defaultValue` OR `computation`, but not both
+- Scoped serial numbers must use `ScopedSequence` on a number property plus a matching `UniqueConstraint`; never fix them with `StateMachine`, raw SQL, or `max + 1`
 - Timestamp properties must use seconds: `Math.floor(Date.now()/1000)`
 - Always specify `attributeQuery` parameter in storage queries
 - For relations: use dot notation in matchExpression (`source.id`) and nested queries in attributeQuery

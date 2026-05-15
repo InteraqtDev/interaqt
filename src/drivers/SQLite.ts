@@ -37,6 +37,14 @@ export class SQLiteDB implements Database{
             'SQLite uses MonoStorage fallback transaction metadata for retry paths and does not provide PostgreSQL-level concurrent dispatch isolation.'
         ],
     }
+    atomicSequenceCapability = {
+        requiresActiveTransaction: true as const,
+        transactional: true,
+        crossConnection: false,
+        crossProcess: false,
+        returning: true,
+        productionSafe: false,
+    }
     schemaDialect = {
         name: 'sqlite' as const,
         maxIdentifierLength: 63,
@@ -64,6 +72,16 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
     "stringValue" TEXT NULL,
     "jsonValue" JSON NULL
 )`, 'setup computation state table')
+    }
+    async setupScopedSequenceState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
+    "sequenceName" TEXT NOT NULL,
+    "scopeKey" TEXT NOT NULL,
+    "scope" JSON NOT NULL,
+    "lastValue" NUMERIC NOT NULL,
+    PRIMARY KEY ("sequenceName", "scopeKey")
+)`, 'setup scoped sequence table')
     }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

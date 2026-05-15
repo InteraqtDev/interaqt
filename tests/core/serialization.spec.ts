@@ -3,7 +3,7 @@ import {
     Entity, Property,
     Any, Every, Custom,
     StateMachine, StateNode, StateTransfer,
-    WeightedSummation, RealTime, Transform,
+    WeightedSummation, RealTime, Transform, ScopedSequence,
     EventSource,
     clearAllInstances
 } from '@core';
@@ -12,7 +12,7 @@ const allClasses = [
     Entity, Property,
     Any, Every, Custom,
     StateMachine, StateNode, StateTransfer,
-    WeightedSummation, RealTime, Transform,
+    WeightedSummation, RealTime, Transform, ScopedSequence,
     EventSource
 ];
 
@@ -497,5 +497,45 @@ describe('EventSource serialization', () => {
         expect(cloned.name).toBe('evt');
         expect(cloned.entity).toBe(entity);
         expect(cloned.guard).toBe(guard);
+    });
+});
+
+describe('ScopedSequence serialization', () => {
+    test('parse restores Entity refs strictly by uuid when available', () => {
+        const originalProject = Entity.create({ name: 'ScopedParseProject' }, { uuid: 'scoped-parse-project-original' });
+        const originalMedia = Entity.create({ name: 'ScopedParseMedia' }, { uuid: 'scoped-parse-media-original' });
+        const sequence = ScopedSequence.create({
+            name: 'ScopedParseSerial',
+            scope: [{ name: 'project', type: 'ref', base: originalProject, path: 'project' }],
+            initializeFrom: {
+                record: originalMedia,
+                valuePath: 'serialNumber',
+                scope: [{ name: 'project', path: 'project' }],
+                aggregate: 'max',
+            },
+        }, { uuid: 'scoped-parse-sequence' });
+        const json = ScopedSequence.stringify(sequence);
+
+        clearAllInstances(ScopedSequence, Entity);
+        Entity.create({ name: 'ScopedParseProject' }, { uuid: 'scoped-parse-project-different' });
+        Entity.create({ name: 'ScopedParseMedia' }, { uuid: 'scoped-parse-media-different' });
+
+        expect(() => ScopedSequence.parse(json)).toThrow('scoped-parse-project-original');
+    });
+
+    test('parse can restore legacy Entity refs by name when uuid is absent', () => {
+        const project = Entity.create({ name: 'ScopedParseLegacyProject' });
+        const sequence = ScopedSequence.create({
+            name: 'ScopedParseLegacySerial',
+            scope: [{ name: 'project', type: 'ref', base: project, path: 'project' }],
+        }, { uuid: 'scoped-parse-legacy-sequence' });
+        const data = JSON.parse(ScopedSequence.stringify(sequence));
+        delete data.public.scope[0].base.uuid;
+
+        clearAllInstances(ScopedSequence);
+        const parsed = ScopedSequence.parse(JSON.stringify(data));
+
+        expect(parsed.scope[0]).toMatchObject({ name: 'project', type: 'ref', path: 'project' });
+        expect((parsed.scope[0] as { base: typeof project }).base).toBe(project);
     });
 });

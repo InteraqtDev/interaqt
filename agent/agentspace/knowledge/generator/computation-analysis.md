@@ -73,7 +73,7 @@ Check `lifecycle.creation` and `lifecycle.deletion`:
 
 **🔴 CRITICAL RULE: Properties can NEVER use Transform computation**
 - Transform is ONLY for Entity/Relation creation
-- Properties must use: _owner, StateMachine, computed, aggregations (Count/Sum/etc.), or Custom
+- Properties must use: _owner, StateMachine, ScopedSequence, computed, aggregations (Count/Sum/etc.), or Custom
 - Even if a property needs to respond to external events (like Integration Events), use StateMachine with appropriate triggers
 
 First check the property's `controlType`, then analyze dependencies if needed:
@@ -92,6 +92,7 @@ Analyze the property's `dataDependencies`, `interactionDependencies`, and `compu
 | Condition | Computation Decision |
 |-----------|---------------------|
 | `calculationMethod` contains "sum of", "count of", "aggregate", or involves Record entities | `Custom` or aggregation (e.g., balance = sum(deposits) - sum(withdrawals)) |
+| Needs a serial/order number scoped by other record fields (e.g. project + prefix) | `ScopedSequence` |
 | Has `interactionDependencies` that can modify it | `StateMachine` for state transitions or value updates (even for external events) |
 | Has `dataDependencies` with relations/entities (including Integration Events) | `StateMachine` if triggered by events, otherwise aggregation computation |
 | `dataDependencies` = self properties only | `computed` function |

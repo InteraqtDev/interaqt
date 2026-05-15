@@ -53,7 +53,7 @@ The Klass pattern uses `generateUUID()` internally. Manual IDs risk collisions a
 - [ ] Entity name is PascalCase and singular (`User` not `users`)
 - [ ] No manual UUID assignment
 - [ ] Computed properties that depend only on the same record use `computed`, NOT Transform
-- [ ] Properties with reactive computations (Count, etc.) include `defaultValue`
+- [ ] Properties with aggregate/state reactive computations include `defaultValue`; `ScopedSequence` does not
 
 ---
 
@@ -148,6 +148,7 @@ Without `type`, the framework cannot determine cardinality. ALWAYS explicitly se
 | Check ANY related record matches condition | `Any` |
 | Derive new entities from events or other entities | `Transform` (on Entity `computation`) |
 | Update a property value based on state transitions | `StateMachine` (on Property `computation`) |
+| Allocate a per-scope serial number on create | `ScopedSequence` (on number Property `computation`) |
 | Simple computation from same-record fields | `computed` (on Property) |
 
 ```typescript
@@ -239,12 +240,56 @@ Property.create({
 ### WHY
 All computations are declared within the `computation` field of Entity, Relation, or Property. The `dict` parameter in Controller is for global Dictionary instances only.
 
+### CORRECT: Scoped atomic serial numbers
+```typescript
+import { Entity, Property, ScopedSequence, UniqueConstraint } from 'interaqt'
+
+const assetSerial = ScopedSequence.create({
+  name: 'projectAssetSerial',
+  scope: [
+    { name: 'project', type: 'ref', base: Project, path: 'project' },
+    { name: 'prefix', type: 'string', path: 'prefix' },
+  ],
+})
+
+const Media = Entity.create({
+  name: 'Media',
+  properties: [
+    Property.create({ name: 'project', type: 'id' }),
+    Property.create({ name: 'prefix', type: 'string' }),
+    Property.create({
+      name: 'serialNumber',
+      type: 'number',
+      computation: assetSerial,
+    }),
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'uniqMediaProjectPrefixSerial',
+      properties: ['project', 'prefix', 'serialNumber'],
+    }),
+  ],
+})
+```
+
+### WHY
+`ScopedSequence` is the declarative way to allocate values like `project + prefix + serialNumber`. It runs after the host record is created and before the dispatch transaction commits. Do not implement this with `StateMachine(lastValue + 1)`, `Custom`, direct SQL, or `max(serialNumber) + 1`; those approaches are not safe across PostgreSQL connections.
+
+### ScopedSequence Checklist
+- [ ] The sequence property is `type: 'number'`
+- [ ] The sequence property has no `defaultValue`
+- [ ] The sequence property is not insert-time non-null
+- [ ] Every scope path reads a primitive/ref value already present on the created record
+- [ ] A `UniqueConstraint` covers the scope fields plus the sequence property
+- [ ] Existing data migrations seed every scope with `initializeFrom`; do not partial-seed with `initializeFrom.match` unless the sequence only ever applies to that subset
+
 ### Checklist
 - [ ] Transform is on `Entity.computation` or `Relation.computation`, NEVER on `Property.computation`
 - [ ] Count, WeightedSummation, Every, Any are on `Property.computation`
 - [ ] StateMachine is on `Property.computation`
+- [ ] ScopedSequence is on a number `Property.computation` for scoped serial allocation
 - [ ] `computed` is used for same-record-only property derivations
-- [ ] Properties with computation ALWAYS have `defaultValue`
+- [ ] Properties with aggregate/state computations have `defaultValue`; `ScopedSequence` does not
 - [ ] NEVER pass computations to Controller constructor
 
 ---

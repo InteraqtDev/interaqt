@@ -65,6 +65,12 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
                     reason: "approved by migration test",
                 };
             }
+            if (requirement.kind === "scoped-sequence-seed" || requirement.kind === "scoped-sequence-no-seed") {
+                return {
+                    ...requirement,
+                    reason: "approved by migration test",
+                };
+            }
             return {
                 kind: "destructive-scope" as const,
                 dataContext: requirement.dataContext,

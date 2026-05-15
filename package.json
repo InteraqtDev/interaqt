@@ -34,6 +34,7 @@
     "check:build": "tsc --noEmit --skipLibCheck -p tsconfig.prod.json",
     "test": "vitest run",
     "test:postgres-concurrency": "node -e \"if (!process.env.INTERAQT_POSTGRES_DATABASE) { console.error('INTERAQT_POSTGRES_DATABASE is required for PostgreSQL concurrency tests'); process.exit(1); }\" && vitest run tests/runtime/postgresqlConcurrency.spec.ts",
+    "test:postgres-scoped-sequence": "node -e \"if (!process.env.INTERAQT_POSTGRES_DATABASE) { console.error('INTERAQT_POSTGRES_DATABASE is required for PostgreSQL scoped sequence tests'); process.exit(1); }\" && vitest run tests/runtime/postgresqlScopedSequence.spec.ts",
     "test:runtime": "vitest run tests/runtime",
     "test:storage": "vitest run tests/storage",
     "test:core": "vitest run tests/core",

@@ -374,7 +374,7 @@ Search `requirements/{module}.interactions-design.json` (using the module name f
 Transform the computation description using semantic best practices:
 - **Don't copy directly** from `requirements/{module}.data-concepts.json`
 - Apply the "Best Practices for Computation Design" principles
-- Use semantic computations (Count, Every, Any, Summation, etc.) where possible
+- Use semantic computations (Count, Every, Any, Summation, ScopedSequence, etc.) where possible
 - Decompose complex calculations into intermediate properties
 - Make the computation intent clear and implementation-ready
 

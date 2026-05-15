@@ -118,6 +118,7 @@ git commit -m "feat: Task 3.1.1 - Setup module file and register in index"
   - **IMPORTANT: If a property will have `computed` or `computation`, do NOT set `defaultValue`**
     - The computation will provide the value, defaultValue would conflict
     - Either use defaultValue OR computation, never both
+    - For future scoped serial numbers, create the primitive scope fields now, but leave the serial property without `defaultValue`; `ScopedSequence` will be attached in the computation phase
 - [ ] Generate all relations with proper cardinality
   - Relations define how entities connect
   - Relations create the property names for accessing related entities

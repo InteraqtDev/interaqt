@@ -180,6 +180,8 @@ color: blue
      })
    - Remove any `defaultValue` if adding computation to that property
    - Never use Transform in Property computation
+   - Use `ScopedSequence` for scoped serial numbers (for example project + prefix + serialNumber). Do not generate `StateMachine`, `Custom`, raw SQL, or `max + 1` logic for this case.
+   - When generating `ScopedSequence`, ensure the property is `type: 'number'`, scope fields are already present on the created record, and a `UniqueConstraint` covers scope fields plus the sequence property.
    - For `_owner` properties, always set them in the owner's creation/derivation logic
 
 2. **Type Check**

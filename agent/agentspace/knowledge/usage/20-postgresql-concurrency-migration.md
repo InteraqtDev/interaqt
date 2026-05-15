@@ -8,6 +8,7 @@ interaqt now uses PostgreSQL as the concurrency coordinator for multi-process de
 
 - Built-in computations use atomic state updates, row locks, unique indexes, or SERIALIZABLE retry where needed.
 - PostgreSQL id generation uses native sequences instead of writing `_IDS_`.
+- `ScopedSequence` uses an internal `_ScopedSequence_` table plus transactional `INSERT ... ON CONFLICT ... DO UPDATE ... RETURNING` to allocate per-scope serial numbers safely across controllers and processes.
 - Custom computations default to retryable `SERIALIZABLE` execution.
 - Async return handling runs in a retryable transaction and applies freshness checks.
 
@@ -79,6 +80,28 @@ Do not write `_IDS_` to control ids. `_IDS_` is legacy input only.
 
 PostgreSQL sequence gaps are normal after rollback or failed transactions. Do not depend on contiguous ids.
 
+## ScopedSequence Atomic Counters
+
+Use `ScopedSequence` when a number property needs a unique serial inside a business scope, for example `project + prefix + serialNumber`.
+
+Key semantics:
+
+- Allocation happens after the host record create mutation and before the dispatch transaction commits.
+- First automatic value is `initialValue + step`.
+- Rollback rolls back the sequence increment because counter state and business writes share the same transaction.
+- Deleting a record does not decrement the counter.
+- Manual values are rejected unless `allowManualValue: true`.
+- `allowManualValue: true` is for import/backfill only and does not advance the counter.
+- Keep a `UniqueConstraint` over the scope fields and allocated property as the database integrity backstop.
+- PostgreSQL is the production-safe driver for cross-connection/cross-process allocation. PGLite and SQLite are test/local single-process options only.
+
+Migration rules:
+
+- Adding or changing a `ScopedSequence` is not an ordinary recompute. Approve it as unrebuildable plus a scoped sequence seed/no-seed decision.
+- Use `initializeFrom` to seed counters from existing values with `MAX(valuePath)` per scope.
+- Do not partial-seed with `initializeFrom.match` when future allocations cover all host rows; otherwise unseeded existing scopes can later collide.
+- Removing a declared `ScopedSequence` must be reviewed explicitly. Do not silently drop the declaration from the manifest while leaving internal counter state behind.
+
 ## Transaction API
 
 Use callback transactions:
@@ -103,3 +126,11 @@ INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-concurrency
 ```
 
 This script intentionally fails when `INTERAQT_POSTGRES_DATABASE` is missing, so PostgreSQL concurrency coverage cannot silently skip in CI.
+
+For `ScopedSequence`, also run:
+
+```bash
+INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-scoped-sequence
+```
+
+This is the critical acceptance test for cross-controller scoped counter allocation.

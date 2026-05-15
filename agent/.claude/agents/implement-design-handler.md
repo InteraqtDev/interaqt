@@ -138,6 +138,7 @@ When analyzing properties in `docs/{module}.data-design.json`:
 - [ ] Create analysis document at `docs/{module}.computation-analysis.json`
 - [ ] Analyze each entity systematically (creation source, update requirements, deletion strategy)
 - [ ] Analyze each property individually (type, purpose, data source, update frequency)
+- [ ] Use `ScopedSequence` for scoped serial/order-number properties; do not model them as StateMachine counters or Custom computations
 - [ ] Analyze each relation's complete lifecycle (creation, updates, deletion)
 - [ ] Select appropriate computation type based on decision trees
 - [ ] Document reasoning for each computation decision

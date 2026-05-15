@@ -17,7 +17,11 @@ import {
     SystemLogType,
     StorageSchemaMetadata,
     DictionaryEntity,
-    EntityIdRef
+    EntityIdRef,
+    AtomicSequenceTarget,
+    AtomicSequenceScope,
+    AtomicSequenceScopeValue,
+    SystemSchemaOptions
 } from "./System.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { RequireSerializableRetry, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
@@ -174,6 +178,61 @@ class MonoStorage implements Storage{
         }
         return runWithTransactionRetry(operation, (isolation) => this.runInTransaction({ name: operation, isolation }, fn))
     }
+    private normalizeSequenceScope(scope: AtomicSequenceScope) {
+        return scope.map(item => ({ name: item.name, type: item.type, value: item.value }))
+    }
+    private validateAtomicSequenceTarget(target: Partial<AtomicSequenceTarget> & { value?: number }) {
+        if (!this.db.atomicSequenceCapability || typeof this.db.setupScopedSequenceState !== 'function') {
+            throw new TransactionCapabilityError({
+                transactionName: `atomic scoped sequence ${target.sequenceName || ''}`,
+                requestedIsolation: this.getTransactionIsolation() || 'READ COMMITTED',
+                capability: this.getTransactionCapability(),
+                reason: 'driver does not support atomic scoped sequences',
+            })
+        }
+        if (typeof target.sequenceName !== 'string' || !/^[a-zA-Z0-9_]+$/.test(target.sequenceName)) {
+            throw new Error('Atomic sequence sequenceName must be a non-empty simple identifier')
+        }
+        if (target.initialValue !== undefined && !Number.isFinite(target.initialValue)) {
+            throw new Error('Atomic sequence initialValue must be a finite number')
+        }
+        if (target.step !== undefined && (!Number.isInteger(target.step) || target.step <= 0)) {
+            throw new Error('Atomic sequence step must be a positive integer')
+        }
+        if (target.value !== undefined && !Number.isFinite(target.value)) {
+            throw new Error('Atomic sequence seed value must be a finite number')
+        }
+        if (!Array.isArray(target.scope)) {
+            throw new Error('Atomic sequence scope must be an ordered array')
+        }
+        for (const { name, type, value } of target.scope) {
+            if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+                throw new Error(`Atomic sequence scope name "${name}" must be a simple identifier`)
+            }
+            if (type !== 'string' && type !== 'number' && type !== 'boolean' && type !== 'null' && type !== 'ref') {
+                throw new Error(`Atomic sequence scope "${name}" has an invalid type`)
+            }
+            const validValue = value === null ||
+                typeof value === 'string' ||
+                typeof value === 'boolean' ||
+                (typeof value === 'number' && Number.isFinite(value)) ||
+                (typeof value === 'object' && value !== null && (value as { type?: unknown; entity?: unknown; id?: unknown }).type === 'ref' && typeof (value as { entity?: unknown }).entity === 'string' && typeof (value as { id?: unknown }).id === 'string')
+            if (!validValue) {
+                throw new Error(`Atomic sequence scope "${name}" has an invalid value`)
+            }
+            const actualType = typeof value === 'object' && value !== null && (value as { type?: unknown }).type === 'ref'
+                ? 'ref'
+                : value === null
+                ? 'null'
+                : typeof value
+            if (type !== actualType) {
+                throw new Error(`Atomic sequence scope "${name}" type does not match its value`)
+            }
+        }
+    }
+    private sequenceScopeKey(scope: AtomicSequenceScope) {
+        return JSON.stringify(this.normalizeSequenceScope(scope))
+    }
     private async setDictionaryValue(key: string, value: unknown, emitEvents: boolean): Promise<void> {
         const match = MatchExp.atom({key: 'key', value: ['=', key]})
         const origin = await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value'])
@@ -210,10 +269,16 @@ class MonoStorage implements Storage{
             return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))}], events)
         }
     }
-    async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false) {
+    private requiresScopedSequenceState(options?: SystemSchemaOptions) {
+        return options?.internalRequirements?.some(requirement => requirement.kind === 'scoped-sequence-table' && requirement.declarations.length > 0) === true
+    }
+    async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false, options?: SystemSchemaOptions) {
         await this.db.open(createTables)
         if (createTables && this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
+        }
+        if (createTables && this.requiresScopedSequenceState(options) && this.db.setupScopedSequenceState) {
+            await this.db.setupScopedSequenceState()
         }
         let dbSetup: DBSetup
         try {
@@ -255,7 +320,7 @@ class MonoStorage implements Storage{
         this.schema = this.createSchemaMetadata(dbSetup)
     }
 
-    async prepareMigrationAdditive(entities: EntityInstance[], relations: RelationInstance[]): Promise<MigrationSchemaPlan> {
+    async prepareMigrationAdditive(entities: EntityInstance[], relations: RelationInstance[], options?: SystemSchemaOptions): Promise<MigrationSchemaPlan> {
         await this.ensureDbOpenForSchemaRead()
         if (this.db.setupInternalComputationState) {
             // The table creation itself is idempotent, but planning must stay
@@ -279,6 +344,19 @@ class MonoStorage implements Storage{
         }
 
         const preRecomputeDDL = await this.createAdditiveSchemaPlan(dbSetup)
+        const existingTables = await this.getExistingTables()
+        if (this.requiresScopedSequenceState(options) && this.db.setupScopedSequenceState && !existingTables.has('_ScopedSequence_')) {
+            const dialect = getSchemaDialect(this.db).name
+            preRecomputeDDL.unshift({
+                kind: 'create-table',
+                tableName: '_ScopedSequence_',
+                logicalPath: 'internal:_ScopedSequence_',
+                description: 'create scoped sequence state table',
+                sql: dialect === 'sqlite'
+                    ? `CREATE TABLE IF NOT EXISTS "_ScopedSequence_" ("sequenceName" TEXT NOT NULL, "scopeKey" TEXT NOT NULL, "scope" JSON NOT NULL, "lastValue" NUMERIC NOT NULL, PRIMARY KEY ("sequenceName", "scopeKey"))`
+                    : `CREATE TABLE IF NOT EXISTS "_ScopedSequence_" ("sequenceName" TEXT NOT NULL, "scopeKey" TEXT NOT NULL, "scope" JSONB NOT NULL, "lastValue" NUMERIC NOT NULL, PRIMARY KEY ("sequenceName", "scopeKey"))`,
+            })
+        }
         const { verificationDDL, postRecomputeDDL } = this.createPostRecomputeSchemaPlan(dbSetup)
         return {
             schema: this.createSchemaMetadata(dbSetup),
@@ -346,6 +424,10 @@ class MonoStorage implements Storage{
         await this.db.open(false)
         if (this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
+        }
+        const requiresScopedSequence = (plan.internal as { options?: SystemSchemaOptions }).options?.internalRequirements?.some(requirement => requirement.kind === 'scoped-sequence-table' && requirement.declarations.length > 0) === true
+        if (requiresScopedSequence && this.db.setupScopedSequenceState) {
+            await this.db.setupScopedSequenceState()
         }
         await this.applyMigrationOperations('schema', plan.preRecomputeDDL, migrationId)
         if (this.db.setupRecordSequences) {
@@ -854,6 +936,70 @@ RETURNING "numberValue" AS value`,
                 )
                 return (this.parseGlobalValue<T>(rows[0]?.value, column) ?? target.defaultValue ?? null) as T | null
             },
+            nextSequenceValue: async (target: AtomicSequenceTarget): Promise<number> => {
+                this.validateAtomicSequenceTarget(target)
+                this.requireTransaction(`atomic scoped sequence ${target.sequenceName}`)
+                const scopeKey = this.sequenceScopeKey(target.scope)
+                const scopeJson = JSON.stringify(this.normalizeSequenceScope(target.scope))
+                const firstValue = target.initialValue + target.step
+                const p = this.getPlaceholder()
+                const sequenceNamePlaceholder = p()
+                const scopeKeyPlaceholder = p()
+                const scopePlaceholder = p()
+                const initialValuePlaceholder = p()
+                const updateStepPlaceholder = p()
+                const rows = await this.db.query<{ value: number | string }>(
+                    `INSERT INTO "_ScopedSequence_" ("sequenceName", "scopeKey", "scope", "lastValue") VALUES (${sequenceNamePlaceholder}, ${scopeKeyPlaceholder}, ${scopePlaceholder}, ${initialValuePlaceholder})
+ON CONFLICT ("sequenceName", "scopeKey") DO UPDATE SET "lastValue" = "_ScopedSequence_"."lastValue" + ${updateStepPlaceholder}
+RETURNING "lastValue" AS value`,
+                    [target.sequenceName, scopeKey, scopeJson, firstValue, target.step],
+                    `atomic scoped sequence ${target.sequenceName}`
+                )
+                if (!rows.length) throw new Error(`ScopedSequence allocation failed for ${target.sequenceName}`)
+                return Number(rows[0].value)
+            },
+            seedSequenceValue: async (target: AtomicSequenceTarget & { value: number; mode?: 'max' | 'replace' }): Promise<void> => {
+                this.validateAtomicSequenceTarget(target)
+                if (target.mode !== undefined && target.mode !== 'max' && target.mode !== 'replace') {
+                    throw new Error('Atomic sequence seed mode must be "max" or "replace"')
+                }
+                this.requireTransaction(`atomic scoped sequence seed ${target.sequenceName}`)
+                const scopeKey = this.sequenceScopeKey(target.scope)
+                const scopeJson = JSON.stringify(this.normalizeSequenceScope(target.scope))
+                const mode = target.mode ?? 'max'
+                const p = this.getPlaceholder()
+                const sequenceNamePlaceholder = p()
+                const scopeKeyPlaceholder = p()
+                const scopePlaceholder = p()
+                const valuePlaceholder = p()
+                const updateValuePlaceholder = p()
+                const dialect = getSchemaDialect(this.db).name
+                const maxExpression = dialect === 'sqlite'
+                    ? `MAX("_ScopedSequence_"."lastValue", ${updateValuePlaceholder})`
+                    : `GREATEST("_ScopedSequence_"."lastValue", ${updateValuePlaceholder})`
+                const assignment = mode === 'replace'
+                    ? `${updateValuePlaceholder}`
+                    : maxExpression
+                await this.db.query(
+                    `INSERT INTO "_ScopedSequence_" ("sequenceName", "scopeKey", "scope", "lastValue") VALUES (${sequenceNamePlaceholder}, ${scopeKeyPlaceholder}, ${scopePlaceholder}, ${valuePlaceholder})
+ON CONFLICT ("sequenceName", "scopeKey") DO UPDATE SET "lastValue" = ${assignment}
+RETURNING "lastValue" AS value`,
+                    [target.sequenceName, scopeKey, scopeJson, target.value, target.value],
+                    `atomic scoped sequence seed ${target.sequenceName}`
+                )
+            },
+            readSequenceValue: async (target: Pick<AtomicSequenceTarget, 'sequenceName' | 'scope'>): Promise<number | undefined> => {
+                this.validateAtomicSequenceTarget(target)
+                const p = this.getPlaceholder()
+                const sequenceNamePlaceholder = p()
+                const scopeKeyPlaceholder = p()
+                const rows = await this.db.query<{ value: number | string }>(
+                    `SELECT "lastValue" AS value FROM "_ScopedSequence_" WHERE "sequenceName" = ${sequenceNamePlaceholder} AND "scopeKey" = ${scopeKeyPlaceholder}`,
+                    [target.sequenceName, this.sequenceScopeKey(target.scope)],
+                    `atomic scoped sequence read ${target.sequenceName}`
+                )
+                return rows.length ? Number(rows[0].value) : undefined
+            },
             updateGlobalFields: async (
                 target: AtomicGlobalTarget,
                 deltas: Record<string, number>,
@@ -1278,7 +1424,9 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         await (this.storage as MonoStorage).markMigrationOperationComplete(migrationId, operationKey)
     }
     
-    async setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], install = false){
+    async setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], options: boolean | SystemSchemaOptions = false){
+        const install = typeof options === 'boolean' ? options : options.install === true
+        const schemaOptions = typeof options === 'boolean' ? { install } : options
         // Use RefContainer to handle cloning and reference updates
         const container = new RefContainer(originalEntities, originalRelations);
         
@@ -1328,7 +1476,8 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         await this.storage.setup(
             [...entities, DictionaryEntity, SystemEntity], 
             relations,
-            install
+            install,
+            schemaOptions
         )
         await this.setupTransformUniqueIndexes(states)
     }
@@ -1384,13 +1533,15 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         }
     }
 
-    async prepareMigrationSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[]) {
+    async prepareMigrationSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], options: SystemSchemaOptions = {}) {
         const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
         const plan = await (this.storage as MonoStorage).prepareMigrationAdditive(
             entities,
             relations,
+            options,
         )
         ;(plan.internal as { states?: ComputationState[] }).states = states
+        ;(plan.internal as { options?: SystemSchemaOptions }).options = options
         plan.postRecomputeDDL.push(...this.createTransformUniqueIndexOperations(plan, states))
         return plan
     }
@@ -1407,13 +1558,15 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         await (this.storage as MonoStorage).verifyMigrationPlan(plan, migrationId)
     }
 
-    async migrateSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[]) {
+    async migrateSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], options: SystemSchemaOptions = {}) {
         const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
         const plan = await (this.storage as MonoStorage).prepareMigrationAdditive(
             entities,
             relations,
+            options,
         )
         ;(plan.internal as { states?: ComputationState[] }).states = states
+        ;(plan.internal as { options?: SystemSchemaOptions }).options = options
         await (this.storage as MonoStorage).applyMigrationAdditivePlan(plan)
         await this.setupTransformUniqueIndexes(states)
     }

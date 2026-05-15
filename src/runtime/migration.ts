@@ -1,11 +1,13 @@
 import type { Controller } from "./Controller.js";
 import type { Computation, ComputationResultPatch, DataBasedComputation, DataContext, EventBasedComputation, GlobalBoundState, RecordBoundState } from "./computations/Computation.js";
 import { ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip } from "./computations/Computation.js";
-import type { RecordMutationEvent, StorageSchemaMetadata, System } from "./System.js";
+import type { AtomicSequenceScope, RecordMutationEvent, ScopedSequenceDeclarationManifest, StorageSchemaMetadata, System } from "./System.js";
 import { DICTIONARY_RECORD } from "./System.js";
 import { EntityQueryHandle, EntityToTableMap, getSchemaDialect, LINK_SYMBOL, MatchExp, quoteIdentifier } from "@storage";
 import { createHash } from "node:crypto";
 import { ComputationSourceMapManager, type DataBasedEntityEventsSourceMap, type EntityEventSourceMap, type EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
+import { canonicalizeScopedSequenceScopeFromValues, readScopedSequencePath } from "./scopedSequenceScope.js";
+import { createScopedSequenceSignatures } from "./scopedSequenceManifest.js";
 
 export const MIGRATION_MANIFEST_CONCEPT = "_MigrationManifest_";
 export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
@@ -175,6 +177,30 @@ export type MigrationDecisionRequirement =
         tableName: string;
         expectedCount: 0;
         reason: string;
+    }
+    | {
+        kind: "scoped-sequence-seed";
+        id: string;
+        dataContext: string;
+        sequenceName: string;
+        hostRecord: string;
+        targetProperty: string;
+        scopeSignature?: string;
+        valuePath: string;
+        aggregate: "max";
+        mode: "max" | "replace";
+        reason: string;
+    }
+    | {
+        kind: "scoped-sequence-no-seed";
+        id: string;
+        dataContext: string;
+        sequenceName: string;
+        hostRecord: string;
+        targetProperty: string;
+        scopeSignature?: string;
+        expectedHostCount: 0;
+        reason: string;
     };
 
 export type MigrationDecision =
@@ -229,6 +255,30 @@ export type MigrationDecision =
         from: string;
         to: string;
         decision: "not-accepted" | "accepted-for-future-primitive";
+        reason: string;
+    }
+    | {
+        kind: "scoped-sequence-seed";
+        id: string;
+        dataContext: string;
+        sequenceName: string;
+        hostRecord: string;
+        targetProperty: string;
+        scopeSignature?: string;
+        valuePath: string;
+        aggregate: "max";
+        mode: "max" | "replace";
+        reason: string;
+    }
+    | {
+        kind: "scoped-sequence-no-seed";
+        id: string;
+        dataContext: string;
+        sequenceName: string;
+        hostRecord: string;
+        targetProperty: string;
+        scopeSignature?: string;
+        expectedHostCount: 0;
         reason: string;
     };
 
@@ -312,6 +362,19 @@ export type ComputationManifest = {
     stateSignature: string;
     structuralSignature: string;
     functionSignature?: ComputationFunctionSignature;
+    allocation?: {
+        kind: "scoped-sequence";
+        timing: "post-create-pre-commit";
+        rebuildable: false;
+        sequenceName: string;
+        scope: unknown[];
+        initialValue: number;
+        step: number;
+        allowManualValue: boolean;
+        initializeFrom?: unknown;
+    };
+    allocationSignature?: string;
+    scopeSignature?: string;
     signature: string;
 };
 
@@ -360,6 +423,7 @@ export type MigrationManifest = {
         computed: boolean;
     }>;
     computations: ComputationManifest[];
+    sequences: ScopedSequenceDeclarationManifest[];
     storage: StorageSchemaMetadata;
 };
 
@@ -424,10 +488,36 @@ export type MigrationPlan = {
     dryRun: boolean;
     changedComputations: ComputationManifest[];
     rebuildPlan: ComputationRebuildItem[];
+    scopedSequenceSeedOperations: ScopedSequenceSeedOperation[];
+    scopedSequenceNoSeedOperations: ScopedSequenceNoSeedOperation[];
     schemaPlan?: Omit<MigrationSchemaPlan, "internal">;
     blockingChanges: string[];
     deletionScope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>;
     approvedDiffHash?: string;
+};
+
+export type ScopedSequenceSeedOperation = {
+    id: string;
+    dataContext: string;
+    sequenceName: string;
+    hostRecord: string;
+    targetProperty: string;
+    scopeSignature?: string;
+    valuePath: string;
+    aggregate: "max";
+    mode: "max" | "replace";
+    reason: string;
+};
+
+export type ScopedSequenceNoSeedOperation = {
+    id: string;
+    dataContext: string;
+    sequenceName: string;
+    hostRecord: string;
+    targetProperty: string;
+    scopeSignature?: string;
+    expectedHostCount: 0;
+    reason: string;
 };
 
 function hash(value: unknown) {
@@ -519,6 +609,74 @@ function computationSemanticType(computation: { constructor?: { computationType?
 
 export function computationManifestId(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { uuid?: string; _type?: string; constructor?: { displayName?: string; name?: string } }; dataContext: DataContext }) {
     return `computation:${dataContextPath(computation.dataContext)}:${computationSemanticType(computation)}`;
+}
+
+function createScopedSequenceSeedRequirement(computation: ComputationManifest): Extract<MigrationDecisionRequirement, { kind: "scoped-sequence-seed" }> | undefined {
+    if (computation.allocation?.kind !== "scoped-sequence" || !computation.allocation.initializeFrom) return undefined;
+    const initializer = computation.allocation.initializeFrom as {
+        record?: unknown;
+        valuePath?: unknown;
+        aggregate?: unknown;
+    };
+    const propertyPath = computation.dataContext.startsWith("property:") ? computation.dataContext.slice("property:".length) : "";
+    const lastDot = propertyPath.lastIndexOf(".");
+    return {
+        kind: "scoped-sequence-seed",
+        id: computation.id,
+        dataContext: computation.dataContext,
+        sequenceName: computation.allocation.sequenceName,
+        hostRecord: computation.outputRecord || (lastDot >= 0 ? propertyPath.slice(0, lastDot) : ""),
+        targetProperty: computation.outputProperty || (lastDot >= 0 ? propertyPath.slice(lastDot + 1) : ""),
+        scopeSignature: computation.scopeSignature,
+        valuePath: String(initializer.valuePath),
+        aggregate: "max",
+        mode: "max",
+        reason: `ScopedSequence ${computation.allocation.sequenceName} requires explicit approval to seed sequence state from ${String(initializer.record)}.${String(initializer.valuePath)}`,
+    };
+}
+
+function scopedSequenceHostAndProperty(computation: ComputationManifest) {
+    const propertyPath = computation.dataContext.startsWith("property:") ? computation.dataContext.slice("property:".length) : "";
+    const lastDot = propertyPath.lastIndexOf(".");
+    return {
+        hostRecord: computation.outputRecord || (lastDot >= 0 ? propertyPath.slice(0, lastDot) : ""),
+        targetProperty: computation.outputProperty || (lastDot >= 0 ? propertyPath.slice(lastDot + 1) : ""),
+    };
+}
+
+function createScopedSequenceNoSeedRequirement(
+    computation: ComputationManifest,
+): Extract<MigrationDecisionRequirement, { kind: "scoped-sequence-no-seed" }> | undefined {
+    if (computation.allocation?.kind !== "scoped-sequence" || computation.allocation.initializeFrom) return undefined;
+    const { hostRecord, targetProperty } = scopedSequenceHostAndProperty(computation);
+    if (!hostRecord || !targetProperty) return undefined;
+    return {
+        kind: "scoped-sequence-no-seed",
+        id: computation.id,
+        dataContext: computation.dataContext,
+        sequenceName: computation.allocation.sequenceName,
+        hostRecord,
+        targetProperty,
+        scopeSignature: computation.scopeSignature,
+        expectedHostCount: 0,
+        reason: `ScopedSequence ${computation.allocation.sequenceName} has no initializeFrom; approve only because host record ${hostRecord} is empty`,
+    };
+}
+
+function createScopedSequenceDeclarationManifests(computations: ComputationManifest[]): ScopedSequenceDeclarationManifest[] {
+    return computations
+        .filter(computation => computation.allocation?.kind === "scoped-sequence")
+        .map(computation => {
+            const { hostRecord, targetProperty } = scopedSequenceHostAndProperty(computation);
+            return {
+                computationId: computation.id,
+                hostRecord,
+                property: targetProperty,
+                sequenceName: computation.allocation!.sequenceName,
+                scopeSignature: computation.scopeSignature,
+                allocationSignature: computation.allocationSignature,
+            };
+        });
 }
 
 function serializeDataDeps(computation: Partial<DataBasedComputation>) {
@@ -620,11 +778,13 @@ function createComputationManifest(computation: Computation, includeFunctionText
     const type = computationSemanticType(computation);
     const identity = createIdentity("computation", id, computation.args.uuid);
     const functionSignature = createFunctionSignature(args, includeFunctionText);
+    const { allocation, scopeSignature, allocationSignature } = createScopedSequenceSignatures(args);
     const outputSignature = hash({
         type,
         dataContext,
         dataDeps: deps,
         eventDeps,
+        allocationSignature,
         hasCompute: typeof (computation as DataBasedComputation).compute === "function",
         hasIncrementalCompute: typeof computation.incrementalCompute === "function",
         hasIncrementalPatchCompute: typeof computation.incrementalPatchCompute === "function",
@@ -637,13 +797,14 @@ function createComputationManifest(computation: Computation, includeFunctionText
         outputProperty: computation.dataContext.type === "property" ? computation.dataContext.id.name : undefined,
         deps,
         eventDeps,
+        allocationSignature,
         callbackPaths: functionSignature?.callbackPaths || [],
         hasFunction: functionSignature?.hasFunction === true,
         hasCompute: typeof (computation as DataBasedComputation).compute === "function",
         hasIncrementalCompute: typeof computation.incrementalCompute === "function",
         hasIncrementalPatchCompute: typeof computation.incrementalPatchCompute === "function",
     });
-    const signature = hash({ structuralSignature, stateSignature, functionHash: functionSignature?.hash });
+    const signature = hash({ structuralSignature, stateSignature, functionHash: functionSignature?.hash, allocationSignature });
 
     return {
         id,
@@ -669,6 +830,9 @@ function createComputationManifest(computation: Computation, includeFunctionText
         stateSignature,
         structuralSignature,
         functionSignature,
+        allocation,
+        allocationSignature,
+        scopeSignature,
         signature,
     };
 }
@@ -742,6 +906,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
     });
     const computations = Array.from(controller.scheduler.computationsHandles.values())
         .map(computation => createComputationManifest(computation, options.includeFunctionText === true));
+    const sequences = createScopedSequenceDeclarationManifests(computations);
     assertUniqueIdentities([
         ...records.flatMap(record => [record.identity, ...record.properties.map(property => property.identity)]),
         ...dictionaries.map(dictionary => dictionary.identity),
@@ -754,7 +919,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
             text: undefined,
         } : undefined,
     }));
-    const model = stripIdentityUUID({ records, relations, dictionaries, computations: hashComputations, storage: storageSchema });
+    const model = stripIdentityUUID({ records, relations, dictionaries, computations: hashComputations, sequences, storage: storageSchema });
 
     return {
         version: 2,
@@ -764,6 +929,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
         relations,
         dictionaries,
         computations,
+        sequences,
         storage: storageSchema,
     };
 }
@@ -797,6 +963,7 @@ function hasSameSemanticComputationShape(oldComputation: ComputationManifest, ne
         oldComputation.outputProperty === nextComputation.outputProperty &&
         oldComputation.asyncReturn === nextComputation.asyncReturn &&
         oldComputation.owner === nextComputation.owner &&
+        oldComputation.allocationSignature === nextComputation.allocationSignature &&
         isEqualValue(stripUndefinedDeep(oldComputation.deps), stripUndefinedDeep(nextComputation.deps)) &&
         isEqualValue(stripUndefinedDeep(oldComputation.eventDeps), stripUndefinedDeep(nextComputation.eventDeps)) &&
         isEqualValue(stripUndefinedDeep(oldComputation.stateKeys), stripUndefinedDeep(nextComputation.stateKeys)) &&
@@ -820,7 +987,10 @@ function normalizeLegacyComputationManifest(oldComputation: ComputationManifest,
         outputSignature: nextComputation.outputSignature,
         stateSignature,
         structuralSignature,
-        signature: hash({ structuralSignature, stateSignature, functionHash: oldComputation.functionSignature?.hash }),
+        allocation: nextComputation.allocation,
+        allocationSignature: nextComputation.allocationSignature,
+        scopeSignature: nextComputation.scopeSignature,
+        signature: hash({ structuralSignature, stateSignature, functionHash: oldComputation.functionSignature?.hash, allocationSignature: nextComputation.allocationSignature }),
         ownershipProof: normalizeComputationOwnershipProof(oldComputation, nextComputation.id),
     };
 }
@@ -845,11 +1015,14 @@ export function normalizePreviousComputationManifest(previousManifest: Migration
     return {
         ...previousManifest,
         computations: normalizedComputations,
+        sequences: previousManifest.sequences || createScopedSequenceDeclarationManifests(normalizedComputations),
     };
 }
 
 function requirementKey(requirement: MigrationDecisionRequirement) {
     if (requirement.kind === "computation") return `${requirement.kind}:${requirement.id}`;
+    if (requirement.kind === "scoped-sequence-seed") return `${requirement.kind}:${requirement.id}`;
+    if (requirement.kind === "scoped-sequence-no-seed") return `${requirement.kind}:${requirement.id}`;
     const recordName = requirement.kind === "destructive-scope" ? requirement.recordName || "" : "";
     if (requirement.kind === "empty-fact-record-removal") return `${requirement.kind}:${requirement.recordName}`;
     return `${requirement.kind}:${requirement.dataContext}:${recordName}`;
@@ -857,6 +1030,8 @@ function requirementKey(requirement: MigrationDecisionRequirement) {
 
 function decisionKey(decision: MigrationDecision) {
     if (decision.kind === "computation") return `${decision.kind}:${decision.id}`;
+    if (decision.kind === "scoped-sequence-seed") return `${decision.kind}:${decision.id}`;
+    if (decision.kind === "scoped-sequence-no-seed") return `${decision.kind}:${decision.id}`;
     if (decision.kind === "rename-candidate-reviewed") return `${decision.kind}:${decision.from}:${decision.to}`;
     const recordName = decision.kind === "destructive-scope" ? decision.recordName || "" : "";
     if (decision.kind === "empty-fact-record-removal") return `${decision.kind}:${decision.recordName}`;
@@ -1035,6 +1210,40 @@ export async function addEmptyFactRecordRemovalReview(
     return diff;
 }
 
+export async function addScopedSequenceNoSeedReview(
+    controller: Controller,
+    diff: MigrationDiffFile,
+    previousManifest: MigrationManifest,
+    nextManifest: MigrationManifest,
+    readHandle?: MigrationReadHandle,
+) {
+    const requirements = new Map(diff.requiredDecisions.map(requirement => [requirementKey(requirement), requirement]));
+    let changed = false;
+    for (const change of diff.changes) {
+        if (change.kind !== "computation" || change.recommendation !== "needs-review") continue;
+        const computationRequirement = diff.requiredDecisions.find(item =>
+            item.kind === "computation" &&
+            item.id === change.id &&
+            item.recommendedDecision === "unrebuildable"
+        );
+        if (!computationRequirement) continue;
+        const computation = nextManifest.computations.find(item => item.id === change.id);
+        const noSeedRequirement = computation ? createScopedSequenceNoSeedRequirement(computation) : undefined;
+        if (!noSeedRequirement) continue;
+        const rows = await readManifestRecords(controller, previousManifest, noSeedRequirement.hostRecord, ["id"], readHandle);
+        if (rows.length !== 0) continue;
+        requirements.set(requirementKey(noSeedRequirement), noSeedRequirement);
+        changed = true;
+    }
+    if (!changed) return diff;
+    diff.requiredDecisions = Array.from(requirements.values());
+    diff.summary = {
+        ...diff.summary,
+        requiredDecisionCount: diff.requiredDecisions.length,
+    };
+    return diff;
+}
+
 export async function getApprovedEmptyFactRecordRemovals(controller: Controller, approvedDiff: MigrationDiffFile | undefined, previousManifest: MigrationManifest) {
     const removals = (approvedDiff?.decisions || [])
         .filter((decision): decision is Extract<MigrationDecision, { kind: "empty-fact-record-removal" }> => decision.kind === "empty-fact-record-removal");
@@ -1054,6 +1263,25 @@ export async function getApprovedEmptyFactRecordRemovals(controller: Controller,
         approved.add(removal.recordName);
     }
     return approved;
+}
+
+export async function assertScopedSequenceNoSeedDecisions(
+    controller: Controller,
+    approvedDiff: MigrationDiffFile | undefined,
+    previousManifest: MigrationManifest,
+    readHandle?: MigrationReadHandle,
+) {
+    const decisions = (approvedDiff?.decisions || [])
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "scoped-sequence-no-seed" }> => decision.kind === "scoped-sequence-no-seed");
+    for (const decision of decisions) {
+        if (decision.expectedHostCount !== 0) {
+            throw new MigrationError(`Invalid scoped sequence no-seed expectedHostCount for ${decision.dataContext}`);
+        }
+        const rows = await readManifestRecords(controller, previousManifest, decision.hostRecord, ["id"], readHandle);
+        if (rows.length !== 0) {
+            throw new MigrationError(`ScopedSequence ${decision.sequenceName} no-seed decision requires empty host record ${decision.hostRecord}`);
+        }
+    }
 }
 
 export async function assertApprovedEmptyFactRecordRemovalsStillEmpty(controller: Controller, approvedDiff: MigrationDiffFile | undefined, previousManifest: MigrationManifest) {
@@ -1389,6 +1617,9 @@ export function buildMigrationDiff(
             eventDepsChanged: old ? !isEqualValue(old.eventDeps, computation.eventDeps) : true,
             outputSignatureChanged: old ? old.outputSignature !== computation.outputSignature : true,
             stateSignatureChanged: old ? old.stateSignature !== computation.stateSignature : true,
+            allocationSignatureChanged: old ? old.allocationSignature !== computation.allocationSignature : computation.allocationSignature !== undefined,
+            allocationSignature: computation.allocationSignature,
+            previousAllocationSignature: old?.allocationSignature,
             functionTextChanged: old ? old.functionSignature?.hash !== computation.functionSignature?.hash : computation.functionSignature?.hasFunction === true,
             functionHash: computation.functionSignature?.hash,
             previousFunctionHash: old?.functionSignature?.hash,
@@ -1404,9 +1635,14 @@ export function buildMigrationDiff(
 
         if (!old) {
             changeType = "added";
-            recommendation = "rebuild";
-            recommendedDecision = "changed";
-            reason = "new computation requires approved rebuild";
+            recommendation = computation.allocation?.kind === "scoped-sequence" ? "needs-review" : "rebuild";
+            recommendedDecision = computation.allocation?.kind === "scoped-sequence" ? "unrebuildable" : "changed";
+            reason = computation.allocation?.kind === "scoped-sequence" ? "new scoped allocation computation requires approved sequence initialization" : "new computation requires approved rebuild";
+        } else if (old.allocationSignature !== computation.allocationSignature) {
+            changeType = "changed";
+            recommendation = "needs-review";
+            recommendedDecision = "unrebuildable";
+            reason = "scoped allocation args changed";
         } else if (old.structuralSignature !== computation.structuralSignature) {
             changeType = "changed";
             recommendation = "needs-review";
@@ -1446,6 +1682,10 @@ export function buildMigrationDiff(
                 recommendedDecision,
                 reason,
             });
+            const seedRequirement = createScopedSequenceSeedRequirement(computation);
+            if (seedRequirement) {
+                requiredDecisions.push(seedRequirement);
+            }
         }
         if (detected.needsEventRebuildHandler) {
             requiredDecisions.push({
@@ -1518,6 +1758,7 @@ export function addMissingRebuildHandlerRequirements(diff: MigrationDiffFile, co
     for (const item of rebuildPlan) {
         if (!item.rebuildOutput) continue;
         const computation = handles.get(item.computationId);
+        if ((computation?.args as { _type?: string } | undefined)?._type === "ScopedSequence") continue;
         if (!computation || typeof (computation as DataBasedComputation).compute === "function") continue;
         const requirement: MigrationDecisionRequirement = {
             kind: "event-rebuild-handler",
@@ -1593,10 +1834,15 @@ export function validateApprovedDiff(
             if (!isFactToComputationTakeover(previousManifest, nextManifest, computation)) {
                 throw new MigrationError(`Migration computation takeover can only discard previous fact output: ${decision.dataContext}`);
             }
+            const scopedSequenceMigrationDecision = computation.allocation?.kind === "scoped-sequence" && approvedDiff.decisions.find(item =>
+                (item.kind === "scoped-sequence-seed" || item.kind === "scoped-sequence-no-seed") &&
+                item.id === decision.computationId &&
+                item.dataContext === decision.dataContext
+            );
             const computationReview = approvedDiff.decisions.find(item =>
                 item.kind === "computation" &&
                 item.id === decision.computationId &&
-                item.decision === "changed"
+                (item.decision === "changed" || (scopedSequenceMigrationDecision && item.decision === "unrebuildable"))
             );
             if (!computationReview) {
                 throw new MigrationError(`Migration computation takeover requires an approved changed computation decision: ${decision.computationId}`);
@@ -1614,6 +1860,50 @@ export function validateApprovedDiff(
             }
             if (decision.targetType === "property" && computation.type.includes("StateMachine") && computation.boundStates.length > 0) {
                 throw new MigrationError(`StateMachine computation takeover requires a state rebuild handler, which is not supported in this migration phase: ${decision.dataContext}`);
+            }
+        }
+        if (decision.kind === "scoped-sequence-seed") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration scoped sequence seed decision does not match a required review item: ${decision.dataContext}`);
+            }
+            const computation = nextManifest.computations.find(item => item.id === decision.id);
+            if (!computation || computation.dataContext !== decision.dataContext || computation.allocation?.kind !== "scoped-sequence") {
+                throw new MigrationError(`Migration scoped sequence seed references unknown scoped sequence computation: ${decision.id}`);
+            }
+            const requirement = expectedReview.requiredDecisions.find((item): item is Extract<MigrationDecisionRequirement, { kind: "scoped-sequence-seed" }> =>
+                item.kind === "scoped-sequence-seed" && item.id === decision.id
+            );
+            if (!requirement ||
+                decision.sequenceName !== requirement.sequenceName ||
+                decision.hostRecord !== requirement.hostRecord ||
+                decision.targetProperty !== requirement.targetProperty ||
+                decision.scopeSignature !== requirement.scopeSignature ||
+                decision.valuePath !== requirement.valuePath ||
+                decision.aggregate !== requirement.aggregate ||
+                decision.mode !== requirement.mode
+            ) {
+                throw new MigrationError(`Migration scoped sequence seed decision does not match the generated seed operation: ${decision.dataContext}`);
+            }
+        }
+        if (decision.kind === "scoped-sequence-no-seed") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration scoped sequence no-seed decision does not match a required review item: ${decision.dataContext}`);
+            }
+            const computation = nextManifest.computations.find(item => item.id === decision.id);
+            if (!computation || computation.dataContext !== decision.dataContext || computation.allocation?.kind !== "scoped-sequence" || computation.allocation.initializeFrom) {
+                throw new MigrationError(`Migration scoped sequence no-seed references unknown scoped sequence computation: ${decision.id}`);
+            }
+            const requirement = expectedReview.requiredDecisions.find((item): item is Extract<MigrationDecisionRequirement, { kind: "scoped-sequence-no-seed" }> =>
+                item.kind === "scoped-sequence-no-seed" && item.id === decision.id
+            );
+            if (!requirement ||
+                decision.sequenceName !== requirement.sequenceName ||
+                decision.hostRecord !== requirement.hostRecord ||
+                decision.targetProperty !== requirement.targetProperty ||
+                decision.scopeSignature !== requirement.scopeSignature ||
+                decision.expectedHostCount !== requirement.expectedHostCount
+            ) {
+                throw new MigrationError(`Migration scoped sequence no-seed decision does not match the generated no-seed operation: ${decision.dataContext}`);
             }
         }
         if (decision.kind === "event-rebuild-handler") {
@@ -1664,6 +1954,18 @@ export function getChangedComputationsFromApprovedDiff(previousManifest: Migrati
     const outputChangedIds = new Set<string>();
     const stateOnlyIds = new Set<string>();
     const newById = new Map(nextManifest.computations.map(item => [item.id, item]));
+    const hasApprovedScopedSequenceSeed = (computation: ComputationManifest) => approvedDiff.decisions.some(decision =>
+        decision.kind === "scoped-sequence-seed" &&
+        decision.id === computation.id &&
+        computation.allocation?.kind === "scoped-sequence" &&
+        computation.allocation.initializeFrom
+    );
+    const hasApprovedScopedSequenceNoSeed = (computation: ComputationManifest) => approvedDiff.decisions.some(decision =>
+        decision.kind === "scoped-sequence-no-seed" &&
+        decision.id === computation.id &&
+        computation.allocation?.kind === "scoped-sequence" &&
+        !computation.allocation.initializeFrom
+    );
     for (const decision of approvedDiff.decisions) {
         if (decision.kind !== "computation") continue;
         const computation = newById.get(decision.id);
@@ -1683,13 +1985,55 @@ export function getChangedComputationsFromApprovedDiff(previousManifest: Migrati
     }
     for (const computation of nextManifest.computations) {
         if (!previousManifest.computations.some(item => item.id === computation.id) && !changedComputations.some(item => item.id === computation.id)) {
+            const approvedUnrebuildable = approvedDiff.decisions.some(decision =>
+                decision.kind === "computation" &&
+                decision.id === computation.id &&
+                decision.decision === "unrebuildable"
+            );
+            if (approvedUnrebuildable && (hasApprovedScopedSequenceSeed(computation) || hasApprovedScopedSequenceNoSeed(computation))) continue;
             throw new MigrationError(`New computation requires approved changed decision: ${computation.id}`);
         }
     }
     const blocking = approvedDiff.decisions
         .filter((decision): decision is Extract<MigrationDecision, { kind: "computation" }> => decision.kind === "computation" && decision.decision === "unrebuildable")
+        .filter(decision => {
+            const computation = newById.get(decision.id);
+            return !(computation && (hasApprovedScopedSequenceSeed(computation) || hasApprovedScopedSequenceNoSeed(computation)));
+        })
         .map(decision => ({ kind: "unrebuildable-computation" as const, logicalPath: decision.dataContext, reason: decision.reason }));
     return { changedComputations, outputChangedIds, stateOnlyIds, blocking };
+}
+
+export function getScopedSequenceSeedOperations(approvedDiff: MigrationDiffFile): ScopedSequenceSeedOperation[] {
+    return approvedDiff.decisions
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "scoped-sequence-seed" }> => decision.kind === "scoped-sequence-seed")
+        .map(decision => ({
+            id: decision.id,
+            dataContext: decision.dataContext,
+            sequenceName: decision.sequenceName,
+            hostRecord: decision.hostRecord,
+            targetProperty: decision.targetProperty,
+            scopeSignature: decision.scopeSignature,
+            valuePath: decision.valuePath,
+            aggregate: decision.aggregate,
+            mode: decision.mode,
+            reason: decision.reason,
+        }));
+}
+
+export function getScopedSequenceNoSeedOperations(approvedDiff: MigrationDiffFile): ScopedSequenceNoSeedOperation[] {
+    return approvedDiff.decisions
+        .filter((decision): decision is Extract<MigrationDecision, { kind: "scoped-sequence-no-seed" }> => decision.kind === "scoped-sequence-no-seed")
+        .map(decision => ({
+            id: decision.id,
+            dataContext: decision.dataContext,
+            sequenceName: decision.sequenceName,
+            hostRecord: decision.hostRecord,
+            targetProperty: decision.targetProperty,
+            scopeSignature: decision.scopeSignature,
+            expectedHostCount: decision.expectedHostCount,
+            reason: decision.reason,
+        }));
 }
 
 function computationById(controller: Controller) {
@@ -1970,6 +2314,29 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
         if (!rebuildIds.has(computationId)) continue;
 
         const dataContext = dataContextPath(computation.dataContext);
+        if ((computation.args as { _type?: string; initializeFrom?: unknown })._type === "ScopedSequence") {
+            const hasInitializer = Boolean((computation.args as { initializeFrom?: unknown }).initializeFrom);
+            if (hasInitializer && hasDecision(options.approvedDiff, decision =>
+                decision.kind === "scoped-sequence-seed" &&
+                decision.id === computationId &&
+                decision.dataContext === dataContext
+            )) {
+                continue;
+            }
+            if (!hasInitializer && hasDecision(options.approvedDiff, decision =>
+                decision.kind === "scoped-sequence-no-seed" &&
+                decision.id === computationId &&
+                decision.dataContext === dataContext
+            )) {
+                continue;
+            }
+            blockingChanges.push({
+                kind: "unrebuildable-computation",
+                logicalPath: dataContext,
+                reason: "ScopedSequence is an allocation computation and cannot be rebuilt; seed sequence state through an approved migration decision",
+            });
+            continue;
+        }
         if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContext)) {
             blockingChanges.push({ kind: "destructive-computed-output", logicalPath: dataContext, reason: "destructive computed output requires an approved destructive-scope decision" });
         }
@@ -2009,6 +2376,240 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
     return blockingChanges;
 }
 
+async function readScopedSequenceSeedGroupsFromStorage(
+    controller: Controller,
+    manifest: MigrationManifest | undefined,
+    recordName: string,
+    valuePath: string,
+    initializerScopes: Array<{ name: string; path: string }>,
+    declaredScope: Record<string, unknown>[],
+    sequenceName: string,
+    match: unknown,
+) {
+    const db = dbQuery(controller);
+    if (typeof db?.query !== "function" || !manifest) return undefined;
+    const record = manifest.storage.records.find(item => item.recordName === recordName);
+    if (!record || record.isFiltered || !record.tableName) return undefined;
+    const attributes = new Map((record.attributeDetails || []).map(attribute => [attribute.name, attribute]));
+    const valueAttribute = attributes.get(valuePath);
+    if (!valueAttribute?.fieldName || valueAttribute.kind !== "value") return undefined;
+    const scopeAttributes = initializerScopes.map(item => {
+        const attribute = attributes.get(item.path);
+        return attribute?.fieldName && attribute.kind === "value" ? { ...item, fieldName: attribute.fieldName } : undefined;
+    });
+    if (scopeAttributes.some(item => !item)) return undefined;
+
+    const dialect = getSchemaDialect(db as never);
+    const quote = (name: string) => quoteIdentifier(name, dialect);
+    const where = compileScopedSequenceSeedMatch(match, attributes, dialect);
+    if (!where) return undefined;
+    const table = quote(record.tableName);
+    const valueColumn = quote(valueAttribute.fieldName);
+    const whereSQL = where.sql ? ` WHERE ${where.sql}` : "";
+    const countRows = await db.query(
+        `SELECT COUNT(*) AS ${quote("__rowCount")}, COUNT(${valueColumn}) AS ${quote("__validValueCount")} FROM ${table}${whereSQL}`,
+        where.params,
+    );
+    const counts = countRows[0] as { __rowCount?: number | string | bigint; __validValueCount?: number | string | bigint } | undefined;
+    const rowCount = Number(counts?.__rowCount ?? 0);
+    const validValueCount = Number(counts?.__validValueCount ?? 0);
+    if (rowCount !== validValueCount) {
+        throw new MigrationError(`ScopedSequence ${sequenceName} initializeFrom valuePath must be present for every matched host row`);
+    }
+    if (rowCount === 0) return [];
+
+    const scopeSelect = scopeAttributes.map((item, index) => `${quote(item!.fieldName)} AS ${quote(`__scope_${index}`)}`);
+    const scopeGroupBy = scopeAttributes.map(item => quote(item!.fieldName));
+    const rows = await db.query(
+        `SELECT ${[...scopeSelect, `MAX(${valueColumn}) AS ${quote("__maxValue")}`].join(", ")} FROM ${table}${whereSQL} GROUP BY ${scopeGroupBy.join(", ")}`,
+        where.params,
+    ) as Record<string, unknown>[];
+    const scopeDefs = new Map(declaredScope.map(item => [String(item.name), item]));
+    return rows.map(row => {
+        const rawScopeValues = new Map<string, unknown>();
+        initializerScopes.forEach((item, index) => {
+            if (!scopeDefs.has(item.name)) throw new Error(`ScopedSequence ${sequenceName} initializeFrom scope "${item.name}" is not declared`);
+            rawScopeValues.set(item.name, row[`__scope_${index}`]);
+        });
+        const max = Number(row.__maxValue);
+        if (!Number.isFinite(max)) {
+            throw new Error(`ScopedSequence ${sequenceName} initializeFrom valuePath must resolve to numbers`);
+        }
+        return {
+            scope: canonicalizeScopedSequenceScopeFromValues(declaredScope, rawScopeValues),
+            max,
+        };
+    });
+}
+
+function compileScopedSequenceSeedMatch(
+    match: unknown,
+    attributes: Map<string, { kind: string; fieldName?: string }>,
+    dialect: ReturnType<typeof getSchemaDialect>,
+): { sql: string; params: unknown[] } | undefined {
+    if (match === undefined || match === null) return { sql: "", params: [] };
+    const params: unknown[] = [];
+    const quote = (name: string) => quoteIdentifier(name, dialect);
+    const placeholder = () => dialect.name === "postgres" ? `$${params.length + 1}` : "?";
+    const rawOf = (value: unknown): unknown => {
+        if (value && typeof value === "object" && "raw" in value) return (value as { raw: unknown }).raw;
+        return value;
+    };
+    const compile = (value: unknown): string | undefined => {
+        const raw = rawOf(value) as { type?: unknown; data?: unknown; operator?: unknown; left?: unknown; right?: unknown };
+        if (!raw || typeof raw !== "object") return undefined;
+        if (raw.type === "atom") {
+            const atom = raw.data as { key?: unknown; value?: unknown };
+            if (typeof atom?.key !== "string" || atom.key.includes(".")) return undefined;
+            const attribute = attributes.get(atom.key);
+            if (!attribute?.fieldName || attribute.kind !== "value") return undefined;
+            if (!Array.isArray(atom.value) || atom.value.length !== 2 || typeof atom.value[0] !== "string") return undefined;
+            const op = atom.value[0].toLowerCase();
+            const operand = atom.value[1];
+            const field = quote(attribute.fieldName);
+            if (op === "is null") return `${field} IS NULL`;
+            if (op === "is not null") return `${field} IS NOT NULL`;
+            if ((op === "=" || op === "!=") && operand === null) {
+                return op === "=" ? `${field} IS NULL` : `${field} IS NOT NULL`;
+            }
+            if (op === "in" || op === "not in") {
+                if (!Array.isArray(operand)) return undefined;
+                if (operand.length === 0) return op === "in" ? "1 = 0" : "1 = 1";
+                const placeholders = operand.map(item => {
+                    const nextPlaceholder = placeholder();
+                    params.push(item);
+                    return nextPlaceholder;
+                });
+                return `${field} ${op === "in" ? "IN" : "NOT IN"} (${placeholders.join(", ")})`;
+            }
+            const sqlOperator = ({
+                "=": "=",
+                "!=": "!=",
+                ">": ">",
+                "<": "<",
+                ">=": ">=",
+                "<=": "<=",
+                "like": "LIKE",
+            } as Record<string, string>)[op];
+            if (!sqlOperator) return undefined;
+            const nextPlaceholder = placeholder();
+            params.push(operand);
+            return `${field} ${sqlOperator} ${nextPlaceholder}`;
+        }
+        if (raw.type === "expression") {
+            const operator = raw.operator;
+            const left = compile(raw.left);
+            if (!left) return undefined;
+            if (operator === "not") return `(NOT ${left})`;
+            const right = compile(raw.right);
+            if (!right) return undefined;
+            if (operator === "and") return `(${left} AND ${right})`;
+            if (operator === "or") return `(${left} OR ${right})`;
+        }
+        return undefined;
+    };
+    const sql = compile(match);
+    return sql === undefined ? undefined : { sql, params };
+}
+
+export async function seedScopedSequenceInitializers(controller: Controller, approvedDiff?: MigrationDiffFile, previousManifest?: MigrationManifest) {
+    for (const computation of controller.scheduler.computationsHandles.values()) {
+        const args = computation.args as Record<string, unknown>;
+        if (args._type !== "ScopedSequence" || !args.initializeFrom) continue;
+        const computationId = computationManifestId(computation);
+        const dataContext = dataContextPath(computation.dataContext);
+        if (!hasDecision(approvedDiff, decision =>
+            decision.kind === "scoped-sequence-seed" &&
+            decision.id === computationId &&
+            decision.dataContext === dataContext
+        )) {
+            throw new MigrationError(`ScopedSequence ${String(args.name)} initializeFrom requires an approved scoped-sequence-seed migration decision`);
+        }
+        const initializer = args.initializeFrom as Record<string, unknown>;
+        const recordName = (initializer.record as { name?: string } | undefined)?.name;
+        if (!recordName) throw new Error(`ScopedSequence ${String(args.name)} initializeFrom.record is missing`);
+        const propertyPath = dataContext.startsWith("property:") ? dataContext.slice("property:".length) : "";
+        const lastDot = propertyPath.lastIndexOf(".");
+        const hostRecord = lastDot >= 0 ? propertyPath.slice(0, lastDot) : "";
+        const targetProperty = lastDot >= 0 ? propertyPath.slice(lastDot + 1) : "";
+        if (recordName !== hostRecord) {
+            throw new MigrationError(`ScopedSequence ${String(args.name)} initializeFrom.record must match host record ${hostRecord}`);
+        }
+        if (String(initializer.valuePath) !== targetProperty) {
+            throw new MigrationError(`ScopedSequence ${String(args.name)} initializeFrom.valuePath must match target property ${hostRecord}.${targetProperty}`);
+        }
+        const initializerScopes = (initializer.scope as Array<{ name: string; path: string }> | undefined) || [];
+        const declaredScope = (args.scope as Record<string, unknown>[]) || [];
+        const storageGroups = await readScopedSequenceSeedGroupsFromStorage(
+            controller,
+            previousManifest,
+            recordName,
+            String(initializer.valuePath),
+            initializerScopes,
+            declaredScope,
+            String(args.name),
+            initializer.match,
+        );
+        if (storageGroups) {
+            for (const group of storageGroups) {
+                await controller.system.storage.atomic.seedSequenceValue({
+                    sequenceName: String(args.name),
+                    scope: group.scope,
+                    initialValue: Number(args.initialValue ?? 0),
+                    step: Number(args.step ?? 1),
+                    value: group.max,
+                    mode: "max",
+                });
+            }
+            continue;
+        }
+        const attributeQuery = Array.from(new Set([
+            String(initializer.valuePath),
+            ...initializerScopes.map(item => item.path),
+        ]));
+        const rows = await controller.system.storage.find(recordName, initializer.match, undefined, attributeQuery) as Record<string, unknown>[];
+        const scopeDefs = new Map(declaredScope.map(item => [String(item.name), item]));
+        const groups = new Map<string, { scope: AtomicSequenceScope; max: number }>();
+        let validValueCount = 0;
+        for (const row of rows) {
+            const rawValue = readScopedSequencePath(row, String(initializer.valuePath));
+            if (rawValue === undefined || rawValue === null) {
+                throw new MigrationError(`ScopedSequence ${String(args.name)} initializeFrom valuePath must be present for every matched host row`);
+            }
+            const numericValue = Number(rawValue);
+            if (!Number.isFinite(numericValue)) {
+                throw new Error(`ScopedSequence ${String(args.name)} initializeFrom valuePath must resolve to numbers`);
+            }
+            validValueCount += 1;
+            const rawScopeValues = new Map<string, unknown>();
+            for (const item of initializerScopes) {
+                const scopeDef = scopeDefs.get(item.name);
+                if (!scopeDef) throw new Error(`ScopedSequence ${String(args.name)} initializeFrom scope "${item.name}" is not declared`);
+                rawScopeValues.set(item.name, readScopedSequencePath(row, item.path));
+            }
+            const scope = canonicalizeScopedSequenceScopeFromValues(declaredScope, rawScopeValues);
+            const key = JSON.stringify(scope);
+            const group = groups.get(key);
+            if (!group || numericValue > group.max) {
+                groups.set(key, { scope, max: numericValue });
+            }
+        }
+        if (validValueCount !== rows.length) {
+            throw new MigrationError(`ScopedSequence ${String(args.name)} initializeFrom did not validate every matched host row`);
+        }
+        for (const group of groups.values()) {
+            await controller.system.storage.atomic.seedSequenceValue({
+                sequenceName: String(args.name),
+                scope: group.scope,
+                initialValue: Number(args.initialValue ?? 0),
+                step: Number(args.step ?? 1),
+                value: group.max,
+                mode: "max",
+            });
+        }
+    }
+}
+
 export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest) {
     const handles = computationById(controller);
     const scope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }> = [];
@@ -2039,7 +2640,7 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
             const ids: string[] = [];
             if (records && typeof (computation as DataBasedComputation).compute === "function") {
                 for (const record of records) {
-                    const result = await (computation as DataBasedComputation).compute(
+                    const result = await (computation as DataBasedComputation).compute!(
                         await controller.scheduler.resolveDataDeps(computation as DataBasedComputation, record),
                         record,
                     );
@@ -2064,7 +2665,7 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
             const sourceKey = (computation.state as any)?.sourceRecordId?.key;
             const indexKey = (computation.state as any)?.transformIndex?.key;
             if (!sourceKey || !indexKey) continue;
-            const result = await (computation as DataBasedComputation).compute(await controller.scheduler.resolveDataDeps(computation as DataBasedComputation));
+            const result = await (computation as DataBasedComputation).compute!(await controller.scheduler.resolveDataDeps(computation as DataBasedComputation));
             if (!Array.isArray(result)) continue;
             const nextKeys = new Set(result.map(item => `${item[sourceKey]}:${item[indexKey]}`));
             const existing = await readExistingRecords(recordName) as Record<string, unknown>[] || [];
@@ -2300,7 +2901,7 @@ function stripPropertyFromInput<T>(value: T, propertyName: string, seen = new We
 
 async function recomputeTransformOutput(controller: Controller, computation: DataBasedComputation, options: MigrationOptions = {}) {
     if (computation.dataContext.type !== "entity" && computation.dataContext.type !== "relation") return [];
-    let result = await computation.compute(await controller.scheduler.resolveDataDeps(computation));
+    let result = await computation.compute!(await controller.scheduler.resolveDataDeps(computation));
     if (result instanceof ComputationResultAsync) {
         result = await resolveMigrationAsyncResult(controller, computation as unknown as Computation, result, undefined, options);
     }
@@ -2464,7 +3065,7 @@ class MigrationScheduler {
         }
         if (computation.dataContext.type === "global") {
             const dataDeps = await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation);
-            const event = await writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute(dataDeps), undefined, this.options);
+            const event = await writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute!(dataDeps), undefined, this.options);
             return event ? [event] : [];
         }
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
@@ -2482,7 +3083,7 @@ class MigrationScheduler {
             const computeDeps = takeover?.targetType === "property"
                 ? stripPropertyFromInput(dataDeps, computation.dataContext.id.name)
                 : dataDeps;
-            const result = await (computation as DataBasedComputation).compute(
+            const result = await (computation as DataBasedComputation).compute!(
                 computeDeps,
                 computeRecord,
             );
@@ -2539,7 +3140,7 @@ class MigrationScheduler {
         if (computation.incrementalPatchCompute) {
             result = await computation.incrementalPatchCompute(undefined, mutationEvent, record, dataDeps);
             if (result instanceof ComputationResultFullRecompute) {
-                result = await computation.compute(dataDeps, record);
+                result = await computation.compute!(dataDeps, record);
                 const event = await writeComputationResult(this.controller, computation, result, record, this.options);
                 return event ? [event] : [];
             }
@@ -2549,10 +3150,10 @@ class MigrationScheduler {
             const lastValue = computation.useLastValue ? await this.controller.retrieveLastValue(computation.dataContext, record) : undefined;
             result = await computation.incrementalCompute(lastValue, mutationEvent, record, dataDeps);
             if (result instanceof ComputationResultFullRecompute) {
-                result = await computation.compute(dataDeps, record);
+                result = await computation.compute!(dataDeps, record);
             }
         } else {
-            result = await computation.compute(dataDeps, record);
+            result = await computation.compute!(dataDeps, record);
         }
         const event = await writeComputationResult(this.controller, computation, result, record, this.options);
         return event ? [event] : [];

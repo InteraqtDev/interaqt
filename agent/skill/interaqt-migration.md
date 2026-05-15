@@ -15,6 +15,8 @@ Phase 1.5 uses a two-step review workflow:
 
 Migration supports additive schema changes, changed/new computation recompute, downstream propagation, filtered membership rebuild, destructive-scope review, post-backfill constraint verification, and explicit fact-to-computation takeover.
 
+`ScopedSequence` is migration-managed state, not a recomputable derivation. Adding or changing a scoped sequence requires an explicit seed/no-seed decision, and removing a scoped sequence declaration must be treated as an explicit migration review item because existing `_ScopedSequence_` counter rows are internal state and must not be silently discarded.
+
 Phase 1.5 does not guess or execute rename/copy/merge/split primitives. Rename candidates may be recorded for review, but compute-route migration will still obey physical layout and destructive-change safety gates.
 
 ---
@@ -275,6 +277,54 @@ Review checklist for takeover:
 
 ---
 
+## ScopedSequence Migration
+
+`ScopedSequence` allocates transactional per-scope counters for number properties. It is intentionally not full-recomputable: migration must seed or explicitly approve empty-state initialization instead of calling the computation for existing rows.
+
+When adding a `ScopedSequence` to an existing property:
+
+```typescript
+Property.create({
+  name: 'serialNumber',
+  type: 'number',
+  computation: ScopedSequence.create({
+    name: 'projectAssetSerial',
+    scope: [
+      { name: 'project', type: 'ref', base: Project, path: 'project' },
+      { name: 'prefix', type: 'string', path: 'prefix' },
+    ],
+    initializeFrom: {
+      record: Media,
+      valuePath: 'serialNumber',
+      scope: [
+        { name: 'project', path: 'project' },
+        { name: 'prefix', path: 'prefix' },
+      ],
+      aggregate: 'max',
+    },
+  }),
+})
+```
+
+Review rules:
+
+- Approve the normal computation review as `decision: 'unrebuildable'`.
+- If `initializeFrom` is present, approve the matching `scoped-sequence-seed` decision.
+- If `initializeFrom` is absent, approve `scoped-sequence-no-seed` only when the host table is empty and the diff reports `expectedHostCount: 0`.
+- `initializeFrom.valuePath` must match the target property and every matched existing row must have a valid numeric value.
+- Seed every existing scope that the future property will allocate for. Do not use `initializeFrom.match` to seed only a subset while leaving other existing scopes with unseeded serials.
+- Keep a database `UniqueConstraint` over the scope fields and sequence property.
+- Changing `scope`, `initialValue`, `step`, `allowManualValue`, or initializer policy changes the allocation signature and requires explicit review.
+- Removing a declared `ScopedSequence` must be reviewed explicitly; do not treat it as a harmless removed computation.
+
+Testing rules:
+
+- PGLite/SQLite are useful for local migration tests, but the production gate is real PostgreSQL.
+- Run `npm run test:postgres-scoped-sequence` when scoped sequence allocation or migration behavior changes.
+- For existing-data migration, test that the next allocation returns `max(existingSerial) + step` for every scope.
+
+---
+
 ## Event and Async Handlers
 
 Event-based computations without full compute support require external rebuild handlers.
@@ -322,6 +372,8 @@ Approved diff cannot bypass core safety gates:
 - Fact destructive schema changes remain blocked.
 - Entity/relation output replacement still needs previous manifest ownership proof.
 - Fact-to-computation takeover requires explicit `computation-takeover` approval and, for entity/relation targets, exact destructive-scope approval.
+- ScopedSequence additions/changes require explicit seed/no-seed review and are not ordinary recompute changes.
+- ScopedSequence removals require explicit review before the declaration disappears from the manifest.
 - Async computations require an approved async completion decision and runtime handler.
 - Event-based computations without full compute require an approved event rebuild decision and runtime handler.
 - Destructive computed output requires exact approved ids.
@@ -412,10 +464,11 @@ This phase does not support converting handwritten properties to `StateMachine` 
 - [ ] Review logical model changes, storage changes, function hashes/text, required decisions, and safety output.
 - [ ] Add one explicit decision for every required decision.
 - [ ] For fact-to-computation takeover, approve both `computation-takeover` and the matching `computation: changed` decision.
+- [ ] For ScopedSequence changes, approve `computation: unrebuildable` plus matching seed/no-seed decisions, and verify every existing scope is seeded.
 - [ ] For entity/relation takeover, approve the exact destructive ids and rerun dry-run if the database changed.
 - [ ] Provide runtime handlers for event rebuild and async completion decisions.
 - [ ] Run `controller.migrate({ approvedDiff, dryRun: true, handlers })`.
 - [ ] Confirm `blockingChanges` is empty and `rebuildPlan` is expected.
 - [ ] Confirm destructive scopes match exactly when cleanup is intentional.
 - [ ] Run `controller.migrate({ approvedDiff, handlers })`.
-- [ ] Run integration tests for the production driver, especially PostgreSQL/MySQL.
+- [ ] Run integration tests for the production driver, especially PostgreSQL/MySQL. For ScopedSequence, run `npm run test:postgres-scoped-sequence`.

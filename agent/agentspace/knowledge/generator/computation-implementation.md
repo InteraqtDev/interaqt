@@ -570,9 +570,10 @@ import { Custom, Dictionary, GlobalBoundState, Entity, Property, Relation } from
 Before using Custom computation, ask yourself:
 1. Can I use Transform for entity/relation creation? → Use Transform
 2. Can I use StateMachine for updates? → Use StateMachine
-3. Can I use Count/Summation/Every/Any for aggregations? → Use those
-4. Can I use computed/getValue for simple calculations? → Use those
-5. Can I combine existing computations? → Combine them
+3. Do I need a scoped serial number allocated on create? → Use ScopedSequence
+4. Can I use Count/Summation/Every/Any for aggregations? → Use those
+5. Can I use computed/getValue for simple calculations? → Use those
+6. Can I combine existing computations? → Combine them
 
 **Only use Custom when:**
 - You need complex business logic that doesn't fit ANY existing computation type
@@ -740,6 +741,50 @@ When using `type: 'property'` with Custom computation:
 3. **Handle errors gracefully** - Custom computations can fail
 
 **Remember:** The power of interaqt comes from its declarative computations. Custom computation breaks this paradigm and should only be used when absolutely necessary. Always try to express your logic using the standard computation types first!
+
+### 4. ScopedSequence - Scoped Atomic Serial Numbers
+
+Use `ScopedSequence` when a property should receive the next number within a declared business scope during record creation.
+
+```typescript
+import { Entity, Property, ScopedSequence, UniqueConstraint } from 'interaqt';
+
+const Asset = Entity.create({
+  name: 'Asset',
+  properties: [
+    Property.create({ name: 'project', type: 'id' }),
+    Property.create({ name: 'prefix', type: 'string' }),
+    Property.create({
+      name: 'serialNumber',
+      type: 'number',
+      computation: ScopedSequence.create({
+        name: 'projectAssetSerial',
+        scope: [
+          { name: 'project', type: 'ref', base: Project, path: 'project' },
+          { name: 'prefix', type: 'string', path: 'prefix' },
+        ],
+      }),
+    }),
+  ],
+  constraints: [
+    UniqueConstraint.create({
+      name: 'uniqAssetProjectPrefixSerial',
+      properties: ['project', 'prefix', 'serialNumber'],
+    }),
+  ],
+});
+```
+
+Generation rules:
+
+- Only generate `ScopedSequence` on a `number` property.
+- Do not add `defaultValue` to the same property.
+- Ensure every scope path is present on the new host record before allocation. Populate scope inputs in the Transform/interaction data that creates the host record.
+- Do not derive the scope from relation traversal or a query.
+- Do not generate `StateMachine`, `Custom`, raw SQL, or `max + 1` allocation for scoped serials.
+- Always generate a `UniqueConstraint` covering scope fields plus the allocated property.
+- If existing rows already have serial values, add `initializeFrom` so migration can seed `MAX(serialNumber)` per scope.
+- Do not use `initializeFrom.match` for partial seeding unless the sequence property will only allocate for that exact subset forever.
 
 ## Implementation Steps
 

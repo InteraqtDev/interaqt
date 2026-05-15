@@ -10,7 +10,7 @@ import {
     ComputationDataDepError
 } from "./errors/index.js";
 import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
-import { DICTIONARY_RECORD, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
+import { DICTIONARY_RECORD, type InternalSchemaRequirement, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import {
     EntityEventSourceMap,
@@ -18,6 +18,7 @@ import {
     ComputationSourceMapManager,
     EntityCreateEventsSourceMap
 } from "./ComputationSourceMap.js";
+import { createScopedSequenceSignatures, scopedSequenceComputationId } from "./scopedSequenceManifest.js";
 
 export { EtityMutationEvent };
 
@@ -279,6 +280,28 @@ export class Scheduler {
             }   
         }
         return states
+    }
+
+    createInternalSchemaRequirements(): InternalSchemaRequirement[] {
+        const declarations = Array.from(this.computationsHandles.values())
+            .filter(computation => (computation.args as { _type?: string })._type === 'ScopedSequence')
+            .map(computation => {
+                const args = computation.args as Record<string, unknown> & { name?: string }
+                const hostRecord = computation.dataContext.type === 'property'
+                    ? computation.dataContext.host.name!
+                    : computation.dataContext.id.name!
+                const property = computation.dataContext.type === 'property' ? computation.dataContext.id.name! : ''
+                const signatures = createScopedSequenceSignatures(args)
+                return {
+                    computationId: scopedSequenceComputationId(hostRecord, property),
+                    hostRecord,
+                    property,
+                    sequenceName: String(args.name),
+                    scopeSignature: signatures.scopeSignature,
+                    allocationSignature: signatures.allocationSignature,
+                }
+            })
+        return declarations.length ? [{ kind: 'scoped-sequence-table', declarations }] : []
     }
 
     async createStateData(instance: IInstance, ...args: any[]) {
@@ -714,6 +737,14 @@ export class Scheduler {
                 if (forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)) {
                     // 全量计算。forceFullCompute 用在了初始化时，或者要修正数据时。
                     const databasedComputation = computation as DataBasedComputation
+                    if (!databasedComputation.compute) {
+                        throw new ComputationError('compute must be defined for full computation', {
+                            handleName: computation.constructor.name,
+                            computationName: computation.args.constructor.displayName,
+                            dataContext: computation.dataContext,
+                            computationPhase: 'full-compute'
+                        })
+                    }
                     computationResult = await databasedComputation.compute(dataDeps, record)
                 } else {
                     if (computation.incrementalCompute) {

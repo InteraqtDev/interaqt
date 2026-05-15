@@ -101,6 +101,14 @@ export class PostgreSQLDB implements Database{
         concurrentTransactions: 'database',
         nestedStrategy: 'reuse',
     }
+    atomicSequenceCapability = {
+        requiresActiveTransaction: true as const,
+        transactional: true,
+        crossConnection: true,
+        crossProcess: true,
+        returning: true,
+        productionSafe: true,
+    }
     schemaDialect = {
         name: 'postgres' as const,
         maxIdentifierLength: 63,
@@ -212,6 +220,16 @@ CREATE TABLE IF NOT EXISTS "_ComputationState_" (
     "stringValue" TEXT NULL,
     "jsonValue" JSONB NULL
 )`, 'setup computation state table')
+    }
+    async setupScopedSequenceState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
+    "sequenceName" TEXT NOT NULL,
+    "scopeKey" TEXT NOT NULL,
+    "scope" JSONB NOT NULL,
+    "lastValue" NUMERIC NOT NULL,
+    PRIMARY KEY ("sequenceName", "scopeKey")
+)`, 'setup scoped sequence table')
     }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext

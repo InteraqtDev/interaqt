@@ -149,6 +149,14 @@ INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-concurrency
 
 This script fails when the database environment variable is missing. Plain `npm test` may skip PostgreSQL-specific tests in local lightweight environments.
 
+For `ScopedSequence` changes, also run:
+
+```bash
+INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-scoped-sequence
+```
+
+Scoped sequence tests must cover allocation through `controller.dispatch`, not direct `storage.create`. Include first-value semantics, multi-scope isolation, manual import behavior, rollback/delete behavior, migration seeding from existing data, and real PostgreSQL two-controller concurrency.
+
 ### Key API Methods
 
 #### 1. Controller APIs

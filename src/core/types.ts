@@ -17,6 +17,7 @@ import type { StateMachineInstance } from './StateMachine';
 import type { RealTimeInstance } from './RealTime';
 import type { DictionaryInstance } from './RealDictionary';
 import { CustomInstance } from './Custom';
+import type { ScopedSequenceInstance } from './ScopedSequence';
 
 export type {
   EntityInstance,
@@ -32,7 +33,8 @@ export type {
   TransformInstance,
   StateMachineInstance,
   RealTimeInstance,
-  DictionaryInstance
+  DictionaryInstance,
+  ScopedSequenceInstance
 };
 
 /**
@@ -48,7 +50,8 @@ export type ComputationInstance =
   | TransformInstance 
   | StateMachineInstance 
   | RealTimeInstance
-  | CustomInstance;
+  | CustomInstance
+  | ScopedSequenceInstance;
 
 /**
  * Record type that can be used in computations.
