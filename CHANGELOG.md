@@ -1,5 +1,12 @@
 
 
+## [1.5.9](https://github.com/InteraqtDev/interaqt/compare/v1.5.8...v1.5.9) (2026-05-16)
+
+
+### Features
+
+* add scoped sequence match support ([605dde0](https://github.com/InteraqtDev/interaqt/commit/605dde09c428a3011d11ac5afb9711f27fdbfaa2))
+
 ## [1.5.8](https://github.com/InteraqtDev/interaqt/compare/v1.5.7...v1.5.8) (2026-05-15)
 
 
