@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { ComputationSourceMapManager, type DataBasedEntityEventsSourceMap, type EntityEventSourceMap, type EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { canonicalizeScopedSequenceScopeFromValues, readScopedSequencePath } from "./scopedSequenceScope.js";
 import { createScopedSequenceSignatures } from "./scopedSequenceManifest.js";
+import { matchesScopedSequenceRecord, scopedSequenceMatchAttributeQuery, scopedSequenceMatchFromUnknown } from "./scopedSequenceMatch.js";
 
 export const MIGRATION_MANIFEST_CONCEPT = "_MigrationManifest_";
 export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
@@ -2455,6 +2456,9 @@ function compileScopedSequenceSeedMatch(
         if (value && typeof value === "object" && "raw" in value) return (value as { raw: unknown }).raw;
         return value;
     };
+    const comparableOperand = (value: unknown): unknown => {
+        return value && typeof value === "object" && "id" in value ? (value as { id?: unknown }).id : value;
+    };
     const compile = (value: unknown): string | undefined => {
         const raw = rawOf(value) as { type?: unknown; data?: unknown; operator?: unknown; left?: unknown; right?: unknown };
         if (!raw || typeof raw !== "object") return undefined;
@@ -2472,29 +2476,34 @@ function compileScopedSequenceSeedMatch(
             if ((op === "=" || op === "!=") && operand === null) {
                 return op === "=" ? `${field} IS NULL` : `${field} IS NOT NULL`;
             }
+            if ((op === "=" || op === "!=") && operand !== null) {
+                const nextPlaceholder = placeholder();
+                params.push(comparableOperand(operand));
+                return op === "="
+                    ? `(${field} IS NOT NULL AND ${field} = ${nextPlaceholder})`
+                    : `(${field} IS NOT NULL AND ${field} != ${nextPlaceholder})`;
+            }
             if (op === "in" || op === "not in") {
                 if (!Array.isArray(operand)) return undefined;
-                if (operand.length === 0) return op === "in" ? "1 = 0" : "1 = 1";
-                const placeholders = operand.map(item => {
+                if (operand.some(item => item === undefined)) return undefined;
+                const nonNullOperands = operand.filter(item => item !== null).map(comparableOperand);
+                const hasNull = operand.length !== nonNullOperands.length;
+                if (op === "in" && operand.length === 0) return "1 = 0";
+                if (op === "not in" && operand.length === 0) return `${field} IS NOT NULL`;
+                const placeholders = nonNullOperands.map(item => {
                     const nextPlaceholder = placeholder();
                     params.push(item);
                     return nextPlaceholder;
                 });
-                return `${field} ${op === "in" ? "IN" : "NOT IN"} (${placeholders.join(", ")})`;
+                if (op === "in") {
+                    const nonNullSql = placeholders.length ? `${field} IN (${placeholders.join(", ")})` : "1 = 0";
+                    return hasNull ? `(${field} IS NULL OR ${nonNullSql})` : `(${field} IS NOT NULL AND ${nonNullSql})`;
+                }
+                if (hasNull && placeholders.length === 0) return `${field} IS NOT NULL`;
+                if (hasNull) return `(${field} IS NOT NULL AND ${field} NOT IN (${placeholders.join(", ")}))`;
+                return `(${field} IS NOT NULL AND ${field} NOT IN (${placeholders.join(", ")}))`;
             }
-            const sqlOperator = ({
-                "=": "=",
-                "!=": "!=",
-                ">": ">",
-                "<": "<",
-                ">=": ">=",
-                "<=": "<=",
-                "like": "LIKE",
-            } as Record<string, string>)[op];
-            if (!sqlOperator) return undefined;
-            const nextPlaceholder = placeholder();
-            params.push(operand);
-            return `${field} ${sqlOperator} ${nextPlaceholder}`;
+            return undefined;
         }
         if (raw.type === "expression") {
             const operator = raw.operator;
@@ -2540,6 +2549,7 @@ export async function seedScopedSequenceInitializers(controller: Controller, app
         }
         const initializerScopes = (initializer.scope as Array<{ name: string; path: string }> | undefined) || [];
         const declaredScope = (args.scope as Record<string, unknown>[]) || [];
+        const effectiveMatch = scopedSequenceMatchFromUnknown(initializer.match ?? args.match);
         const storageGroups = await readScopedSequenceSeedGroupsFromStorage(
             controller,
             previousManifest,
@@ -2548,7 +2558,7 @@ export async function seedScopedSequenceInitializers(controller: Controller, app
             initializerScopes,
             declaredScope,
             String(args.name),
-            initializer.match,
+            effectiveMatch,
         );
         if (storageGroups) {
             for (const group of storageGroups) {
@@ -2566,8 +2576,11 @@ export async function seedScopedSequenceInitializers(controller: Controller, app
         const attributeQuery = Array.from(new Set([
             String(initializer.valuePath),
             ...initializerScopes.map(item => item.path),
+            ...scopedSequenceMatchAttributeQuery(effectiveMatch),
         ]));
-        const rows = await controller.system.storage.find(recordName, initializer.match, undefined, attributeQuery) as Record<string, unknown>[];
+        const effectiveAttributeQuery = attributeQuery.includes("*") ? ["*"] : attributeQuery;
+        const rows = (await controller.system.storage.find(recordName, undefined, undefined, effectiveAttributeQuery) as Record<string, unknown>[])
+            .filter(row => matchesScopedSequenceRecord(effectiveMatch, row));
         const scopeDefs = new Map(declaredScope.map(item => [String(item.name), item]));
         const groups = new Map<string, { scope: AtomicSequenceScope; max: number }>();
         let validValueCount = 0;

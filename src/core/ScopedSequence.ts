@@ -1,5 +1,6 @@
 import { generateUUID, IInstance, SerializedData } from './interfaces.js';
 import { Entity, type EntityInstance } from './Entity.js';
+import { BoolExp, type ExpressionData } from './BoolExp.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -21,12 +22,30 @@ export type ScopedSequenceInitializer = {
   valuePath: string;
   scope: Array<{ name: string; path: string }>;
   aggregate: 'max';
-  match?: unknown;
+  match?: ScopedSequenceMatchExpression;
 };
+
+export type ScopedSequenceMatchOperator =
+  | '='
+  | '!='
+  | 'is null'
+  | 'is not null'
+  | 'in'
+  | 'not in';
+
+export type ScopedSequenceMatchAtom = {
+  key: string;
+  value: [ScopedSequenceMatchOperator, unknown];
+};
+
+export type ScopedSequenceMatchExpression =
+  | ExpressionData<ScopedSequenceMatchAtom>
+  | BoolExp<ScopedSequenceMatchAtom>;
 
 export interface ScopedSequenceInstance extends IInstance {
   name: string;
   scope: ScopedSequenceScopeItem[];
+  match?: ScopedSequenceMatchExpression;
   initialValue?: number;
   step?: number;
   allowManualValue?: boolean;
@@ -36,6 +55,7 @@ export interface ScopedSequenceInstance extends IInstance {
 export interface ScopedSequenceCreateArgs {
   name: string;
   scope: ScopedSequenceScopeItem[];
+  match?: ScopedSequenceMatchExpression;
   initialValue?: number;
   step?: number;
   allowManualValue?: boolean;
@@ -73,6 +93,96 @@ function assertStablePath(path: unknown, label: string) {
   }
 }
 
+function assertSupportedMatchPath(path: string, label: string) {
+  const segments = path.split('.');
+  if (segments.length === 1) return;
+  if (segments.length === 2 && segments[1] === 'id') return;
+  throw new Error(`${label} only supports top-level fields and ref id paths`);
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+}
+
+function cloneNormalizedMatch<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function normalizeScopedSequenceMatchExpression(
+  match: ScopedSequenceMatchExpression | undefined,
+): ExpressionData<ScopedSequenceMatchAtom> | undefined {
+  if (match === undefined) return undefined;
+  const raw = match instanceof BoolExp ? match.raw : match;
+  if (!BoolExp.isExpressionData(raw)) {
+    throw new Error('ScopedSequence.match must be a BoolExp expression');
+  }
+  return cloneNormalizedMatch(raw as ExpressionData<ScopedSequenceMatchAtom>);
+}
+
+export function stableScopedSequenceMatchStringify(match: ScopedSequenceMatchExpression | undefined): string {
+  return stableStringify(normalizeScopedSequenceMatchExpression(match));
+}
+
+export function getEffectiveScopedSequenceInitializerMatch(
+  args: Pick<ScopedSequenceInstance, 'match' | 'initializeFrom'>,
+): ExpressionData<ScopedSequenceMatchAtom> | undefined {
+  return normalizeScopedSequenceMatchExpression(args.initializeFrom?.match ?? args.match);
+}
+
+function visitScopedSequenceMatchAtoms(
+  match: ScopedSequenceMatchExpression | undefined,
+  visitor: (atom: ScopedSequenceMatchAtom) => void,
+) {
+  const normalized = normalizeScopedSequenceMatchExpression(match);
+  if (!normalized) return;
+  const visit = (node: ExpressionData<ScopedSequenceMatchAtom>) => {
+    if (node.type === 'atom') {
+      visitor(node.data);
+      return;
+    }
+    if (node.operator !== 'and' && node.operator !== 'or' && node.operator !== 'not') {
+      throw new Error(`ScopedSequence.match has unsupported boolean operator "${String(node.operator)}"`);
+    }
+    visit(node.left);
+    if (node.operator !== 'not') {
+      if (!node.right) throw new Error(`ScopedSequence.match "${node.operator}" expression must declare a right operand`);
+      visit(node.right);
+    }
+  };
+  visit(normalized);
+}
+
+function validateScopedSequenceMatchExpression(
+  match: ScopedSequenceMatchExpression | undefined,
+  label: string,
+) {
+  visitScopedSequenceMatchAtoms(match, atom => {
+    assertStablePath(atom.key, `${label} atom key`);
+    assertSupportedMatchPath(atom.key, `${label} atom key`);
+    if (!Array.isArray(atom.value) || atom.value.length !== 2) {
+      throw new Error(`${label} atom value must be [operator, operand]`);
+    }
+    const [operator, operand] = atom.value;
+    if (!['=', '!=', 'is null', 'is not null', 'in', 'not in'].includes(operator)) {
+      throw new Error(`${label} has unsupported operator "${String(operator)}"`);
+    }
+    if (operand === undefined) {
+      throw new Error(`${label} value cannot be undefined`);
+    }
+    if (operator === 'in' || operator === 'not in') {
+      if (!Array.isArray(operand)) {
+        throw new Error(`${label} ${operator} value must be an array`);
+      }
+      if (operand.some(item => item === undefined)) {
+        throw new Error(`${label} ${operator} value cannot contain undefined`);
+      }
+    }
+  });
+}
+
 function serializeScopeItem(item: ScopedSequenceScopeItem) {
   return item.type === 'ref' ? { ...item, base: serializeEntityRef(item.base) } : item;
 }
@@ -84,7 +194,11 @@ function deserializeScopeItem(item: ScopedSequenceScopeItem | (Omit<Extract<Scop
 }
 
 function serializeInitializer(initializer: ScopedSequenceInitializer | undefined) {
-  return initializer ? { ...initializer, record: serializeEntityRef(initializer.record) } : undefined;
+  return initializer ? {
+    ...initializer,
+    record: serializeEntityRef(initializer.record),
+    match: normalizeScopedSequenceMatchExpression(initializer.match),
+  } : undefined;
 }
 
 function deserializeInitializer(initializer: (Omit<ScopedSequenceInitializer, 'record'> & { record: SerializedEntityRef }) | undefined) {
@@ -97,6 +211,7 @@ export class ScopedSequence implements ScopedSequenceInstance {
   public _options?: { uuid?: string };
   public name: string;
   public scope: ScopedSequenceScopeItem[];
+  public match?: ScopedSequenceMatchExpression;
   public initialValue?: number;
   public step?: number;
   public allowManualValue?: boolean;
@@ -108,10 +223,14 @@ export class ScopedSequence implements ScopedSequenceInstance {
     this.uuid = generateUUID(options);
     this.name = args.name;
     this.scope = args.scope;
+    this.match = normalizeScopedSequenceMatchExpression(args.match);
     this.initialValue = args.initialValue;
     this.step = args.step;
     this.allowManualValue = args.allowManualValue;
-    this.initializeFrom = args.initializeFrom;
+    this.initializeFrom = args.initializeFrom ? {
+      ...args.initializeFrom,
+      match: normalizeScopedSequenceMatchExpression(args.initializeFrom.match),
+    } : undefined;
   }
 
   static isKlass = true as const;
@@ -130,6 +249,11 @@ export class ScopedSequence implements ScopedSequenceInstance {
       instanceType: {} as unknown as ScopedSequenceScopeItem,
       collection: true as const,
       required: true as const,
+    },
+    match: {
+      instanceType: {} as unknown as ScopedSequenceMatchExpression,
+      collection: false as const,
+      required: false as const,
     },
     initialValue: {
       type: 'number' as const,
@@ -187,6 +311,7 @@ export class ScopedSequence implements ScopedSequenceInstance {
     if (args.initialValue !== undefined && !Number.isFinite(args.initialValue)) {
       throw new Error('ScopedSequence initialValue must be a finite number');
     }
+    validateScopedSequenceMatchExpression(args.match, 'ScopedSequence.match');
     if (args.initializeFrom) {
       if (!args.initializeFrom.record?.name) {
         throw new Error('ScopedSequence initializeFrom.record must declare a source entity');
@@ -218,6 +343,16 @@ export class ScopedSequence implements ScopedSequenceInstance {
           throw new Error(`ScopedSequence initializeFrom.scope is missing declared scope item "${declaredName}"`);
         }
       }
+      validateScopedSequenceMatchExpression(args.initializeFrom.match, 'ScopedSequence initializeFrom.match');
+      if (args.initializeFrom.match && !args.match) {
+        throw new Error('ScopedSequence initializeFrom.match cannot be declared without ScopedSequence.match');
+      }
+      if (
+        args.initializeFrom.match &&
+        stableScopedSequenceMatchStringify(args.initializeFrom.match) !== stableScopedSequenceMatchStringify(args.match)
+      ) {
+        throw new Error('ScopedSequence initializeFrom.match must match ScopedSequence.match');
+      }
     }
   }
 
@@ -229,6 +364,7 @@ export class ScopedSequence implements ScopedSequenceInstance {
       public: {
         name: instance.name,
         scope: instance.scope.map(serializeScopeItem) as ScopedSequenceScopeItem[],
+        match: normalizeScopedSequenceMatchExpression(instance.match),
         initialValue: instance.initialValue,
         step: instance.step,
         allowManualValue: instance.allowManualValue,
@@ -242,6 +378,7 @@ export class ScopedSequence implements ScopedSequenceInstance {
     return this.create({
       name: instance.name,
       scope: [...instance.scope],
+      match: normalizeScopedSequenceMatchExpression(instance.match),
       initialValue: instance.initialValue,
       step: instance.step,
       allowManualValue: instance.allowManualValue,

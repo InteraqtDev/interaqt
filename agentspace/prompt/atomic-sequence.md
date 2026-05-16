@@ -53,3 +53,38 @@
 
 ### 追加任务6
 我们已经完成  `agentspace/output/scoped-atomic-sequence-feature-plan.md` 实现。你来深度检查当前的代码状态是否已经达到可发布新版本的状态。
+
+## Task 2 功能增强
+
+深入理解 `agentspace/output/scoped-sequence-match-implementation-plan.md` 中的问题和方案。看有没有：
+1. 致命错误。
+2. 违背上面原则的地方
+把你的 review 结果写成一个独立的新文档
+
+### 追加任务1
+深度理解 Task 2 和原计划 `agentspace/output/scoped-sequence-match-implementation-plan.md`，然后逐条 review `agentspace/output/scoped-sequence-match-implementation-plan-review.md` 中的意见，如果：
+1. 意见正确，就修改原文档
+2. 意见不正确，要指出为什么
+注意：
+1. 修复的时候也要遵守上面的原则
+2. 对任何意见都要辩证思考、到代码中真实求证，不能盲目相信。
+
+### 追加任务2
+深度理解 Task 2 并执行 `agentspace/output/scoped-sequence-match-implementation-plan.md`。注意：
+1. 一定要遵守上面的原则
+2. 完成后一定要做矩阵式的完整的测试，我们这是一个框架项目，要求极为严格。
+
+### 追加任务3
+我们已经完成了一轮  `agentspace/output/scoped-sequence-match-implementation-plan.md`。你深度 review `agentspace/output/scoped-sequence-match-task2-additional-task4-review.md` 中指出的问题，如果：
+1. 意见正确，就修复代码
+2. 意见不正确，要指出为什么
+
+注意：
+1. 一定要遵守上面的原则
+2. 完成后一定要做矩阵式的完整的测试，我们这是一个框架项目，要求极为严格。
+
+### 追加任务4
+我们已经完成了一轮  `agentspace/output/scoped-sequence-match-implementation-plan.md`。你深度 review 代码，看看有没有：
+1. 致命错误
+2. 未完成的工作
+把你的结论写成一个独立文档

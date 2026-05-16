@@ -4,10 +4,12 @@ import {
   Custom,
   Entity,
   KlassByName,
+  BoolExp,
   MatchExp,
   MonoSystem,
   Property,
   ScopedSequence,
+  type ScopedSequenceMatchAtom,
   UniqueConstraint,
   createMigrationManifest,
   readMigrationManifest,
@@ -15,6 +17,7 @@ import {
 } from "interaqt";
 import { PGLiteDB } from "@drivers";
 import { SQLiteDB } from "@drivers";
+import { matchesScopedSequenceRecord } from "../../src/runtime/scopedSequenceMatch.js";
 
 const PROJECT_1 = "00000000-0000-0000-0000-000000000001";
 const PROJECT_2 = "00000000-0000-0000-0000-000000000002";
@@ -57,6 +60,7 @@ function createScopedSequenceModel(prefix: string, options: Partial<Parameters<t
     properties: [
       Property.create({ name: "project", type: "id" }),
       Property.create({ name: "prefix", type: "string" }),
+      Property.create({ name: "kind", type: "string" }),
       Property.create({ name: "serialNumber", type: "number", computation: sequence }),
     ],
     constraints: [
@@ -132,6 +136,59 @@ function approveScopedSequenceDiff(diff: Awaited<ReturnType<Controller["generate
 }
 
 describe("ScopedSequence", () => {
+  test("evaluates match operators with nullish and ref-like path semantics", () => {
+    const cases: Array<{
+      name: string;
+      record: Record<string, unknown>;
+      key: string;
+      value: ScopedSequenceMatchAtom["value"];
+      expected: boolean;
+    }> = [
+      { name: "is null matches missing", record: {}, key: "kind", value: ["is null", null], expected: true },
+      { name: "is null matches undefined", record: { kind: undefined }, key: "kind", value: ["is null", null], expected: true },
+      { name: "is null matches null", record: { kind: null }, key: "kind", value: ["is null", null], expected: true },
+      { name: "is not null rejects missing", record: {}, key: "kind", value: ["is not null", null], expected: false },
+      { name: "in empty never matches", record: { kind: "PROJECT_ASSET" }, key: "kind", value: ["in", []], expected: false },
+      { name: "in null matches missing", record: {}, key: "kind", value: ["in", [null]], expected: true },
+      { name: "in value matches non-null", record: { kind: "PROJECT_ASSET" }, key: "kind", value: ["in", [null, "PROJECT_ASSET"]], expected: true },
+      { name: "not in empty matches non-null", record: { kind: "PROJECT_ASSET" }, key: "kind", value: ["not in", []], expected: true },
+      { name: "not in empty rejects missing", record: {}, key: "kind", value: ["not in", []], expected: false },
+      { name: "not in null matches non-null", record: { kind: "PROJECT_ASSET" }, key: "kind", value: ["not in", [null]], expected: true },
+      { name: "not in null and value rejects listed value", record: { kind: "PUBLIC_LIBRARY" }, key: "kind", value: ["not in", [null, "PUBLIC_LIBRARY"]], expected: false },
+      { name: "not in null and value accepts other non-null value", record: { kind: "PROJECT_ASSET" }, key: "kind", value: ["not in", [null, "PUBLIC_LIBRARY"]], expected: true },
+      { name: "project.id matches primitive ref id", record: { project: PROJECT_1 }, key: "project.id", value: ["=", PROJECT_1], expected: true },
+      { name: "project.id matches object ref id", record: { project: { id: PROJECT_1 } }, key: "project.id", value: ["=", PROJECT_1], expected: true },
+    ];
+
+    for (const item of cases) {
+      expect(matchesScopedSequenceRecord(BoolExp.atom({ key: item.key, value: item.value }), item.record), item.name).toBe(item.expected);
+    }
+  });
+
+  test("normalizes match serialization, parse, clone, and initializer equality", () => {
+    const Project = Entity.create({ name: "ScopedSerializationProject", properties: [] });
+    const matchAtom: ScopedSequenceMatchAtom = { key: "kind", value: ["=", "PROJECT_ASSET"] };
+    const rawMatch = BoolExp.atom(matchAtom).raw;
+    const sequence = ScopedSequence.create({
+      name: "ScopedSerializationSerial",
+      scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+      match: BoolExp.atom(matchAtom),
+      initializeFrom: {
+        record: Project,
+        valuePath: "serialNumber",
+        scope: [{ name: "project", path: "project" }],
+        aggregate: "max",
+        match: rawMatch,
+      },
+    });
+
+    const parsed = ScopedSequence.parse(ScopedSequence.stringify(sequence));
+    const cloned = ScopedSequence.clone(sequence);
+    expect(JSON.parse(ScopedSequence.stringify(parsed)).public.match).toEqual(rawMatch);
+    expect(JSON.parse(ScopedSequence.stringify(cloned)).public.match).toEqual(rawMatch);
+    expect(JSON.parse(ScopedSequence.stringify(parsed)).public.initializeFrom.match).toEqual(rawMatch);
+  });
+
   test("validates core arguments and host property type", async () => {
     const Project = Entity.create({ name: "ScopedValidationProject", properties: [] });
     expect(() => ScopedSequence.create({
@@ -195,6 +252,51 @@ describe("ScopedSequence", () => {
         aggregate: "max",
       },
     })).toThrow("stable path");
+    expect(() => ScopedSequence.create({
+      name: "InitializerMatchWithoutMainMatch",
+      scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+      initializeFrom: {
+        record: Project,
+        valuePath: "serialNumber",
+        scope: [{ name: "project", path: "project" }],
+        aggregate: "max",
+        match: BoolExp.atom({ key: "kind", value: ["=", "PROJECT_ASSET"] }),
+      },
+    })).toThrow("cannot be declared without ScopedSequence.match");
+    expect(() => ScopedSequence.create({
+      name: "InitializerMatchDiffersFromMainMatch",
+      scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+      match: BoolExp.atom({ key: "kind", value: ["=", "PROJECT_ASSET"] }),
+      initializeFrom: {
+        record: Project,
+        valuePath: "serialNumber",
+        scope: [{ name: "project", path: "project" }],
+        aggregate: "max",
+        match: BoolExp.atom({ key: "kind", value: ["=", "PUBLIC_LIBRARY"] }),
+      },
+    })).toThrow("must match ScopedSequence.match");
+    expect(() => ScopedSequence.create({
+      name: "NestedObjectMatchSequence",
+      scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+      match: BoolExp.atom({ key: "metadata.source", value: ["=", "PROJECT"] }),
+    })).toThrow("only supports top-level fields and ref id paths");
+    expect(() => ScopedSequence.create({
+      name: "RefFieldTraversalMatchSequence",
+      scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+      match: BoolExp.atom({ key: "project.name", value: ["=", "Demo"] }),
+    })).toThrow("only supports top-level fields and ref id paths");
+    expect(() => ScopedSequence.create({
+      name: "InitializerNestedMatchSequence",
+      scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+      match: BoolExp.atom({ key: "project.id", value: ["=", PROJECT_1] }),
+      initializeFrom: {
+        record: Project,
+        valuePath: "serialNumber",
+        scope: [{ name: "project", path: "project" }],
+        aggregate: "max",
+        match: BoolExp.atom({ key: "project.name", value: ["=", "Demo"] }),
+      },
+    })).toThrow("only supports top-level fields and ref id paths");
 
     const BadHost = Entity.create({
       name: "ScopedBadHost",
@@ -212,6 +314,41 @@ describe("ScopedSequence", () => {
     });
     const system = new MonoSystem(new PGLiteDB());
     expect(() => new Controller({ system, entities: [Project, BadHost], relations: [] })).toThrow('must have type "number"');
+
+    const MatchTargetHost = Entity.create({
+      name: "ScopedMatchTargetHost",
+      properties: [
+        Property.create({ name: "project", type: "id" }),
+        Property.create({
+          name: "serialNumber",
+          type: "number",
+          computation: ScopedSequence.create({
+            name: "ScopedMatchTargetSerial",
+            scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+            match: BoolExp.atom({ key: "serialNumber", value: ["is not null", null] }),
+          }),
+        }),
+      ],
+    });
+    expect(() => new Controller({ system: new MonoSystem(new PGLiteDB()), entities: [Project, MatchTargetHost], relations: [] })).toThrow("target computed property");
+
+    const MatchComputedHost = Entity.create({
+      name: "ScopedMatchComputedHost",
+      properties: [
+        Property.create({ name: "project", type: "id" }),
+        Property.create({ name: "isProjectAsset", type: "boolean", computation: Custom.create({ name: "ScopedMatchComputedFlag", compute: () => true }) }),
+        Property.create({
+          name: "serialNumber",
+          type: "number",
+          computation: ScopedSequence.create({
+            name: "ScopedMatchComputedSerial",
+            scope: [{ name: "project", type: "ref", base: Project, path: "project" }],
+            match: BoolExp.atom({ key: "isProjectAsset", value: ["=", true] }),
+          }),
+        }),
+      ],
+    });
+    expect(() => new Controller({ system: new MonoSystem(new PGLiteDB()), entities: [Project, MatchComputedHost], relations: [] })).toThrow('computed property "isProjectAsset"');
   });
 
   test("allocates first values, isolates scopes, rejects manual values by default, and records timing effects", async () => {
@@ -263,6 +400,99 @@ describe("ScopedSequence", () => {
     await controller.dispatch(model.CreateMedia, { payload: { project: PROJECT_1, prefix: "img" } });
     const records = await system.storage.find(model.Media.name, undefined, undefined, ["serialNumber"]);
     expect(records.map(item => item.serialNumber).sort((a, b) => a - b)).toEqual([1, 10]);
+
+    await system.destroy();
+  });
+
+  test("uses match to skip non-applicable records before manual checks and scope resolution", async () => {
+    const model = createScopedSequenceModel("ScopedMatrixMatch", {
+      match: BoolExp.atom({ key: "kind", value: ["=", "PROJECT_ASSET"] }),
+      allowManualValue: false,
+    });
+    const { system, controller } = await setupController(model);
+
+    const publicMedia = await controller.dispatch(model.CreateMedia, {
+      payload: { kind: "PUBLIC_LIBRARY", prefix: "img", serialNumber: 99 },
+    });
+    expect(publicMedia.error).toBeUndefined();
+    expect(await system.storage.atomic.readSequenceValue({
+      sequenceName: model.sequence.name,
+      scope: scopedSequenceScope(model.Project.name, PROJECT_1, "img"),
+    })).toBeUndefined();
+
+    const missingScope = await controller.dispatch(model.CreateMedia, {
+      payload: { kind: "PROJECT_ASSET", prefix: "img" },
+    });
+    expect(String(missingScope.error)).toContain('ScopedSequence scope "project" is missing');
+
+    const manualProjectAsset = await controller.dispatch(model.CreateMedia, {
+      payload: { kind: "PROJECT_ASSET", project: PROJECT_1, prefix: "img", serialNumber: 10 },
+    });
+    expect(String(manualProjectAsset.error)).toContain("cannot be set manually");
+
+    const projectAsset = await controller.dispatch(model.CreateMedia, {
+      payload: { kind: "PROJECT_ASSET", project: PROJECT_1, prefix: "img" },
+    });
+    expect(projectAsset.error).toBeUndefined();
+    const records = await system.storage.find(model.Media.name, undefined, undefined, ["kind", "project", "serialNumber"]);
+    expect(records.find(item => item.kind === "PUBLIC_LIBRARY")?.serialNumber).toBe(99);
+    expect(records.find(item => item.kind === "PROJECT_ASSET")?.serialNumber).toBe(1);
+
+    await system.destroy();
+  });
+
+  test("matches project.id consistently for primitive and object ref inputs", async () => {
+    const primitiveModel = createScopedSequenceModel("ScopedMatrixProjectIdPrimitive", {
+      match: BoolExp.atom({ key: "project.id", value: ["=", PROJECT_1] }),
+    });
+    const primitive = await setupController(primitiveModel);
+
+    await primitive.controller.dispatch(primitiveModel.CreateMedia, {
+      payload: { project: PROJECT_1, prefix: "img" },
+    });
+    await primitive.controller.dispatch(primitiveModel.CreateMedia, {
+      payload: { project: PROJECT_2, prefix: "img" },
+    });
+    const primitiveRows = await primitive.system.storage.find(primitiveModel.Media.name, undefined, undefined, ["project", "serialNumber"]);
+    expect(primitiveRows.find(row => row.project === PROJECT_1)?.serialNumber).toBe(1);
+    expect(primitiveRows.find(row => row.project === PROJECT_2)?.serialNumber).toBeUndefined();
+    await primitive.system.destroy();
+
+    const Project = Entity.create({
+      name: "ScopedMatrixProjectIdObjectProject",
+      properties: [Property.create({ name: "name", type: "string" })],
+    });
+    const sequence = ScopedSequence.create({
+      name: "ScopedMatrixProjectIdObjectSerial",
+      scope: [
+        { name: "project", type: "ref", base: Project, path: "project" },
+        { name: "prefix", type: "string", path: "prefix" },
+      ],
+      match: BoolExp.atom({ key: "project.id", value: ["=", PROJECT_1] }),
+    });
+    const Media = Entity.create({
+      name: "ScopedMatrixProjectIdObjectMedia",
+      properties: [
+        Property.create({ name: "project", type: "object" }),
+        Property.create({ name: "prefix", type: "string" }),
+        Property.create({ name: "serialNumber", type: "number", computation: sequence }),
+      ],
+    });
+    const CreateMedia = createEventSource("ScopedMatrixProjectIdObjectCreateMedia", Media, (args) => args.payload);
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Project, Media], relations: [], eventSources: [CreateMedia] });
+    await controller.setup(true);
+
+    await controller.dispatch(CreateMedia, {
+      payload: { project: { id: PROJECT_1 }, prefix: "img" },
+    });
+    await controller.dispatch(CreateMedia, {
+      payload: { project: { id: PROJECT_2 }, prefix: "img" },
+    });
+    const objectRows = await system.storage.find(Media.name, undefined, undefined, ["project", "serialNumber"]);
+    expect(objectRows.find(row => (row.project as { id?: string }).id === PROJECT_1)?.serialNumber).toBe(1);
+    expect(objectRows.find(row => (row.project as { id?: string }).id === PROJECT_2)?.serialNumber).toBeUndefined();
 
     await system.destroy();
   });
@@ -469,6 +699,7 @@ describe("ScopedSequence", () => {
 
     const v2 = createScopedSequenceModel("ScopedMatrixSeedMatch", {
       allowManualValue: false,
+      match: BoolExp.atom({ key: "prefix", value: ["=", "img"] }),
       initializeFrom: {
         record: v1.Media,
         valuePath: "serialNumber",
@@ -477,7 +708,6 @@ describe("ScopedSequence", () => {
           { name: "prefix", path: "prefix" },
         ],
         aggregate: "max",
-        match: MatchExp.atom({ key: "prefix", value: ["=", "img"] }),
       },
     });
     const controllerV2 = new Controller({
@@ -504,6 +734,102 @@ describe("ScopedSequence", () => {
       });
       expect(imgNext).toBe(8);
       expect(videoNext).toBe(1);
+    });
+
+    await system.destroy();
+  });
+
+  test("seeds not in matches containing null with storage-level aggregate migration", async () => {
+    const v1 = createScopedSequenceModel("ScopedMatrixSeedNotInNull", { allowManualValue: true });
+    const { system, controller } = await setupController(v1);
+    await controller.dispatch(v1.CreateMedia, { payload: { project: PROJECT_1, prefix: "img", serialNumber: 7 } });
+    await controller.dispatch(v1.CreateMedia, { payload: { project: PROJECT_1, prefix: "video", serialNumber: 3 } });
+    await writeMigrationManifest(controller, createMigrationManifest(controller));
+
+    const v2 = createScopedSequenceModel("ScopedMatrixSeedNotInNull", {
+      allowManualValue: false,
+      match: BoolExp.atom({ key: "prefix", value: ["not in", [null, "video"]] }),
+      initializeFrom: {
+        record: v1.Media,
+        valuePath: "serialNumber",
+        scope: [
+          { name: "project", path: "project" },
+          { name: "prefix", path: "prefix" },
+        ],
+        aggregate: "max",
+      },
+    });
+    const controllerV2 = new Controller({
+      system,
+      entities: [v2.Project, v2.Media, v2.Command],
+      relations: [],
+      eventSources: [v2.CreateMedia],
+    });
+    const approvedDiff = approveScopedSequenceDiff(await controllerV2.generateMigrationDiff());
+    await controllerV2.migrate({ approvedDiff });
+    await system.storage.runInTransaction({ name: "verify not-in-null scoped sequence seed" }, async () => {
+      const imgNext = await system.storage.atomic.nextSequenceValue({
+        sequenceName: v2.sequence.name,
+        scope: scopedSequenceScope(v2.Project.name, PROJECT_1, "img"),
+        initialValue: 0,
+        step: 1,
+      });
+      const videoNext = await system.storage.atomic.nextSequenceValue({
+        sequenceName: v2.sequence.name,
+        scope: scopedSequenceScope(v2.Project.name, PROJECT_1, "video"),
+        initialValue: 0,
+        step: 1,
+      });
+      expect(imgNext).toBe(8);
+      expect(videoNext).toBe(1);
+    });
+
+    await system.destroy();
+  });
+
+  test("falls back to JS seed filtering for project.id match over primitive refs", async () => {
+    const v1 = createScopedSequenceModel("ScopedMatrixSeedProjectId", { allowManualValue: true });
+    const { system, controller } = await setupController(v1);
+    await controller.dispatch(v1.CreateMedia, { payload: { project: PROJECT_1, prefix: "img", serialNumber: 7 } });
+    await controller.dispatch(v1.CreateMedia, { payload: { project: PROJECT_2, prefix: "img", serialNumber: 3 } });
+    await writeMigrationManifest(controller, createMigrationManifest(controller));
+
+    const v2 = createScopedSequenceModel("ScopedMatrixSeedProjectId", {
+      allowManualValue: false,
+      match: BoolExp.atom({ key: "project.id", value: ["=", PROJECT_1] }),
+      initializeFrom: {
+        record: v1.Media,
+        valuePath: "serialNumber",
+        scope: [
+          { name: "project", path: "project" },
+          { name: "prefix", path: "prefix" },
+        ],
+        aggregate: "max",
+      },
+    });
+    const controllerV2 = new Controller({
+      system,
+      entities: [v2.Project, v2.Media, v2.Command],
+      relations: [],
+      eventSources: [v2.CreateMedia],
+    });
+    const approvedDiff = approveScopedSequenceDiff(await controllerV2.generateMigrationDiff());
+    await controllerV2.migrate({ approvedDiff });
+    await system.storage.runInTransaction({ name: "verify project-id scoped sequence seed" }, async () => {
+      const projectOneNext = await system.storage.atomic.nextSequenceValue({
+        sequenceName: v2.sequence.name,
+        scope: scopedSequenceScope(v2.Project.name, PROJECT_1, "img"),
+        initialValue: 0,
+        step: 1,
+      });
+      const projectTwoNext = await system.storage.atomic.nextSequenceValue({
+        sequenceName: v2.sequence.name,
+        scope: scopedSequenceScope(v2.Project.name, PROJECT_2, "img"),
+        initialValue: 0,
+        step: 1,
+      });
+      expect(projectOneNext).toBe(8);
+      expect(projectTwoNext).toBe(1);
     });
 
     await system.destroy();
@@ -720,5 +1046,6 @@ describe("ScopedSequence", () => {
     await assertAllocationReview("Initial", { initialValue: 5 });
     await assertAllocationReview("Step", { step: 2 });
     await assertAllocationReview("Manual", { allowManualValue: true });
+    await assertAllocationReview("Match", { match: BoolExp.atom({ key: "kind", value: ["=", "PROJECT_ASSET"] }) });
   });
 });

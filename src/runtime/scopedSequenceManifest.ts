@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getEffectiveScopedSequenceInitializerMatch, normalizeScopedSequenceMatchExpression } from "@core";
 
 export type ScopedSequenceAllocationManifest = {
     kind: "scoped-sequence";
@@ -14,6 +15,7 @@ export type ScopedSequenceAllocationManifest = {
     initialValue: number;
     step: number;
     allowManualValue: boolean;
+    match?: unknown;
     initializeFrom?: {
         record?: unknown;
         valuePath?: unknown;
@@ -48,6 +50,7 @@ export function createScopedSequenceAllocationManifest(args: Record<string, unkn
         base: item.type === "ref" ? (item.base as { name?: string } | undefined)?.name : undefined,
     }));
     const initializeFrom = args.initializeFrom as Record<string, unknown> | undefined;
+    const match = normalizeScopedSequenceMatchExpression(args.match as never);
     return {
         kind: "scoped-sequence",
         timing: "post-create-pre-commit",
@@ -57,12 +60,13 @@ export function createScopedSequenceAllocationManifest(args: Record<string, unkn
         initialValue: Number(args.initialValue ?? 0),
         step: Number(args.step ?? 1),
         allowManualValue: args.allowManualValue === true,
+        match,
         initializeFrom: initializeFrom ? {
             record: (initializeFrom.record as { name?: string } | undefined)?.name,
             valuePath: initializeFrom.valuePath,
             scope: initializeFrom.scope,
             aggregate: initializeFrom.aggregate,
-            match: initializeFrom.match,
+            match: getEffectiveScopedSequenceInitializerMatch(args as never),
         } : undefined,
     };
 }
