@@ -4,6 +4,7 @@ import { PropertyDataContext } from "./computations/Computation.js";
 import { Controller } from "./Controller.js";
 import { DICTIONARY_RECORD, RecordMutationEvent } from "./System.js";
 import { Scheduler } from "./Scheduler.js";
+import { ComputationProtocolError } from "./errors/index.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
@@ -94,6 +95,14 @@ export class ComputationSourceMapManager {
         for(const computation of computations) {
             // 1. 根据 data deps 计算出 mutation events
             if( this.scheduler.isDataBasedComputation(computation)) {
+                if ((computation.incrementalCompute || computation.incrementalPatchCompute) && !computation.planIncremental) {
+                    throw new ComputationProtocolError('Incremental data-based computation must implement planIncremental()', {
+                        handleName: computation.constructor.name,
+                        computationName: computation.args.constructor.displayName,
+                        dataContext: computation.dataContext,
+                        computationPhase: 'source-map-initialization'
+                    })
+                }
 
                 Object.entries(computation.dataDeps).forEach(([dataDepName, dataDep]) => {
                     const sources = this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)
@@ -304,8 +313,13 @@ export class ComputationSourceMapManager {
             
             if (!eventType || eventType === 'update') {
                 // 监听 update
-                if (dataDep.attributeQuery) {
-                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataDep.source.name!, dataDep.attributeQuery, [], computation, false))
+                const attributeQuery = this.mergeAttributeQueries(
+                    dataDep.attributeQuery,
+                    this.matchAttributeQuery(dataDep.match),
+                    this.modifierAttributeQuery(dataDep.modifier)
+                )
+                if (attributeQuery.length > 0) {
+                    ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataDep.source.name!, attributeQuery, [], computation, false))
                 }
             }
             
@@ -345,6 +359,62 @@ export class ComputationSourceMapManager {
         }
 
         return ERMutationEventsSource
+    }
+
+    private mergeAttributeQueries(...queries: (AttributeQueryData | undefined)[]): AttributeQueryData {
+        const result: AttributeQueryData = []
+        const seen = new Set<string>()
+        for (const query of queries) {
+            for (const item of query || []) {
+                const key = JSON.stringify(item)
+                if (seen.has(key)) continue
+                seen.add(key)
+                result.push(item)
+            }
+        }
+        return result
+    }
+
+    private matchAttributeQuery(match: RecordsDataDep['match']): AttributeQueryData {
+        if (!match) return []
+        const paths: string[][] = []
+        const visit = (node: any) => {
+            if (!node) return
+            if (typeof node.isExpression === 'function' && node.isExpression()) {
+                visit(node.left)
+                visit(node.right)
+            } else if (typeof node.isAtom === 'function' && node.isAtom()) {
+                const key = node.data?.key
+                if (typeof key === 'string') paths.push(key.split('.'))
+            } else if (node.type === 'expression') {
+                visit(node.left)
+                visit(node.right)
+            } else if (node.type === 'atom') {
+                const key = node.data?.key
+                if (typeof key === 'string') paths.push(key.split('.'))
+            }
+        }
+        visit(match)
+        return this.pathsToAttributeQuery(paths)
+    }
+
+    private modifierAttributeQuery(modifier: RecordsDataDep['modifier']): AttributeQueryData {
+        const orderBy = (modifier as any)?.orderBy
+        if (!orderBy || typeof orderBy !== 'object') return []
+        return this.pathsToAttributeQuery(Object.keys(orderBy).map(key => key.split('.')))
+    }
+
+    private pathsToAttributeQuery(paths: string[][]): AttributeQueryData {
+        const result: AttributeQueryData = []
+        for (const path of paths) {
+            if (path.length === 0) continue
+            if (path.length === 1) {
+                result.push(path[0])
+                continue
+            }
+            result.push([path[0], { attributeQuery: this.pathsToAttributeQuery([path.slice(1)]) }])
+        }
+        return result
     }
     
     convertAttrsToERMutationEventsSourceMap(dataDep: DataDep, baseRecordName: string, attributes: AttributeQueryData, context: string[], computation: Computation, includeCreate: boolean = false) {

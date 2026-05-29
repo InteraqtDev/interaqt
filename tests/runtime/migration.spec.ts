@@ -2920,6 +2920,7 @@ describe("Data migration phase 1", () => {
         const probeV1 = new Custom({
             name: "MigrationEventShapeProbe",
             dataDeps: { current: { type: "property", attributeQuery: [["tasks", { attributeQuery: ["active"] }]] } },
+            incrementalDataDeps: [],
             compute: async () => 0,
             incrementalCompute: async (lastValue: number) => lastValue,
         }, { uuid: "migration-event-shape-probe-computation" });
@@ -2961,6 +2962,7 @@ describe("Data migration phase 1", () => {
         const probeV2 = new Custom({
             name: "MigrationEventShapeProbe",
             dataDeps: { current: { type: "property", attributeQuery: [["tasks", { attributeQuery: ["active"] }]] } },
+            incrementalDataDeps: [],
             compute: async () => 0,
             incrementalCompute: async (lastValue: number, mutationEvent: any) => {
                 sawRelationEventShape =

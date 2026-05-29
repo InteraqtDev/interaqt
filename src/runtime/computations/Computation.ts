@@ -6,6 +6,7 @@ import {
 import { Controller } from "../Controller";
 import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { type ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
+import type { EtityMutationEvent } from "../ComputationSourceMap.js";
 
 // Types from ComputationHandle.ts
 export type GlobalDataContext = {
@@ -235,6 +236,71 @@ export type PropertyDataDep = {
 
 export type DataDep = RecordsDataDep|PropertyDataDep|GlobalDataDep
 
+export type LastValuePolicy =
+    | { mode: 'none' }
+    | { mode: 'normal' }
+    | { mode: 'fullOutput', reason: string }
+
+export type IncrementalPlan =
+    | {
+        type: 'incremental',
+        dataDepKeys: string[],
+        needsLastValue?: boolean | LastValuePolicy,
+        reason?: string
+    }
+    | {
+        type: 'fullRecompute',
+        reason: string
+    }
+    | {
+        type: 'skip',
+        reason: string
+    }
+
+export type ComputationExecutionResult =
+    | { mode: 'skip' }
+    | { mode: 'full', result: unknown }
+    | { mode: 'incremental', result: unknown }
+    | { mode: 'patch', result: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined|unknown }
+
+export type DataDepEventContext = {
+    depKey?: string,
+    dep?: DataDep,
+    depRole: 'primary' | 'external' | 'self' | 'unknown',
+    membershipChange: 'none' | 'entered' | 'left' | 'maybe' | 'unknown',
+    requiresFullRecompute: boolean,
+    skip?: boolean,
+    requiresFullOutputLastValue?: boolean,
+    reason?: string
+}
+
+export function externalDataDepKeys(dataDeps: Record<string, DataDep>, primaryKeys: string[]) {
+    const primary = new Set(primaryKeys)
+    return Object.keys(dataDeps).filter(key => !primary.has(key))
+}
+
+export function defaultDataBasedIncrementalPlan(
+    dataDeps: Record<string, DataDep>,
+    primaryKeys: string[],
+    context: DataDepEventContext,
+    options: { needsLastValue?: boolean | LastValuePolicy } = {}
+): IncrementalPlan {
+    if (context.requiresFullRecompute) {
+        return { type: 'fullRecompute', reason: context.reason || 'data dependency requires full recompute' }
+    }
+    if (context.skip) {
+        return { type: 'skip', reason: context.reason || 'data dependency event does not affect computation' }
+    }
+    if (context.depRole !== 'primary') {
+        return { type: 'fullRecompute', reason: `event is not from a primary data dependency: ${context.depKey || 'unknown'}` }
+    }
+    return {
+        type: 'incremental',
+        dataDepKeys: externalDataDepKeys(dataDeps, primaryKeys),
+        needsLastValue: options.needsLastValue
+    }
+}
+
 
 
 export interface DataBasedComputation {
@@ -254,6 +320,12 @@ export interface DataBasedComputation {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getInitialValue?: (...args: any[]) => unknown
     useLastValue?: boolean
+    primaryDataDepKeys?: string[]
+    planIncremental?: (
+        event: EtityMutationEvent,
+        record: unknown | undefined,
+        context: DataDepEventContext
+    ) => IncrementalPlan
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     asyncReturn?: (...args: any[]) => Promise<ComputationResultSkip|unknown>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

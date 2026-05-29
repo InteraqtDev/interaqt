@@ -1028,6 +1028,8 @@ Transform supports two modes of operation:
      - **Context**: `this` is bound to the Controller instance, providing access to system APIs via `this.system.storage`, `this.globals`, etc.
      - **Signature**: `function(this: Controller, mutationEvent: MutationEvent): any | any[]`
 
+Transform does not accept `dataDeps`. For cross-source enrichment, persist the needed values on the source event/record or use a `Custom` computation.
+
 **Event Dependencies (eventDeps)**
 
 The `eventDeps` parameter allows Transform to react to specific mutation events (create, update, delete) on entities. This is the recommended approach for transforming data based on interactions or system events.
@@ -1688,9 +1690,13 @@ Custom.create(config: CustomConfig): CustomInstance
   - For Property computation: use `type: 'property'` with `attributeQuery` to access current record and its relations
   - For Dictionary computation: use `type: 'records'` with `source: EntityName`
   - For accessing dictionaries: use `type: 'global'` with `source: DictionaryInstance`
+- `config.incrementalDataDeps` (string[], optional): Required for simple incremental computations. Lists exactly which data dependency keys are resolved before `incrementalCompute` / `incrementalPatchCompute`; use `[]` when the event itself is enough.
+- `config.planIncremental` (function, optional): Required instead of `incrementalDataDeps` for advanced incremental computations. Return `{ type: 'incremental', dataDepKeys, needsLastValue? }`, `{ type: 'fullRecompute', reason }`, or `{ type: 'skip', reason }`.
 - `config.useLastValue` (boolean, optional): Whether to use last computed value in incremental computation
 - `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
 - `config.concurrency` (`'serializable' | 'atomic-safe'`, optional): Defaults to `'serializable'`. Serializable custom computations are retried in PostgreSQL `SERIALIZABLE` transactions. Use `'atomic-safe'` only when the callback is explicitly written with atomic state, idempotent patches, or other safe primitives.
+
+If `incrementalCompute` or `incrementalPatchCompute` is provided without `incrementalDataDeps` or `planIncremental`, runtime setup fails with `ComputationProtocolError`. Incremental callbacks receive only the planned partial `dataDeps`, not all declared dependencies.
 
 **Retry safety**
 
@@ -1720,7 +1726,7 @@ const userStats = Dictionary.create({
                 attributeQuery: ['id', 'authorId', 'status']
             }
         },
-        compute: async function(this: Controller, dataContext, args, state, dataDeps) {
+        compute: async function(dataDeps) {
             const activeUsers = dataDeps.users.filter(u => u.status === 'active');
             const publishedPosts = dataDeps.posts.filter(p => p.status === 'published');
             
@@ -1759,19 +1765,22 @@ const counterDict = Dictionary.create({
                 attributeQuery: ['value']
             }
         },
+        incrementalDataDeps: [],
         compute: async function(dataDeps) {
             const total = dataDeps.counters.reduce((sum, c) => sum + (c.value || 0), 0);
             return { total, count: dataDeps.counters.length };
         },
         incrementalCompute: async function(lastValue, mutationEvent, record, dataDeps) {
             console.log('Previous value:', lastValue);
-            const total = dataDeps.counters.reduce((sum, c) => sum + (c.value || 0), 0);
-            const diff = total - (lastValue?.total || 0);
+            const delta = mutationEvent.type === 'delete'
+                ? -(mutationEvent.oldRecord?.value || 0)
+                : (mutationEvent.record?.value || 0) - (mutationEvent.oldRecord?.value || 0);
+            const total = (lastValue?.total || 0) + delta;
             
             return {
                 total,
-                count: dataDeps.counters.length,
-                lastChange: diff,
+                count: (lastValue?.count || 0) + (mutationEvent.type === 'create' ? 1 : mutationEvent.type === 'delete' ? -1 : 0),
+                lastChange: delta,
                 timestamp: Math.floor(Date.now()/1000)  // In seconds
             };
         },

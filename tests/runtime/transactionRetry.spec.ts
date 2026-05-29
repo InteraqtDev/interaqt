@@ -79,6 +79,7 @@ describe("transaction retry and serializable promotion", () => {
         dataDeps: {
           counters: { type: "records", source: Counter, attributeQuery: ["value"] },
         },
+        incrementalDataDeps: [],
         incrementalCompute: async function(this: { controller: Controller }, lastValue: number, mutationEvent: any) {
           seenIsolations.push(this.controller.system.storage.getTransactionIsolation());
           return (lastValue || 0) + (mutationEvent.record?.value || 0);
@@ -117,6 +118,7 @@ describe("transaction retry and serializable promotion", () => {
         dataDeps: {
           items: { type: "records", source: Item, attributeQuery: ["value"] },
         },
+        incrementalDataDeps: [],
         incrementalCompute: async function(this: { controller: Controller }) {
           incrementalIsolations.push(this.controller.system.storage.getTransactionIsolation());
           return ComputationResult.fullRecompute("test fallback");
@@ -811,4 +813,3 @@ describe("transaction retry and serializable promotion", () => {
     await system.destroy();
   });
 });
-

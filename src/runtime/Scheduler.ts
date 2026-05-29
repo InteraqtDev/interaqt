@@ -1,4 +1,4 @@
-import { AttributeQueryData, MatchExp } from "@storage";
+import { AttributeQueryData, MatchExp, type MatchExpressionData } from "@storage";
 import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance, DictionaryInstance } from "@core";
 import { DataBasedEntityEventsSourceMap, EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { Controller } from "./Controller.js";
@@ -7,9 +7,10 @@ import { assert } from "./util.js";
 import {
     SchedulerError,
     ComputationError, ComputationStateError,
-    ComputationDataDepError
+    ComputationDataDepError,
+    ComputationProtocolError
 } from "./errors/index.js";
-import { Computation, ComputationClass, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, EventBasedComputation, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
+import { Computation, ComputationClass, ComputationExecutionResult, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, DataDep, DataDepEventContext, EventBasedComputation, GlobalBoundState, IncrementalPlan, LastValuePolicy, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, type InternalSchemaRequirement, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import {
@@ -585,6 +586,258 @@ export class Scheduler {
             this.isCustomSerializable(computation)
         )
     }
+    private hasUnsafeRecordsModifier(dataDep?: DataDep) {
+        if (!dataDep || dataDep.type !== 'records' || !dataDep.modifier) return false
+        const modifier = dataDep.modifier as Record<string, unknown>
+        return modifier.limit !== undefined || modifier.offset !== undefined || modifier.orderBy !== undefined
+    }
+    private readMatchPath(record: Record<string, unknown> | undefined, path: string) {
+        if (!record) return undefined
+        let current: any = record
+        for (const part of path.split('.')) {
+            if (current === null || current === undefined || typeof current !== 'object') return undefined
+            current = current[part]
+        }
+        return current
+    }
+    private compareMatchValue(value: unknown, operator: string, operand: unknown): boolean | undefined {
+        switch (operator.toLowerCase()) {
+            case '=':
+            case '==':
+                return value === operand
+            case '!=':
+            case '<>':
+                return value !== operand
+            case '>':
+                return typeof value === 'number' && typeof operand === 'number' ? value > operand : undefined
+            case '>=':
+                return typeof value === 'number' && typeof operand === 'number' ? value >= operand : undefined
+            case '<':
+                return typeof value === 'number' && typeof operand === 'number' ? value < operand : undefined
+            case '<=':
+                return typeof value === 'number' && typeof operand === 'number' ? value <= operand : undefined
+            case 'in':
+                return Array.isArray(operand) ? operand.includes(value) : undefined
+            case 'not in':
+                return Array.isArray(operand) ? !operand.includes(value) : undefined
+            case 'not':
+                return value !== operand
+            case 'like':
+                if (typeof value !== 'string' || typeof operand !== 'string') return undefined
+                return new RegExp(`^${operand.split('%').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`).test(value)
+            default:
+                return undefined
+        }
+    }
+    private evaluateRecordsMatch(match: MatchExpressionData | undefined, record: Record<string, unknown> | undefined): boolean | undefined {
+        if (!match) return true
+        if (!record) return undefined
+        const node = match as any
+        const raw = node.raw || node
+        if (raw.type === 'atom') {
+            const atom = raw.data
+            if (!atom || typeof atom.key !== 'string' || !Array.isArray(atom.value)) return undefined
+            return this.compareMatchValue(this.readMatchPath(record, atom.key), atom.value[0], atom.value[1])
+        }
+        if (raw.type === 'expression') {
+            const left = this.evaluateRecordsMatch(raw.left, record)
+            const right = raw.right ? this.evaluateRecordsMatch(raw.right, record) : undefined
+            if (raw.operator === 'and') return left === undefined || right === undefined ? undefined : left && right
+            if (raw.operator === 'or') return left === undefined || right === undefined ? undefined : left || right
+            if (raw.operator === 'not') return left === undefined ? undefined : !left
+            return undefined
+        }
+        return undefined
+    }
+    private buildMatchEventContext(dataDep: DataDep | undefined, event: EtityMutationEvent): Partial<DataDepEventContext> {
+        if (!dataDep || dataDep.type !== 'records' || !dataDep.match) return {}
+        if (event.relatedAttribute?.length) {
+            return {
+                membershipChange: 'unknown',
+                requiresFullRecompute: true,
+                reason: 'records match over related path requires full recompute'
+            }
+        }
+
+        const oldRecord = event.oldRecord as Record<string, unknown> | undefined
+        const currentRecord = event.type === 'update'
+            ? { ...(event.oldRecord || {}), ...(event.record || {}) } as Record<string, unknown>
+            : event.record as Record<string, unknown> | undefined
+        const oldMatches = event.type === 'create' ? false : this.evaluateRecordsMatch(dataDep.match, oldRecord)
+        const newMatches = event.type === 'delete' ? false : this.evaluateRecordsMatch(dataDep.match, currentRecord)
+        if (oldMatches === undefined || newMatches === undefined) {
+            return {
+                membershipChange: 'unknown',
+                requiresFullRecompute: true,
+                reason: 'records match membership could not be evaluated locally'
+            }
+        }
+        if (!oldMatches && !newMatches) {
+            return {
+                membershipChange: 'none',
+                requiresFullRecompute: false,
+                skip: true,
+                reason: 'records match excludes mutation event'
+            }
+        }
+        if (!oldMatches && newMatches) {
+            return {
+                membershipChange: 'entered',
+                requiresFullRecompute: event.type === 'update',
+                reason: event.type === 'update' ? 'records match membership entered on update' : undefined
+            }
+        }
+        if (oldMatches && !newMatches) {
+            return {
+                membershipChange: 'left',
+                requiresFullRecompute: event.type === 'update',
+                reason: event.type === 'update' ? 'records match membership left on update' : undefined
+            }
+        }
+        return {
+            membershipChange: 'none',
+            requiresFullRecompute: false
+        }
+    }
+    buildDataDepEventContext(computation: DataBasedComputation, event: EtityMutationEvent): DataDepEventContext {
+        const depEntry = Object.entries(computation.dataDeps || {}).find(([, dep]) => dep === event.dataDep)
+        const depKey = depEntry?.[0]
+        const dep = depEntry?.[1]
+        const primaryKeys = new Set(computation.primaryDataDepKeys || [])
+        const depRole: DataDepEventContext['depRole'] = depKey === undefined ? 'unknown' : depKey === '_self' ? 'self' : primaryKeys.has(depKey) ? 'primary' : 'external'
+        const modifierRequiresFullRecompute = this.hasUnsafeRecordsModifier(dep)
+        const matchContext = this.buildMatchEventContext(dep, event)
+        const requiresFullRecompute = Boolean(modifierRequiresFullRecompute || matchContext.requiresFullRecompute)
+        return {
+            depKey,
+            dep,
+            depRole,
+            membershipChange: modifierRequiresFullRecompute ? 'maybe' : matchContext.membershipChange || 'none',
+            requiresFullRecompute,
+            skip: matchContext.skip,
+            reason: modifierRequiresFullRecompute ? `records data dependency ${depKey} has modifier membership risk` : matchContext.reason
+        }
+    }
+    private normalizeLastValuePolicy(needsLastValue: boolean | LastValuePolicy | undefined): LastValuePolicy {
+        if (!needsLastValue) return { mode: 'none' }
+        if (needsLastValue === true) return { mode: 'normal' }
+        return needsLastValue
+    }
+    private async resolvePlannedLastValue(computation: DataBasedComputation, record: unknown, plan: IncrementalPlan, context: DataDepEventContext) {
+        if (plan.type !== 'incremental') return undefined
+        const policy = this.normalizeLastValuePolicy(plan.needsLastValue)
+        if (policy.mode === 'none') return undefined
+        if ((computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') && policy.mode !== 'fullOutput') {
+            throw new ComputationProtocolError('Entity/relation incremental last value requires explicit fullOutput policy', {
+                handleName: computation.constructor.name,
+                computationName: computation.args.constructor.displayName,
+                dataContext: computation.dataContext,
+                computationPhase: 'incremental-plan',
+                context: { depKey: context.depKey }
+            })
+        }
+        try {
+            return await this.controller.retrieveLastValue(computation.dataContext, record as Record<string, unknown> | undefined)
+        } catch (e) {
+            throw new ComputationStateError('Failed to retrieve planned last value for incremental computation', {
+                handleName: computation.constructor.name,
+                computationName: computation.args.constructor.displayName,
+                dataContext: computation.dataContext,
+                causedBy: e instanceof Error ? e : new Error(String(e))
+            })
+        }
+    }
+    private normalizePlanDataDepKeys(computation: DataBasedComputation, keys: string[]) {
+        const uniqueKeys = [...new Set(keys)]
+        for (const key of uniqueKeys) {
+            if (!Object.prototype.hasOwnProperty.call(computation.dataDeps || {}, key)) {
+                throw new ComputationDataDepError(`Unknown incremental data dependency key '${key}'`, {
+                    depName: key,
+                    invalidData: true,
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext
+                })
+            }
+        }
+        return uniqueKeys
+    }
+    async executeDataBasedComputation(
+        computation: DataBasedComputation,
+        erRecordMutationEvent: EtityMutationEvent,
+        record?: any,
+        forceFullCompute: boolean = false
+    ): Promise<ComputationExecutionResult> {
+        const shouldFullCompute = forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)
+        if (shouldFullCompute) {
+            const dataDeps = computation.dataDeps ? await this.resolveAllDataDeps(computation, record) : {}
+            if (!computation.compute) {
+                throw new ComputationError('compute must be defined for full computation', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    computationPhase: 'full-compute'
+                })
+            }
+            return { mode: 'full', result: await computation.compute(dataDeps, record) }
+        }
+
+        const context = this.buildDataDepEventContext(computation, erRecordMutationEvent)
+        const plan = computation.planIncremental?.(erRecordMutationEvent, record, context)
+        if (!plan) {
+            throw new ComputationProtocolError('Incremental data-based computation must implement planIncremental()', {
+                handleName: computation.constructor.name,
+                computationName: computation.args.constructor.displayName,
+                dataContext: computation.dataContext,
+                computationPhase: 'incremental-plan'
+            })
+        }
+        if (plan.type === 'skip') {
+            return { mode: 'skip' }
+        }
+        if (context.requiresFullRecompute || plan.type === 'fullRecompute') {
+            if (this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                throw new RequireSerializableRetry(`full recompute ${(computation.args as any).name || computation.args.constructor.displayName}`)
+            }
+            const fullDeps = computation.dataDeps ? await this.resolveAllDataDeps(computation, record) : {}
+            if (!computation.compute) {
+                throw new ComputationError('compute must be defined for planned full recompute', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    computationPhase: 'planned-full-compute'
+                })
+            }
+            return { mode: 'full', result: await computation.compute(fullDeps, record) }
+        }
+
+        const dataDepKeys = this.normalizePlanDataDepKeys(computation, plan.dataDepKeys)
+        const dataDeps = await this.resolveSelectedDataDeps(computation, record, dataDepKeys)
+        const lastValue = await this.resolvePlannedLastValue(computation, record, plan, context)
+        const result = computation.incrementalCompute
+            ? await computation.incrementalCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+            : await computation.incrementalPatchCompute!(lastValue, erRecordMutationEvent, record, dataDeps)
+
+        if (result instanceof ComputationResultFullRecompute) {
+            if (this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                throw new RequireSerializableRetry(`full recompute ${(computation.args as any).name || computation.args.constructor.displayName}`)
+            }
+            if (!computation.compute) {
+                throw new ComputationError('compute must be defined for computation when incremental returns ComputationResultFullRecompute', {
+                    handleName: computation.constructor.name,
+                    computationName: computation.args.constructor.displayName,
+                    dataContext: computation.dataContext,
+                    computationPhase: 'fallback-compute'
+                })
+            }
+            const fullDeps = computation.dataDeps ? await this.resolveAllDataDeps(computation, record) : {}
+            return { mode: 'full', result: await computation.compute(fullDeps, record) }
+        }
+        return {
+            mode: computation.incrementalCompute ? 'incremental' : 'patch',
+            result
+        }
+    }
     private getAsyncTaskFreshnessKey(computation: Computation, args: any, record?: any) {
         if (args?.freshnessKey !== undefined) return String(args.freshnessKey)
         if (computation.dataContext.type === 'property') return String(record?.id)
@@ -712,31 +965,25 @@ export class Scheduler {
     async runComputation(computation: Computation, erRecordMutationEvent: RecordMutationEvent, record?: any, forceFullCompute: boolean = false) {
         try {
             let computationResult: ComputationResult|any
+            let computationResultMode: ComputationExecutionResult['mode'] | undefined
             const currentIsolation = this.controller.system.storage.getTransactionIsolation()
             this.requireSerializableForCustomCallback(computation, 'run')
             if (forceFullCompute && currentIsolation !== 'SERIALIZABLE') {
                 throw new RequireSerializableRetry(`force full compute ${this.getComputationName(computation)}`)
             }
 
-            // 1. 依赖解析阶段的错误处理
-            let dataDeps: any = {}
+            // 1. 计算执行阶段的错误处理
             try {
-                dataDeps = (computation as DataBasedComputation).dataDeps ? await this.resolveDataDeps(computation as DataBasedComputation, record) : {}
-            } catch (e) {
-                const error = new ComputationDataDepError('Failed to resolve computation data dependencies', {
-                    handleName: computation.constructor.name,
-                    computationName: computation.args.constructor.displayName,
-                    dataContext: computation.dataContext,
-                    causedBy: e instanceof Error ? e : new Error(String(e))
-                })
-                throw error
-            }
-
-            // 2. 计算执行阶段的错误处理
-            try {
-                if (forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)) {
-                    // 全量计算。forceFullCompute 用在了初始化时，或者要修正数据时。
-                    const databasedComputation = computation as DataBasedComputation
+                if (this.isDataBasedComputation(computation)) {
+                    const executionResult = await this.executeDataBasedComputation(computation, erRecordMutationEvent, record, forceFullCompute)
+                    if (executionResult.mode === 'skip') {
+                        return
+                    }
+                    computationResult = executionResult.result
+                    computationResultMode = executionResult.mode
+                } else if (forceFullCompute || (!computation.incrementalCompute && !computation.incrementalPatchCompute)) {
+                    const databasedComputation = computation as unknown as DataBasedComputation
+                    const dataDeps = databasedComputation.dataDeps ? await this.resolveAllDataDeps(databasedComputation, record) : {}
                     if (!databasedComputation.compute) {
                         throw new ComputationError('compute must be defined for full computation', {
                             handleName: computation.constructor.name,
@@ -746,9 +993,9 @@ export class Scheduler {
                         })
                     }
                     computationResult = await databasedComputation.compute(dataDeps, record)
+                    computationResultMode = 'full'
                 } else {
                     if (computation.incrementalCompute) {
-                        // 1.增量计算，返回全量结果
                         let lastValue = undefined
                         if (computation.useLastValue) {
                             try {
@@ -764,10 +1011,10 @@ export class Scheduler {
                             }
                         }
                         
-                        computationResult = await computation.incrementalCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+                        computationResult = await computation.incrementalCompute(lastValue, erRecordMutationEvent, record, {})
+                        computationResultMode = 'incremental'
                         
                     } else if(computation.incrementalPatchCompute){
-                        // 2.增量计算，返回增量结果
                         let lastValue = undefined
                         if (computation.useLastValue) {
                             try {
@@ -783,7 +1030,8 @@ export class Scheduler {
                             }
                         }
             
-                        computationResult = await computation.incrementalPatchCompute(lastValue, erRecordMutationEvent, record, dataDeps)
+                        computationResult = await computation.incrementalPatchCompute(lastValue, erRecordMutationEvent, record, {})
+                        computationResultMode = 'patch'
                     } else {
                         const error = new ComputationError(`Unknown computation type: ${computation.constructor.name}`, {
                             handleName: computation.constructor.name,
@@ -793,25 +1041,6 @@ export class Scheduler {
                         })
                         throw error
                     }
-
-                    if (computationResult instanceof ComputationResultFullRecompute) {
-                        // 如果计算结果为 false ，说明不能增量计算，要全量计算。
-                        const databasedComputation = computation as DataBasedComputation
-                        if (this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
-                            throw new RequireSerializableRetry(`full recompute ${(computation.args as any).name || computation.args.constructor.displayName}`)
-                        }
-                        if (!databasedComputation.compute) {
-                            const error = new ComputationError('compute must be defined for computation when incrementalCompute returns ComputationResultFullRecompute', {
-                                handleName: computation.constructor.name,
-                                computationName: computation.args.constructor.displayName,
-                                dataContext: computation.dataContext,
-                                computationPhase: 'fallback-compute'
-                            })
-                            throw error
-                        }
-                        dataDeps = databasedComputation.dataDeps ? await this.resolveDataDeps(databasedComputation, record) : {}
-                        computationResult = await databasedComputation.compute(dataDeps, record)
-                    }   
                 }
             } catch (e) {
                 if (e instanceof ComputationError) {
@@ -849,7 +1078,7 @@ export class Scheduler {
             try {
                 const result = computationResult instanceof ComputationResultResolved ? await computation.asyncReturn!(computationResult.result, computationResult.args) : computationResult
                 
-                if (computation.incrementalPatchCompute) {
+                if (computationResultMode === 'patch') {
                     if (this.requiresSerializablePatchApply(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
                         throw new RequireSerializableRetry(`entity/relation patch from custom computation ${this.getComputationName(computation)}`)
                     }
@@ -882,13 +1111,31 @@ export class Scheduler {
             throw error
         }
     }
+    async resolveAllDataDeps(computation: DataBasedComputation, record?: any) {
+        return this.resolveSelectedDataDeps(computation, record, Object.keys(computation.dataDeps || {}))
+    }
     async resolveDataDeps(computation: DataBasedComputation, record?: any) {
+        return this.resolveAllDataDeps(computation, record)
+    }
+    async resolveSelectedDataDeps(computation: DataBasedComputation, record?: any, depKeys: string[] = []) {
+        const selectedKeys = [...new Set(depKeys)]
+        if (selectedKeys.length === 0) return {}
         if (computation.dataDeps) {
             try {
-                const values: any[] = await Promise.all(Object.entries(computation.dataDeps).map(async ([dataDepName, dataDep]) => {
+                const values: any[] = await Promise.all(selectedKeys.map(async (dataDepName) => {
+                    const dataDep = computation.dataDeps[dataDepName]
+                    if (!dataDep) {
+                        throw new ComputationDataDepError(`Unknown data dependency '${dataDepName}'`, {
+                            depName: dataDepName,
+                            invalidData: true,
+                            handleName: computation.constructor.name,
+                            computationName: computation.args.constructor.displayName,
+                            dataContext: computation.dataContext
+                        })
+                    }
                     try {
                         if (dataDep.type === 'records') {
-                            return await this.controller.system.storage.find(dataDep.source.name!, undefined, {}, dataDep.attributeQuery)
+                            return await this.controller.system.storage.find(dataDep.source.name!, dataDep.match, dataDep.modifier ?? {}, dataDep.attributeQuery)
                         } else if (dataDep.type === 'property') {
                             if (!record?.id) {
                                 const error = new ComputationDataDepError('Record ID is required for property data dependency', {
@@ -930,7 +1177,7 @@ export class Scheduler {
                         throw error
                     }
                 }))
-                return Object.fromEntries(Object.entries(computation.dataDeps).map(([dataDepName], index) => [dataDepName, values[index]]))
+                return Object.fromEntries(selectedKeys.map((dataDepName, index) => [dataDepName, values[index]]))
             } catch (e) {
                 if (e instanceof ComputationDataDepError) {
                     throw e
@@ -976,4 +1223,3 @@ export class Scheduler {
         }
     }
 }
-

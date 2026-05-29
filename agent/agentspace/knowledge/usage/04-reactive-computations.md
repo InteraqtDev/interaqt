@@ -87,6 +87,8 @@ Built-in computations such as Count, Summation, Average, Every, Any, WeightedSum
 
 Custom computations are different because interaqt cannot inspect user callback logic. `Custom.create()` defaults to `concurrency: 'serializable'`, so the framework promotes the transaction to PostgreSQL `SERIALIZABLE` and retries on `40001` / `40P01`. Use `concurrency: 'atomic-safe'` only when the custom computation is explicitly written with atomic state, idempotent patches, or other safe primitives.
 
+Custom incremental computations must declare an incremental plan. Use `incrementalDataDeps: [...]` for the common case, or `planIncremental(event, record, context)` when the computation needs to choose between incremental, full recompute, and skip per event. Incremental callbacks receive only the planned partial `dataDeps`; the runtime no longer resolves all declared dependencies before incremental execution.
+
 Because retry replays the transaction attempt, `guard`, `mapEventData`, `resolve`, computation callbacks, `afterDispatch`, and `asyncReturn` must be deterministic and retry-safe. Put irreversible external IO in `postCommit` for interaction-specific effects or `recordMutationSideEffects` for mutation-driven effects; both run after the final commit.
 
 ### Scoped Atomic Sequences
@@ -871,31 +873,25 @@ const ActivityReward = Entity.create({
   ],
   computation: Transform.create({
     record: InteractionEventEntity,
-    attributeQuery: ['interactionName', 'user', 'createdAt'],
-    dataDeps: {
-      users: {
-        type: 'records',
-        source: User,
-        attributeQuery: ['username', 'monthlyLoginCount']
-      }
-    },
-    callback: (interactionEvents, dataDeps) => {
+    attributeQuery: ['interactionName', 'user', 'payload', 'createdAt'],
+    callback: (interactionEvents) => {
       // Transform essence: define data transformation rules
-      // Input: InteractionEventEntity data + dependency data
+      // Input: InteractionEventEntity data
       // Output: ActivityReward data (or null)
       
       return interactionEvents
         .filter(event => event.interactionName === 'userLogin')
         .map(event => {
-          const user = dataDeps.users.find(u => u.id === event.user.id);
+          const monthlyLoginCount = event.payload?.monthlyLoginCount || 0;
+          const username = event.payload?.username || 'User';
           
           // Declare transformation condition: when user monthly login count >= 10, this interaction data transforms to reward data
-          if (user && user.monthlyLoginCount >= 10) {
+          if (monthlyLoginCount >= 10) {
             return {
               type: 'frequent_user',
-              description: `${user.username} received active user reward`,
+              description: `${username} received active user reward`,
               createdAt: event.createdAt,
-              userId: user.id
+              userId: event.user.id
             };
           }
           
@@ -924,28 +920,22 @@ const DirectorMemo = Entity.create({
   computation: Transform.create({
     record: InteractionEventEntity,
     attributeQuery: ['interactionName', 'user', 'payload', 'createdAt'],
-    dataDeps: {
-      users: {
-        type: 'records',
-        source: User,
-        attributeQuery: ['username', 'currentMonthLeaveCount']
-      }
-    },
-    callback: (interactionEvents, dataDeps) => {
+    callback: (interactionEvents) => {
       // Declare data transformation relationship:
-      // Input: submitLeaveRequest interaction data + user data
+      // Input: submitLeaveRequest interaction data
       // Output: qualifying DirectorMemo data
       
       return interactionEvents
         .filter(event => event.interactionName === 'submitLeaveRequest')
         .map(event => {
-          const user = dataDeps.users.find(u => u.id === event.user.id);
+          const username = event.payload?.username || 'User';
+          const currentMonthLeaveCount = event.payload?.currentMonthLeaveCount || 0;
           
           // Transformation rule: when user's current month leave count >= 3, this interaction data transforms to memo data
-          if (user && user.currentMonthLeaveCount >= 3) {
+          if (currentMonthLeaveCount >= 3) {
             return {
-              content: `${user.username} taking leave for the ${user.currentMonthLeaveCount}th time this month, needs attention`,
-              priority: user.currentMonthLeaveCount >= 5 ? 'urgent' : 'high',
+              content: `${username} taking leave for the ${currentMonthLeaveCount}th time this month, needs attention`,
+              priority: currentMonthLeaveCount >= 5 ? 'urgent' : 'high',
               createdAt: event.createdAt
             };
           }

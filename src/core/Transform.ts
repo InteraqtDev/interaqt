@@ -1,7 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyAttribute } from './utils.js';
 import type { ComputationRecord, AttributeQueryData } from './types.js';
-import { DataDep } from './Computation.js';
 
 const PHASE_BEFORE_ALL = 0
 const PHASE_NORMAL = 1
@@ -22,9 +21,6 @@ export interface TransformInstance extends IInstance {
   eventDeps?: {
     [key: string]: EventDep;
   };
-  dataDeps?: {
-    [key: string]: DataDep;
-  };
   attributeQuery?: AttributeQueryData;
   callback: Function;
 }
@@ -33,9 +29,6 @@ export interface TransformCreateArgs {
   record?: ComputationRecord;
   eventDeps?: {
     [key: string]: EventDep;
-  };
-  dataDeps?: {
-    [key: string]: DataDep;
   };
   attributeQuery?: AttributeQueryData;
   callback: Function;

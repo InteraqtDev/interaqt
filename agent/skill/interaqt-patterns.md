@@ -215,7 +215,7 @@ Property.create({
 ```
 
 ### WHY
-Count uses incremental algorithms. Transform loads all records into memory, which is inefficient for counting.
+Count uses aggregate-specific incremental algorithms. Transform creates derived entity/relation rows and is not a property aggregate.
 
 ### WRONG: Computations passed to Controller
 ```typescript
@@ -291,6 +291,8 @@ const Media = Entity.create({
 - [ ] `computed` is used for same-record-only property derivations
 - [ ] Properties with aggregate/state computations have `defaultValue`; `ScopedSequence` does not
 - [ ] NEVER pass computations to Controller constructor
+- [ ] Custom incremental computations declare `incrementalDataDeps` or `planIncremental`
+- [ ] Transform does not use `dataDeps`
 
 ---
 

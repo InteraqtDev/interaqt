@@ -235,7 +235,6 @@ Transform.create(args: {
 
   // Common
   callback: Function                          // (this: Controller, record/mutationEvent) => any | any[] | null
-  dataDeps?: { [key: string]: DataDep }
 }): TransformInstance
 ```
 
@@ -246,6 +245,32 @@ Constraints:
 - NEVER reference the entity being defined as `record` (circular reference)
 - Use `eventDeps` mode for interaction-based transformations (recommended)
 - Use `record` mode for deriving entities from other entities
+- Transform does not accept `dataDeps`; put cross-source logic in persisted state or a `Custom` computation
+
+---
+
+## Custom.create
+
+```typescript
+Custom.create(args: {
+  name: string
+  dataDeps?: { [key: string]: DataDep }
+  compute?: (this: { controller: Controller, state: any }, dataDeps: any, record?: any) => any
+  incrementalCompute?: (lastValue: any, event: any, record: any, dataDeps: any) => any
+  incrementalPatchCompute?: (lastValue: any, event: any, record: any, dataDeps: any) => ComputationResultPatch | ComputationResultPatch[] | undefined
+  incrementalDataDeps?: string[]
+  planIncremental?: (event: any, record: any, context: DataDepEventContext) => IncrementalPlan
+  useLastValue?: boolean
+  concurrency?: 'serializable' | 'atomic-safe'
+}): CustomInstance
+```
+
+Constraints:
+- If `incrementalCompute` or `incrementalPatchCompute` is present, also provide `incrementalDataDeps` or `planIncremental`
+- `incrementalDataDeps` lists the data dependency keys the incremental callback needs; use `[]` when it needs none
+- `planIncremental` returns `{ type: 'incremental' | 'fullRecompute' | 'skip', ... }`
+- Incremental callbacks receive only planned partial `dataDeps`, not all declared deps
+- Entity/relation incremental computations that need last output state must use `needsLastValue: { mode: 'fullOutput', reason }`
 
 ---
 

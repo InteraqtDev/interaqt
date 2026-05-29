@@ -510,9 +510,12 @@ Transform.create(config: TransformConfig): KlassInstance<typeof Transform>
 ```
 
 **Parameters**
-- `config.record` (Entity|Relation, required): Entity or relation to transform from (source collection)
+- `config.record` (Entity|Relation, optional): Entity or relation to transform from (source collection)
+- `config.eventDeps` (object, optional): Event-driven source map. Use either `record` or `eventDeps`.
 - `config.callback` (function, required): Transformation function that converts source data to target data
-- `config.attributeQuery` (AttributeQueryData, required): Attribute query configuration
+- `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
+
+Transform does not accept `dataDeps`. Use `eventDeps` / `record` as the source, and keep cross-source enrichment in existing persisted state or a `Custom` computation.
 
 ### Custom.create()
 
@@ -524,6 +527,13 @@ Create a custom computation when built-in computations are not expressive enough
 - `'atomic-safe'`: you explicitly promise the custom computation only uses atomic state, idempotent patches, or other concurrency-safe primitives. Full recompute and entity/relation full replace paths still require SERIALIZABLE even for `atomic-safe` custom computations.
 
 Custom callbacks may be replayed after retryable transaction failures. Do not perform irreversible external IO inside custom `compute`, `incrementalCompute`, `incrementalPatchCompute`, or `asyncReturn`; use `recordMutationSideEffects` for post-commit external work.
+
+**Incremental planning**
+- If `incrementalCompute` or `incrementalPatchCompute` is provided, the computation must also provide `incrementalDataDeps` or `planIncremental`.
+- `incrementalDataDeps: string[]` lists exactly which `dataDeps` keys should be resolved for the incremental callback; use `[]` when none are needed.
+- `planIncremental(event, record, context)` is the advanced form. Return `{ type: 'incremental', dataDepKeys, needsLastValue? }`, `{ type: 'fullRecompute', reason }`, or `{ type: 'skip', reason }`.
+- Incremental callbacks receive only planned partial `dataDeps`; the runtime no longer resolves all `dataDeps` before incremental execution.
+- For entity/relation outputs, last value requires explicit `{ mode: 'fullOutput', reason }` because it may read the full output table.
 
 ### ScopedSequence.create()
 

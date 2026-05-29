@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Count } from "@core";
 import { Controller } from "../Controller.js";
 import { CountInstance, EntityInstance, RelationInstance } from "@core";
-import { ComputationResult, DataBasedComputation, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
@@ -19,6 +19,7 @@ export class GlobalCountHandle implements DataBasedComputation {
     state!: GlobalCountState
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['main']
     record: (EntityInstance|RelationInstance)
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: DataContext) {
@@ -60,6 +61,9 @@ export class GlobalCountHandle implements DataBasedComputation {
         await this.state.count.setInternal(count)
         return count;
     }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
+    }
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
         if (mutationEvent.recordName !== (this.dataDeps.main as RecordsDataDep).source!.name || mutationEvent.relatedAttribute?.length) {
@@ -97,6 +101,7 @@ export class PropertyCountHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['_current']
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
@@ -177,6 +182,9 @@ export class PropertyCountHandle implements DataBasedComputation {
         
         await this.state.count.setInternal(_current, count)
         return count;
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {

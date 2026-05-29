@@ -126,3 +126,19 @@ export class ComputationDataDepError extends ComputationError {
         this.invalidData = options.invalidData
     }
 }
+
+export class ComputationProtocolError extends ComputationError {
+    constructor(
+        message: string,
+        options: ConstructorParameters<typeof ComputationError>[1] = {}
+    ) {
+        super(message, {
+            ...options,
+            severity: ErrorSeverity.HIGH,
+            context: {
+                ...options.context,
+                errorType: 'ComputationProtocolError'
+            }
+        })
+    }
+}

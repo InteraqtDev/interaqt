@@ -145,6 +145,7 @@ describe('Custom computation', () => {
             attributeQuery: ['value']
           }
         },
+        incrementalDataDeps: [],
         compute: async function(this: Controller, dataDeps: any) {
           console.log('compute called with dataDeps:', dataDeps);
           computeCount++;

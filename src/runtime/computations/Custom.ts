@@ -1,4 +1,4 @@
-import { DataContext, PropertyDataContext } from "./Computation.js";
+import { DataContext, DataDepEventContext, IncrementalPlan, PropertyDataContext } from "./Computation.js";
 import { Custom, CustomInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { 
@@ -10,6 +10,7 @@ import {
   GlobalBoundState
 } from "./Computation.js";
 import { assert } from "../util.js";
+import { ComputationProtocolError } from "../errors/index.js";
 
 // Base class for shared implementation
 abstract class BaseCustomComputationHandle implements DataBasedComputation {
@@ -18,6 +19,8 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   state: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>} = {}
   useLastValue: boolean
   dataDeps: {[key: string]: DataDep} = {}
+  incrementalDataDepKeys?: string[]
+  planIncrementalCallback?: Function
   
   computeCallback?: Function
   incrementalComputeCallback?: Function
@@ -37,6 +40,12 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     // 设置自定义的 dataDeps
     if (args.dataDeps) {
       this.dataDeps = args.dataDeps as {[key: string]: DataDep};
+    }
+    if (args.incrementalDataDeps) {
+      this.incrementalDataDepKeys = args.incrementalDataDeps;
+    }
+    if (args.planIncremental) {
+      this.planIncrementalCallback = args.planIncremental;
     }
     
 
@@ -112,6 +121,15 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
         }
       }
     }
+
+    if ((args.incrementalCompute || args.incrementalPatchCompute) && !args.planIncremental && !args.incrementalDataDeps) {
+      throw new ComputationProtocolError('Custom incremental computation must declare planIncremental or incrementalDataDeps', {
+        handleName: this.constructor.name,
+        computationName: args.name,
+        dataContext: this.dataContext,
+        computationPhase: 'custom-incremental-plan'
+      })
+    }
     
     // 如果提供了 createState，调用它来初始化 state
     if (this.createStateCallback) {
@@ -157,6 +175,38 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       return await this.computeCallback.call(context, dataDeps, record);
     }
     return ComputationResult.skip();
+  }
+
+  planIncremental(event: unknown, record: unknown, context: DataDepEventContext): IncrementalPlan {
+    if (this.planIncrementalCallback) {
+      return this.planIncrementalCallback.call(
+        {
+          controller: this.controller,
+          state: this.state,
+          getState: (key: string) => this.state[key]
+        },
+        event,
+        record,
+        context
+      ) as IncrementalPlan
+    }
+    if (this.incrementalDataDepKeys) {
+      if (context.skip) {
+        return { type: 'skip', reason: context.reason || 'Custom data dependency event does not affect computation' }
+      }
+      if (context.requiresFullRecompute) {
+        return { type: 'fullRecompute', reason: context.reason || 'Custom dependency requires full recompute' }
+      }
+      return {
+        type: 'incremental',
+        dataDepKeys: this.incrementalDataDepKeys,
+        needsLastValue: this.useLastValue ? { mode: 'normal' } : { mode: 'none' }
+      }
+    }
+    return {
+      type: 'fullRecompute',
+      reason: 'Custom incremental computation must declare planIncremental or incrementalDataDeps'
+    }
   }
   
 }

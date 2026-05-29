@@ -7,6 +7,8 @@ export type CustomConcurrency = 'serializable' | 'atomic-safe';
 export interface CustomInstance extends IInstance {
   name: string;
   dataDeps?: { [key: string]: DataDep };
+  incrementalDataDeps?: string[];
+  planIncremental?: Function;
   compute?: Function;
   incrementalCompute?: Function;
   incrementalPatchCompute?: Function;
@@ -29,6 +31,8 @@ export interface CustomInstance extends IInstance {
 export interface CustomCreateArgs {
   name: string;
   dataDeps?: { [key: string]: DataDep };
+  incrementalDataDeps?: string[];
+  planIncremental?: Function;
   compute?: Function;
   incrementalCompute?: Function;
   incrementalPatchCompute?: Function;
@@ -45,6 +49,8 @@ export class Custom implements CustomInstance {
   public _options?: { uuid?: string };
   public name: string;
   public dataDeps?: { [key: string]: DataDep };
+  public incrementalDataDeps?: string[];
+  public planIncremental?: Function;
   public compute?: Function;
   public incrementalCompute?: Function;
   public incrementalPatchCompute?: Function;
@@ -59,6 +65,8 @@ export class Custom implements CustomInstance {
     this.uuid = generateUUID(options);
     this.name = args.name;
     this.dataDeps = args.dataDeps;
+    this.incrementalDataDeps = args.incrementalDataDeps;
+    this.planIncremental = args.planIncremental;
     this.compute = args.compute;
     this.incrementalCompute = args.incrementalCompute;
     this.incrementalPatchCompute = args.incrementalPatchCompute;
@@ -85,6 +93,16 @@ export class Custom implements CustomInstance {
     },
     dataDeps: {
       type: 'object' as const,
+      collection: false as const,
+      required: false as const
+    },
+    incrementalDataDeps: {
+      type: 'object' as const,
+      collection: false as const,
+      required: false as const
+    },
+    planIncremental: {
+      type: 'function' as const,
       collection: false as const,
       required: false as const
     },
@@ -148,6 +166,8 @@ export class Custom implements CustomInstance {
       name: instance.name
     };
     if (instance.dataDeps !== undefined) args.dataDeps = stringifyAttribute(instance.dataDeps);
+    if (instance.incrementalDataDeps !== undefined) args.incrementalDataDeps = stringifyAttribute(instance.incrementalDataDeps);
+    if (instance.planIncremental !== undefined) args.planIncremental = stringifyAttribute(instance.planIncremental);
     if (instance.compute !== undefined) args.compute = stringifyAttribute(instance.compute);
     if (instance.incrementalCompute !== undefined) args.incrementalCompute = stringifyAttribute(instance.incrementalCompute);
     if (instance.incrementalPatchCompute !== undefined) args.incrementalPatchCompute = stringifyAttribute(instance.incrementalPatchCompute);
@@ -170,6 +190,8 @@ export class Custom implements CustomInstance {
     return this.create({
       name: instance.name,
       dataDeps: instance.dataDeps,
+      incrementalDataDeps: instance.incrementalDataDeps,
+      planIncremental: instance.planIncremental,
       compute: instance.compute,
       incrementalCompute: instance.incrementalCompute,
       incrementalPatchCompute: instance.incrementalPatchCompute,
@@ -194,7 +216,7 @@ export class Custom implements CustomInstance {
     const args = { ...data.public } as Record<string, unknown>;
     
     // 反序列化函数
-    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'asyncReturn'];
+    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'asyncReturn', 'planIncremental'];
     functionFields.forEach(field => {
       if (typeof args[field] === 'string' && args[field].startsWith('func::')) {
         args[field] = new Function('return ' + args[field].substring(6))();

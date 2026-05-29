@@ -3148,27 +3148,12 @@ class MigrationScheduler {
     }
 
     private async runOneDirtyComputation(computation: DataBasedComputation, mutationEvent: EtityMutationEvent, record?: Record<string, unknown>) {
-        const dataDeps = await this.controller.scheduler.resolveDataDeps(computation, record);
-        let result: unknown;
-        if (computation.incrementalPatchCompute) {
-            result = await computation.incrementalPatchCompute(undefined, mutationEvent, record, dataDeps);
-            if (result instanceof ComputationResultFullRecompute) {
-                result = await computation.compute!(dataDeps, record);
-                const event = await writeComputationResult(this.controller, computation, result, record, this.options);
-                return event ? [event] : [];
-            }
-            return writeComputationPatch(this.controller, computation, result, record, this.options);
+        const executionResult = await this.controller.scheduler.executeDataBasedComputation(computation, mutationEvent, record);
+        if (executionResult.mode === "skip") return [];
+        if (executionResult.mode === "patch") {
+            return writeComputationPatch(this.controller, computation, executionResult.result, record, this.options);
         }
-        if (computation.incrementalCompute) {
-            const lastValue = computation.useLastValue ? await this.controller.retrieveLastValue(computation.dataContext, record) : undefined;
-            result = await computation.incrementalCompute(lastValue, mutationEvent, record, dataDeps);
-            if (result instanceof ComputationResultFullRecompute) {
-                result = await computation.compute!(dataDeps, record);
-            }
-        } else {
-            result = await computation.compute!(dataDeps, record);
-        }
-        const event = await writeComputationResult(this.controller, computation, result, record, this.options);
+        const event = await writeComputationResult(this.controller, computation, executionResult.result, record, this.options);
         return event ? [event] : [];
     }
 }

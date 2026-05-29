@@ -6,7 +6,8 @@ import { FrameworkError, ErrorSeverity, ErrorCategory } from './FrameworkError.j
 export {
     ComputationError,
     ComputationStateError,
-    ComputationDataDepError
+    ComputationDataDepError,
+    ComputationProtocolError
 } from './ComputationErrors.js'
 export {
     ConstraintViolationError,

@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext, RecordBoundState, GlobalBoundState } 
 import { Summation } from "@core";
 import { Controller } from "../Controller.js";
 import { SummationInstance, EntityInstance, RelationInstance } from "@core";
-import { ComputationResult, DataBasedComputation, DataDep, RecordsDataDep } from "./Computation.js";
+import { ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, IncrementalPlan, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
@@ -14,6 +14,7 @@ export class GlobalSumHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['main']
     record: (EntityInstance|RelationInstance)
     sumFieldPath: string[]
     constructor(public controller: Controller, public args: SummationInstance, public dataContext: DataContext) {
@@ -71,6 +72,9 @@ export class GlobalSumHandle implements DataBasedComputation {
         await this.state.sum.setInternal(sum)
         return sum;
     }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
+    }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
         // 注意要同时检测名字和 relatedAttribute 才能确定是不是自己的更新，因为可能有自己和自己的关联关系的 dataDep。
@@ -105,6 +109,7 @@ export class PropertySumHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['_current']
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
@@ -183,6 +188,9 @@ export class PropertySumHandle implements DataBasedComputation {
         
         await this.state.sum.setInternal(_current, sum)
         return sum;
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {

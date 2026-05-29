@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Any } from "@core";
 import { Controller } from "../Controller.js";
 import { AnyInstance, RelationInstance } from "@core";
-import { ComputationResult, DataDep, GlobalBoundState, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
@@ -16,6 +16,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['main']
     constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: DataContext, ) {
         this.callback = this.args.callback.bind(this.controller)
         this.dataDeps = {
@@ -53,6 +54,9 @@ export class GlobalAnyHandle implements DataBasedComputation {
         await this.state.matchCount.setInternal(matchCount)
 
         return matchCount>0
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
     }
 
     async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<boolean|ComputationResult> {
@@ -96,6 +100,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['_current']
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
@@ -164,6 +169,9 @@ export class PropertyAnyHandle implements DataBasedComputation {
         }
         await this.state.matchCount.setInternal(_current, matchCount)
         return matchCount>0
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
     }
 
     async incrementalCompute(lastValue: boolean, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<boolean|ComputationResult> {

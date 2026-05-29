@@ -1,4 +1,4 @@
-import { DataContext, EntityDataContext, EventDep } from "./Computation.js";
+import { DataContext, DataDepEventContext, EntityDataContext, EventDep, IncrementalPlan } from "./Computation.js";
 import { Transform, TransformInstance, type ComputationRecord } from "@core";
 import { Controller } from "../Controller.js";
 import { MatchExp } from "@storage";
@@ -15,18 +15,16 @@ export class RecordsTransformHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['_source']
     eventDeps?: {[key: string]: EventDep}
     constructor(public controller: Controller, public args: TransformInstance, public dataContext: DataContext) {
         assert(!(this.args.record && this.args.eventDeps), 'Transform must have either record or eventDep')
-        assert(!(this.args.dataDeps && this.args.eventDeps), 'Transform must have either dataDeps or eventDeps')
         this.transformCallback = this.args.callback.bind(this.controller)
         
         if (this.args.eventDeps) {
             this.eventDeps = this.args.eventDeps
         } else {
-            assert(this.args.dataDeps?._source === undefined, 'dataDep name `_source` is reserved for Transform')
             this.dataDeps = {
-                ...(this.args.dataDeps || {}),
                 _source: {
                     type: 'records',
                     source: this.args.record as ComputationRecord,
@@ -79,6 +77,15 @@ export class RecordsTransformHandle implements DataBasedComputation {
         } else {
             return this.dataBasedIncrementalPatchCompute(lastValue, mutationEvent)
         }
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        if (context.requiresFullRecompute) {
+            return { type: 'fullRecompute', reason: context.reason || 'Transform source requires full recompute' }
+        }
+        if (context.depRole !== 'primary') {
+            return { type: 'fullRecompute', reason: `Transform can only increment from _source events, got ${context.depKey || 'unknown'}` }
+        }
+        return { type: 'incremental', dataDepKeys: [] }
     }
     async eventBasedIncrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputationResultPatch | ComputationResultPatch[]|undefined> {
         const results: ComputationResultPatch[] = []

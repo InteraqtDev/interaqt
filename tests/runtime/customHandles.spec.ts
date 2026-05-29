@@ -69,6 +69,7 @@ describe('Custom computation handle: incrementalCompute', () => {
                         attributeQuery: ['amount'],
                     },
                 },
+                incrementalDataDeps: [],
                 compute: async function (this: any, dataDeps: any) {
                     const records = dataDeps.records || [];
                     return records.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
@@ -456,6 +457,7 @@ describe('Custom computation handle: incrementalPatchCompute', () => {
                         attributeQuery: ['items'],
                     },
                 },
+                incrementalDataDeps: [],
                 compute: async function (this: any, dataDeps: any) {
                     return (dataDeps.records || []).length;
                 },

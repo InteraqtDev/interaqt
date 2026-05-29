@@ -1,7 +1,7 @@
 import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Average, AverageInstance, RelationInstance, EntityInstance } from "@core";
 import { Controller } from "../Controller.js";
-import { ComputationResult, DataBasedComputation, DataDep, RecordBoundState, GlobalBoundState, RecordsDataDep } from "./Computation.js";
+import { ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, RecordBoundState, GlobalBoundState, IncrementalPlan, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
@@ -12,6 +12,7 @@ export class GlobalAverageHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['main']
     record: (EntityInstance|RelationInstance)
     avgFieldPath: string[]
     
@@ -73,6 +74,9 @@ export class GlobalAverageHandle implements DataBasedComputation {
         await this.state.aggregate.setInternal({ sum, count });
         
         return count > 0 ? sum / count : 0;
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {
@@ -145,6 +149,7 @@ export class PropertyAverageHandle implements DataBasedComputation {
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
+    primaryDataDepKeys = ['_current']
     relationAttr: string
     relatedRecordName: string
     isSource: boolean
@@ -227,6 +232,9 @@ export class PropertyAverageHandle implements DataBasedComputation {
         await this.state.count.setInternal(_current, count);
         
         return count > 0 ? sum / count : 0;
+    }
+    planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context)
     }
 
     async incrementalCompute(lastValue: number, mutationEvent: EtityMutationEvent, record: any, dataDeps: {[key: string]: unknown}): Promise<number|ComputationResult> {

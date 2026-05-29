@@ -1,363 +1,220 @@
 # 实现 DataBasedComputation 指南
 
-本文档提供了如何实现自定义的 DataBasedComputation 的详细指南，基于已有的 WeightedSummation、Every、Any 等实现经验。
+本文档说明 runtime 中基于数据的 computation 如何实现全量计算和安全的增量计算。当前调度协议的核心原则是：增量路径必须先声明本次事件真正需要读取哪些 `dataDeps`，scheduler 只解析这些依赖；只有初始化、强制全量、计划阶段要求 full recompute 或增量结果回退 full recompute 时，才解析完整依赖。
 
-## 什么是 DataBasedComputation
+## 核心概念
 
-DataBasedComputation 是一个接口，用于定义基于数据的计算逻辑。它是增量计算的基础，允许系统根据数据变化高效地更新计算结果，而不是每次都重新计算全部数据。
+一个 `DataBasedComputation` 通常包含：
 
-## 核心组件
+1. `dataDeps`：全量计算需要的数据依赖。
+2. `primaryDataDepKeys`：当前 computation 自己维护的主集合依赖，例如 `main`、`_current`、`_source`。
+3. `compute()`：全量计算入口，接收完整 `dataDeps`。
+4. `incrementalCompute()` 或 `incrementalPatchCompute()`：增量入口，只接收计划声明的 partial `dataDeps`。
+5. `planIncremental()`：增量计划入口，必须为所有 data-based incremental computation 实现。
 
-实现一个 DataBasedComputation 通常需要以下核心组件：
+## 增量计划协议
 
-1. **处理类** - 例如 `GlobalXXXHandle` 和 `PropertyXXXHandle`
-2. **状态管理** - 使用 `GlobalBoundState` 或 `RecordBoundState`
-3. **计算逻辑** - 包括初始计算 (`compute`) 和增量计算 (`incrementalCompute`)
-4. **数据依赖** - 通过 `dataDeps` 定义计算所需的数据源
-
-## 实现步骤
-
-### 1. 定义处理类
-
-通常需要为全局计算和属性计算分别实现处理类：
+只要 data-based computation 声明了 `incrementalCompute()` 或 `incrementalPatchCompute()`，就必须实现 `planIncremental()`。缺失该协议会在 source map 初始化或调度阶段抛 `ComputationProtocolError`，不会静默回到旧的 eager resolve 行为。
 
 ```typescript
-// 全局计算处理类
+import {
+  DataBasedComputation,
+  DataDepEventContext,
+  IncrementalPlan,
+  defaultDataBasedIncrementalPlan,
+} from "./Computation.js";
+
 export class GlobalXXXHandle implements DataBasedComputation {
-    // 实现...
-}
+  primaryDataDepKeys = ["main"];
 
-// 实体属性计算处理类
-export class PropertyXXXHandle implements DataBasedComputation {
-    // 实现...
+  dataDeps = {
+    main: {
+      type: "records",
+      source: this.args.record,
+      attributeQuery: this.args.attributeQuery || [],
+      match: this.args.match,
+      modifier: this.args.modifier,
+    },
+    extra: this.args.dataDeps?.extra,
+  };
+
+  planIncremental(_event: unknown, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+    return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context, {
+      needsLastValue: { mode: "normal" },
+    });
+  }
 }
 ```
 
-### 2. 实现 DataBasedComputation 接口
+`IncrementalPlan` 有三种结果：
 
-每个处理类需要实现 DataBasedComputation 接口的必要方法和属性：
+```typescript
+type IncrementalPlan =
+  | { type: "incremental"; dataDepKeys: string[]; needsLastValue?: boolean | LastValuePolicy }
+  | { type: "fullRecompute"; reason: string }
+  | { type: "skip"; reason: string };
+```
+
+- `incremental`：只解析 `dataDepKeys` 中列出的依赖。`[]` 表示本次增量不需要预解析任何 data dep。
+- `fullRecompute`：当前事件不能安全增量处理，scheduler 会直接进入 full compute，只解析完整依赖一次。
+- `skip`：source map 保守触发了事件，但计划阶段确认该事件不影响计算；scheduler 不读取依赖、不调用计算、不写结果。
+
+`defaultDataBasedIncrementalPlan()` 适合大多数内置聚合类 computation：主 dep 事件走增量并只解析外部 deps；外部 dep 事件、match/modifier membership 风险走 full recompute；可安全判定的非匹配事件走 skip。
+
+对声明 `incrementalPatchCompute()` 的 computation，计划阶段或增量结果触发的 full recompute 会按 full output 写入，而不是传给 `applyResultPatch()`。scheduler 内部会区分 `full`、`incremental`、`patch`、`skip` 执行结果；只有真正执行 `incrementalPatchCompute()` 并返回 patch 结果时才走 patch apply。
+
+## DataDepEventContext
+
+`planIncremental()` 会收到 scheduler 标准化后的事件上下文：
+
+```typescript
+type DataDepEventContext = {
+  depKey?: string;
+  depRole: "primary" | "external" | "self" | "unknown";
+  membershipChange: "none" | "entered" | "left" | "maybe" | "unknown";
+  requiresFullRecompute: boolean;
+  skip?: boolean;
+  reason?: string;
+};
+```
+
+handle 不应该各自重新解析 `event.dataDep`、`records.match` 或 `modifier.orderBy`。如果 `context.requiresFullRecompute` 为 true，返回 full recompute；如果 `context.skip` 为 true，返回 skip。
+
+## Data Deps 解析语义
+
+runtime 提供两个显式入口：
+
+```typescript
+await scheduler.resolveAllDataDeps(computation, record);
+await scheduler.resolveSelectedDataDeps(computation, record, ["extra"]);
+```
+
+全量路径使用 `resolveAllDataDeps()`。增量路径只能使用 `planIncremental().dataDepKeys` 触发的 `resolveSelectedDataDeps()`。partial resolve 会去重、校验未知 key，并按 key 构造结果对象，不能依赖对象枚举顺序。
+
+`records` data dep 的 full resolve 会传入 `match` 和 `modifier`：
+
+```typescript
+storage.find(dataDep.source.name, dataDep.match, dataDep.modifier ?? {}, dataDep.attributeQuery);
+```
+
+## Records Match 和 Modifier
+
+`RecordsDataDep.match` 同时影响查询语义和 source map 触发语义：
+
+- full resolve 必须应用 `match`。
+- update source map 会监听 `match` 中涉及的字段。
+- create/delete 事件如果能在本地确认不匹配，计划阶段会 skip。
+- update 事件如果跨越 match membership 边界，计划阶段会 full recompute。
+- relation path 或无法安全本地判断的复杂 match 会保守 full recompute。
+
+`RecordsDataDep.modifier` 中的 `limit`、`offset`、`orderBy` 会改变窗口或排序 membership，默认不安全增量。`orderBy` 字段会进入 update source map；一旦触发相关事件，计划阶段 full recompute，而不是尝试用单条 delta 维护有序窗口。
+
+## Last Value
+
+增量路径不会因为 `useLastValue` 自动读取 last value。只有 `planIncremental()` 显式声明 `needsLastValue` 时才读取：
+
+```typescript
+return {
+  type: "incremental",
+  dataDepKeys: [],
+  needsLastValue: { mode: "normal" },
+};
+```
+
+对 `entity` / `relation` 输出，当前 last value 读取可能扫描完整输出表，因此必须显式声明高风险策略：
+
+```typescript
+needsLastValue: { mode: "fullOutput", reason: "patch needs complete output state" }
+```
+
+如果 entity/relation incremental computation 只返回 `needsLastValue: true` 或 `{ mode: "normal" }`，scheduler 会抛 `ComputationProtocolError`。
+
+## 实现示例
+
+全局计数类 computation 的典型结构：
 
 ```typescript
 export class GlobalXXXHandle implements DataBasedComputation {
-    // 上下文和回调函数
-    callback: (this: Controller, item: any) => any
-    state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
-    dataDeps: {[key: string]: DataDep} = {}
-    
-    // 构造函数
-    constructor(public controller: Controller, args: KlassInstance<typeof XXX>, public dataContext: DataContext) {
-        // 初始化...
-    }
-    
-    // 状态管理
-    createState() {
-        // 返回状态对象...
-    }
-    
-    // 默认值
-    getInitialValue() {
-        // 返回默认值...
-    }
-    
-    // 全量计算
-    async compute(data: any): Promise<any> {
-        // 实现计算逻辑...
-    }
-    
-    // 增量计算
-    async incrementalCompute(lastValue: any, mutationEvent: ERRecordMutationEvent): Promise<any> {
-        // 实现增量计算逻辑...
-    }
-}
-```
+  primaryDataDepKeys = ["main"];
+  useLastValue = true;
 
-### 3. 定义数据依赖
+  dataDeps = {
+    main: {
+      type: "records",
+      source: this.args.record,
+      attributeQuery: this.args.attributeQuery || [],
+      match: this.args.match,
+    },
+    ...(this.args.dataDeps || {}),
+  };
 
-在构造函数中，需要定义计算所需的数据依赖：
-
-```typescript
-constructor(public controller: Controller, args: KlassInstance<typeof XXX>, public dataContext: DataContext) {
-    this.callback = args.callback.bind(this)
-    
-    this.dataDeps = {
-        main: {
-            type: 'records',
-            source: args.record,
-            attributeQuery: args.attributeQuery || []
-        }
-    }
-}
-```
-
-### 4. 实现状态管理
-
-根据计算类型，使用 GlobalBoundState 或 RecordBoundState 来管理状态：
-
-```typescript
-// 全局状态
-createState() {
-    return {
-        result: new GlobalBoundState<number>(0) // 初始值
-    }
-}
-
-// 记录绑定状态
-createState() {
-    return {
-        result: new RecordBoundState<number>(0) // 初始值
-    }
-}
-```
-
-### 5. 实现全量计算
-
-`compute` 方法用于执行初始的全量计算：
-
-```typescript
-async compute({main: records}: {main: any[]}): Promise<number> {
-    // 对记录执行计算
+  async compute({ main, ...externalDeps }: Record<string, unknown>) {
     let result = 0;
-    for (const record of records) {
-        // 应用计算逻辑
-        result += this.calculateValue(record);
+    for (const item of main as unknown[]) {
+      result += this.callback.call(this.controller, item, externalDeps) ? 1 : 0;
     }
-    
-    // 保存状态
     await this.state.result.set(result);
     return result;
+  }
+
+  planIncremental(_event: unknown, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+    return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context, {
+      needsLastValue: { mode: "normal" },
+    });
+  }
+
+  async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent, _record: unknown, dataDeps: Record<string, unknown>) {
+    // dataDeps only contains keys returned by planIncremental(); it will not contain main.
+    return this.applyDelta(lastValue, mutationEvent, dataDeps);
+  }
 }
 ```
 
-### 6. 实现增量计算
-
-`incrementalCompute` 方法是优化的关键，它只处理变化的部分：
+属性级 computation 通常将 `_current` 作为主 dep：
 
 ```typescript
-async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
-    let result = lastValue;
-    
-    if (mutationEvent.type === 'create') {
-        // 处理新建记录
-        const newValue = this.calculateValue(mutationEvent.record);
-        result = result + newValue;
-    } else if (mutationEvent.type === 'delete') {
-        // 处理删除记录
-        const oldValue = this.calculateValue(mutationEvent.oldRecord);
-        result = result - oldValue;
-    } else if (mutationEvent.type === 'update') {
-        // 处理更新记录
-        const oldValue = this.calculateValue(mutationEvent.oldRecord);
-        const newValue = this.calculateValue(mutationEvent.record);
-        result = result - oldValue + newValue;
-    }
-    
-    // 更新状态
-    await this.state.result.set(result);
-    return result;
-}
-```
-
-### 7. 声明支持的计算类型
-
-每个处理类需要声明它所支持的计算类型和数据上下文类型：
-
-```typescript
-export class GlobalXXXHandle implements DataBasedComputation {
-    static computationType = XXX
-    static contextType = 'global' as const
-    // ... 其他实现
-}
-
 export class PropertyXXXHandle implements DataBasedComputation {
-    static computationType = XXX  
-    static contextType = 'property' as const
-    // ... 其他实现
-}
+  primaryDataDepKeys = ["_current"];
 
-// 如果一个处理类支持多种上下文类型
-export class MultiContextHandle implements DataBasedComputation {
-    static computationType = XXX
-    static contextType = ['entity', 'relation'] as const
-    // ... 其他实现
-}
+  dataDeps = {
+    _current: {
+      type: "property",
+      attributeQuery: [[this.relationAttr, { attributeQuery: this.args.attributeQuery || [] }]],
+    },
+  };
 
-// 导出计算处理器数组
-export const XXXHandles = [GlobalXXXHandle, PropertyXXXHandle];
+  planIncremental(_event: unknown, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+    return defaultDataBasedIncrementalPlan(this.dataDeps, this.primaryDataDepKeys, context, {
+      needsLastValue: { mode: "normal" },
+    });
+  }
+}
 ```
 
-### 8. 使用自定义计算
+## Custom Computation
 
-在创建 Controller 时，将自定义计算处理器传入：
+`Custom` 的增量计算也必须声明计划。简单场景可以使用声明式 `incrementalDataDeps`：
 
 ```typescript
-const controller = new Controller({
-    system: system,
-    entities: entities,
-    relations: relations,
-    activities: [],
-    interactions: [],
-    computations: [...XXXHandles] // 传入自定义计算处理器
+Custom.create({
+  name: "customScore",
+  dataDeps: {
+    main: { type: "records", source: Item, attributeQuery: ["id", "score"] },
+    config: { type: "global", source: ConfigValue },
+  },
+  incrementalDataDeps: ["config"],
+  incrementalCompute(lastValue, event, record, dataDeps) {
+    // dataDeps contains config only.
+  },
 });
 ```
 
-## 实现示例：WeightedSummation
-
-下面是 WeightedSummation 的实现示例，展示了如何创建加权求和计算：
-
-### 全局加权求和
-
-```typescript
-export class GlobalWeightedSummationHandle implements DataBasedComputation {
-    matchRecordToWeight: (this: Controller, item: any) => { weight: number; value: number }
-    state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
-    dataDeps: {[key: string]: DataDep} = {}
-
-    constructor(public controller: Controller, args: KlassInstance<typeof WeightedSummation>, public dataContext: DataContext) {
-        this.matchRecordToWeight = args.callback.bind(this)
-        this.dataDeps = {
-            main: {
-                type: 'records',
-                source: args.record,
-                attributeQuery: args.attributeQuery || []
-            }
-        }
-    }
-
-    createState() {
-        return {
-            summation: new GlobalBoundState<number>(0)
-        }
-    }
-    
-    getInitialValue() {
-        return 0
-    }
-
-    async compute({main: records}: {main: any[]}): Promise<number> {
-        let summation = 0;
-        
-        for (const record of records) {
-            const result = this.matchRecordToWeight.call(this.controller, record);
-            summation += result.weight * result.value;
-        }
-
-        await this.state.summation.set(summation);
-        return summation;
-    }
-
-    async incrementalCompute(lastValue: number, mutationEvent: ERRecordMutationEvent): Promise<number> {
-        let summation = await this.state!.summation.get();
-        
-        if (mutationEvent.type === 'create') {
-            const newItem = mutationEvent.record;
-            const result = this.matchRecordToWeight.call(this.controller, newItem);
-            summation = await this.state!.summation.set(summation + (result.weight * result.value));
-        } else if (mutationEvent.type === 'delete') {
-            const oldItem = mutationEvent.oldRecord;
-            const result = this.matchRecordToWeight.call(this.controller, oldItem);
-            summation = await this.state!.summation.set(summation - (result.weight * result.value));
-        } else if (mutationEvent.type === 'update') {
-            const oldItem = mutationEvent.oldRecord;
-            const newItem = mutationEvent.record;
-            
-            const oldResult = this.matchRecordToWeight.call(this.controller, oldItem);
-            const newResult = this.matchRecordToWeight.call(this.controller, newItem);
-            
-            const oldValue = oldResult.weight * oldResult.value;
-            const newValue = newResult.weight * newResult.value;
-            
-            summation = await this.state!.summation.set(summation - oldValue + newValue);
-        }
-
-        return summation;
-    }
-}
-```
-
-## 实现示例：属性计算
-
-特别地，属性计算需要处理关系数据：
-
-```typescript
-export class PropertyXXXHandle implements DataBasedComputation {
-    callback: (this: Controller, item: any) => any
-    state!: ReturnType<typeof this.createState>
-    useLastValue: boolean = true
-    dataDeps: {[key: string]: DataDep} = {}
-    relationAttr: string
-    relatedRecordName: string
-    isSource: boolean
-
-    constructor(public controller: Controller, public args: KlassInstance<typeof XXX>, public dataContext: PropertyDataContext) {
-        this.callback = args.callback.bind(this)
-
-        const relation = args.record as KlassInstance<typeof Relation>
-        this.relationAttr = relation.source.name === dataContext.host.name ? relation.sourceProperty : relation.targetProperty
-        this.isSource = relation.source.name === dataContext.host.name
-        this.relatedRecordName = this.isSource ? relation.target.name : relation.source.name
-        
-        this.dataDeps = {
-            _current: {
-                type: 'property',
-                attributeQuery: [[this.relationAttr, {attributeQuery: args.attributeQuery || []}]]
-            }
-        }
-    }
-
-    createState() {
-        return {
-            result: new RecordBoundState<any>(this.getInitialValue())
-        }   
-    }
-    
-    getInitialValue() {
-        return 0 // 或其他默认值
-    }
-
-    async compute({_current}: {_current: any}): Promise<any> {
-        // 实现具体的计算逻辑...
-    }
-
-    async incrementalCompute(lastValue: any, mutationEvent: ERRecordMutationEvent): Promise<any> {
-        // 特别处理关联变更...
-        const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
-        
-        if (relatedMutationEvent.type === 'create') {
-            // 处理关联创建...
-        } else if (relatedMutationEvent.type === 'delete') {
-            // 处理关联删除...
-        } else if (relatedMutationEvent.type === 'update') {
-            // 处理关联更新...
-        }
-
-        return result;
-    }
-}
-```
-
-## 性能考虑
-
-1. **状态缓存** - 使用 RecordBoundState 和 GlobalBoundState 来缓存中间计算结果
-2. **增量计算** - 只处理发生变化的数据部分
-3. **数据依赖** - 精确定义计算所需的数据，避免不必要的数据获取
-4. **事件处理** - 根据事件类型（创建/更新/删除）采取不同的处理策略
-
-## 调试技巧
-
-1. 确保 callback 函数正确绑定了 this
-2. 验证状态是否正确保存和读取
-3. 检查增量计算是否正确处理所有场景
-4. 使用日志跟踪计算过程中的值变化
-5. 确保在处理关系数据时正确识别源和目标
+复杂场景可以传入 `planIncremental(event, record, context)`，手动返回 `incremental`、`fullRecompute` 或 `skip`。如果声明了 `incrementalCompute` 或 `incrementalPatchCompute`，但没有 `planIncremental` / `incrementalDataDeps`，runtime 会明确失败。
 
 ## 最佳实践
 
-1. **分离关注点** - 将全局计算和属性计算的逻辑分开
-2. **保持简洁** - 每个计算只负责一种明确的计算任务
-3. **处理边界情况** - 考虑零值、负值、空集合等特殊情况
-4. **添加类型注解** - 确保类型安全和代码可读性
-5. **全面测试** - 针对不同场景编写测试用例
-6. **命名一致** - 遵循项目的命名约定
-7. **文档注释** - 为复杂的计算逻辑添加注释 
+1. 把主集合依赖放进 `primaryDataDepKeys`，增量计划只声明外部 deps 或真正需要的 deps。
+2. 在 `compute()` 中按完整数据实现正确性，在增量方法中只处理当前事件 delta。
+3. 遇到外部 dep 事件、复杂 relation path、match membership 边界变化、modifier 窗口/排序变化时，优先 full recompute。
+4. 只有计划明确需要时才读取 last value；entity/relation 输出要显式声明 `fullOutput` 策略。
+5. 为新增 computation 补测试：不 eager resolve 主 dep、partial dep key 映射、full recompute fallback、match/modifier membership、last value 策略。
