@@ -1,5 +1,12 @@
 
 
+## [1.6.0](https://github.com/InteraqtDev/interaqt/compare/v1.5.9...v1.6.0) (2026-05-29)
+
+
+### Features
+
+* **runtime:** plan data-based incremental deps ([abd7ce0](https://github.com/InteraqtDev/interaqt/commit/abd7ce0392291244c8bf16bd6870084ad19acc7b))
+
 ## [1.5.9](https://github.com/InteraqtDev/interaqt/compare/v1.5.8...v1.5.9) (2026-05-16)
 
 
