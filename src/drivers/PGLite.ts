@@ -230,7 +230,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         } else if (type === 'boolean') {
             return 'BOOL'
         } else if(type === 'number'){
-            return "INT"
+            // CAUTION JS 的 number 是双精度浮点。映射成 INT 会让合法的小数值
+            //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
+            return "DOUBLE PRECISION"
         }else if(type === 'timestamp'){
             return "TIMESTAMP"
         }else{

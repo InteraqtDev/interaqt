@@ -67,7 +67,17 @@ class IDSystem {
         }
         for (const [quotedSequence, maxExistingId] of sequenceMax) {
             if (maxExistingId >= 1) {
-                await this.db.query(`SELECT setval($1::regclass, $2, true)`, [quotedSequence, maxExistingId], `set sequence ${quotedSequence}`)
+                // CAUTION 只允许"向前推进"序列，绝不能回拨。
+                //  setup(false)（新进程 attach 已运行的库）会走到这里，此时其他进程可能正在写入：
+                //  它们未提交的行对 MAX() 不可见，但已经消费了更大的序列值。无条件 setval 会把
+                //  序列拨回已提交的最大 id，后续 nextval 就会发出重复 id。
+                //  last_value/is_called 与 nextval 一样是非事务性的、立即可见，所以用它们做守卫是安全的：
+                //  只在序列从未使用（初始化/legacy 迁移）或落后于表内已有 id（外部 id 写入）时才推进。
+                await this.db.query(
+                    `SELECT setval($1::regclass, $2, true) FROM ${quotedSequence} WHERE NOT is_called OR last_value < $2`,
+                    [quotedSequence, maxExistingId],
+                    `advance sequence ${quotedSequence}`
+                )
             }
         }
     }
@@ -122,6 +132,17 @@ export class PostgreSQLDB implements Database{
         this.db = new Client({ ...options })
     }
     async open(forceDrop = false) {
+        // CAUTION open() 必须可以在 openForSchemaRead()（或再次 open）之后被调用而不泄漏连接池。
+        //  例如 Controller.setup(false) 会先经 prepareMigrationSchema 打开只读池做 manifest 校验，
+        //  再走 system.setup 调用 open(false)。如果这里无条件 new Pool，旧池会被孤儿化：
+        //  close() 只会关掉最新的池，残留的空闲连接之后被 DROP DATABASE ... WITH (FORCE)
+        //  之类的管理命令杀死时，会在进程里产生无人处理的 'error' 事件。
+        if (this.pool && forceDrop) {
+            // forceDrop 会摧毁当前数据库，先优雅关闭已有的池，避免它的空闲连接被强杀。
+            await this.pool.end()
+            this.pool = undefined
+        }
+
         const adminClient = new Client({
             ...this.options,
         })
@@ -139,30 +160,45 @@ export class PostgreSQLDB implements Database{
         }
         await adminClient.end()
 
-        this.pool = new Pool({
-            ...this.options,
-            database: this.database
-        })
+        if (!this.pool) {
+            this.pool = this.createPool()
 
-        this.db = new Client({
-            ...this.options,
-            database: this.database
-        })
+            this.db = new Client({
+                ...this.options,
+                database: this.database
+            })
+        }
     }
     async openForSchemaRead() {
         if (this.pool) return
         // Strict dry-run schema planning must only connect to the target
         // database. Database creation/drop and framework table setup belong to
         // the normal open/setup paths.
-        this.pool = new Pool({
-            ...this.options,
-            database: this.database
-        })
+        this.pool = this.createPool()
 
         this.db = new Client({
             ...this.options,
             database: this.database
         })
+    }
+    private createPool() {
+        const pool = new Pool({
+            ...this.options,
+            database: this.database
+        })
+        // CAUTION 必须给 Pool 挂 'error' 监听器（node-postgres 的标准要求）。
+        //  空闲连接被服务端终止（如管理命令、服务重启）时 Pool 会 emit 'error'，
+        //  没有监听器的话会直接变成进程级 uncaught exception。
+        //  这种错误是可恢复的：Pool 会丢弃该连接，下次取用时重建，所以记录日志即可。
+        pool.on('error', (error) => {
+            this.logger.error({
+                type: 'pool',
+                name: 'idle client error',
+                sql: '',
+                error: error instanceof Error ? error.message : String(error),
+            })
+        })
+        return pool
     }
     private getQueryable() {
         const context = this.transactionContext.getStore()
@@ -337,7 +373,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         } else if (type === 'boolean') {
             return 'BOOLEAN'
         } else if(type === 'number'){
-            return "INT"
+            // CAUTION JS 的 number 是双精度浮点。映射成 INT 会让合法的小数值
+            //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
+            return "DOUBLE PRECISION"
         }else if(type === 'timestamp'){
             return "TIMESTAMP"
         }else{

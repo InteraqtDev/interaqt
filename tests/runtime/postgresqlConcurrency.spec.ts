@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'vitest';
-import { Entity, Property, Dictionary, Summation, Controller, MonoSystem, MatchExp, KlassByName, Relation, Custom, Interaction, Action, Payload, PayloadItem, ComputationResult, Count, Average, Every, Any, WeightedSummation, Transform, StateMachine, StateNode, StateTransfer, InteractionEventEntity, runWithTransactionRetry } from 'interaqt';
+import { Entity, Property, Dictionary, Controller, MonoSystem, MatchExp, KlassByName, Relation, Custom, Interaction, Action, Payload, PayloadItem, ComputationResult, runWithTransactionRetry } from 'interaqt';
 import { PostgreSQLDB } from '@drivers';
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const execFileAsync = promisify(execFile);
 const describeIfPostgres = process.env.INTERAQT_POSTGRES_DATABASE ? describe : describe.skip;
+// CAUTION 独占的数据库名（带后缀）。postgres 相关的 spec 文件会被 vitest 并行执行，
+//  且各自 setup(true) 会 DROP DATABASE ... WITH (FORCE)，共享库名会互相摧毁数据。
+const database = process.env.INTERAQT_POSTGRES_DATABASE ? `${process.env.INTERAQT_POSTGRES_DATABASE}_concurrency` : '';
 const dbOptions = {
   host: process.env.PGHOST,
   port: process.env.PGPORT ? Number(process.env.PGPORT) : undefined,
@@ -15,212 +19,36 @@ const dbOptions = {
   password: process.env.PGPASSWORD,
 };
 
-function createPropertyAggregateFixture() {
-  const User = Entity.create({
-    name: 'PgAggregateUser',
-    properties: [Property.create({ name: 'name', type: 'string' })],
-  });
-  const Order = Entity.create({
-    name: 'PgAggregateOrder',
-    properties: [
-      Property.create({ name: 'amount', type: 'number' }),
-      Property.create({ name: 'weight', type: 'number' }),
-    ],
-  });
-  const UserOrder = Relation.create({
-    name: 'PgAggregateUserOrder',
-    source: User,
-    sourceProperty: 'orders',
-    target: Order,
-    targetProperty: 'buyer',
-    type: '1:n',
-  });
+// CAUTION 与 worker 子进程共享的模型 fixture（见该模块内注释：manifest 依赖函数文本一致性）。
+import {
+  createAsyncReturnFixture,
+  createFullReplaceFixture,
+  createGlobalSummationFixture,
+  createPropertyAggregateFixture,
+  createStateMachineFixture,
+  createTransformFixture,
+} from './helpers/postgresConcurrencyFixtures.js';
 
-  User.properties.push(
-    Property.create({ name: 'orderCount', type: 'number', computation: Count.create({ property: 'orders' }) }),
-    Property.create({ name: 'orderTotal', type: 'number', computation: Summation.create({ property: 'orders', attributeQuery: ['amount'] }) }),
-    Property.create({ name: 'orderAverage', type: 'number', computation: Average.create({ property: 'orders', attributeQuery: ['amount'] }) }),
-    Property.create({
-      name: 'allPositive',
-      type: 'boolean',
-      computation: Every.create({ property: 'orders', attributeQuery: ['amount'], callback: (order: any) => order.amount > 0 }),
-    }),
-    Property.create({
-      name: 'hasLargeOrder',
-      type: 'boolean',
-      computation: Any.create({ property: 'orders', attributeQuery: ['amount'], callback: (order: any) => order.amount >= 1000 }),
-    }),
-    Property.create({
-      name: 'weightedTotal',
-      type: 'number',
-      computation: WeightedSummation.create({
-        property: 'orders',
-        attributeQuery: ['amount', 'weight'],
-        callback: (order: any) => ({ value: order.amount || 0, weight: order.weight || 0 }),
-      }),
-    })
+const specDir = path.dirname(fileURLToPath(import.meta.url));
+const workerPath = path.resolve(specDir, 'helpers/postgresConcurrencyWorker.ts');
+const require = createRequire(import.meta.url);
+const viteNodeEntry = path.resolve(path.dirname(require.resolve('vite-node/package.json')), 'vite-node.mjs');
+const vitestConfigPath = path.resolve(specDir, '../../vitest.config.ts');
+
+// CAUTION worker 子进程必须使用和 vitest 父进程完全相同的模块转换管线（vite-node，同一份配置）。
+//  migration manifest 会对 computation 回调做 Function.prototype.toString() 哈希：
+//  父进程用 vitest(vite/esbuild) 转换、worker 若用其他 loader（如 tsx，会压缩空白），
+//  同一份源码会得到不同的函数文本 → modelHash 不一致 → setup(false) 正确地报
+//  "Model manifest mismatch"。这不是伪造绕过，而是让父子进程真正运行同一份编译产物。
+function execWorker(env: Record<string, string>) {
+  return execFileAsync(
+    process.execPath,
+    [viteNodeEntry, '--config', vitestConfigPath, workerPath],
+    {
+      env: { ...process.env, ...env },
+      maxBuffer: 1024 * 1024,
+    }
   );
-
-  return { User, Order, entities: [User, Order], relations: [UserOrder] };
-}
-
-function createStateMachineFixture() {
-  const Order = Entity.create({
-    name: 'PgStateOrder',
-    properties: [Property.create({ name: 'title', type: 'string' })],
-  });
-  const Approve = Interaction.create({
-    name: 'pgApproveOrder',
-    action: Action.create({ name: 'pgApproveOrder' }),
-    payload: Payload.create({ items: [PayloadItem.create({ name: 'order', type: 'Entity', base: Order, isRef: true })] }),
-  });
-  const Reject = Interaction.create({
-    name: 'pgRejectOrder',
-    action: Action.create({ name: 'pgRejectOrder' }),
-    payload: Payload.create({ items: [PayloadItem.create({ name: 'order', type: 'Entity', base: Order, isRef: true })] }),
-  });
-  const pending = StateNode.create({ name: 'pending' });
-  const approved = StateNode.create({ name: 'approved' });
-  const rejected = StateNode.create({ name: 'rejected' });
-
-  Order.properties.push(Property.create({
-    name: 'status',
-    type: 'string',
-    computation: StateMachine.create({
-      states: [pending, approved, rejected],
-      initialState: pending,
-      transfers: [
-        StateTransfer.create({
-          trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: Approve.name } },
-          current: pending,
-          next: approved,
-          computeTarget: (event: any) => ({ id: event.record.payload.order.id }),
-        }),
-        StateTransfer.create({
-          trigger: { recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: Reject.name } },
-          current: pending,
-          next: rejected,
-          computeTarget: (event: any) => ({ id: event.record.payload.order.id }),
-        }),
-      ],
-    }),
-  }));
-
-  return { Order, Approve, Reject, entities: [Order], relations: [], eventSources: [Approve, Reject] };
-}
-
-function createTransformFixture() {
-  const Source = Entity.create({
-    name: 'PgTransformSource',
-    properties: [Property.create({ name: 'items', type: 'number' })],
-  });
-  const Derived = Entity.create({
-    name: 'PgTransformDerived',
-    properties: [Property.create({ name: 'idx', type: 'number' })],
-    computation: Transform.create({
-      record: Source,
-      attributeQuery: ['*'],
-      callback: (source: any) => ({ idx: source.items || 0 }),
-    }),
-  });
-
-  return { Source, Derived, entities: [Source, Derived], relations: [] };
-}
-
-function createAsyncReturnWorkerFixture() {
-  const Source = Entity.create({
-    name: 'PgAsyncWorkerSource',
-    properties: [Property.create({ name: 'value', type: 'number' })],
-  });
-  const AddSource = Interaction.create({
-    name: 'pgAddAsyncWorkerSource',
-    action: Action.create({ name: 'pgAddAsyncWorkerSource' }),
-    payload: Payload.create({
-      items: [PayloadItem.create({ name: 'source', type: 'Entity', base: Source })],
-    }),
-  });
-  AddSource.resolve = async function(this: Controller, event: any) {
-    return this.system.storage.create('PgAsyncWorkerSource', event.payload.source);
-  };
-  const total = Dictionary.create({
-    name: 'pgAsyncWorkerTotal',
-    type: 'number',
-    collection: false,
-    computation: Custom.create({
-      name: 'PgAsyncWorkerTotal',
-      dataDeps: {
-        sources: { type: 'records', source: Source, attributeQuery: ['value'] },
-      },
-      compute: async () => ComputationResult.async({ freshnessKey: 'pg-async-worker' }),
-      asyncReturn: async (result: number) => result,
-    }),
-  });
-
-  return { Source, AddSource, total, entities: [Source], relations: [], eventSources: [AddSource], dict: [total] };
-}
-
-function createFullReplaceFixture() {
-  const Trigger = Entity.create({
-    name: 'PgReplaceTrigger',
-    properties: [Property.create({ name: 'value', type: 'number' })],
-  });
-  const AddTrigger = Interaction.create({
-    name: 'pgAddReplaceTrigger',
-    action: Action.create({ name: 'pgAddReplaceTrigger' }),
-    payload: Payload.create({
-      items: [PayloadItem.create({ name: 'trigger', type: 'Entity', base: Trigger })],
-    }),
-  });
-  AddTrigger.resolve = async function(this: Controller, event: any) {
-    return this.system.storage.create('PgReplaceTrigger', event.payload.trigger);
-  };
-  const Result = Entity.create({
-    name: 'PgReplaceResult',
-    properties: [Property.create({ name: 'value', type: 'number' })],
-    computation: Custom.create({
-      name: 'PgReplaceResultComputation',
-      dataDeps: {
-        triggers: { type: 'records', source: Trigger, attributeQuery: ['value'] },
-      },
-      compute: async (dataDeps: any) => (dataDeps.triggers || []).map((trigger: any) => ({ value: trigger.value })),
-    }),
-  });
-  const Left = Entity.create({
-    name: 'PgReplaceLeft',
-    properties: [Property.create({ name: 'name', type: 'string' })],
-  });
-  const Right = Entity.create({
-    name: 'PgReplaceRight',
-    properties: [Property.create({ name: 'name', type: 'string' })],
-  });
-  const ResultRelation = Relation.create({
-    name: 'PgReplaceRelation',
-    source: Left,
-    sourceProperty: 'replaceLinks',
-    target: Right,
-    targetProperty: 'replaceLinkedBy',
-    type: 'n:n',
-    properties: [Property.create({ name: 'value', type: 'number' })],
-    computation: Custom.create({
-      name: 'PgReplaceRelationComputation',
-      dataDeps: {
-        triggers: { type: 'records', source: Trigger, attributeQuery: ['value'] },
-        lefts: { type: 'records', source: Left, attributeQuery: ['id'] },
-        rights: { type: 'records', source: Right, attributeQuery: ['id'] },
-      },
-      compute: async (dataDeps: any) => {
-        const lefts = dataDeps.lefts || [];
-        const rights = dataDeps.rights || [];
-        return (dataDeps.triggers || []).slice(0, Math.min(lefts.length, rights.length)).map((trigger: any, index: number) => ({
-          source: { id: lefts[index].id },
-          target: { id: rights[index].id },
-          value: trigger.value,
-        }));
-      },
-    }),
-  });
-
-  return { Trigger, AddTrigger, Result, Left, Right, ResultRelation, entities: [Trigger, Result, Left, Right], relations: [ResultRelation], eventSources: [AddTrigger] };
 }
 
 function createBarrier(count: number) {
@@ -239,7 +67,6 @@ function createBarrier(count: number) {
 
 describeIfPostgres('PostgreSQL computation concurrency', () => {
   test('allocates unique ids through sequences during concurrent creates', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const sequenceEntity = Entity.create({
       name: 'PgSequenceItem',
       properties: [
@@ -272,7 +99,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('allocates unique ids for relation links through sequences', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const User = Entity.create({
       name: 'PgSequenceUser',
       properties: [Property.create({ name: 'name', type: 'string' })],
@@ -315,7 +141,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('initializes PostgreSQL sequences from legacy ids, table max, missing ids table, and shared physical tables', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const MigrationItem = Entity.create({
       name: 'PgSequenceMigrationItem',
       properties: [Property.create({ name: 'value', type: 'number' })],
@@ -391,7 +216,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('runs 50 concurrent dispatches through Pool without transaction cross-talk', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const EventRecord = Entity.create({
       name: 'PgPoolDispatchEvent',
       properties: [Property.create({ name: 'value', type: 'number' })],
@@ -443,7 +267,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('runs concurrent serializable custom dispatches through retry', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const Counter = Entity.create({
       name: 'PgSerializableDispatchCounter',
       properties: [Property.create({ name: 'value', type: 'number' })],
@@ -475,6 +298,8 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
         dataDeps: {
           counters: { type: 'records', source: Counter, attributeQuery: ['value'] },
         },
+        // 增量计算只依赖 lastValue（每个 mutation +1），不需要额外的增量数据依赖
+        incrementalDataDeps: [],
         incrementalCompute: async (lastValue: number) => (lastValue || 0) + 1,
         getInitialValue: () => 0,
       }),
@@ -509,7 +334,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('handles a PostgreSQL async task only once across repeated workers', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const Source = Entity.create({
       name: 'PgAsyncOnceSource',
       properties: [Property.create({ name: 'value', type: 'number' })],
@@ -567,7 +391,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('keeps property aggregate computations consistent across worker processes', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const fixture = createPropertyAggregateFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
@@ -580,31 +403,18 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
     await controller.setup(true);
     const user = await system.storage.create('PgAggregateUser', { name: 'aggregate-user' });
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     const workerCount = 4;
     const iterations = 12;
 
     await Promise.all(
       Array.from({ length: workerCount }, (_, workerIndex) =>
-        execFileAsync(
-          process.execPath,
-          ['--import', 'tsx', workerPath],
-          {
-            env: {
-              ...process.env,
-              INTERAQT_POSTGRES_DATABASE: database,
-              INTERAQT_POSTGRES_WORKER_MODE: 'property-aggregate',
-              INTERAQT_POSTGRES_USER_ID: String(user.id),
-              INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
-              INTERAQT_POSTGRES_ITERATIONS: String(iterations),
-            },
-            maxBuffer: 1024 * 1024,
-          }
-        )
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_WORKER_MODE: 'property-aggregate',
+          INTERAQT_POSTGRES_USER_ID: String(user.id),
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
+          INTERAQT_POSTGRES_ITERATIONS: String(iterations),
+        })
       )
     );
 
@@ -637,7 +447,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('keeps property aggregate computations consistent during concurrent updates and deletes', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const fixture = createPropertyAggregateFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
@@ -658,37 +467,24 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       }));
     }
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     const chunks = [orders.slice(0, 8), orders.slice(8, 16), orders.slice(16, 24)];
     await Promise.all(
       chunks.map((chunk, workerIndex) =>
-        execFileAsync(process.execPath, ['--import', 'tsx', workerPath], {
-          env: {
-            ...process.env,
-            INTERAQT_POSTGRES_DATABASE: database,
-            INTERAQT_POSTGRES_WORKER_MODE: 'property-aggregate-update',
-            INTERAQT_POSTGRES_ORDER_IDS: JSON.stringify(chunk.map(order => order.id)),
-            INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
-          },
-          maxBuffer: 1024 * 1024,
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_WORKER_MODE: 'property-aggregate-update',
+          INTERAQT_POSTGRES_ORDER_IDS: JSON.stringify(chunk.map(order => order.id)),
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
         })
       )
     );
     await Promise.all(
       chunks.slice(0, 2).map((chunk, workerIndex) =>
-        execFileAsync(process.execPath, ['--import', 'tsx', workerPath], {
-          env: {
-            ...process.env,
-            INTERAQT_POSTGRES_DATABASE: database,
-            INTERAQT_POSTGRES_WORKER_MODE: 'property-aggregate-delete',
-            INTERAQT_POSTGRES_ORDER_IDS: JSON.stringify(chunk.map(order => order.id)),
-            INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
-          },
-          maxBuffer: 1024 * 1024,
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_WORKER_MODE: 'property-aggregate-delete',
+          INTERAQT_POSTGRES_ORDER_IDS: JSON.stringify(chunk.map(order => order.id)),
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
         })
       )
     );
@@ -722,7 +518,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('serializes concurrent state machine transitions across worker processes', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const fixture = createStateMachineFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
@@ -737,28 +532,15 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
     const order = await system.storage.create('PgStateOrder', { title: 'state-order' });
     await system.destroy();
 
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
-
     await Promise.all(
       ['approve', 'reject'].map((action, workerIndex) =>
-        execFileAsync(
-          process.execPath,
-          ['--import', 'tsx', workerPath],
-          {
-            env: {
-              ...process.env,
-              INTERAQT_POSTGRES_DATABASE: database,
-              INTERAQT_POSTGRES_WORKER_MODE: 'state-machine',
-              INTERAQT_POSTGRES_ORDER_ID: String(order.id),
-              INTERAQT_POSTGRES_STATE_ACTION: action,
-              INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
-            },
-            maxBuffer: 1024 * 1024,
-          }
-        )
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_WORKER_MODE: 'state-machine',
+          INTERAQT_POSTGRES_ORDER_ID: String(order.id),
+          INTERAQT_POSTGRES_STATE_ACTION: action,
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
+        })
       )
     );
 
@@ -783,7 +565,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('keeps transform mapped records aligned during concurrent source updates', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const fixture = createTransformFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
@@ -796,28 +577,15 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
     await controller.setup(true);
     const source = await system.storage.create('PgTransformSource', { items: 2 });
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     await Promise.all(
       Array.from({ length: 4 }, (_, workerIndex) =>
-        execFileAsync(
-          process.execPath,
-          ['--import', 'tsx', workerPath],
-          {
-            env: {
-              ...process.env,
-              INTERAQT_POSTGRES_DATABASE: database,
-              INTERAQT_POSTGRES_WORKER_MODE: 'transform',
-              INTERAQT_POSTGRES_SOURCE_ID: String(source.id),
-              INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
-              INTERAQT_POSTGRES_ITERATIONS: '6',
-            },
-            maxBuffer: 1024 * 1024,
-          }
-        )
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_WORKER_MODE: 'transform',
+          INTERAQT_POSTGRES_SOURCE_ID: String(source.id),
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
+          INTERAQT_POSTGRES_ITERATIONS: '6',
+        })
       )
     );
 
@@ -844,7 +612,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('keeps transform mapped records aligned during concurrent update/delete and installs unique index', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const fixture = createTransformFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
@@ -874,32 +641,19 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       [transformIndexKey!]: mappedBefore[transformIndexKey!],
     })).rejects.toThrow();
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     await Promise.all([
-      execFileAsync(process.execPath, ['--import', 'tsx', workerPath], {
-        env: {
-          ...process.env,
-          INTERAQT_POSTGRES_DATABASE: database,
-          INTERAQT_POSTGRES_WORKER_MODE: 'transform',
-          INTERAQT_POSTGRES_SOURCE_ID: String(source.id),
-          INTERAQT_POSTGRES_WORKER_INDEX: '10',
-          INTERAQT_POSTGRES_ITERATIONS: '6',
-        },
-        maxBuffer: 1024 * 1024,
+      execWorker({
+        INTERAQT_POSTGRES_DATABASE: database,
+        INTERAQT_POSTGRES_WORKER_MODE: 'transform',
+        INTERAQT_POSTGRES_SOURCE_ID: String(source.id),
+        INTERAQT_POSTGRES_WORKER_INDEX: '10',
+        INTERAQT_POSTGRES_ITERATIONS: '6',
       }),
-      execFileAsync(process.execPath, ['--import', 'tsx', workerPath], {
-        env: {
-          ...process.env,
-          INTERAQT_POSTGRES_DATABASE: database,
-          INTERAQT_POSTGRES_WORKER_MODE: 'transform-delete',
-          INTERAQT_POSTGRES_SOURCE_ID: String(source.id),
-          INTERAQT_POSTGRES_WORKER_DELAY: '20',
-        },
-        maxBuffer: 1024 * 1024,
+      execWorker({
+        INTERAQT_POSTGRES_DATABASE: database,
+        INTERAQT_POSTGRES_WORKER_MODE: 'transform-delete',
+        INTERAQT_POSTGRES_SOURCE_ID: String(source.id),
+        INTERAQT_POSTGRES_WORKER_DELAY: '20',
       }),
     ]);
 
@@ -926,8 +680,7 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('handles the same PostgreSQL async task once across worker processes', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
-    const fixture = createAsyncReturnWorkerFixture();
+    const fixture = createAsyncReturnFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
     const controller = new Controller({
@@ -950,27 +703,14 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       result: 31,
     });
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     await Promise.all(
       [1, 2].map(workerIndex =>
-        execFileAsync(
-          process.execPath,
-          ['--import', 'tsx', workerPath],
-          {
-            env: {
-              ...process.env,
-              INTERAQT_POSTGRES_DATABASE: database,
-              INTERAQT_POSTGRES_WORKER_MODE: 'async-return',
-              INTERAQT_POSTGRES_TASK_ID: String(task.id),
-              INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex),
-            },
-            maxBuffer: 1024 * 1024,
-          }
-        )
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_WORKER_MODE: 'async-return',
+          INTERAQT_POSTGRES_TASK_ID: String(task.id),
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex),
+        })
       )
     );
 
@@ -992,8 +732,7 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('skips stale async tasks when a newer dispatch wins concurrently', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
-    const fixture = createAsyncReturnWorkerFixture();
+    const fixture = createAsyncReturnFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
     const controller = new Controller({
@@ -1015,20 +754,11 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       status: 'success',
       result: 11,
     });
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
-    const oldWorker = execFileAsync(process.execPath, ['--import', 'tsx', workerPath], {
-      env: {
-        ...process.env,
-        INTERAQT_POSTGRES_DATABASE: database,
-        INTERAQT_POSTGRES_WORKER_MODE: 'async-return',
-        INTERAQT_POSTGRES_TASK_ID: String(oldTask.id),
-        INTERAQT_POSTGRES_WORKER_DELAY: '30',
-      },
-      maxBuffer: 1024 * 1024,
+    const oldWorker = execWorker({
+      INTERAQT_POSTGRES_DATABASE: database,
+      INTERAQT_POSTGRES_WORKER_MODE: 'async-return',
+      INTERAQT_POSTGRES_TASK_ID: String(oldTask.id),
+      INTERAQT_POSTGRES_WORKER_DELAY: '30',
     });
     const dispatchResult = await controller.dispatch(fixture.AddSource, {
       user: { id: 'pg-async-dispatch-user' },
@@ -1053,7 +783,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('retries real PostgreSQL serialization failures and deadlocks', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const db = new PostgreSQLDB(database, dbOptions);
     await db.open(true);
 
@@ -1101,7 +830,6 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('keeps entity and relation full replace equivalent to a serial order across worker processes', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
     const fixture = createFullReplaceFixture();
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
@@ -1121,20 +849,11 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       await system.storage.create('PgReplaceRight', { name: 'right-2' }),
     ];
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     await Promise.all([1, 2].map(workerIndex =>
-      execFileAsync(process.execPath, ['--import', 'tsx', workerPath], {
-        env: {
-          ...process.env,
-          INTERAQT_POSTGRES_DATABASE: database,
-          INTERAQT_POSTGRES_WORKER_MODE: 'full-replace-entity',
-          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex),
-        },
-        maxBuffer: 1024 * 1024,
+      execWorker({
+        INTERAQT_POSTGRES_DATABASE: database,
+        INTERAQT_POSTGRES_WORKER_MODE: 'full-replace-entity',
+        INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex),
       })
     ));
 
@@ -1159,31 +878,15 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
   }, 120000);
 
   test('keeps global summation consistent across worker processes', async () => {
-    const database = process.env.INTERAQT_POSTGRES_DATABASE!;
-    const counterEntity = Entity.create({
-      name: 'PgAtomicCounter',
-      properties: [
-        Property.create({ name: 'value', type: 'number' }),
-      ],
-    });
-
-    const totalDictionary = Dictionary.create({
-      name: 'pgAtomicTotal',
-      type: 'number',
-      collection: false,
-      computation: Summation.create({
-        record: counterEntity,
-        attributeQuery: ['value'],
-      }),
-    });
+    const fixture = createGlobalSummationFixture();
 
     const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
     system.conceptClass = KlassByName;
     const controller = new Controller({
       system,
-      entities: [counterEntity],
-      relations: [],
-      dict: [totalDictionary],
+      entities: fixture.entities,
+      relations: fixture.relations,
+      dict: fixture.dict,
     });
 
     await controller.setup(true);
@@ -1193,30 +896,17 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       counters.push(await system.storage.create('PgAtomicCounter', { value: 0 }));
     }
     await system.destroy();
-
-    const workerPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      'helpers/postgresConcurrencyWorker.ts'
-    );
     const workerCount = 4;
     const iterations = 20;
 
     await Promise.all(
       Array.from({ length: workerCount }, (_, workerIndex) =>
-        execFileAsync(
-          process.execPath,
-          ['--import', 'tsx', workerPath],
-          {
-            env: {
-              ...process.env,
-              INTERAQT_POSTGRES_DATABASE: database,
-              INTERAQT_POSTGRES_COUNTER_IDS: JSON.stringify(counters.map(counter => counter.id)),
-              INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
-              INTERAQT_POSTGRES_ITERATIONS: String(iterations),
-            },
-            maxBuffer: 1024 * 1024,
-          }
-        )
+        execWorker({
+          INTERAQT_POSTGRES_DATABASE: database,
+          INTERAQT_POSTGRES_COUNTER_IDS: JSON.stringify(counters.map(counter => counter.id)),
+          INTERAQT_POSTGRES_WORKER_INDEX: String(workerIndex + 1),
+          INTERAQT_POSTGRES_ITERATIONS: String(iterations),
+        })
       )
     );
 
@@ -1224,9 +914,9 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
     verifySystem.conceptClass = KlassByName;
     const verifyController = new Controller({
       system: verifySystem,
-      entities: [counterEntity],
-      relations: [],
-      dict: [totalDictionary],
+      entities: fixture.entities,
+      relations: fixture.relations,
+      dict: fixture.dict,
     });
     await verifyController.setup(false);
 

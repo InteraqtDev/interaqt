@@ -191,7 +191,9 @@ export class MysqlDB implements Database{
         } else if (type === 'boolean') {
             return 'INT(2)'
         } else if(type === 'number'){
-            return "INT"
+            // CAUTION JS 的 number 是双精度浮点。映射成 INT 会让合法的小数值
+            //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
+            return "DOUBLE"
         }else if(type === 'timestamp'){
             return "TIMESTAMP"
         }else{
