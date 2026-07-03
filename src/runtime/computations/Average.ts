@@ -105,6 +105,9 @@ export class GlobalAverageHandle implements DataBasedComputation {
             const oldValue = (await this.state.itemValue.get(mutationEvent.record)) || 0;
             sumDelta = -oldValue;
             countDelta = -1;
+            // CAUTION delete 事件可能只是 filtered entity 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则记录再次进入时 replace 读到陈旧值导致增量错误。物理删除场景 setInternal 会安全忽略。
+            await this.state.itemValue.setInternal(mutationEvent.record, 0)
         } else if (mutationEvent.type === 'update') {
             const newRecord = await this.controller.system.storage.findOne(
                 this.record.name!, 

@@ -63,7 +63,11 @@ export type RecordMapItem = {
     filteredBy? : string[],
     // filtered relation 相关
     isFilteredRelation?: boolean,
-    baseRelationName?: string
+    baseRelationName?: string,
+    // merged entity/relation（联合类型）相关。
+    // CAUTION merged item 是抽象联合类型（union），不允许以它的名义直接创建记录（explicit control）。
+    //  同样地，以 merged item 为 base 的 filtered entity 也无法确定具体的 __type，禁止创建。
+    isMergedAbstract?: boolean
 }
 
 type RecordMap = {

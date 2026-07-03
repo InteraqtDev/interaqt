@@ -85,7 +85,7 @@ describe('merged entity test', () => {
         const foundCustomer = await entityQueryHandle.findOne('Customer', 
             MatchExp.atom({ key: 'email', value: ['=', 'john@example.com'] }),
             undefined,
-            ['id', 'name', 'email', 'customerLevel', 'isActive', '__Contact_input_entity']
+            ['id', 'name', 'email', 'customerLevel', 'isActive', '__type']
         );
         
         expect(foundCustomer).toBeTruthy();
@@ -93,7 +93,7 @@ describe('merged entity test', () => {
         expect(foundCustomer.email).toBe('john@example.com');
         expect(foundCustomer.customerLevel).toBe('bronze'); // 默认值
         expect(foundCustomer.isActive).toBe(true); // Customer 的默认值
-        expect(foundCustomer.__Contact_input_entity).toEqual(['Customer']);
+        expect(foundCustomer.__type).toBe('Customer');
 
         // 通过 Vendor entity 创建记录
         const vendor1 = await entityQueryHandle.create('Vendor', {
@@ -106,14 +106,14 @@ describe('merged entity test', () => {
         const foundVendor = await entityQueryHandle.findOne('Vendor',
             MatchExp.atom({ key: 'vendorCode', value: ['=', 'V001'] }),
             undefined,
-            ['id', 'name', 'email', 'vendorCode', 'isActive', '__Contact_input_entity']
+            ['id', 'name', 'email', 'vendorCode', 'isActive', '__type']
         );
         
         expect(foundVendor).toBeTruthy();
         expect(foundVendor.name).toBe('ABC Corp');
         expect(foundVendor.vendorCode).toBe('V001');
         expect(foundVendor.isActive).toBe(false); // Vendor 的默认值
-        expect(foundVendor.__Contact_input_entity).toEqual(['Vendor']);
+        expect(foundVendor.__type).toBe('Vendor');
 
         // 通过 Employee entity 创建记录
         const employee1 = await entityQueryHandle.create('Employee', {
@@ -127,14 +127,14 @@ describe('merged entity test', () => {
         const foundEmployee = await entityQueryHandle.findOne('Employee',
             MatchExp.atom({ key: 'employeeId', value: ['=', 'E001'] }),
             undefined,
-            ['id', 'name', 'email', 'employeeId', 'department', 'isActive', '__Contact_input_entity']
+            ['id', 'name', 'email', 'employeeId', 'department', 'isActive', '__type']
         );
         
         expect(foundEmployee).toBeTruthy();
         expect(foundEmployee.name).toBe('Jane Smith');
         expect(foundEmployee.department).toBe('Engineering');
         expect(foundEmployee.isActive).toBe(true); // Employee 的默认值
-        expect(foundEmployee.__Contact_input_entity).toEqual(['Employee']);
+        expect(foundEmployee.__type).toBe('Employee');
     });
 
     test('merged entity query through Contact', async () => {
@@ -161,7 +161,7 @@ describe('merged entity test', () => {
         const allContacts = await entityQueryHandle.find('Contact', 
             undefined,
             undefined,
-            ['id', 'name', 'email', '__Contact_input_entity']
+            ['id', 'name', 'email', '__type']
         );
 
         expect(allContacts).toHaveLength(3);
@@ -170,10 +170,10 @@ describe('merged entity test', () => {
         const names = allContacts.map(c => c.name).sort();
         expect(names).toEqual(['Customer 1', 'Employee 1', 'Vendor 1']);
 
-        // 验证 __input_entity 字段正确记录了原始类型
-        expect(allContacts[0].__Contact_input_entity).toEqual(['Customer']);
-        expect(allContacts[1].__Contact_input_entity).toEqual(['Vendor']);
-        expect(allContacts[2].__Contact_input_entity).toEqual(['Employee']);
+        // 验证 __type 判别列正确记录了创建时的具体类型
+        expect(allContacts[0].__type).toBe('Customer');
+        expect(allContacts[1].__type).toBe('Vendor');
+        expect(allContacts[2].__type).toBe('Employee');
     });
 
     test('merged entity update functionality', async () => {
@@ -193,12 +193,12 @@ describe('merged entity test', () => {
         const updatedRecord = await entityQueryHandle.findOne('Customer',
             MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
             undefined,
-            ['id', 'name', 'email', '__Contact_input_entity']
+            ['id', 'name', 'email', '__type']
         );
 
         expect(updatedRecord.name).toBe('Updated Name');
         expect(updatedRecord.email).toBe('original@example.com');
-        expect(updatedRecord.__Contact_input_entity).toEqual(['Customer']); // 类型不变
+        expect(updatedRecord.__type).toBe('Customer'); // 类型不变
     });
 
     test('merged entity delete functionality', async () => {
@@ -226,17 +226,14 @@ describe('merged entity test', () => {
     });
 
     test('merged entity should not support direct creation', async () => {
-        // 尝试直接通过 merged entity 创建记录应该失败
-        try {
-            await entityQueryHandle.create('Contact', {
-                name: 'Direct Create',
-                email: 'direct@example.com'
-            });
-            expect.fail('Should not allow direct creation through merged entity');
-        } catch (error) {
-            // 预期会抛出错误
-            expect(error).toBeTruthy();
-        }
+        // 尝试直接通过 merged entity 创建记录应该显式失败：
+        // merged entity 是抽象联合类型，直接创建无法确定具体的 __type。
+        // CAUTION 旧版本的这个测试是假阳性（expect.fail 抛出的断言错误被 catch 吞掉），
+        //  实际行为是静默接受并产生不属于任何 input 的记录。现在必须真实抛错。
+        await expect(entityQueryHandle.create('Contact', {
+            name: 'Direct Create',
+            email: 'direct@example.com'
+        })).rejects.toThrow(/merged \(union\) type "Contact"/);
     });
 
     test('merged entity with plain input entities should not create virtual base entity', async () => {
@@ -244,7 +241,7 @@ describe('merged entity test', () => {
         // 不会创建虚拟的 base entity（如 Contact_base）
         
         // 重要发现：虽然不创建 virtual base entity，但 input entities 本身会被转换成 filtered entities！
-        // Customer 被替换成: baseEntity = Contact, matchExpression = __Contact_input_entity contains 'Customer'
+        // Customer 被替换成: baseEntity = Contact, matchExpression = __type = 'Customer'
         // 这就是为什么我们能通过 input entity 名字正确读取的原因
         
         // 1. 验证不存在 Contact_base entity
@@ -266,25 +263,25 @@ describe('merged entity test', () => {
         const foundByCustomer = await entityQueryHandle.findOne('Customer',
             MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
             undefined,
-            ['id', 'name', 'email', 'customerLevel', '__Contact_input_entity']
+            ['id', 'name', 'email', 'customerLevel', '__type']
         );
 
         expect(foundByCustomer).toBeTruthy();
         expect(foundByCustomer.name).toBe('Test Customer');
         expect(foundByCustomer.email).toBe('test@customer.com');
         expect(foundByCustomer.customerLevel).toBe('bronze');
-        expect(foundByCustomer.__Contact_input_entity).toEqual(['Customer']);
+        expect(foundByCustomer.__type).toBe('Customer');
 
         // 4. 验证也可以通过 Contact (merged entity) 读取
         const foundByContact = await entityQueryHandle.findOne('Contact',
             MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
             undefined,
-            ['id', 'name', 'email', '__Contact_input_entity']
+            ['id', 'name', 'email', '__type']
         );
 
         expect(foundByContact).toBeTruthy();
         expect(foundByContact.name).toBe('Test Customer');
-        expect(foundByContact.__Contact_input_entity).toEqual(['Customer']);
+        expect(foundByContact.__type).toBe('Customer');
 
         // 5. 验证可以直接更新 Customer
         await entityQueryHandle.update('Customer',
@@ -343,7 +340,7 @@ describe('merged entity test', () => {
         const allContacts = await entityQueryHandle.find('Contact',
             undefined,
             undefined,
-            ['id', 'name', '__Contact_input_entity']
+            ['id', 'name', '__type']
         );
 
         expect(allContacts.length).toBeGreaterThanOrEqual(3);
@@ -356,25 +353,25 @@ describe('merged entity test', () => {
         const customerQuery = await entityQueryHandle.find('Customer',
             undefined,
             undefined,
-            ['id', 'name', '__Contact_input_entity', 'customerLevel']
+            ['id', 'name', '__type', 'customerLevel']
         );
         
         // Customer 查询应该只返回 __Contact_input_entity 包含 'Customer' 的记录
         expect(customerQuery.length).toBeGreaterThanOrEqual(1);
         for (const record of customerQuery) {
-            expect(record.__Contact_input_entity).toContain('Customer');
+            expect(record.__type).toBe('Customer');
             expect(record.customerLevel).toBeTruthy(); // Customer 特有字段
         }
 
         const vendorQuery = await entityQueryHandle.find('Vendor',
             undefined,
             undefined,
-            ['id', 'name', '__Contact_input_entity', 'vendorCode']
+            ['id', 'name', '__type', 'vendorCode']
         );
         
         expect(vendorQuery.length).toBeGreaterThanOrEqual(1);
         for (const record of vendorQuery) {
-            expect(record.__Contact_input_entity).toContain('Vendor');
+            expect(record.__type).toBe('Vendor');
             expect(record.vendorCode).toBeTruthy(); // Vendor 特有字段
         }
 
@@ -382,20 +379,20 @@ describe('merged entity test', () => {
         const customerById = await entityQueryHandle.findOne('Customer',
             MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
             undefined,
-            ['id', 'name', 'email', '__Contact_input_entity']
+            ['id', 'name', 'email', '__type']
         );
 
         const contactById = await entityQueryHandle.findOne('Contact',
             MatchExp.atom({ key: 'id', value: ['=', customer.id] }),
             undefined,
-            ['id', 'name', 'email', '__Contact_input_entity']
+            ['id', 'name', 'email', '__type']
         );
 
         // 这两个查询返回的是同一条物理记录，只是查询路径不同
         expect(customerById.id).toBe(contactById.id);
         expect(customerById.name).toBe(contactById.name);
         expect(customerById.email).toBe(contactById.email);
-        expect(customerById.__Contact_input_entity).toEqual(contactById.__Contact_input_entity);
+        expect(customerById.__type).toEqual(contactById.__type);
 
         // 关键验证 4: 通过 Contact 更新记录，通过 Customer 名字也能看到更新
         await entityQueryHandle.update('Contact',
@@ -521,14 +518,14 @@ describe('more complex merged entity test', () => {
         const specialContacts = await entityQueryHandle2.find('SpecialContact',
             undefined,
             undefined,
-            ['id', 'name', 'isActive', '__SpecialContact_input_entity', 'customerType', 'vendorType']
+            ['id', 'name', 'isActive', '__type', 'customerType', 'vendorType']
         );
 
         expect(specialContacts).toHaveLength(4); // 2 active customers + 2 inactive vendors
         
         // 验证包含正确的记录
-        const activeCustomers = specialContacts.filter(c => c.__SpecialContact_input_entity.includes('ActiveCustomer'));
-        const inactiveVendors = specialContacts.filter(c => c.__SpecialContact_input_entity.includes('InactiveVendor'));
+        const activeCustomers = specialContacts.filter(c => c.__type === 'CustomerBase');
+        const inactiveVendors = specialContacts.filter(c => c.__type === 'VendorBase');
         
         expect(activeCustomers).toHaveLength(2);
         expect(inactiveVendors).toHaveLength(2);
@@ -549,12 +546,12 @@ describe('more complex merged entity test', () => {
         const directActiveCustomers = await entityQueryHandle2.find('ActiveCustomer',
             undefined,
             undefined,
-            ['id', 'name', 'isActive', '__SpecialContact_input_entity']
+            ['id', 'name', 'isActive', '__type']
         );
 
         expect(directActiveCustomers).toHaveLength(2);
         for (const customer of directActiveCustomers) {
-            expect(customer.__SpecialContact_input_entity).toEqual(['ActiveCustomer']);
+            expect(customer.__type).toBe('CustomerBase');
             expect(customer.isActive).toBe(true);
         }
 
@@ -601,11 +598,11 @@ describe('more complex merged entity test', () => {
         const found1 = await entityQueryHandle3.findOne('Entity1',
             MatchExp.atom({ key: 'id', value: ['=', record1.id] }),
             undefined,
-            ['id', 'commonField', 'uniqueField1', '__MergedEntity_input_entity']
+            ['id', 'commonField', 'uniqueField1', '__type']
         );
 
         expect(found1.commonField).toBe('default1');
-        expect(found1.__MergedEntity_input_entity).toEqual(['Entity1']);
+        expect(found1.__type).toBe('Entity1');
 
         // 通过 Entity2 创建记录，应该使用 Entity2 的默认值
         const record2 = await entityQueryHandle3.create('Entity2', {
@@ -615,11 +612,11 @@ describe('more complex merged entity test', () => {
         const found2 = await entityQueryHandle3.findOne('Entity2',
             MatchExp.atom({ key: 'id', value: ['=', record2.id] }),
             undefined,
-            ['id', 'commonField', 'uniqueField2', '__MergedEntity_input_entity']
+            ['id', 'commonField', 'uniqueField2', '__type']
         );
 
         expect(found2.commonField).toBe('default2');
-        expect(found2.__MergedEntity_input_entity).toEqual(['Entity2']);
+        expect(found2.__type).toBe('Entity2');
 
         await db3.close();
     });
@@ -879,36 +876,36 @@ describe('more complex merged entity test', () => {
         const internalStaffRecords = await queryHandleNested.find('InternalStaff',
             undefined,
             undefined,
-            ['id', 'empName', 'mgrName', '__InternalStaff_input_entity']
+            ['id', 'empName', 'mgrName', '__type']
         );
 
         expect(internalStaffRecords).toHaveLength(2);
-        expect(internalStaffRecords[0].__InternalStaff_input_entity).toEqual(['Employee']);
-        expect(internalStaffRecords[1].__InternalStaff_input_entity).toEqual(['Manager']);
+        expect(internalStaffRecords[0].__type).toBe('Employee');
+        expect(internalStaffRecords[1].__type).toBe('Manager');
 
         // 验证可以通过 AllContacts (第二层 merged) 查询到所有记录
         const allContactsRecords = await queryHandleNested.find('AllContacts',
             undefined,
             undefined,
-            ['id', '__AllContacts_input_entity']
+            ['id', '__type']
         );
 
         expect(allContactsRecords).toHaveLength(3);
-        expect(allContactsRecords[0].__AllContacts_input_entity).toEqual(['InternalStaff']);
-        expect(allContactsRecords[1].__AllContacts_input_entity).toEqual(['InternalStaff']);
-        expect(allContactsRecords[2].__AllContacts_input_entity).toEqual(['ExternalPartner']);
+        expect(allContactsRecords[0].__type).toBe('Employee');
+        expect(allContactsRecords[1].__type).toBe('Manager');
+        expect(allContactsRecords[2].__type).toBe('ExternalPartner');
 
         // 验证通过 AllContacts 查询特定 Employee 记录
         const empViaAllContacts = await queryHandleNested.findOne('AllContacts',
             MatchExp.atom({ key: 'id', value: ['=', emp1.id] }),
             undefined,
-            ['id', 'empName', 'empId', 'department', '__AllContacts_input_entity']
+            ['id', 'empName', 'empId', 'department', '__type']
         );
 
         expect(empViaAllContacts).toBeTruthy();
         expect(empViaAllContacts.empName).toBe('Alice Smith');
         expect(empViaAllContacts.empId).toBe('EMP001');
-        expect(empViaAllContacts.__AllContacts_input_entity).toEqual(['InternalStaff']);
+        expect(empViaAllContacts.__type).toBe('Employee');
 
         // ========== UPDATE 操作测试 ==========
         
@@ -969,7 +966,7 @@ describe('more complex merged entity test', () => {
         const finalAllContacts = await queryHandleNested.find('AllContacts',
             undefined,
             undefined,
-            ['id', '__AllContacts_input_entity']
+            ['id', '__type']
         );
         expect(finalAllContacts).toHaveLength(2);
 
@@ -977,10 +974,10 @@ describe('more complex merged entity test', () => {
         const finalInternalStaff = await queryHandleNested.find('InternalStaff',
             undefined,
             undefined,
-            ['id', '__InternalStaff_input_entity']
+            ['id', '__type']
         );
         expect(finalInternalStaff).toHaveLength(1);
-        expect(finalInternalStaff[0].__InternalStaff_input_entity).toEqual(['Employee']);
+        expect(finalInternalStaff[0].__type).toBe('Employee');
 
         await dbNested.close();
     });

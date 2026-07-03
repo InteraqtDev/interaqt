@@ -78,6 +78,9 @@ export class GlobalEveryHandle implements DataBasedComputation {
             totalDelta = -1
             const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.record)
             matchDelta = oldItemMatch ? -1 : 0
+            // CAUTION delete 事件可能只是 filtered entity 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则记录再次进入时 replace 读到陈旧值导致增量错误。物理删除场景 setInternal 会安全忽略。
+            await this.state!.isItemMatch.setInternal(mutationEvent.record, false)
         } else if (mutationEvent.type === 'update') {
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
             const { oldValue } = await this.state!.isItemMatch.replace(mutationEvent.record, newItemMatch)

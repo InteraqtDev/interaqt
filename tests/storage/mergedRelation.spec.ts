@@ -125,12 +125,12 @@ describe('merged relation test', () => {
         const foundLike = await entityQueryHandle.findOne('UserLikesPost',
             MatchExp.atom({ key: 'id', value: ['=', likeRelation.id] }),
             undefined,
-            ['id', 'rating', '__UserInteractsWithPost_input_relation']
+            ['id', 'rating', '__type']
         );
         
         expect(foundLike).toBeTruthy();
         expect(foundLike.rating).toBe(4);
-        expect(foundLike.__UserInteractsWithPost_input_relation).toEqual(['UserLikesPost']);
+        expect(foundLike.__type).toBe('UserLikesPost');
 
         // 通过 UserBookmarksPost relation 创建关系
         const bookmarkRelation = await entityQueryHandle.create('UserBookmarksPost', {
@@ -143,12 +143,12 @@ describe('merged relation test', () => {
         const foundBookmark = await entityQueryHandle.findOne('UserBookmarksPost',
             MatchExp.atom({ key: 'id', value: ['=', bookmarkRelation.id] }),
             undefined,
-            ['id', 'category', '__UserInteractsWithPost_input_relation']
+            ['id', 'category', '__type']
         );
         
         expect(foundBookmark).toBeTruthy();
         expect(foundBookmark.category).toBe('tech');
-        expect(foundBookmark.__UserInteractsWithPost_input_relation).toEqual(['UserBookmarksPost']);
+        expect(foundBookmark.__type).toBe('UserBookmarksPost');
     });
 
     test('merged relation query through UserInteractsWithPost', async () => {
@@ -197,13 +197,13 @@ describe('merged relation test', () => {
         const allInteractions = await entityQueryHandle.find('UserInteractsWithPost',
             undefined,
             undefined,
-            ['id', '__UserInteractsWithPost_input_relation']
+            ['id', '__type']
         );
 
         expect(allInteractions).toHaveLength(3);
         
         // 验证包含所有三种类型的关系
-        const relationTypes = allInteractions.map(r => r.__UserInteractsWithPost_input_relation[0]).sort();
+        const relationTypes = allInteractions.map(r => r.__type).sort();
         expect(relationTypes).toEqual(['UserBookmarksPost', 'UserLikesPost', 'UserSharesPost']);
     });
 
@@ -236,11 +236,11 @@ describe('merged relation test', () => {
         const updatedRelation = await entityQueryHandle.findOne('UserLikesPost',
             MatchExp.atom({ key: 'id', value: ['=', likeRelation.id] }),
             undefined,
-            ['id', 'rating', '__UserInteractsWithPost_input_relation']
+            ['id', 'rating', '__type']
         );
 
         expect(updatedRelation.rating).toBe(5);
-        expect(updatedRelation.__UserInteractsWithPost_input_relation).toEqual(['UserLikesPost']); // 类型不变
+        expect(updatedRelation.__type).toBe('UserLikesPost'); // 类型不变
     });
 
     test('merged relation delete functionality', async () => {
@@ -289,14 +289,18 @@ describe('merged relation test', () => {
             content: 'Should fail'
         });
 
-        // 尝试直接通过 merged relation 创建关系应该失败
+        // 尝试直接通过 merged relation 创建关系应该显式失败：
+        // merged relation 是抽象联合类型，直接创建无法确定具体的 __type。
+        // CAUTION 旧版本的这个测试是假阳性（expect.fail 抛出的断言错误被 catch 吞掉），
+        //  实际行为是静默接受并产生不属于任何 input 的记录。现在必须真实抛错。
         try {
             await entityQueryHandle.create('UserInteractsWithPost', {
                 source: { id: user.id },
                 target: { id: post.id }
             });
             expect.fail('Should not allow direct creation through merged relation');
-        } catch (error) {
+        } catch (error: any) {
+            expect(error.message).toMatch(/merged \(union\) type "UserInteractsWithPost"/);
             // 预期会抛出错误
             expect(error).toBeTruthy();
         }
@@ -524,12 +528,12 @@ describe('complex merged relation test', () => {
         const foundWrite = await entityQueryHandle3.findOne('AuthorWritesBook',
             MatchExp.atom({ key: 'id', value: ['=', writeRelation.id] }),
             undefined,
-            ['id', 'role', 'contribution', '__AuthorContributesToBook_input_relation']
+            ['id', 'role', 'contribution', '__type']
         );
 
         expect(foundWrite.role).toBe('author');
         expect(foundWrite.contribution).toBe('writing');
-        expect(foundWrite.__AuthorContributesToBook_input_relation).toEqual(['AuthorWritesBook']);
+        expect(foundWrite.__type).toBe('AuthorWritesBook');
 
         // 通过 AuthorEditsBook 创建关系，应该使用 AuthorEditsBook 的默认值
         const editRelation = await entityQueryHandle3.create('AuthorEditsBook', {
@@ -540,12 +544,12 @@ describe('complex merged relation test', () => {
         const foundEdit = await entityQueryHandle3.findOne('AuthorEditsBook',
             MatchExp.atom({ key: 'id', value: ['=', editRelation.id] }),
             undefined,
-            ['id', 'role', 'editLevel', '__AuthorContributesToBook_input_relation']
+            ['id', 'role', 'editLevel', '__type']
         );
 
         expect(foundEdit.role).toBe('editor');
         expect(foundEdit.editLevel).toBe('copyedit');
-        expect(foundEdit.__AuthorContributesToBook_input_relation).toEqual(['AuthorEditsBook']);
+        expect(foundEdit.__type).toBe('AuthorEditsBook');
 
         await db3.close();
     });
@@ -949,44 +953,38 @@ describe('complex merged relation test', () => {
         const engagements = await entityQueryHandle4.find('UserEngagesArticle',
             undefined,
             undefined,
-            ['id', '__UserEngagesArticle_input_relation', '__UserFullyInteractsArticle_input_relation']
+            ['id', '__type']
         );
 
         expect(engagements).toHaveLength(2); // read + bookmark
         
-        // 验证 engagements 有两个 input relation 字段
+        // 判别列记录创建时的具体类型（叶子类型名，而不是中间 merged 名）
         engagements.forEach(engagement => {
-            expect(engagement.__UserEngagesArticle_input_relation).toBeDefined();
-            expect(engagement.__UserEngagesArticle_input_relation.length).toBe(1);
-            expect(['UserReadsArticle', 'UserBookmarksArticle']).toContain(
-                engagement.__UserEngagesArticle_input_relation[0]
-            );
-            
-            // 这些记录也应该有 UserFullyInteractsArticle 的标记
-            expect(engagement.__UserFullyInteractsArticle_input_relation).toEqual(['UserEngagesArticle']);
+            expect(engagement.__type).toBeDefined();
+            expect(['UserReadsArticle', 'UserBookmarksArticle']).toContain(engagement.__type);
         });
 
         // 验证第二个 merged relation (UserFullyInteractsArticle)
         const fullInteractions = await entityQueryHandle4.find('UserFullyInteractsArticle',
             undefined,
             undefined,
-            ['id', '__UserFullyInteractsArticle_input_relation']
+            ['id', '__type']
         );
 
         expect(fullInteractions).toHaveLength(4); // read + bookmark + comment + share
         
-        // 验证包含所有类型的关系
-        const interactionTypes = fullInteractions.map(r => r.__UserFullyInteractsArticle_input_relation[0]).sort();
+        // 验证包含所有类型的关系（__type 始终是具体叶子类型）
+        const interactionTypes = fullInteractions.map(r => r.__type).sort();
         expect(interactionTypes).toEqual([
+            'UserBookmarksArticle',
             'UserCommentsArticle',
-            'UserEngagesArticle',  // 这个代表了 UserReadsArticle
-            'UserEngagesArticle',  // 这个代表了 UserBookmarksArticle
+            'UserReadsArticle',
             'UserSharesArticle'
         ]);
 
-        // 通过 UserFullyInteractsArticle 查询特定类型
+        // 通过 UserFullyInteractsArticle 查询内层 merged relation 覆盖的记录
         const userEngagesInFull = fullInteractions.filter(
-            r => r.__UserFullyInteractsArticle_input_relation[0] === 'UserEngagesArticle'
+            r => r.__type === 'UserReadsArticle' || r.__type === 'UserBookmarksArticle'
         );
         expect(userEngagesInFull).toHaveLength(2);
 
@@ -1000,12 +998,11 @@ describe('complex merged relation test', () => {
         const updatedRead = await entityQueryHandle4.findOne('UserReadsArticle',
             MatchExp.atom({ key: 'id', value: ['=', readRelation.id] }),
             undefined,
-            ['id', 'readTime', '__UserEngagesArticle_input_relation', '__UserFullyInteractsArticle_input_relation']
+            ['id', 'readTime', '__type']
         );
 
         expect(updatedRead.readTime).toBe(30);
-        expect(updatedRead.__UserEngagesArticle_input_relation).toEqual(['UserReadsArticle']);
-        expect(updatedRead.__UserFullyInteractsArticle_input_relation).toEqual(['UserEngagesArticle']);
+        expect(updatedRead.__type).toBe('UserReadsArticle'); // 类型不变
 
         // 通过 UserFullyInteractsArticle 删除
         await entityQueryHandle4.delete('UserFullyInteractsArticle',

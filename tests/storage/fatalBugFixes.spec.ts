@@ -291,12 +291,26 @@ describe('F3: merged entity with filtered input preserves base identity & predic
         await db.close();
     });
 
-    test('merged entity contains only declared inputs, not base records', async () => {
+    test('filtered input membership is declarative: base records enter/leave by predicate', async () => {
+        // CAUTION 语义已按判别列 + 声明式谓词模型修正（storage 深度分析报告 2.2(b)/2.3）：
+        //  ActiveCustomer 的定义是 "CustomerBase 中 isActive = true 的子集"，
+        //  成员资格由谓词实时求值决定，与记录以哪个名字创建无关（旧 tag 模型是创建时写死的）。
+        //  因此以 CustomerBase 名义创建且 isActive = true 的记录同样属于 ActiveCustomer，进而属于 Contact。
         const { db, handle } = await build();
-        await handle.create('CustomerBase', { name: 'baseRec', isActive: true });
+        await handle.create('CustomerBase', { name: 'baseActive', isActive: true });
+        await handle.create('CustomerBase', { name: 'baseInactive', isActive: false });
         await handle.create('ActiveCustomer', { name: 'activeRec', isActive: true });
-        const merged = await handle.find('Contact', undefined, undefined, ['name']);
-        expect(merged.map(r => r.name)).toEqual(['activeRec']);
+
+        // 满足谓词的 base 记录属于 ActiveCustomer / Contact；不满足的只属于 CustomerBase
+        expect((await handle.find('ActiveCustomer', undefined, undefined, ['name'])).map(r => r.name).sort()).toEqual(['activeRec', 'baseActive']);
+        expect((await handle.find('Contact', undefined, undefined, ['name'])).map(r => r.name).sort()).toEqual(['activeRec', 'baseActive']);
+        expect((await handle.find('CustomerBase', undefined, undefined, ['name'])).map(r => r.name).sort()).toEqual(['activeRec', 'baseActive', 'baseInactive']);
+
+        // 属性变化时自然进出（tag 模型下 tag 不迁移的问题随判别列模型消失）
+        const events: any[] = [];
+        await handle.update('CustomerBase', MatchExp.atom({ key: 'name', value: ['=', 'baseInactive'] }), { isActive: true }, events);
+        expect((await handle.find('Contact', undefined, undefined, ['name'])).map(r => r.name).sort()).toEqual(['activeRec', 'baseActive', 'baseInactive']);
+        expect(events.filter(e => e.type === 'create' && e.recordName === 'ActiveCustomer')).toHaveLength(1);
         await db.close();
     });
 });

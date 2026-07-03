@@ -129,7 +129,7 @@ The actual work is split across executors, which the agent wires together (they 
 - `UpdateExecutor` — record updates, same-row data updates (`updateSameRowData`), reliance updates (`handleUpdateReliance`)
 - `DeletionExecutor` — record deletion, unlink, cascade deletion, deletion events
 - `SQLBuilder` — builds all SQL statements
-- `FilteredEntityManager` — filtered entity dependency analysis and `__filtered_entities` flag/event maintenance
+- `FilteredEntityManager` — filtered entity dependency analysis and stateless membership diffing (before-snapshot/settle hooks around every mutation path emit filtered create/delete events; membership is never persisted, the SQL predicate evaluation is the single source of truth)
 
 ## Data Flow
 

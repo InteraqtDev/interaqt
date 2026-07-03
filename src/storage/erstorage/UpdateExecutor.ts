@@ -5,7 +5,7 @@ import { AttributeQuery } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { SQLBuilder } from "./SQLBuilder.js";
-import { FilteredEntityManager } from "./FilteredEntityManager.js";
+import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 
 /**
@@ -58,8 +58,16 @@ export class UpdateExecutor {
         
         const matchedEntities = await this.agent.findRecords(updateRecordQuery, `find record for updating ${entityName}`)
         // 注意下面使用的都是 updateRecordQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
+        const changedFields = Object.keys(newEntityData.getData())
         const result: Record[] = []
         for (let matchedEntity of matchedEntities) {
+            // 0. 成员资格快照：必须在任何物理变更之前采集（无状态 membership diff，见 FilteredEntityManager）。
+            //  - membershipChecks：本记录（以及经反向路径受影响的记录）在依赖 changedFields 的 filtered entity 中的成员资格；
+            //  - linkChecks：通过行内字段（merged link / combined）新建关系时另一端既有记录的成员资格。
+            //    嵌套的 unlink/addLink 有各自的钩子，账本（ledger）保证同一批 events 中不产生重复事件。
+            const membershipChecks = await this.filteredEntityManager.collectMembershipChecks(updateRecordQuery.recordName, [matchedEntity.id], changedFields, events)
+            const linkChecks = events ? await this.collectUpdateLinkChecks(newEntityData, events) : []
+
             // 1. 创建我依赖的
             const newEntityDataWithDep = await this.agent.createRecordDependency(newEntityData, events)
             // 2. 把同表的实体移出去，为新同表 Record 建立 id；可能有要删除的 reliance
@@ -67,16 +75,32 @@ export class UpdateExecutor {
             // 3. 更新依赖我的和关系表独立的
             const relianceUpdatedResult = await this.handleUpdateReliance(updateRecordQuery.recordName, matchedEntity, newEntityData, events)
 
-            // 处理 filtered entity - 检查更新后的记录是否属于任何 filtered entity
-            // 传递原始的 matchedEntity，它包含更新前的 __filtered_entities 状态
-            // 以及实际更改的字段
-            const changedFields = Object.keys(newEntityData.getData())
-            await this.filteredEntityManager.updateFilteredEntityFlags(updateRecordQuery.recordName, matchedEntity.id, events, matchedEntity, false, changedFields)
+            // 4. 成员资格结算：重新求值并与快照 diff，产生 filtered entity 的 create/delete 事件。
+            await this.filteredEntityManager.settleMembershipChecks(membershipChecks.concat(linkChecks), events)
 
             result.push({...newEntityData.getData(), ...newEntityDataWithIdsWithFlashOutRecords.getData(), ...relianceUpdatedResult})
         }
 
         return result
+    }
+
+    /**
+     * 采集本次 update 通过行内字段建立新关系时"另一端既有记录"的成员资格快照。
+     * （行内写入不经过 addLink，另一端记录的成员资格变化需要在这里显式覆盖。）
+     */
+    private async collectUpdateLinkChecks(newEntityData: NewRecordData, events: RecordMutationEvent[]): Promise<MembershipCheck[]> {
+        const checks: MembershipCheck[] = []
+        for (const relatedRecord of newEntityData.mergedLinkTargetRecordIdRefs.concat(newEntityData.combinedRecordIdRefs)) {
+            const relatedId = relatedRecord.getRef().id
+            const linkName = relatedRecord.info!.linkName
+            const relatedIsTarget = relatedRecord.info!.isRecordSource()
+            checks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
+                linkName,
+                relatedIsTarget ? { targetIds: [relatedId] } : { sourceIds: [relatedId] },
+                events
+            ))
+        }
+        return checks
     }
 
     /**

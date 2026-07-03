@@ -250,14 +250,13 @@ describe('3.1 fixes that need a live database', () => {
         expect(found.length).toBe(1)
     })
 
-    test('3.1.7 NULL __filtered_entities does not crash flag update', async () => {
+    test('3.1.7 membership is stateless: no flag column, events derive from predicate evaluation', async () => {
+        // 成员资格没有持久化标记（原 __filtered_entities 列已删除），
+        // 不存在"存量数据标记为 NULL"这类脏状态问题：事件由变更前后谓词求值的 diff 直接得出。
+        expect(setup.map.records['User'].attributes['__filtered_entities']).toBeUndefined()
+
         const team = await handle.create('Team', { name: 'T2', type: 'tech' })
         const user = await handle.create('User', { name: 'F1', age: 5, isActive: false, team })
-
-        // 模拟存量数据/手工迁移：把 __filtered_entities 置为 NULL
-        const flagsField = (setup.map.records['User'].attributes['__filtered_entities'] as any).field
-        const table = setup.map.records['User'].table
-        await db.query(`UPDATE "${table}" SET "${flagsField}" = NULL`, [])
 
         const events: RecordMutationEvent[] = []
         await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', user.id] }), { isActive: true }, events)
@@ -265,9 +264,9 @@ describe('3.1 fixes that need a live database', () => {
         const filteredCreateEvents = events.filter(e => e.type === 'create' && e.recordName === 'ActiveTechUser')
         expect(filteredCreateEvents.length).toBe(1)
 
-        // 标记被正确重建
-        const updated = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', user.id] }), {}, ['*'])
-        expect(updated.__filtered_entities['ActiveTechUser']).toBe(true)
+        // 成员资格由查询侧谓词重写实时判定
+        const members = await handle.find('ActiveTechUser', MatchExp.atom({ key: 'id', value: ['=', user.id] }), {}, ['name'])
+        expect(members.length).toBe(1)
     })
 })
 
@@ -620,7 +619,7 @@ describe('3.2.3 batched filtered entity flag maintenance', () => {
         await db.close()
     })
 
-    test('one flags query + one membership query per dependency when many records are affected', async () => {
+    test('membership queries are batched per dependency when many records are affected', async () => {
         const team = await handle.create('Team', { type: 'sales' })
         const users = []
         for (let i = 0; i < 3; i++) {
@@ -636,14 +635,17 @@ describe('3.2.3 batched filtered entity flag maintenance', () => {
         expect(filteredCreateEvents.length).toBe(3)
         expect(new Set(filteredCreateEvents.map(e => e.record!.id))).toEqual(new Set(users.map(u => u.id)))
 
-        // 批量化：取当前标记 1 次查询（修复前是每条受影响记录 1 次）
-        const flagQueries = recorded.filter(q => q.name.includes('get current filtered entity flags'))
-        expect(flagQueries.length).toBe(1)
-        // membership 检查 1 次查询（修复前是每条受影响记录 1 次）
+        // 批量化（无状态 membership diff）：受影响记录反查 1 次；
+        // 变更前 membership 求值 1 次 + 变更后 1 次（不再有持久化标记的读/写）；
+        // settle 阶段取回当前记录（事件 payload）1 次。所有查询都按记录批量执行，与记录数无关。
+        const reverseQueries = recorded.filter(q => q.name.includes('find affected source records'))
+        expect(reverseQueries.length).toBe(1)
         const membershipQueries = recorded.filter(q => q.name.includes('match filter condition'))
-        expect(membershipQueries.length).toBe(1)
+        expect(membershipQueries.length).toBe(2)
+        const settleFetchQueries = recorded.filter(q => q.name.includes('membership settle'))
+        expect(settleFetchQueries.length).toBe(1)
 
-        // 标记全部正确持久化
+        // 成员资格由谓词实时判定
         const techUsers = await handle.find('TechTeamUser', undefined, {}, ['name'])
         expect(techUsers.length).toBe(3)
     })

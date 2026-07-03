@@ -3159,31 +3159,21 @@ class MigrationScheduler {
 }
 
 export async function recomputeFilteredMemberships(controller: Controller, oldManifest: MigrationManifest, newManifest: MigrationManifest) {
+    // CAUTION filtered entity 的成员资格没有持久化标记（storage 侧为无状态设计，成员资格 = 谓词实时求值）。
+    //  迁移时新增的 filtered entity 不需要"回填"任何状态，只需要为已有的存量成员合成 create 事件，
+    //  让依赖它的计算得到增量输入。存量非成员从未属于该（新建的）filtered entity，不产生 delete 事件。
     const oldFiltered = new Set(oldManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
     const affectedFilteredRecords = newManifest.storage.records.filter(record => record.isFiltered && !oldFiltered.has(record.recordName));
     const events: RecordMutationEvent[] = [];
     for (const filteredRecord of affectedFilteredRecords) {
         const baseRecordName = filteredRecord.resolvedBaseRecordName;
         if (!baseRecordName || !filteredRecord.resolvedMatchExpression) continue;
-        const allBaseRecords = await controller.system.storage.find(baseRecordName, undefined, undefined, ["id", "__filtered_entities"]);
-        const matchedRecords = await controller.system.storage.find(baseRecordName, filteredRecord.resolvedMatchExpression, undefined, ["id"]);
-        const matchedIds = new Set(matchedRecords.map(record => String(record.id)));
-        for (const baseRecord of allBaseRecords) {
-            const flags = {
-                ...((baseRecord.__filtered_entities && typeof baseRecord.__filtered_entities === "object") ? baseRecord.__filtered_entities : {}),
-                [filteredRecord.recordName]: matchedIds.has(String(baseRecord.id)),
-            };
-            await controller.system.storage.update(
-                baseRecordName,
-                MatchExp.atom({ key: "id", value: ["=", baseRecord.id] }),
-                { __filtered_entities: flags },
-            );
+        const matchedRecords = await controller.system.storage.find(baseRecordName, filteredRecord.resolvedMatchExpression, undefined, ["*"]);
+        for (const matchedRecord of matchedRecords) {
             events.push({
                 recordName: filteredRecord.recordName,
-                type: matchedIds.has(String(baseRecord.id)) ? "create" : "delete",
-                record: { ...baseRecord, __filtered_entities: flags } as any,
-                oldRecord: baseRecord as any,
-                keys: ["__filtered_entities"],
+                type: "create",
+                record: matchedRecord as any,
             });
         }
     }

@@ -371,13 +371,15 @@ describe('filtered entity test', () => {
             });
         });
 
-        // 检查 __filtered_entities 字段
-        const userAfterCreate = await entityQueryHandle.find('User',
-            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-            undefined,
-            ['id', 'name', 'age', 'isActive', 'department', '__filtered_entities']
-        );
-        expect(userAfterCreate[0].__filtered_entities).toBeDefined();
+        // 成员资格没有持久化标记：直接通过查询验证记录属于所有匹配的 filtered entity
+        for (const filteredName of ['ActiveUsers', 'YoungUsers', 'TechYoungUsers']) {
+            const members = await entityQueryHandle.find(filteredName,
+                MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+                undefined,
+                ['id', 'name']
+            );
+            expect(members).toHaveLength(1);
+        }
     });
 
     test('filtered entity events are properly emitted on update', async () => {
@@ -518,15 +520,7 @@ describe('filtered entity test', () => {
             updateEvents
         );
 
-        // 查询用户的当前状态，看看第一次更新后的 __filtered_entities 字段
-        const userAfterFirstUpdate = await entityQueryHandle.find('User',
-            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-            undefined,
-            ['id', 'name', 'age', 'department', '__filtered_entities']
-        );
-        console.log('User after first update:', userAfterFirstUpdate[0]);
-
-        // 由于 __filtered_entities 在创建时已经初始化，第一次更新只会生成状态变化的事件
+        // 成员资格由谓词实时求值：第一次更新只会生成状态变化的事件
         // 1个 User update + 1个 TechYoungUsers create（新满足条件）
         console.log('First update events:', updateEvents.map(e => ({ type: e.type, recordName: e.recordName })));
         expect(updateEvents).toHaveLength(2);
@@ -552,15 +546,7 @@ describe('filtered entity test', () => {
 
         // 第二次更新时，应该有一个 update 事件和一个 TechYoungUsers delete 事件
         console.log('Second update events:', updateEvents2.map(e => ({ type: e.type, recordName: e.recordName })));
-        
-        // 查询用户的当前状态，看看 __filtered_entities 字段
-        const currentUser = await entityQueryHandle.find('User',
-            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-            undefined,
-            ['id', 'name', 'age', 'department', '__filtered_entities']
-        );
-        console.log('Current user after second update:', currentUser[0]);
-        
+
         expect(updateEvents2).toHaveLength(2);
         expect(updateEvents2[0].type).toBe('update');
         expect(updateEvents2[0].recordName).toBe('User');
@@ -575,7 +561,7 @@ describe('filtered entity test', () => {
         });
     });
 
-    test('debug filtered entity initialization', async () => {
+    test('filtered entity membership is stateless (no persisted flag column)', async () => {
         // 创建一个满足所有 filtered entity 条件的用户
         const user = await entityQueryHandle.create('User', {
             name: 'Test',
@@ -584,36 +570,27 @@ describe('filtered entity test', () => {
             department: 'Tech'
         });
 
-        // 查询用户，检查 __filtered_entities 字段
-        const users1 = await entityQueryHandle.find('User', 
-            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-            undefined,
-            ['id', 'name', '__filtered_entities']
-        );
-        console.log('After create, __filtered_entities:', users1[0].__filtered_entities);
+        // 成员资格没有持久化标记：base entity 上不存在 __filtered_entities 内部列
+        expect(setup.map.records['User'].attributes['__filtered_entities']).toBeUndefined();
+        const userTable = setup.map.records['User'].table;
+        const flagColumns = Object.keys(setup.tables[userTable].columns).filter(column => column.includes('filtered'));
+        expect(flagColumns).toHaveLength(0);
 
-        // 执行一次更新
+        // 执行一次与成员资格无关的更新，不影响成员判定
+        const noiseEvents: any[] = [];
         await entityQueryHandle.update('User',
             MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-            { name: 'Test Updated' }
+            { name: 'Test Updated' },
+            noiseEvents
         );
+        // 只有 User 的 update 事件，没有任何 filtered entity 事件（成员资格没有变化）
+        expect(noiseEvents.map(e => ({ type: e.type, recordName: e.recordName }))).toEqual([
+            { type: 'update', recordName: 'User' }
+        ]);
 
-        // 再次查询用户，检查 __filtered_entities 字段
-        const users2 = await entityQueryHandle.find('User', 
-            MatchExp.atom({ key: 'id', value: ['=', user.id] }),
-            undefined,
-            ['id', 'name', '__filtered_entities']
-        );
-        console.log('After update, __filtered_entities:', users2[0].__filtered_entities);
-
-        // 验证 __filtered_entities 字段已被初始化
-        expect(users2[0].__filtered_entities).toBeDefined();
-        // 字段可能已经被解析为对象，所以直接使用
-        const flags = typeof users2[0].__filtered_entities === 'string' 
-            ? JSON.parse(users2[0].__filtered_entities) 
-            : users2[0].__filtered_entities;
-        expect(flags.ActiveUsers).toBe(true);
-        expect(flags.YoungUsers).toBe(true);
-        expect(flags.TechYoungUsers).toBe(true);
+        // 成员资格完全由谓词实时求值
+        expect(await entityQueryHandle.find('ActiveUsers', MatchExp.atom({ key: 'id', value: ['=', user.id] }), undefined, ['id'])).toHaveLength(1);
+        expect(await entityQueryHandle.find('YoungUsers', MatchExp.atom({ key: 'id', value: ['=', user.id] }), undefined, ['id'])).toHaveLength(1);
+        expect(await entityQueryHandle.find('TechYoungUsers', MatchExp.atom({ key: 'id', value: ['=', user.id] }), undefined, ['id'])).toHaveLength(1);
     });
 }); 

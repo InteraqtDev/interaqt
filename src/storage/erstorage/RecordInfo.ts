@@ -151,6 +151,10 @@ export class RecordInfo {
         return this.data?.isFilteredRelation
     }
 
+    get isMergedAbstract() {
+        return this.data?.isMergedAbstract
+    }
+
     get baseRelationName() {
         return this.data?.baseRelationName
     }

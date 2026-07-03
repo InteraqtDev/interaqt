@@ -205,12 +205,26 @@ export class DBSetup {
     
     private currentFilteredEntityName?: string;
     /**
-     * 递归收集所有依赖于给定实体的 filtered entities（包括级联的）
+     * 获取 entity/relation 的有效名字（未命名 relation 使用自动生成名）。
+     */
+    private getItemEffectiveName(item: EntityInstance | RelationInstance): string {
+        if (isRelation(item)) {
+            const relation = item as RelationInstance
+            return relation.name || `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`
+        }
+        return (item as EntityInstance).name
+    }
+    /**
+     * 递归收集所有依赖于给定实体的 filtered entities（包括级联的）。
+     * CAUTION 用名字而不是实例身份比较：merged item 处理阶段会克隆实体图
+     *  （RefContainer.add 会克隆虚拟 base），实例身份在图手术后不可靠，而名字全局唯一。
      */
     private collectAllFilteredEntities(entity: EntityInstance | RelationInstance): (EntityInstance | RelationInstance)[] {
-        const directFiltered = [...this.entities, ...this.relations].filter(e => 
-            (e as any).baseEntity === entity || (e as any).baseRelation === entity
-        );
+        const targetName = this.getItemEffectiveName(entity)
+        const directFiltered = [...this.entities, ...this.relations].filter(e => {
+            const base = (e as any).baseEntity || (e as any).baseRelation
+            return !!base && this.getItemEffectiveName(base) === targetName
+        });
         
         const allFiltered: (EntityInstance | RelationInstance)[] = [...directFiltered];
         
@@ -249,20 +263,11 @@ export class DBSetup {
             fieldType: this.database!.mapToDBFieldType('pk')
         }
 
-        // 使用递归方法收集所有依赖的 filtered entities
+        // 使用递归方法收集所有依赖的 filtered entities。
+        // CAUTION filtered entity 的成员资格没有持久化标记（无状态设计）：
+        //  查询侧靠谓词重写（resolvedMatchExpression），事件侧靠变更时的 membership diff
+        //  （见 FilteredEntityManager），成员资格只有一个真相源——谓词对当前数据的求值结果。
         const filteredBy = this.collectAllFilteredEntities(entity);
-        
-        if (filteredBy.length) {
-            attributes['__filtered_entities'] = {
-                name: '__filtered_entities',
-                type: 'json',
-                fieldType: this.database!.mapToDBFieldType('json') || 'JSON',
-                collection: false,
-                computed: undefined,
-                // JSON 字段的默认值应该返回对象，在写入数据库时会自动序列化
-                defaultValue: () => ({})
-            };
-        }
 
         return {
             table: entity.name,
@@ -719,6 +724,9 @@ export class DBSetup {
         // 4.5. 复制 base entity 的 attributes 到 filtered entity
         this.copyAttributesToFilteredEntities();
 
+        // 4.6. 标记抽象记录（merged item 不允许直接创建）
+        this.markMergedAbstractRecords();
+
         // 5. 验证所有 filtered entity 的路径
         this.validateAllFilteredEntityPaths();
 
@@ -734,6 +742,7 @@ export class DBSetup {
     /**
      * 统一处理 merged entities 和 merged relations
      */
+    private mergedAbstractNames: Set<string> = new Set()
     private processMergedItems() {
         const result = processMergedItems(
             this.entities,
@@ -742,6 +751,20 @@ export class DBSetup {
         
         this.entities = result.entities;
         this.relations = result.relations;
+        this.mergedAbstractNames = result.abstractNames;
+    }
+
+    /**
+     * 标记抽象记录（merged item 及其派生名）。
+     * merged item 是联合类型（抽象类型），直接以它的名义创建记录无法确定具体 __type，
+     * 必须在运行期显式报错（explicit control），而不是静默接受产生不属于任何 input 的记录。
+     */
+    private markMergedAbstractRecords() {
+        for (const name of this.mergedAbstractNames) {
+            if (this.map.records[name]) {
+                this.map.records[name].isMergedAbstract = true
+            }
+        }
     }
 
     mergeRecords() {
