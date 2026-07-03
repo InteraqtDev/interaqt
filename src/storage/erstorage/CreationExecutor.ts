@@ -392,7 +392,11 @@ export class CreationExecutor {
             ...attributes
         })
 
-        return this.createRecord(newLinkData, `create link record ${linkInfo.name}`, events)
+        const linkRecord = await this.createRecord(newLinkData, `create link record ${linkInfo.name}`, events)
+        // CAUTION 关系建立会改变依赖该关系的 filtered entity 的成员资格，必须显式传播。
+        //  放在这里而不是 RecordQueryAgent.addLink，是为了同时覆盖 addLinkFromRecord 等直接调用本方法的入口。
+        await this.filteredEntityManager.propagateLinkChange(linkInfo.name, sourceId, targetId, events)
+        return linkRecord
     }
 
     /**

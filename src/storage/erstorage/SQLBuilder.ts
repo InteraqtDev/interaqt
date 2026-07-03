@@ -70,10 +70,16 @@ export class SQLBuilder {
         const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
 
         const p = parentP || this.getPlaceholder()
-        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(p, this.database)
+        // CAUTION EXIST 子查询必须在遍历原子的过程中"就地"构建（通过 fnMatchHandler），
+        //  保证编号型占位符（$1/$2...）的分配顺序和 buildWhereClause 收集参数的树序一致。
+        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(
+            p,
+            this.database,
+            (atomData) => this.parseFunctionMatchAtom(recordQuery.recordName, atomData, recordQuery.contextRootEntity, p)
+        )
 
         const [whereClause, params] = this.buildWhereClause(
-            this.parseMatchExpressionValue(recordQuery.recordName, fieldMatchExp, recordQuery.contextRootEntity, p),
+            fieldMatchExp,
             prefix,
             p
         )
@@ -199,9 +205,22 @@ ${modifierClause}
     ): string {
         const { limit, offset, orderBy } = modifier
         const clauses: string[] = []
-        
+
+        // CAUTION limit/offset/order 会被直接插值进 SQL（LIMIT/OFFSET 不支持所有数据库的参数绑定），
+        //  而 modifier 常来自外部输入，必须做运行时校验防止注入。
+        if (limit !== undefined && limit !== null && (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0)) {
+            throw new Error(`modifier.limit must be a non-negative integer, got: ${JSON.stringify(limit)}`)
+        }
+        if (offset !== undefined && offset !== null && (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0)) {
+            throw new Error(`modifier.offset must be a non-negative integer, got: ${JSON.stringify(offset)}`)
+        }
+
         if (orderBy.length) {
             clauses.push(`ORDER BY ${orderBy.map(({ attribute, recordName, order }) => {
+                const normalizedOrder = String(order).toUpperCase()
+                if (normalizedOrder !== 'ASC' && normalizedOrder !== 'DESC') {
+                    throw new Error(`orderBy value must be 'ASC' or 'DESC', got: ${JSON.stringify(order)} for attribute ${attribute}`)
+                }
                 // 解析 attribute，支持路径（如 'leader.age'）
                 const pathParts = attribute.split('.')
                 
@@ -229,7 +248,7 @@ ${modifierClause}
                 )
                 
                 const fullFieldRef = `${this.withPrefix(prefix)}${tableAlias}`
-                return `"${fullFieldRef}"."${fieldName}" ${order}`
+                return `"${fullFieldRef}"."${fieldName}" ${normalizedOrder}`
             }).join(',')}`)
         }
 
@@ -358,7 +377,64 @@ ${modifierClause}
     }
     
     /**
+     * 解析单个函数匹配原子（EXIST 子查询）
+     * CAUTION 必须在 buildFieldMatchExpression 遍历原子时就地调用，
+     *  这样 EXIST 内层子查询消耗的占位符编号才能和外层值原子保持树序一致（PG 系编号占位符依赖这一点）。
+     */
+    parseFunctionMatchAtom(
+        entityName: string,
+        atomData: FieldMatchAtom,
+        contextRootEntity: string | undefined,
+        p: PlaceholderGen
+    ): FieldMatchAtom {
+        if (!Array.isArray(atomData.value)) {
+            throw new Error(`match value is not a array ${atomData.key}`)
+        }
+
+        if (atomData.value[0].toLowerCase() !== 'exist') {
+            throw new Error(`we only support Exist function match on entity for now. yours: ${atomData.key} ${atomData.value[0]} ${atomData.value[1]}`)
+        }
+
+        const info = this.map.getInfoByPath(atomData.namePath!)!
+        const { alias: currentAlias } = this.map.getTableAndAliasStack(atomData.namePath!).at(-1)!
+        const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
+
+        // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上
+        const parentAttributeNamePath = atomData.namePath!.slice(1, -1)
+
+        const existEntityQuery = RecordQuery.create(
+            info.recordName,
+            this.map,
+            {
+                matchExpression: MatchExp.atom({
+                    key: `${reverseAttributeName}.id`,
+                    value: ['=', parentAttributeNamePath.concat('id').join('.')],
+                    isReferenceValue: true
+                }).and(atomData.value[1])
+            },
+            // 如果上层还有，就继承上层的，如果没有， context 就只这一层
+            contextRootEntity || entityName
+        )
+
+        const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, currentAlias, p)
+
+        return {
+            ...atomData,
+            isInnerQuery: true,
+            fieldValue: `
+EXISTS (
+${innerQuerySQL}
+)
+`,
+            fieldParams: innerParams,
+        }
+    }
+
+    /**
      * 解析匹配表达式中的 EXIST 子查询
+     * CAUTION 该方法保留用于外部（测试等）单独调用。注意在使用编号型占位符的数据库上，
+     *  应通过 buildFieldMatchExpression 的 fnMatchHandler 就地处理（见 buildXToOneFindQuery），
+     *  否则占位符编号会和参数收集顺序错位。
      */
     parseMatchExpressionValue(
         entityName: string,
@@ -375,43 +451,7 @@ ${modifierClause}
 
             if (!exp.data.isFunctionMatch) return { ...exp.data }
 
-            if (exp.data.value[0].toLowerCase() !== 'exist') {
-                throw new Error(`we only support Exist function match on entity for now. yours: ${exp.data.key} ${exp.data.value[0]} ${exp.data.value[1]}`)
-            }
-
-            const info = this.map.getInfoByPath(exp.data.namePath!)!
-            const { alias: currentAlias } = this.map.getTableAndAliasStack(exp.data.namePath!).at(-1)!
-            const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
-
-            // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上
-            const parentAttributeNamePath = exp.data.namePath!.slice(1, -1)
-
-            const existEntityQuery = RecordQuery.create(
-                info.recordName,
-                this.map,
-                {
-                    matchExpression: MatchExp.atom({
-                        key: `${reverseAttributeName}.id`,
-                        value: ['=', parentAttributeNamePath.concat('id').join('.')],
-                        isReferenceValue: true
-                    }).and(exp.data.value[1])
-                },
-                // 如果上层还有，就继承上层的，如果没有， context 就只这一层
-                contextRootEntity || entityName
-            )
-
-            const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, currentAlias, p)
-
-            return {
-                ...exp.data,
-                isInnerQuery: true,
-                fieldValue: `
-EXISTS (
-${innerQuerySQL}
-)
-`,
-                fieldParams: innerParams,
-            }
+            return this.parseFunctionMatchAtom(entityName, exp.data, contextRootEntity, p)
         })
     }
     
