@@ -2505,7 +2505,8 @@ describe("Data migration phase 1", () => {
         }
     });
 
-    test("approved changed and unchanged decisions control built-in global aggregate rebuilds", async () => {
+    // 该用例顺序跑 5 个内置聚合的完整 setup+migrate 流程，耗时贴近默认 5s 超时（慢机器上会环境性超时），显式放宽。
+    test("approved changed and unchanged decisions control built-in global aggregate rebuilds", { timeout: 30000 }, async () => {
         const cases = [
             {
                 key: "Average",

@@ -344,7 +344,7 @@ export class QueryExecutor {
         // 分组需要每条子记录带上父 id。如果用户没有查询反向属性，这里追加 [reverseAttr, {attributeQuery: ['id']}]
         //（1:n 的反向是 x:1，同一次 JOIN 查询即可拿到，无额外往返），组装结果时再删掉。
         const reverseAttrInUserQuery = relatedRecordQuery.attributeQuery.data.some(
-            item => Array.isArray(item) && item[0] === reverseAttributeName
+            item => (typeof item === 'string' ? item : item[0]) === reverseAttributeName
         )
         const attributeQueryData: AttributeQueryData = reverseAttrInUserQuery ?
             relatedRecordQuery.attributeQuery.data :

@@ -1,6 +1,6 @@
-# @interaqt/storage Implementation Details
+# interaqt storage Implementation Details
 
-This document explains the internal architecture of the `@interaqt/storage` package, providing insights into how it works under the hood. Understanding these details can be valuable if you need to extend the package, debug issues, or simply gain a deeper understanding of its functionality.
+This document explains the internal architecture of the storage layer (`src/storage`, path alias `@storage`), providing insights into how it works under the hood. Understanding these details can be valuable if you need to extend the package, debug issues, or simply gain a deeper understanding of its functionality.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This document explains the internal architecture of the `@interaqt/storage` pack
 
 ## Overall Architecture
 
-The `@interaqt/storage` package is built as an ORM (Object-Relational Mapping) layer that abstracts database operations and provides a semantic interface for working with entities and their relationships. At a high level, it consists of:
+The storage package is built as an ORM (Object-Relational Mapping) layer that abstracts database operations and provides a semantic interface for working with entities and their relationships. At a high level, it consists of:
 
 1. **Schema Definition** - Entities, relations, and their properties define the data model
 2. **Schema Mapping** - Maps the logical schema to the physical database schema
@@ -115,13 +115,21 @@ This translates to selecting the `name` and `age` attributes of the main entity,
 
 ### RecordQueryAgent
 
-The `RecordQueryAgent` is the core execution engine that translates high-level semantic operations into SQL queries. It:
+The `RecordQueryAgent` is the facade of the execution engine that translates high-level semantic operations into SQL queries. It:
 
 1. Takes queries built by the `EntityQueryHandle`
 2. Resolves all the necessary information from the entity-to-table map
-3. Generates appropriate SQL
-4. Executes the SQL against the database
-5. Maps the results back to entity objects
+3. Delegates work to specialized executors
+4. Maps the results back to entity objects
+
+The actual work is split across executors, which the agent wires together (they call back into the agent through the explicit `RecordOperationAgent` contract):
+
+- `QueryExecutor` — executes SELECT queries, structures raw rows, resolves x:1 via JOIN and x:n via secondary (batched) queries
+- `CreationExecutor` — record creation, dependency resolution, link creation, same-row data preprocessing (`preprocessSameRowData`, shared by create and update paths)
+- `UpdateExecutor` — record updates, same-row data updates (`updateSameRowData`), reliance updates (`handleUpdateReliance`)
+- `DeletionExecutor` — record deletion, unlink, cascade deletion, deletion events
+- `SQLBuilder` — builds all SQL statements
+- `FilteredEntityManager` — filtered entity dependency analysis and `__filtered_entities` flag/event maintenance
 
 ## Data Flow
 
@@ -237,7 +245,7 @@ The system supports removing relations by setting the relation field to `null` d
    - It removes all these relationships in a single operation
    - For many-to-many relations, it deletes the junction table entries
 
-The implementation is in the `updateSameRowData` and `handleUpdateReliance` methods of the `RecordQueryAgent` class:
+The implementation is in the `updateSameRowData` and `handleUpdateReliance` methods of the `UpdateExecutor` class (invoked through `RecordQueryAgent.updateRecord`):
 - `updateSameRowData` handles x:1 relations and same-table relations
 - `handleUpdateReliance` handles x:n relations and different-table relations
 
@@ -276,26 +284,26 @@ Throughout the system, various data structures are used:
 ### Entity and Relation Definitions
 
 ```typescript
-// Entity definition
-const userEntity: Entity = {
+// Entity definition (Klass factory pattern; names must match /^[a-zA-Z0-9_]+$/)
+const userEntity = Entity.create({
   name: 'User',
   properties: [
-    { name: 'name', type: 'String' },
-    { name: 'age', type: 'Number' }
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'age', type: 'number' })
   ]
-};
+});
 
-// Relation definition
-const profileRelation: Relation = {
+// Relation definition. type is a string: '1:1' | '1:n' | 'n:1' | 'n:n'
+const profileRelation = Relation.create({
   source: profileEntity,
   sourceProperty: 'owner',
   target: userEntity,
   targetProperty: 'profile',
-  type: RelationType.OneToOne,
+  type: '1:1',
   properties: [
-    { name: 'viewed', type: 'Number' }
+    Property.create({ name: 'viewed', type: 'number' })
   ]
-};
+});
 ```
 
 ### Match Expression Data
@@ -363,6 +371,6 @@ These events can be captured and used for audit logging, triggering side effects
 
 ## Conclusion
 
-The `@interaqt/storage` package provides a powerful abstraction over database operations, allowing you to work with entities and relations in a more natural way. By understanding these implementation details, you can make more effective use of the package and potentially extend or customize its functionality to better suit your needs.
+The storage package provides a powerful abstraction over database operations, allowing you to work with entities and relations in a more natural way. By understanding these implementation details, you can make more effective use of the package and potentially extend or customize its functionality to better suit your needs.
 
 For specific implementation questions or issues, refer to the source code in the `erstorage` directory, which contains the detailed logic for each component described here. 
