@@ -1,5 +1,5 @@
 import { EntityInstance, RelationInstance, PropertyInstance, Property, Entity, Relation, RefContainer } from "@core";
-import { MatchExp } from "./MatchExp.js";
+import { MatchExp, MatchExpressionData } from "./MatchExp.js";
 import { assert } from "../utils.js";
 
 export type MergedItem = EntityInstance | RelationInstance;
