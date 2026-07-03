@@ -6,7 +6,7 @@ import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { SQLBuilder } from "./SQLBuilder.js";
 import { FilteredEntityManager } from "./FilteredEntityManager.js";
-import type { Record } from "./RecordQueryAgent.js";
+import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 
 /**
  * UpdateExecutor - 更新操作执行器
@@ -26,15 +26,8 @@ export class UpdateExecutor {
         private database: Database,
         filteredEntityManager: FilteredEntityManager,
         sqlBuilder: SQLBuilder,
-        private helper: {
-            findRecords: (entityQuery: RecordQuery, queryName: string) => Promise<Record[]>,
-            createRecordDependency: (newRecordData: NewRecordData, events?: RecordMutationEvent[]) => Promise<NewRecordData>,
-            createRecord: (newEntityData: NewRecordData, queryName?: string, events?: RecordMutationEvent[]) => Promise<EntityIdRef>,
-            addLinkFromRecord: (entity: string, attribute: string, entityId: string, relatedEntityId: string, attributes?: RawEntityData, events?: RecordMutationEvent[]) => Promise<EntityIdRef>,
-            unlink: (linkName: string, matchExpression: MatchExpressionData, moveSource: boolean, reason: string, events?: RecordMutationEvent[]) => Promise<Record[]>,
-            deleteRecordSameRowData: (recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp?: boolean) => Promise<Record[]>,
-            preprocessSameRowData: (newEntityData: NewRecordData, isUpdate: boolean, events?: RecordMutationEvent[], oldRecord?: Record) => Promise<NewRecordData>
-        }
+        // CAUTION executor 之间的互相回调通过 RecordOperationAgent 显式契约进行（见 RecordQueryAgent）。
+        private agent: RecordOperationAgent
     ) {
         this.sqlBuilder = sqlBuilder
         this.filteredEntityManager = filteredEntityManager
@@ -45,19 +38,30 @@ export class UpdateExecutor {
      */
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: RecordMutationEvent[]): Promise<Record[]> {
         // 现在支持在 update 字段的同时，使用 null 来删除关系
-        // FIXME update 的 attributeQuery 应该按需查询，现在查询的记录太多
+        // CAUTION 前置查询按需裁剪：
+        //  - 值属性全部保留：update 事件的 oldRecord、computed 属性重算、增量计算都依赖旧值。
+        //  - 关系记录（reliance/合表/合并 link）只保留本次 update 实际涉及的 attribute：
+        //    unlink 判断和 flash-out 只会用到 newEntityData 里出现的关系，其余的递归 JOIN 纯属浪费。
+        //  - link record 自身的 source/target（managedRecordAttributes）始终保留，它们是同行字段，代价极小。
+        const fullAttributeQuery = AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
+        const recordInfo = this.map.getRecordInfo(this.map.getRecordInfo(entityName).resolvedBaseRecordName!)
+        const involvedRecordAttributes = new Set(Object.keys(newEntityData.getData() || {}))
+        recordInfo.managedRecordAttributes.forEach(info => involvedRecordAttributes.add(info.attributeName))
+        const trimmedAttributeQuery = fullAttributeQuery.filter(item =>
+            typeof item === 'string' || involvedRecordAttributes.has(item[0])
+        )
 
         const updateRecordQuery = RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpressionData,
-            attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
+            attributeQuery: trimmedAttributeQuery
         })
         
-        const matchedEntities = await this.helper.findRecords(updateRecordQuery, `find record for updating ${entityName}`)
+        const matchedEntities = await this.agent.findRecords(updateRecordQuery, `find record for updating ${entityName}`)
         // 注意下面使用的都是 updateRecordQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
         const result: Record[] = []
         for (let matchedEntity of matchedEntities) {
             // 1. 创建我依赖的
-            const newEntityDataWithDep = await this.helper.createRecordDependency(newEntityData, events)
+            const newEntityDataWithDep = await this.agent.createRecordDependency(newEntityData, events)
             // 2. 把同表的实体移出去，为新同表 Record 建立 id；可能有要删除的 reliance
             const newEntityDataWithIdsWithFlashOutRecords = await this.updateSameRowData(updateRecordQuery.recordName, matchedEntity, newEntityDataWithDep, events)
             // 3. 更新依赖我的和关系表独立的
@@ -95,7 +99,7 @@ export class UpdateExecutor {
                 continue
             }
 
-            await this.helper.unlink(
+            await this.agent.unlink(
                 linkInfo.name,
                 MatchExp.atom({
                     key: `${updatedEntityLinkAttr}.id`,
@@ -108,7 +112,7 @@ export class UpdateExecutor {
         }
 
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
-        const newEntityDataWithIdsWithFlashOutRecords = await this.helper.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
+        const newEntityDataWithIdsWithFlashOutRecords = await this.agent.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
         const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue(matchedEntity)
         const columnAndValue = allSameRowData.map(({field, value}: { field: string, value: string }) => (
             {
@@ -148,7 +152,7 @@ export class UpdateExecutor {
 
             removedLinkName.add(linkInfo.name)
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName) ? 'source' : 'target'
-            await this.helper.unlink(
+            await this.agent.unlink(
                 linkInfo.name,
                 MatchExp.atom({
                     key: `${updatedEntityLinkAttr}.id`,
@@ -176,11 +180,11 @@ export class UpdateExecutor {
             if (newRelatedEntityData.isRef()) {
                 finalRelatedEntityRef = newRelatedEntityData.getRef()
             } else {
-                finalRelatedEntityRef = await this.helper.createRecord(newRelatedEntityData, `create new related record for update ${newEntityData.recordName}.${newRelatedEntityData.info?.attributeName}`, events)
+                finalRelatedEntityRef = await this.agent.createRecord(newRelatedEntityData, `create new related record for update ${newEntityData.recordName}.${newRelatedEntityData.info?.attributeName}`, events)
             }
 
             // FIXME 这里没有在更新的时候一次性写入，而是又通过 addLinkFromRecord 建立的关系。需要优化
-            const linkRecord = await this.helper.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, matchedEntity.id, finalRelatedEntityRef.id, undefined, events)
+            const linkRecord = await this.agent.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, matchedEntity.id, finalRelatedEntityRef.id, undefined, events)
 
             if (newRelatedEntityData.info!.isXToMany) {
                 if (!result[newRelatedEntityData.info!.attributeName!]) {

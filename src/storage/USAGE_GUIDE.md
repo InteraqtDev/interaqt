@@ -1,8 +1,8 @@
-# @interaqt/storage Usage Guide
+# interaqt storage Usage Guide
 
 ## Introduction
 
-The `@interaqt/storage` package is an ORM-like library that provides a high-level, semantic interface for database operations. It abstracts away database-specific details and allows you to work with entities, relations, and queries in a natural way. This guide will walk you through how to use this package effectively.
+The interaqt storage layer (`src/storage`, path alias `@storage`) is an ORM-like library that provides a high-level, semantic interface for database operations. It abstracts away database-specific details and allows you to work with entities, relations, and queries in a natural way. This guide will walk you through how to use this package effectively.
 
 ## Table of Contents
 
@@ -19,12 +19,14 @@ The `@interaqt/storage` package is an ORM-like library that provides a high-leve
 ## Installation
 
 ```bash
-npm install @interaqt/storage
+npm install interaqt
 ```
+
+The storage layer ships as part of the `interaqt` package (`src/storage`, path alias `@storage` inside the repository).
 
 ## Basic Concepts
 
-The `@interaqt/storage` package is built around a few key concepts:
+The storage layer is built around a few key concepts:
 
 - **Entities**: Represent your data models (like User, Product, etc.)
 - **Relations**: Represent relationships between entities (like one-to-many, many-to-many)
@@ -38,37 +40,37 @@ The `@interaqt/storage` package is built around a few key concepts:
 First, you need to define your data model using entities and relations:
 
 ```typescript
-import { Entity, Property, Relation, RelationType } from "@storage";
+import { Entity, Property, Relation } from 'interaqt';
 
-// Define an entity
-const userEntity: Entity = {
+// Define an entity. Names must match /^[a-zA-Z0-9_]+$/ (enforced at create time).
+const userEntity = Entity.create({
   name: 'User',
   properties: [
-    { name: 'name', type: 'String' },
-    { name: 'age', type: 'Number' },
-    { name: 'gender', type: 'String', defaultValue: () => 'male' }
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'age', type: 'number' }),
+    Property.create({ name: 'gender', type: 'string', defaultValue: () => 'male' })
   ]
-};
+});
 
 // Define another entity
-const profileEntity: Entity = {
+const profileEntity = Entity.create({
   name: 'Profile',
   properties: [
-    { name: 'title', type: 'String' }
+    Property.create({ name: 'title', type: 'string' })
   ]
-};
+});
 
-// Define a relation between entities
-const profileRelation: Relation = {
+// Define a relation between entities. type is a string: '1:1' | '1:n' | 'n:1' | 'n:n'
+const profileRelation = Relation.create({
   source: profileEntity,
   sourceProperty: 'owner',
   target: userEntity,
   targetProperty: 'profile',
-  type: RelationType.OneToOne,
+  type: '1:1',
   properties: [
-    { name: 'viewed', type: 'Number' }
+    Property.create({ name: 'viewed', type: 'number' })
   ]
-};
+});
 
 // Create collections of entities and relations
 const entities = [userEntity, profileEntity];
@@ -80,8 +82,8 @@ const relations = [profileRelation];
 After defining your data model, you need to set up the storage with a database:
 
 ```typescript
-import { DBSetup, EntityToTableMap, EntityQueryHandle } from "@storage";
-import { SQLiteDB } from "your-database-adapter"; // Example database adapter
+import { DBSetup, EntityToTableMap, EntityQueryHandle } from 'interaqt';
+import { SQLiteDB } from 'interaqt'; // or PGLiteDB / PostgreSQLDB / MysqlDB
 
 // Create and open the database connection
 const db = new SQLiteDB(':memory:');
@@ -92,8 +94,9 @@ const setup = new DBSetup(entities, relations, db);
 await setup.createTables();
 await setup.createConstraints();
 
-// Create the query handle to interact with the database
-const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+// Create the query handle to interact with the database.
+// Pass setup.aliasManager so pregenerated table aliases are reused.
+const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 ```
 
 ### Schema Constraints and Metadata
@@ -457,41 +460,41 @@ console.log(events);
 
 ```typescript
 // Define entities and relations
-const userEntity = {
+const userEntity = Entity.create({
   name: 'User',
   properties: [
-    { name: 'name', type: 'String' },
-    { name: 'email', type: 'String' },
-    { name: 'age', type: 'Number' }
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'email', type: 'string' }),
+    Property.create({ name: 'age', type: 'number' })
   ]
-};
+});
 
-const taskEntity = {
+const taskEntity = Entity.create({
   name: 'Task',
   properties: [
-    { name: 'title', type: 'String' },
-    { name: 'description', type: 'String' },
-    { name: 'completed', type: 'Boolean', defaultValue: () => false }
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'description', type: 'string' }),
+    Property.create({ name: 'completed', type: 'boolean', defaultValue: () => false })
   ]
-};
+});
 
-const taskAssignmentRelation = {
+const taskAssignmentRelation = Relation.create({
   source: userEntity,
   sourceProperty: 'assignedTasks',
   target: taskEntity,
   targetProperty: 'assignee',
-  type: RelationType.OneToMany,
+  type: '1:n',
   properties: [
-    { name: 'assignedAt', type: 'Date' }
+    Property.create({ name: 'assignedAt', type: 'string' })
   ]
-};
+});
 
 // Set up the storage
 const db = new SQLiteDB(':memory:');
 await db.open();
 const setup = new DBSetup([userEntity, taskEntity], [taskAssignmentRelation], db);
 await setup.createTables();
-const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map), db);
+const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
 
 // Create a user
 const user = await entityQueryHandle.create('User', {
@@ -537,4 +540,4 @@ await entityQueryHandle.delete('Task', MatchExp.atom({ key: 'id', value: ['>', 0
 await entityQueryHandle.delete('User', MatchExp.atom({ key: 'id', value: ['>', 0] }));
 ```
 
-This guide provides a comprehensive overview of how to use the `@interaqt/storage` package. For more specific use cases or advanced features, please refer to the source code or create specific examples tailored to your needs. 
+This guide provides a comprehensive overview of how to use the interaqt storage layer. For more specific use cases or advanced features, please refer to the source code or create specific examples tailored to your needs. 

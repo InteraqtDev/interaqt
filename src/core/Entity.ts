@@ -130,6 +130,11 @@ export class Entity implements EntityInstance {
   };
   
   static create(args: EntityCreateArgs, options?: { uuid?: string }): EntityInstance {
+    // 强制执行 nameFormat 约束：name 会被用作表名/字段名/别名直接进入 SQL，必须严格校验。
+    if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
+      throw new Error(`Entity name "${args.name}" is invalid. Entity names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+
     const instance = new Entity(args, options);
     
     // 检查 uuid 是否重复

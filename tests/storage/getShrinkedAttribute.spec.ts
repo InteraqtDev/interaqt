@@ -66,4 +66,34 @@ describe("getShrinkedAttribute test", () => {
         const result = entityToTableMap.getShrinkedAttribute('User', 'leader.&.target.name');
         expect(result).toBe('leader.name');
     });
-}); 
+
+    // 以下为 3.3.4 重写后补充的边界用例（重写不改变语义，这里把语义固定下来）
+
+    test("should keep & at the beginning of a path unchanged", () => {
+        const result = entityToTableMap.getShrinkedAttribute('User', '&.profile.title');
+        expect(result).toBe('&.profile.title');
+    });
+
+    test("should keep & followed by a non source/target segment and stop entity tracking", () => {
+        // & 后面不是 source/target（读取关系自身属性），无压缩语义，原样保留
+        const result = entityToTableMap.getShrinkedAttribute('User', 'profile.&.viewed');
+        expect(result).toBe('profile.&.viewed');
+    });
+
+    test("should keep segments after a non-shrinkable endpoint unchanged", () => {
+        // owner.&.source 回到关系另一端（File），不能压缩，且后续段不再解析实体
+        const result = entityToTableMap.getShrinkedAttribute('File', 'owner.&.source.fileName');
+        expect(result).toBe('owner.&.source.fileName');
+    });
+
+    test("should shrink first segment then keep the second non-shrinkable one", () => {
+        // owner.&.target 可压缩（都指向 User）；随后的 profile.&.viewed 保留
+        const result = entityToTableMap.getShrinkedAttribute('File', 'owner.&.target.profile.&.viewed');
+        expect(result).toBe('owner.profile.&.viewed');
+    });
+
+    test("should keep plain single attribute unchanged", () => {
+        const result = entityToTableMap.getShrinkedAttribute('User', 'name');
+        expect(result).toBe('name');
+    });
+});

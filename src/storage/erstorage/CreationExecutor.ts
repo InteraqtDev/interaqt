@@ -7,7 +7,7 @@ import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { assert } from "../utils.js";
 import { SQLBuilder } from "./SQLBuilder.js";
 import { FilteredEntityManager } from "./FilteredEntityManager.js";
-import type { Record } from "./RecordQueryAgent.js";
+import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 import type { QueryExecutor } from "./QueryExecutor.js";
 
 /**
@@ -31,13 +31,8 @@ export class CreationExecutor {
         private queryExecutor: QueryExecutor,
         filteredEntityManager: FilteredEntityManager,
         sqlBuilder: SQLBuilder,
-        private helper: {
-            updateRecord: (entity: string, matchExpression: MatchExpressionData, newRecordData: NewRecordData, events?: RecordMutationEvent[]) => Promise<Record[]>,
-            unlink: (linkName: string, matchExpression: MatchExpressionData, moveSource: boolean, reason: string, events?: RecordMutationEvent[]) => Promise<Record[]>,
-            deleteRecordSameRowData: (recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp?: boolean) =>Promise<Record[]>,
-            flashOutCombinedRecordsAndMergedLinks: (newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string) => Promise<{ [k: string]: RawEntityData }>,
-            relocateCombinedRecordDataForLink: (linkName: string, matchExpression: MatchExpressionData, moveSource: boolean, events?: RecordMutationEvent[]) => Promise<Record[]>
-        }
+        // CAUTION executor 之间的互相回调通过 RecordOperationAgent 显式契约进行（见 RecordQueryAgent）。
+        private agent: RecordOperationAgent
     ) {
         this.sqlBuilder = sqlBuilder
         this.filteredEntityManager = filteredEntityManager
@@ -99,8 +94,9 @@ export class CreationExecutor {
         // 合并所有数据以获得完整的记录
         const fullRecord = Object.assign({}, newEntityData.getData(), newRecordIdRef, relianceResult);
 
-        // 处理 filtered entity - 检查新创建的记录是否属于任何 filtered entity
-        // 传递 isCreation = true 表示这是创建操作，只生成事件但不持久化 __filtered_entities
+        // 处理 filtered entity - 检查新创建的记录是否属于任何 filtered entity。
+        // 传递 isCreation = true 表示这是创建操作：直接对所有相关 filtered entity 求值，
+        // 生成 create 事件并把结果持久化到 __filtered_entities 标记列。
         await this.filteredEntityManager.updateFilteredEntityFlags(newEntityData.recordName, newRecordIdRef.id, events, fullRecord, true)
 
         // 更新 relianceResult 的信息
@@ -196,7 +192,7 @@ export class CreationExecutor {
 
         // 2. 处理需要 flashOut 的数据
         // TODO create 的情况下，有没可能不需要 flashout 已有的数据，直接更新到已有的 combined record 的行就行了。
-        const flashOutRecordRasData: { [k: string]: RawEntityData } = await this.helper.flashOutCombinedRecordsAndMergedLinks(
+        const flashOutRecordRasData: { [k: string]: RawEntityData } = await this.agent.flashOutCombinedRecordsAndMergedLinks(
             newEntityData,
             events,
             `finding combined records for ${newEntityData.recordName} to flash out, for ${isUpdate ? 'updating' : 'creation'} with data ${JSON.stringify(newEntityDataWithIds.getData())}`
@@ -259,7 +255,7 @@ export class CreationExecutor {
                 [reverseInfo!.attributeName]: currentIdRef,
                 [LINK_SYMBOL]: record.getData()[LINK_SYMBOL]
             }
-            const [updatedRecord] = await this.helper.updateRecord(reverseInfo.parentEntityName, idMatch, new NewRecordData(this.map, reverseInfo.parentEntityName, newData), events)
+            const [updatedRecord] = await this.agent.updateRecord(reverseInfo.parentEntityName, idMatch, new NewRecordData(this.map, reverseInfo.parentEntityName, newData), events)
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
                     newIdRefs[record.info!.attributeName!] = []
@@ -315,7 +311,7 @@ export class CreationExecutor {
                     value: ['=', record.getRef().id]
                 })
                 // 这里需要调用 RecordQueryAgent 的 unlink 方法
-                await this.helper.unlink(record.info!.linkName, match, false, 'unlink xToOne old link', events)
+                await this.agent.unlink(record.info!.linkName, match, false, 'unlink xToOne old link', events)
             }
             const linkRawData: RawEntityData = record.linkRecordData?.getData() || {}
             Object.assign(linkRawData, {
@@ -383,7 +379,7 @@ export class CreationExecutor {
                 value: ['=', unlinkId]
             })
             // 这里需要调用 RecordQueryAgent 的 unlink 方法
-            await this.helper.unlink(linkName, match, false, 'unlink combined record for add new link', events)
+            await this.agent.unlink(linkName, match, false, 'unlink combined record for add new link', events)
         }
 
         const newLinkData = new NewRecordData(this.map, linkInfo.name, {

@@ -207,7 +207,7 @@ export class MatchExp {
         let fieldParams:unknown[] = []
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
 
-        if (simpleOp.includes(value[0]) || (value[0] === 'not' && value[1] !== null)) {
+        if (simpleOp.includes(value[0])) {
             if (isReferenceValue) {
                 // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL，不使用占位符
                 const referenceField = this.getReferenceFieldValue(value[1])
@@ -217,12 +217,28 @@ export class MatchExp {
                 fieldValue = `${value[0]} ${p()}`
                 fieldParams = [value[1]]
             }
-        } else if((value[0] === 'not' && value[1] === null)) {
+        } else if (value[0] === 'not') {
+            // CAUTION 'not' 只支持 null（表示 IS NOT NULL）。
+            //  其他值会生成 `"field" not $1` 这种非法 SQL，必须显式报错。
+            if (value[1] !== null) {
+                throw new Error(`match operator 'not' only supports null (meaning IS NOT NULL). To exclude a value use '!=', got: ${JSON.stringify(value[1])} for key "${key}"`)
+            }
             fieldValue = `IS NOT NULL`
         } else if (value[0].toLowerCase() === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
-            fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
-            fieldParams = value[1]
+            if (!Array.isArray(value[1])) {
+                throw new Error(`match operator 'in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
+            }
+            if (value[1].length === 0) {
+                // 空数组的 IN 语义上恒为 false（任何值都不在空集合中）。
+                // `IN ()` 是非法 SQL，这里生成跨数据库合法且恒为 false 的表达式：
+                // `x IN (NULL)` 求值为 NULL，`NULL AND (1=0)` 为 false，且在外层 NOT 下取反后正确为 true。
+                fieldValue = `IN (NULL) AND 1=0`
+                fieldParams = []
+            } else {
+                fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
+                fieldParams = value[1]
+            }
         } else if (value[0].toLowerCase() === 'between') {
             if (isReferenceValue) {
                 // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL

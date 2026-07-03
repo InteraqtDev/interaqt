@@ -267,20 +267,154 @@ export class QueryExecutor {
         for (let subEntityQuery of entityQuery.attributeQuery.xToManyRecords) {
             // XToMany 的 relationData 是在上面 buildFindQuery 一起查完了的
             if (!subEntityQuery.onlyRelationData) {
-                for (let record of records) {
-                    const nextContext = entityQuery.label ? nextRecursiveContext.concat(record) : nextRecursiveContext
-                    record[subEntityQuery.alias || subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                // CAUTION 优先按父 id 集合批量查询（IN (...) + 按反向属性分组回填），消掉一层 N+1。
+                //  无法批量的场景（递归 label/goto、per-parent limit/offset、n:n 等）退回逐条查询。
+                if (this.canBatchXToManyQuery(entityQuery, subEntityQuery, records)) {
+                    await this.findXToManyRelatedRecordsBatched(
                         entityQuery.recordName,
                         subEntityQuery.attributeName!,
-                        record.id,
+                        records,
                         subEntityQuery,
                         recordQueryRef,
-                        nextContext
+                        nextRecursiveContext
                     )
+                } else {
+                    for (let record of records) {
+                        const nextContext = entityQuery.label ? nextRecursiveContext.concat(record) : nextRecursiveContext
+                        record[subEntityQuery.alias || subEntityQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                            entityQuery.recordName,
+                            subEntityQuery.attributeName!,
+                            record.id,
+                            subEntityQuery,
+                            recordQueryRef,
+                            nextContext
+                        )
+                    }
                 }
             }
         }
         return records
+    }
+
+    /**
+     * 判断某个 x:n 关联查询能否按父 id 集合批量执行。
+     * 限制条件：
+     * - 至少两条父记录（单条时批量没有收益）。
+     * - 没有递归语义（父查询 label / 子查询 label/goto 需要 per-record 的递归上下文）。
+     * - 子查询没有 limit/offset（它们是 per-parent 语义，合并后无法保证）。
+     * - 关系是 1:n 且非对称：反向是 x:1，可以通过一次 JOIN 拿到父 id 做分组；
+     *   n:n 的反向仍是 x:n，批量会引入 fan-out 与嵌套 N+1，保持逐条查询。
+     */
+    private canBatchXToManyQuery(entityQuery: RecordQuery, subEntityQuery: RecordQuery, records: Record[]): boolean {
+        if (records.length < 2) return false
+        if (entityQuery.label || subEntityQuery.label || subEntityQuery.goto) return false
+        const modifierData = subEntityQuery.modifier?.data
+        if (modifierData?.limit !== undefined || modifierData?.offset !== undefined) return false
+        const info = this.map.getInfo(entityQuery.recordName, subEntityQuery.attributeName!)
+        if (!info.isOneToMany) return false
+        if (info.isLinkManyToManySymmetric()) return false
+        return true
+    }
+
+    /**
+     * 按父 id 集合批量查询 x:n（1:n）关联记录，并按反向属性分组回填到各父记录上。
+     * 与 findXToManyRelatedRecords 的逐条语义保持一致（包括关系数据 & 的处理），
+     * 只是把"每个父记录一次查询"合并为"每批父记录一次查询"。
+     */
+    async findXToManyRelatedRecordsBatched(
+        recordName: string,
+        attributeName: string,
+        parentRecords: Record[],
+        relatedRecordQuery: RecordQuery,
+        recordQueryRef: RecordQueryRef,
+        context: RecursiveContext
+    ): Promise<void> {
+        const BATCH_SIZE = 500
+        const info = this.map.getInfo(recordName, attributeName)
+        const reverseAttributeName = info.getReverseInfo()?.attributeName!
+        const resultKey = relatedRecordQuery.alias || relatedRecordQuery.attributeName!
+
+        // 保证每个父记录都有数组（没有子记录的父记录也一样）
+        const parentById = new Map<string, Record>()
+        for (const parent of parentRecords) {
+            parent[resultKey] = []
+            parentById.set(parent.id, parent)
+        }
+
+        // 分组需要每条子记录带上父 id。如果用户没有查询反向属性，这里追加 [reverseAttr, {attributeQuery: ['id']}]
+        //（1:n 的反向是 x:1，同一次 JOIN 查询即可拿到，无额外往返），组装结果时再删掉。
+        const reverseAttrInUserQuery = relatedRecordQuery.attributeQuery.data.some(
+            item => (typeof item === 'string' ? item : item[0]) === reverseAttributeName
+        )
+        const attributeQueryData: AttributeQueryData = reverseAttrInUserQuery ?
+            relatedRecordQuery.attributeQuery.data :
+            [...relatedRecordQuery.attributeQuery.data, [reverseAttributeName, { attributeQuery: ['id'] }] as AttributeQueryDataRecordItem]
+
+        const parentLinkRecordQuery = relatedRecordQuery.attributeQuery.parentLinkRecordQuery
+        const shouldQueryParentLink = !!parentLinkRecordQuery
+
+        for (let start = 0; start < parentRecords.length; start += BATCH_SIZE) {
+            const chunk = parentRecords.slice(start, start + BATCH_SIZE)
+            const newMatch = relatedRecordQuery.matchExpression.and({
+                key: `${reverseAttributeName}.id`,
+                value: ['in', chunk.map(r => r.id)]
+            })
+            const newAttributeQuery = new AttributeQuery(
+                relatedRecordQuery.recordName,
+                this.map,
+                attributeQueryData,
+                relatedRecordQuery.parentRecord,
+                relatedRecordQuery.attributeName,
+                shouldQueryParentLink
+            )
+            const newSubQuery = relatedRecordQuery.derive({
+                matchExpression: newMatch,
+                attributeQuery: newAttributeQuery
+            })
+
+            const data = await this.findRecords(
+                newSubQuery,
+                `finding related records in batch: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`,
+                recordQueryRef,
+                context
+            )
+
+            for (const item of data) {
+                const parentId = item[reverseAttributeName]?.id
+                const parent = parentId !== undefined ? parentById.get(parentId) : undefined
+
+                // 和 findXToManyRelatedRecords 一致：把和父亲的关系数据挂到 & 上，并去掉临时的反向属性
+                if (shouldQueryParentLink) {
+                    item[LINK_SYMBOL] = item[reverseAttributeName]?.[LINK_SYMBOL]
+                    delete item[reverseAttributeName]
+                } else if (!reverseAttrInUserQuery) {
+                    delete item[reverseAttributeName]
+                }
+
+                // 和父亲的关联关系上的 x:n 数据
+                if (parentLinkRecordQuery) {
+                    for (let subEntityQueryOfLink of parentLinkRecordQuery.attributeQuery.xToManyRecords) {
+                        const linkId = item[LINK_SYMBOL].id
+                        setByPath(
+                            item,
+                            [LINK_SYMBOL, subEntityQueryOfLink.attributeName!],
+                            await this.findXToManyRelatedRecords(
+                                subEntityQueryOfLink.parentRecord!,
+                                subEntityQueryOfLink.attributeName!,
+                                linkId,
+                                subEntityQueryOfLink,
+                                recordQueryRef,
+                                context
+                            )
+                        )
+                    }
+                }
+
+                if (parent) {
+                    (parent[resultKey] as Record[]).push(item)
+                }
+            }
+        }
     }
 
     /**
