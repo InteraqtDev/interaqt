@@ -81,12 +81,12 @@ describe('merged entity in relation test', () => {
             const contacts = await entityQueryHandle.find('Contact',
                 undefined,
                 undefined,
-                ['id', 'name', 'email', '__Contact_input_entity']
+                ['id', 'name', 'email', '__type']
             );
 
             expect(contacts).toHaveLength(1);
             expect(contacts[0].name).toBe('John Doe');
-            expect(contacts[0].__Contact_input_entity).toEqual(['Customer']);
+            expect(contacts[0].__type).toBe('Customer');
 
             // 6. 验证可以通过 relation 查询 Contact 的 orders
             const contactWithOrders = await entityQueryHandle.findOne('Contact',
@@ -127,11 +127,11 @@ describe('merged entity in relation test', () => {
             const allContacts = await entityQueryHandle.find('Contact',
                 undefined,
                 undefined,
-                ['id', 'name', '__Contact_input_entity']
+                ['id', 'name', '__type']
             );
 
             expect(allContacts).toHaveLength(2);
-            const inputTypes = allContacts.map(c => c.__Contact_input_entity[0]).sort();
+            const inputTypes = allContacts.map(c => c.__type).sort();
             expect(inputTypes).toEqual(['Customer', 'Vendor']);
 
             // 10. 通过 relation contact attrubuteQuery 查找 common properties 字段。
@@ -387,11 +387,11 @@ describe('merged entity in relation test', () => {
             const companyAsActor = await entityQueryHandle.findOne('Actor',
                 MatchExp.atom({ key: 'id', value: ['=', company1.id] }),
                 undefined,
-                ['id', 'name', 'ownedProjects', '__Actor_input_entity']
+                ['id', 'name', 'ownedProjects', '__type']
             );
 
             expect(companyAsActor).toBeTruthy();
-            expect(companyAsActor!.__Actor_input_entity).toEqual(['Company']);
+            expect(companyAsActor!.__type).toBe('Company');
             expect(companyAsActor!.ownedProjects).toBeTruthy();
 
         } finally {

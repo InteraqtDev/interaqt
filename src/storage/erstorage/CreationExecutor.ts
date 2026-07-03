@@ -6,7 +6,7 @@ import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { assert } from "../utils.js";
 import { SQLBuilder } from "./SQLBuilder.js";
-import { FilteredEntityManager } from "./FilteredEntityManager.js";
+import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 import type { QueryExecutor } from "./QueryExecutor.js";
 
@@ -86,7 +86,25 @@ export class CreationExecutor {
      * 创建记录（主入口）
      */
     async createRecord(newEntityData: NewRecordData, queryName?: string, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        // CAUTION merged entity/relation 是抽象联合类型：以它（或以它为 base 的 filtered item）的
+        //  名义创建记录无法确定具体的 __type 判别值，必须显式报错（explicit control）。
+        //  只拦截 createRecord 入口：flash-out/relocate 等对既有记录的行迁移走 insertSameRowData，不受影响。
+        const originalRecordInfo = this.map.getRecordInfo(newEntityData.originalRecordName)
+        if (originalRecordInfo.isMergedAbstract) {
+            throw new Error(
+                `cannot create record of merged (union) type "${newEntityData.originalRecordName}" directly. ` +
+                `A merged entity/relation is an abstract union type; create the record through one of its input types instead.`
+            )
+        }
+
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
+
+        // CAUTION 成员资格快照必须在物理变更之前采集（见 FilteredEntityManager 的无状态设计）。
+        //  1) link record 的创建会改变两端实体在依赖该关系的 filtered entity 中的成员资格；
+        //  2) 合并进本行的既有关联记录（merged link / combined 的 id ref）等价于对既有记录追加关系，
+        //     同样会改变"另一端"记录的成员资格。
+        const linkChecks = await this.collectCreationLinkChecks(newEntityDataWithDep, events)
+
         const newRecordIdRef = await this.insertSameRowData(newEntityDataWithDep, queryName, events)
 
         const relianceResult = await this.handleCreationReliance(newEntityDataWithDep.merge(newRecordIdRef), events)
@@ -94,13 +112,47 @@ export class CreationExecutor {
         // 合并所有数据以获得完整的记录
         const fullRecord = Object.assign({}, newEntityData.getData(), newRecordIdRef, relianceResult);
 
-        // 处理 filtered entity - 检查新创建的记录是否属于任何 filtered entity。
-        // 传递 isCreation = true 表示这是创建操作：直接对所有相关 filtered entity 求值，
-        // 生成 create 事件并把结果持久化到 __filtered_entities 标记列。
-        await this.filteredEntityManager.updateFilteredEntityFlags(newEntityData.recordName, newRecordIdRef.id, events, fullRecord, true)
+        // 关系两端既有记录的成员资格结算（diff 产生 create/delete 事件）
+        await this.filteredEntityManager.settleMembershipChecks(linkChecks, events)
+        // 新记录自身的成员资格：满足谓词即产生 filtered entity 的 create 事件
+        await this.filteredEntityManager.handleRecordCreation(newEntityData.recordName, newRecordIdRef.id, fullRecord, events)
 
         // 更新 relianceResult 的信息
         return Object.assign(newRecordIdRef, relianceResult)
+    }
+
+    /**
+     * 采集本次创建涉及的"既有记录端"成员资格快照：
+     * - 自身是 link record：source/target 两端；
+     * - 关系合并进本行（merged link）或三表合一（combined）的既有关联记录：另一端就是这些既有记录。
+     * 新建的关联记录不需要采集——它们各自的 createRecord 调用会处理自己的成员资格。
+     */
+    private async collectCreationLinkChecks(newEntityData: NewRecordData, events?: RecordMutationEvent[]): Promise<MembershipCheck[]> {
+        if (!events) return []
+        const checks: MembershipCheck[] = []
+
+        const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
+        if (recordInfo.isRelation && this.map.data.links[newEntityData.recordName]) {
+            const rawData = newEntityData.getData()
+            checks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
+                newEntityData.recordName,
+                { sourceIds: [rawData.source?.id], targetIds: [rawData.target?.id] },
+                events
+            ))
+        }
+
+        for (const relatedRecord of newEntityData.mergedLinkTargetRecordIdRefs.concat(newEntityData.combinedRecordIdRefs)) {
+            const relatedId = relatedRecord.getRef().id
+            const linkName = relatedRecord.info!.linkName
+            // 关联既有记录位于关系的哪一端：parent 是 source 时它是 target，反之亦然。
+            const relatedIsTarget = relatedRecord.info!.isRecordSource()
+            checks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
+                linkName,
+                relatedIsTarget ? { targetIds: [relatedId] } : { sourceIds: [relatedId] },
+                events
+            ))
+        }
+        return checks
     }
 
     /**
@@ -388,11 +440,9 @@ export class CreationExecutor {
             ...attributes
         })
 
-        const linkRecord = await this.createRecord(newLinkData, `create link record ${linkInfo.name}`, events)
-        // CAUTION 关系建立会改变依赖该关系的 filtered entity 的成员资格，必须显式传播。
-        //  放在这里而不是 RecordQueryAgent.addLink，是为了同时覆盖 addLinkFromRecord 等直接调用本方法的入口。
-        await this.filteredEntityManager.propagateLinkChange(linkInfo.name, sourceId, targetId, events)
-        return linkRecord
+        // CAUTION 关系建立对成员资格的影响统一由 createRecord 内的 link 钩子处理（before 快照 + settle diff），
+        //  这样 addLink、addLinkFromRecord、以及创建/更新流程中内部生成的 link record 都走同一条路径。
+        return this.createRecord(newLinkData, `create link record ${linkInfo.name}`, events)
     }
 
     /**

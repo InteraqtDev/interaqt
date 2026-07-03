@@ -182,6 +182,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
             attributeQuery: attributeQuery
         }), `finding combined records for relocate ${linkName}.${moveAttribute}`, undefined)
 
+        // 关系（combined link）即将解除：先采集两端实体的成员资格快照（无状态 membership diff）。
+        const linkChecks = await this.filteredEntityManager.collectLinkMembershipChecks(linkName, {
+            sourceIds: records.map(r => r.source?.id),
+            targetIds: records.map(r => r.target?.id)
+        }, events)
+
         const toMoveRecordInfo = this.map.getLinkInfoByName(linkName)[moveSource ? 'sourceRecordInfo' : 'targetRecordInfo']
 
         // 1. 把这些数据删除，在下面重新插入到新行
@@ -199,6 +205,9 @@ export class RecordQueryAgent implements RecordOperationAgent {
                 record: record
             })
         }
+
+        // 4. 关系解除后的成员资格结算
+        await this.filteredEntityManager.settleMembershipChecks(linkChecks, events)
 
         return records
     }
@@ -238,19 +247,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
     }
 
 
-    // 委托给 DeletionExecutor
+    // 委托给 DeletionExecutor。
+    // CAUTION 关系解除对成员资格的影响统一在 link record 的删除路径内处理
+    //  （DeletionExecutor.deleteRecord 与 relocateCombinedRecordDataForLink 的 before 快照 + settle diff），
+    //  这样显式 unlink、删除关联实体引发的关系删除等所有路径共用同一套钩子。
     async unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, reason = '', events?: RecordMutationEvent[]): Promise<Record[]> {
-        const removedLinks = await this.deletionExecutor.unlink(linkName, matchExpressionData, moveSource, reason, events)
-        // CAUTION 关系解除同样会改变依赖该关系的 filtered entity 的成员资格，逐条传播受影响的两端实体。
-        for (const link of removedLinks) {
-            await this.filteredEntityManager.propagateLinkChange(
-                linkName,
-                link.source?.id,
-                link.target?.id,
-                events
-            )
-        }
-        return removedLinks
+        return this.deletionExecutor.unlink(linkName, matchExpressionData, moveSource, reason, events)
     }
 
     /**

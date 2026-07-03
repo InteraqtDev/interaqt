@@ -5,7 +5,7 @@ import { AttributeQuery } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { assert } from "../utils.js";
 import { SQLBuilder } from "./SQLBuilder.js";
-import { FilteredEntityManager } from "./FilteredEntityManager.js";
+import { DeletionMembershipSnapshot, FilteredEntityManager, shareMembershipLedger } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 import type { QueryExecutor } from "./QueryExecutor.js";
 
@@ -57,19 +57,34 @@ export class DeletionExecutor {
         // 注意下面使用的都是 deleteQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
         // CAUTION 我们应该先删除关系，再删除关联实体。按照下面的顺序就能保证事件顺序的正确。
         if (records.length) {
+            // 成员资格快照必须在任何物理删除之前采集（谓词求值需要行与关系仍然存在）：
+            // 1) 待删除记录（含同表 reliance 树）当前所属的 filtered entity —— 生成 filtered delete 事件；
+            // 2) 如果删除的是 link record，两端实体在依赖该关系的 filtered entity 中的成员资格 —— 删除后 diff。
+            const deletionSnapshot = await this.filteredEntityManager.collectDeletionMemberships(deleteQuery.recordName, records, events)
+            const linkChecks = this.map.data.links[deleteQuery.recordName] && events ?
+                await this.filteredEntityManager.collectLinkMembershipChecks(deleteQuery.recordName, {
+                    sourceIds: records.map(r => r.source?.id),
+                    targetIds: records.map(r => r.target?.id)
+                }, events) : []
+
             // 删除关系数据（独立表或者关系在另一边的关系数据）
             await this.deleteNotReliantSeparateLinkRecords(deleteQuery.recordName, records, events)
             // 删除依赖我的实体（其他表中的）。注意, reliance 只可能是 1:x，不可能多个 n 个 record 被1个 reliace 依赖。
             //  为什么这里要单独计算 events, 是因为 1:1 并且刚好关系数据分配到了当前 record 上 时，关系事件顺序会不正确了。
             const relianceEvents: RecordMutationEvent[] = []
+            shareMembershipLedger(relianceEvents, events)
             await this.deleteDifferentTableReliance(deleteQuery.recordName, records, relianceEvents)
             // 删除自身、有生命周期依赖的合表 record、合表到当前 record 的关系数据。
             // CAUTION 这里按结构分组收集事件（关系/级联事件 与 当前 record 删除事件分开），
             //  而不是依赖"事件数组的最后 N 条一定是 record 删除事件"这种脆弱的位置约定。
-            const { linkAndCascadeEvents, recordDeleteEvents } = await this.deleteRecordSameRowDataGrouped(deleteQuery.recordName, records, inSameRowDataOp)
+            const { linkAndCascadeEvents, recordDeleteEvents } = await this.deleteRecordSameRowDataGrouped(deleteQuery.recordName, records, inSameRowDataOp, deletionSnapshot, events)
 
             // 事件顺序：先关系删除事件，再 reliance 删除事件，最后是 record 本身的删除事件。
             events?.push(...linkAndCascadeEvents, ...relianceEvents, ...recordDeleteEvents)
+
+            // link record 删除后两端实体的成员资格结算（例如删除关联实体导致的关系删除，
+            // 或显式 unlink——它们都会经过本方法）。
+            await this.filteredEntityManager.settleMembershipChecks(linkChecks, events)
         }
 
         return records
@@ -79,8 +94,11 @@ export class DeletionExecutor {
      * 删除记录的同行数据
      * 这里会把同表的 reliance，以及 reliance 的 reliance 都删除掉
      */
-    async deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp = false): Promise<Record[]> {
-        const { linkAndCascadeEvents, recordDeleteEvents } = await this.deleteRecordSameRowDataGrouped(recordName, records, inSameRowDataOp)
+    async deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp = false, deletionSnapshot?: DeletionMembershipSnapshot): Promise<Record[]> {
+        // 调用方没有提供快照且行还存在（!inSameRowDataOp）时补采集；
+        // 没有 events 时（flash-out / relocate 等内部行迁移）不产生成员资格事件，跳过。
+        const snapshot = deletionSnapshot ?? (!inSameRowDataOp ? await this.filteredEntityManager.collectDeletionMemberships(recordName, records as Record[], events) : undefined)
+        const { linkAndCascadeEvents, recordDeleteEvents } = await this.deleteRecordSameRowDataGrouped(recordName, records, inSameRowDataOp, snapshot, events)
         events?.push(...linkAndCascadeEvents, ...recordDeleteEvents)
         return records as Record[]
     }
@@ -90,9 +108,13 @@ export class DeletionExecutor {
      * 事件按结构分组返回：
      * - linkAndCascadeEvents：关系（link）删除事件、同表 reliance 级联删除事件、filtered entity 删除事件。
      * - recordDeleteEvents：当前批次 record 本身的删除事件（与传入 records 一一对应）。
+     * @param deletionSnapshot 删除前采集的成员资格快照（删除后无法再求值谓词）。
+     * @param ledgerEvents 整个操作共享的 events 数组（用于成员资格事件的账本判重）。
      */
-    private async deleteRecordSameRowDataGrouped(recordName: string, records: EntityIdRef[], inSameRowDataOp = false): Promise<{ linkAndCascadeEvents: RecordMutationEvent[], recordDeleteEvents: RecordMutationEvent[] }> {
+    private async deleteRecordSameRowDataGrouped(recordName: string, records: EntityIdRef[], inSameRowDataOp = false, deletionSnapshot?: DeletionMembershipSnapshot, ledgerEvents?: RecordMutationEvent[]): Promise<{ linkAndCascadeEvents: RecordMutationEvent[], recordDeleteEvents: RecordMutationEvent[] }> {
         const linkAndCascadeEvents: RecordMutationEvent[] = []
+        // 局部事件数组与操作级 events 共享成员资格账本，避免嵌套钩子重复发出事件。
+        shareMembershipLedger(linkAndCascadeEvents, ledgerEvents)
         const recordInfo = this.map.getRecordInfo(recordName)
 
         for (let record of records) {
@@ -149,7 +171,9 @@ export class DeletionExecutor {
                         },
                     })
 
-                    await this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, linkAndCascadeEvents)
+                    // 同表 reliance 的行数据已随本行删除，成员资格快照来自删除前的递归采集。
+                    const childSnapshot = deletionSnapshot?.children.find(child => child.recordName === relianceInfo.recordName)
+                    await this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, linkAndCascadeEvents, childSnapshot, ledgerEvents)
                 }
             }
 
@@ -195,26 +219,9 @@ export class DeletionExecutor {
             })
         }
         
-        // 处理 filtered entity 的删除事件
-        for (let record of records) {
-            const filteredEntities = this.filteredEntityManager.getFilteredEntitiesForBase(recordName);
-            if (filteredEntities.length > 0 && record.__filtered_entities) {
-                // __filtered_entities 可能已经被解析为对象
-                const currentFlags = typeof record.__filtered_entities === 'string' 
-                    ? JSON.parse(record.__filtered_entities) 
-                    : record.__filtered_entities;
-                for (const filteredEntity of filteredEntities) {
-                    if (currentFlags[filteredEntity.name] === true) {
-                        // 记录属于这个 filtered entity，生成删除事件
-                        linkAndCascadeEvents.push({
-                            type: 'delete',
-                            recordName: filteredEntity.name,
-                            record: { ...record }
-                        });
-                    }
-                }
-            }
-        }
+        // filtered entity 的删除事件：按删除前采集的成员资格快照生成（谓词实时求值，无持久化标记）。
+        // 事件位置保持在 record 本身的 delete 事件之前。
+        this.filteredEntityManager.settleDeletionMemberships(deletionSnapshot, recordName, records as Record[], linkAndCascadeEvents, ledgerEvents)
 
         const recordDeleteEvents = records.map(record => ({
             type: 'delete',
@@ -227,13 +234,13 @@ export class DeletionExecutor {
     /**
      * 处理被删除记录的依赖关系
      */
-    async handleDeletedRecordReliance(recordName: string, record: EntityIdRef, events?: RecordMutationEvent[]) {
+    async handleDeletedRecordReliance(recordName: string, record: EntityIdRef, events?: RecordMutationEvent[], deletionSnapshot?: DeletionMembershipSnapshot, ledgerEvents?: RecordMutationEvent[]) {
         // 删除独立表或者关系在另一边的关系数据
         await this.deleteNotReliantSeparateLinkRecords(recordName, [record], events)
         // 删除依赖我的实体
         await this.deleteDifferentTableReliance(recordName, [record], events)
         // 删除自身以及有生命周期依赖的合表 record
-        await this.deleteRecordSameRowData(recordName, [record], events, true)
+        await this.deleteRecordSameRowData(recordName, [record], events, true, deletionSnapshot)
         return record
     }
 

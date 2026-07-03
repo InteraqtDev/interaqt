@@ -1,666 +1,515 @@
 import { EntityInstance, RelationInstance, PropertyInstance, Property, Entity, Relation, RefContainer } from "@core";
 import { MatchExp, MatchExpressionData } from "./MatchExp.js";
-import { assert } from "../utils.js";
 
 export type MergedItem = EntityInstance | RelationInstance;
 export type InputItem = EntityInstance | RelationInstance;
 
-export interface MergedItemConfig<T extends MergedItem> {
-    name: string;
-    inputItems: T[];
-    inputFieldName: string;
+/**
+ * merged entity/relation 的判别列（discriminator column）名。
+ *
+ * merged item 本质是单表继承（Single Table Inheritance）：所有 input 的记录存放在同一张
+ * 物理表中，用一个字符串判别列记录"记录以哪个具体类型创建"。
+ * - 记录创建时 `__type` = 创建所用实体的具体类型名（filtered entity 取其 root base 名）。
+ * - 普通 input 的成员条件：`__type = 'X'`（等值匹配，可索引，无跨 driver JSON 兼容问题）。
+ * - filtered input 的成员条件：`__type = '根 base 名' AND 谓词`（谓词声明式，随数据变化自然进出）。
+ * - merged item 的成员条件：各 input 成员条件的 OR。
+ */
+export const MERGED_TYPE_ATTR = '__type';
+
+export interface ProcessMergedItemsResult {
+    entities: EntityInstance[];
+    relations: RelationInstance[];
+    /**
+     * 抽象名集合：不允许以这些名字直接创建记录。
+     * 包括所有 merged item 名、以 merged item 为（传递）base 的 filtered item 名，
+     * 以及内部生成的虚拟 base 名。
+     */
+    abstractNames: Set<string>;
+}
+
+function isEntity(item: MergedItem): item is EntityInstance {
+    return !('sourceProperty' in item);
+}
+
+function getItemName(item: MergedItem): string {
+    if (isEntity(item)) return item.name;
+    const relation = item as RelationInstance;
+    return relation.name || `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`;
+}
+
+function getInputItems(item: MergedItem): MergedItem[] | undefined {
+    return isEntity(item) ? item.inputEntities : (item as RelationInstance).inputRelations;
+}
+
+function getBaseItem(item: MergedItem): MergedItem | undefined {
+    return isEntity(item) ? (item.baseEntity as MergedItem | undefined) : (item as RelationInstance).baseRelation;
 }
 
 /**
- * 统一处理 merged entity 和 merged relation 的处理器
+ * 沿（原始图的）base 链走到根，累积沿途谓词。
  */
-export function buildEntityTree(entities: EntityInstance[]) {
-        const tree = new Map<string, string[]>()
-        for (const entity of entities) {
-            if (entity.inputEntities) {
-                tree.set(entity.name, entity.inputEntities.map(inputEntity => inputEntity.name))
-            } else if(entity.baseEntity) {
-                const leafSet = tree.get(entity.baseEntity.name!) || []
-                leafSet.push(entity.name)
-                tree.set(entity.baseEntity.name!, leafSet)
-            }
+function collectBaseChain(item: MergedItem): { root: MergedItem, match: MatchExpressionData | undefined } {
+    let current: MergedItem = item;
+    let match: MatchExpressionData | undefined = undefined;
+    while (getBaseItem(current)) {
+        const currentMatch = (current as { matchExpression?: MatchExpressionData }).matchExpression;
+        if (currentMatch) {
+            match = match ? match.and(currentMatch) : currentMatch;
         }
-        return tree
+        current = getBaseItem(current)!;
     }
-    
-export function buildRelationTree(relations: RelationInstance[]) {
-        const tree = new Map<string, string[]>()
-        for (const relation of relations) {
-            const relationName = relation.name || 
-                `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`;
-            if (relation.inputRelations) {
-                const inputRelationNames = relation.inputRelations.map(inputRelation => {
-                    return inputRelation.name!
-                });
-                tree.set(relationName, inputRelationNames)
-            } else if(relation.baseRelation) {
-                const baseRelationName = relation.baseRelation.name || 
-                    `${relation.baseRelation.source.name}_${relation.baseRelation.sourceProperty}_${relation.baseRelation.targetProperty}_${relation.baseRelation.target.name}`;
-                const leafSet = tree.get(baseRelationName) || []
-                leafSet.push(relationName)
-                tree.set(baseRelationName, leafSet)
-            }
-        }
-        return tree
-    }
+    return { root: current, match };
+}
+
 /**
- * 统一处理所有 merged items (entities 和 relations)
+ * 单个 merged item 编译后的信息。
+ */
+type CompiledMergedInfo = {
+    // 成员条件：各 input 成员条件的 OR（以 __type 判别列 + 声明式谓词表达）。
+    // inputItems 为空的退化 merged item（空联合）没有成员条件。
+    memberCondition: MatchExpressionData | undefined,
+    // 该 merged item 的物理 base（虚拟 base 或 merged item 自身）所承载的所有具体类型名。
+    // 用于嵌套 merge 时 rebase 内层 base 的成员条件。
+    hostedTypes: Set<string>,
+    // 物理 base 的名字
+    physicalBaseName: string,
+}
+
+/**
+ * 按依赖关系拓扑排序 merged items：被用作 input 的 merged item 先处理。
+ */
+function sortMergedItemsByDependency<T extends MergedItem>(mergedItems: T[]): T[] {
+    const mergedByName = new Map(mergedItems.map(item => [getItemName(item), item]));
+    const sorted: T[] = [];
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+
+    const visit = (item: T) => {
+        const name = getItemName(item);
+        if (visited.has(name)) return;
+        if (visiting.has(name)) {
+            throw new Error(`Circular merged item dependency detected at "${name}"`);
+        }
+        visiting.add(name);
+        for (const input of getInputItems(item) || []) {
+            const inputName = getItemName(input);
+            const inputMerged = mergedByName.get(inputName);
+            if (inputMerged) visit(inputMerged);
+        }
+        visiting.delete(name);
+        visited.add(name);
+        sorted.push(item);
+    };
+
+    mergedItems.forEach(visit);
+    return sorted;
+}
+
+/**
+ * 统一处理所有 merged items (entities 和 relations)。
+ *
+ * merged item 被"编译"为 filtered item 视图：
+ * 1. 物理 base（merged item 自身或虚拟 base）持有合并后的 properties + `__type` 判别列。
+ * 2. 每个 input 变成物理 base 上的 filtered item，成员条件用 `__type` 表达。
+ * 3. filtered input 的 root base（如 CustomerBase）同样 rebase 为 filtered item，保持可查询性。
+ * 之后查询重写与事件（membership diff）完全复用 filtered entity 的统一机制，无需独立代码路径。
  */
 export function processMergedItems(
-        entities: EntityInstance[],
-        relations: RelationInstance[],
-    ): { entities: EntityInstance[], relations: RelationInstance[] } {
-        const refContainer = new RefContainer(entities, relations);
-        const entityTree = buildEntityTree(entities);
-        const relationTree = buildRelationTree(relations);
-        
-        // 处理 merged entities
-        processMergedItemsOfType(
-            entities,
-            refContainer,
-            entityTree,
-            'entity'
-        );
-        
-        // 处理 merged relations
-        processMergedItemsOfType(
-            relations,
-            refContainer,
-            relationTree,
-            'relation'
-        );
-        
-        return refContainer.getAll();
-    }
-    
-/**
- * 处理特定类型的 merged items
- */
-function processMergedItemsOfType<T extends MergedItem>(
-        items: T[],
-        refContainer: RefContainer,
-        itemTree: Map<string, string[]>,
-        itemType: 'entity' | 'relation'
-    ): void {
-        // 过滤出有 input items 的项
-        const mergedItems = items.filter(item => {
-            const inputItems = getInputItems(item);
-            return inputItems !== undefined;
-        });
-        
-        // 处理每个 merged item
-        for (const mergedItem of mergedItems) {
-            processSingleMergedItem(
-                mergedItem,
-                refContainer,
-                itemType,
-                itemTree
-            );
-        }
-    }
-    
-/**
- * 处理单个 merged item
- */
-function processSingleMergedItem<T extends MergedItem>(
-        mergedItem: T,
-        refContainer: RefContainer,
-        itemType: 'entity' | 'relation',
-        itemTree: Map<string, string[]>
-    ): void {
-        // 构建 leaf to input map
+    entities: EntityInstance[],
+    relations: RelationInstance[],
+): ProcessMergedItemsResult {
+    const refContainer = new RefContainer(entities, relations);
+    const abstractNames = new Set<string>();
 
-        const isEntity = itemType === 'entity';
-        const itemName = getItemName(mergedItem);
-        const inputTypeFieldName = `__${itemName}_input_${itemType}`;
-        
-        
-        const itemToTransform = isEntity? refContainer.getEntityByName(mergedItem.name!) : refContainer.getRelationByName(mergedItem.name!);
-      
-        // 转换 merged item
-        const [transformedItem, virtualBaseItem] = transformMergedItem(
-            itemToTransform!,
-            inputTypeFieldName,
-            itemTree,
-            refContainer
-        );
-        
-        // 替换原 item
-        refContainer.replace(transformedItem, mergedItem);
-        if (virtualBaseItem !== transformedItem) {
-            refContainer.add(virtualBaseItem);
-        }
-
-        // 获取 input items（对于 entity 需要更新）
-        const inputItems = getInputItems(mergedItem) || [];
-        // 如果 mergedItem 约定了 commonProperties，那么要检查是不是所有的 input item 都有 commonProperties，如果没有就报错。
-        if( mergedItem.commonProperties) {
-            const notValidItems = inputItems.filter(inputItem => {
-                // inputItem.properties 是否全部包含了 mergedItem.commonProperties
-                return mergedItem.commonProperties!.some(commonProperty => {
-                    return !inputItem.properties.some(property => property.name === commonProperty.name && property.type === commonProperty.type );
-                });
-            });
-            if(notValidItems.length > 0) {
-                throw new Error(`Merged ${itemType} ${mergedItem.name} defined commonProperties, but these ${itemType}s do not have commonProperties: ${notValidItems.map(item => item.name).join(', ')}`);
-            }
-        }
-
-        // 处理 input items。让所有 input item 都是 virtual base item 的 filtered item。
-        if (inputItems) {
-            // rootBaseName -> 共享该 root base 的 input 名称集合，用于修复被 input 覆盖的 root base 身份
-            const rootBaseToInputs = new Map<string, string[]>();
-            for (const inputItem of inputItems) {
-                processInputItem(
-                    inputItem,
-                    virtualBaseItem!,
-                    inputTypeFieldName,
-                    refContainer,
-                    isEntity,
-                    rootBaseToInputs
-                );
-            }
-
-            // CAUTION 修复 F3：filtered input 的 root base entity（例如 CustomerBase）必须保留自身身份。
-            //  旧实现直接把 root base 的槽位替换成"带 input tag 的 filtered entity"，导致：
-            //  1) 通过 root base 名创建的记录在任何实体里都查不到（黑洞）；
-            //  2) root base 丢失了自己的谓词。
-            //  这里为每个 distinct root base 单独生成一个 filtered entity，成员条件是
-            //  "tag 属于自己或其任一子 input"，从而保持可查询与 IS-A 语义。
-            if (isEntity) {
-                for (const [rootBaseName, inputNames] of rootBaseToInputs) {
-                    rebaseRootBaseEntity(rootBaseName, inputNames, virtualBaseItem as EntityInstance, inputTypeFieldName, refContainer);
-                }
-            }
+    // 1. 基于原始（克隆前的）图计算每个名字的具体类型值：
+    //    typeValue(name) = 沿 base 链走到根的名字；根是 merged item 时该名字是抽象的（不可创建）。
+    const allItems: MergedItem[] = [...entities, ...relations];
+    const typeValueByName = new Map<string, string>();
+    for (const item of allItems) {
+        const name = getItemName(item);
+        const { root } = collectBaseChain(item);
+        if (getInputItems(root)) {
+            // merged item 自身，或（传递）base 是 merged item 的 filtered item：无法确定具体 __type。
+            abstractNames.add(name);
+        } else {
+            typeValueByName.set(name, getItemName(root));
         }
     }
 
-/**
- * 计算 filtered entity 从自身到 root base（不含）的完整谓词，并返回 root base。
- */
-function collectFilteredEntityChain(inputEntity: EntityInstance): { rootBase: EntityInstance, match: MatchExpressionData | undefined } {
-        let current: EntityInstance = inputEntity;
-        let match: MatchExpressionData | undefined = undefined;
-        while (current.baseEntity) {
-            const currentMatch = (current as any).matchExpression as MatchExpressionData | undefined;
-            if (currentMatch) {
-                match = match ? match.and(currentMatch) : currentMatch;
-            }
-            current = current.baseEntity as EntityInstance;
-        }
-        return { rootBase: current, match };
+    const compiledByName = new Map<string, CompiledMergedInfo>();
+
+    const mergedEntities = sortMergedItemsByDependency(entities.filter(entity => entity.inputEntities));
+    const mergedRelations = sortMergedItemsByDependency(relations.filter(relation => relation.inputRelations));
+
+    const entityTree = buildItemTree(entities);
+    const relationTree = buildItemTree(relations);
+
+    for (const mergedEntity of mergedEntities) {
+        processSingleMergedItem(mergedEntity, refContainer, 'entity', entityTree, typeValueByName, compiledByName, abstractNames);
+    }
+    for (const mergedRelation of mergedRelations) {
+        processSingleMergedItem(mergedRelation, refContainer, 'relation', relationTree, typeValueByName, compiledByName, abstractNames);
+    }
+
+    const result = refContainer.getAll();
+    return { ...result, abstractNames };
 }
 
 /**
- * 为 filtered input 的 root base entity 重新生成 filtered entity，使其保留自身可查询性。
+ * 构建 base/input 树（name -> 直接子孙 names），用于 mergeProperties 的 defaultValue 分发。
  */
-function rebaseRootBaseEntity(
-        rootBaseName: string,
-        inputNames: string[],
-        virtualBaseItem: EntityInstance,
-        inputFieldName: string,
-        refContainer: RefContainer
-    ): void {
-        // root base 就是 virtual base 本身时无需处理
-        if (rootBaseName === virtualBaseItem.name) return;
-        const existing = refContainer.getEntityByName(rootBaseName);
-        // root base 未作为独立实体注册（匿名 base）则无需处理
-        if (!existing) return;
-
-        // 成员条件：tag 属于 root base 自己，或其任一子 input（IS-A 语义）
-        const tagNames = [rootBaseName, ...inputNames];
-        const rootFiltered = Entity.clone(existing, true);
-        rootFiltered.name = rootBaseName;
-        rootFiltered.baseEntity = virtualBaseItem;
-        rootFiltered.matchExpression = MatchExp.fromArray(
-            tagNames.map(name => ({ key: inputFieldName, value: ['contains', name] as [string, any] }))
-        );
-        rootFiltered.inputEntities = undefined;
-        refContainer.replace(rootFiltered, existing);
-    }
-    
-/**
- * 处理单个 input item
- */
-function processInputItem(
-        inputItem: MergedItem,
-        virtualBaseItem: MergedItem,
-        inputTypeFieldName: string,
-        refContainer: RefContainer,
-        isEntity: boolean,
-        rootBaseToInputs?: Map<string, string[]>
-    ): void {
-        if (isEntity) {
-            processInputEntity(
-                inputItem as EntityInstance,
-                virtualBaseItem as EntityInstance,
-                inputTypeFieldName,
-                refContainer,
-                rootBaseToInputs
-            );
-            return;
-        }
-
-        // Relation 处理（保持原有逻辑）
-        const [filteredItem, baseItem] = createFilteredItemFromInput(
-            inputItem,
-            virtualBaseItem,
-            inputTypeFieldName
-        );
-
-        // Relation 特殊处理：检查是否就是 input 本身
-        if (filteredItem === inputItem) {
-            return;
-        }
-
-        const baseItemName = getItemName(baseItem);
-        const existingItem = refContainer.getRelationByName(baseItemName);
-        if (existingItem) {
-            refContainer.replace(filteredItem, existingItem);
-        }
-    }
-
-/**
- * 处理 merged entity 的单个 input entity。
- * - 普通 input：克隆自身，rebase 到 virtual base，成员条件为 tag contains(自身名)。
- * - filtered input：rebase input 自身到 virtual base，成员条件为 (自身完整谓词) AND tag contains(自身名)，
- *   谓词得以保留（修复 F3'）；同时记录其 root base，稍后由 rebaseRootBaseEntity 保留 root base 的可查询性（修复 F3）。
- */
-function processInputEntity(
-        inputEntity: EntityInstance,
-        virtualBaseItem: EntityInstance,
-        inputFieldName: string,
-        refContainer: RefContainer,
-        rootBaseToInputs?: Map<string, string[]>
-    ): void {
-        const inputName = inputEntity.name;
-        const existing = refContainer.getEntityByName(inputName);
-        if (!existing) return;
-
-        const tagAtom = MatchExp.atom({ key: inputFieldName, value: ['contains', inputName] });
-
-        if (inputEntity.baseEntity) {
-            // filtered input：保留其自身谓词，并直接 rebase 到 virtual base
-            const { rootBase, match } = collectFilteredEntityChain(inputEntity);
-            const filtered = Entity.clone(rootBase, true);
-            filtered.name = inputName;
-            filtered.baseEntity = virtualBaseItem;
-            filtered.matchExpression = match ? match.and(tagAtom) : tagAtom;
-            filtered.inputEntities = undefined;
-            refContainer.replace(filtered, existing);
-
-            // 记录 root base，稍后统一保留其身份
-            if (rootBaseToInputs && rootBase.name !== inputName) {
-                const list = rootBaseToInputs.get(rootBase.name) || [];
-                list.push(inputName);
-                rootBaseToInputs.set(rootBase.name, list);
-            }
-        } else {
-            // 普通 input：克隆自身作为 virtual base 的 filtered entity
-            const filtered = Entity.clone(inputEntity, true);
-            filtered.name = inputName;
-            filtered.baseEntity = virtualBaseItem;
-            filtered.matchExpression = tagAtom;
-            filtered.inputEntities = undefined;
-            refContainer.replace(filtered, existing);
-        }
-    }
-    
-/**
- * 构建从子孙 item 到 input item 的映射关系
- * 用于处理嵌套的 merged/filtered items
- */
-function buildLeafToInputMap<T extends MergedItem>(
-        item: T,
-        itemTree: Map<string, string[]>
-    ): Map<string, string[]> {
-        const leafToInputMap = new Map<string, string[]>();
-        
+export function buildItemTree(items: MergedItem[]) {
+    const tree = new Map<string, string[]>();
+    for (const item of items) {
+        const name = getItemName(item);
         const inputItems = getInputItems(item);
-        if (inputItems && inputItems.length > 0) {
-            for (const inputItem of inputItems) {
-                const itemName = getItemName(inputItem);
-                const leafSet = [...(itemTree.get(itemName) || [])];
-                const inputItemNames = leafToInputMap.get(itemName) || [];
-                inputItemNames.push(itemName);
-                leafToInputMap.set(itemName, inputItemNames);
-                
-                // 递归处理所有子孙 items
-                while (leafSet.length) {
-                    const leafItem = leafSet.shift()!;
-                    const leafInputItemNames = leafToInputMap.get(leafItem) || [];
-                    leafInputItemNames.push(...inputItemNames);
-                    leafToInputMap.set(leafItem, leafInputItemNames);
-                    const childSet = itemTree.get(leafItem) || [];
-                    leafSet.push(...childSet);
-                }
+        if (inputItems) {
+            const children = tree.get(name) || [];
+            children.push(...inputItems.map(getItemName));
+            tree.set(name, children);
+        } else {
+            const base = getBaseItem(item);
+            if (base) {
+                const baseName = getItemName(base);
+                const children = tree.get(baseName) || [];
+                children.push(name);
+                tree.set(baseName, children);
             }
         }
-        
-        return leafToInputMap;
     }
-    
+    return tree;
+}
+
 /**
- * 创建用于记录 input type 的特殊字段
+ * 计算单个 input 的成员条件与其承载的具体类型集合。
  */
-function createInputTypeProperty(
-        inputFieldName: string,
-        mergedItem: MergedItem,
-        itemTree: Map<string, string[]>
-    ): PropertyInstance {
-        const leafToInputMap = buildLeafToInputMap(mergedItem, itemTree);
-        
-        return Property.create({
-            name: inputFieldName,
-            type: 'json',
-            defaultValue: (record: any, entityName: string) => {
-                const inputItems = getInputItems(mergedItem) || [];
-                const inputCandidates = leafToInputMap.get(entityName) || [];
-                const inputNames = inputCandidates.filter(name => 
-                    inputItems.some(input => getItemName(input) === name)
-                );
-                return inputNames.length > 0 ? inputNames : [entityName];
-            }
-        });
+function resolveInputMembership(
+    inputItem: MergedItem,
+    typeValueByName: Map<string, string>,
+    compiledByName: Map<string, CompiledMergedInfo>,
+): { memberCondition: MatchExpressionData, hostedTypes: Set<string>, rootToRebase?: MergedItem } {
+    const inputName = getItemName(inputItem);
+
+    // 嵌套 merged input：成员条件与承载类型来自其编译结果。
+    const compiled = compiledByName.get(inputName);
+    if (compiled) {
+        if (!compiled.memberCondition) {
+            throw new Error(`Merged item "${inputName}" has no input items (empty union) and cannot be used as an input of another merged item.`);
+        }
+        return { memberCondition: compiled.memberCondition, hostedTypes: new Set(compiled.hostedTypes) };
     }
-    
+
+    if (getBaseItem(inputItem)) {
+        // filtered input：root base 的类型条件 AND 自身完整谓词链。
+        const { root, match } = collectBaseChain(inputItem);
+        const rootName = getItemName(root);
+        const rootCompiled = compiledByName.get(rootName);
+        if (rootCompiled) {
+            if (!rootCompiled.memberCondition) {
+                throw new Error(`Merged item "${rootName}" has no input items (empty union) and cannot be used as the base of a filtered input.`);
+            }
+            // root 是（已编译的）merged item：成员条件 = merged 成员条件 AND 谓词。
+            const memberCondition = match ? rootCompiled.memberCondition.and(match) : rootCompiled.memberCondition;
+            return { memberCondition, hostedTypes: new Set(rootCompiled.hostedTypes) };
+        }
+        const typeAtom = MatchExp.atom({ key: MERGED_TYPE_ATTR, value: ['=', rootName] });
+        return {
+            memberCondition: match ? typeAtom.and(match) : typeAtom,
+            hostedTypes: new Set([rootName]),
+            rootToRebase: root,
+        };
+    }
+
+    // 普通 input：等值判别。
+    return {
+        memberCondition: MatchExp.atom({ key: MERGED_TYPE_ATTR, value: ['=', typeValueByName.get(inputName) || inputName] }),
+        hostedTypes: new Set([inputName]),
+    };
+}
+
 /**
- * 合并所有 input items 的 properties
+ * 处理单个 merged item：编译成员条件、生成物理 base、把 inputs 与 root bases rebase 为 filtered items。
+ */
+function processSingleMergedItem<T extends MergedItem>(
+    mergedItem: T,
+    refContainer: RefContainer,
+    itemType: 'entity' | 'relation',
+    itemTree: Map<string, string[]>,
+    typeValueByName: Map<string, string>,
+    compiledByName: Map<string, CompiledMergedInfo>,
+    abstractNames: Set<string>,
+): void {
+    const isEntityType = itemType === 'entity';
+    const itemName = getItemName(mergedItem);
+    const inputItems = getInputItems(mergedItem) || [];
+
+    // 校验 commonProperties（约定：所有 input 必须包含同名同类型的 property）
+    if (mergedItem.commonProperties) {
+        const notValidItems = inputItems.filter(inputItem => {
+            return mergedItem.commonProperties!.some(commonProperty => {
+                return !inputItem.properties.some(property => property.name === commonProperty.name && property.type === commonProperty.type);
+            });
+        });
+        if (notValidItems.length > 0) {
+            throw new Error(`Merged ${itemType} ${itemName} defined commonProperties, but these ${itemType}s do not have commonProperties: ${notValidItems.map(item => getItemName(item)).join(', ')}`);
+        }
+    }
+
+    // 用户属性不允许与判别列同名。
+    for (const inputItem of inputItems) {
+        if (inputItem.properties.some(property => property.name === MERGED_TYPE_ATTR)) {
+            throw new Error(`Property name "${MERGED_TYPE_ATTR}" on ${itemType} "${getItemName(inputItem)}" conflicts with the merged ${itemType} discriminator column. Please rename the property.`);
+        }
+    }
+
+    // 1. 逐 input 计算成员条件
+    const inputMemberships = inputItems.map(inputItem => ({
+        inputItem,
+        ...resolveInputMembership(inputItem, typeValueByName, compiledByName),
+    }));
+
+    const hostedTypes = new Set<string>();
+    inputMemberships.forEach(m => m.hostedTypes.forEach(t => hostedTypes.add(t)));
+
+    // inputItems 为空是退化情况（空联合，无任何成员），只承载 commonProperties 定义。
+    let memberCondition: MatchExpressionData | undefined = inputMemberships[0]?.memberCondition;
+    for (let i = 1; i < inputMemberships.length; i++) {
+        memberCondition = memberCondition!.or(inputMemberships[i].memberCondition);
+    }
+
+    // 2. 合并 properties + 判别列。
+    // CAUTION 属性合并必须基于 refContainer 中的克隆（its input references 已指向先前处理过的
+    //  transformed item）：嵌套 merge 时内层 merged item 的 properties 只存在于 transformed 版本上。
+    const itemToTransform = isEntityType ? refContainer.getEntityByName(itemName)! : refContainer.getRelationByName(itemName)!;
+    const mergedProperties = [
+        ...mergeProperties(itemToTransform, itemTree, refContainer),
+        createTypeProperty(typeValueByName),
+        ...mergedItem.properties,
+    ];
+    const hasFilteredInput = inputItems.some(inputItem => getBaseItem(inputItem));
+    const [transformedItem, physicalBaseItem] = transformMergedItem(
+        itemToTransform as T,
+        mergedProperties,
+        hasFilteredInput ? memberCondition : undefined,
+    );
+
+    refContainer.replace(transformedItem, itemToTransform);
+    if (physicalBaseItem !== transformedItem) {
+        refContainer.add(physicalBaseItem);
+        abstractNames.add(getItemName(physicalBaseItem));
+    }
+
+    compiledByName.set(itemName, {
+        memberCondition,
+        hostedTypes,
+        physicalBaseName: getItemName(physicalBaseItem),
+    });
+
+    // 4. 把每个 input 替换成物理 base 上的 filtered item
+    //    rootBaseName -> 该 root base 承载的类型集合，用于保持 root base 的可查询性（IS-A 语义）。
+    const rootsToRebase = new Map<string, MergedItem>();
+    for (const { inputItem, memberCondition: inputCondition, rootToRebase } of inputMemberships) {
+        rebaseAsFilteredItem(getItemName(inputItem), physicalBaseItem, inputCondition, refContainer, isEntityType);
+        if (rootToRebase && getItemName(rootToRebase) !== getItemName(physicalBaseItem)) {
+            rootsToRebase.set(getItemName(rootToRebase), rootToRebase);
+        }
+    }
+
+    // 5. filtered input 的 root base（例如 CustomerBase）保持自身身份与可查询性：
+    //    rebase 为物理 base 上的 filtered item，成员条件就是自己的类型判别（IS-A：包含所有子 input 的记录）。
+    for (const [rootName] of rootsToRebase) {
+        const rootCondition = MatchExp.atom({ key: MERGED_TYPE_ATTR, value: ['=', rootName] });
+        rebaseAsFilteredItem(rootName, physicalBaseItem, rootCondition, refContainer, isEntityType);
+    }
+}
+
+/**
+ * 把名为 name 的 item（若已注册）替换为 baseItem 上的 filtered item，成员条件为 matchExpression。
+ */
+function rebaseAsFilteredItem(
+    name: string,
+    baseItem: MergedItem,
+    matchExpression: MatchExpressionData,
+    refContainer: RefContainer,
+    isEntityType: boolean,
+): void {
+    if (isEntityType) {
+        const existing = refContainer.getEntityByName(name);
+        if (!existing) return;
+        const filtered = Entity.clone(existing, true);
+        filtered.name = name;
+        filtered.baseEntity = baseItem as EntityInstance;
+        filtered.matchExpression = matchExpression;
+        filtered.inputEntities = undefined;
+        refContainer.replace(filtered, existing);
+    } else {
+        const existing = refContainer.getRelationByName(name);
+        if (!existing) return;
+        const baseRelation = baseItem as RelationInstance;
+        const filtered = Relation.create({
+            name,
+            baseRelation,
+            sourceProperty: existing.sourceProperty,
+            targetProperty: existing.targetProperty,
+            matchExpression,
+        });
+        refContainer.replace(filtered, existing);
+    }
+}
+
+/**
+ * 创建判别列 property。
+ * defaultValue 只捕获 name -> 具体类型名 的纯字符串映射（可序列化、可调试），
+ * 不再捕获实体实例或 leafToInputMap 闭包。
+ */
+function createTypeProperty(typeValueByName: Map<string, string>): PropertyInstance {
+    // CAUTION 复制成普通对象，避免闭包持有整个 Map（也便于调试时直接查看）。
+    const valueByName = Object.fromEntries(typeValueByName);
+    return Property.create({
+        name: MERGED_TYPE_ATTR,
+        type: 'string',
+        defaultValue: (_record: any, creatingName: string) => valueByName[creatingName],
+    });
+}
+
+/**
+ * 合并所有 input items 的 properties。
+ * 同名 property 取合并版本，defaultValue 按"创建时使用的名字"分发到对应 input 的原始 defaultValue。
  */
 function mergeProperties(
-        mergedItem: MergedItem,
-        itemTree: Map<string, string[]>,
-        refContainer: RefContainer
-    ): PropertyInstance[] {
-        // 收到的 itemName 有三种：
-        // 1. 就是当前的 input item 的 name。
-        // 2. 如果当前 input item 被 filtered 了，那么可能是 filtered item 的 name。
-        // 3. 如果当前 input item 是 merged item，那么一定子 input entity 的 name。
+    mergedItem: MergedItem,
+    itemTree: Map<string, string[]>,
+    refContainer: RefContainer
+): PropertyInstance[] {
+    // 收到的 itemName 有三种：
+    // 1. 就是当前的 input item 的 name。
+    // 2. 如果当前 input item 被 filtered 了，那么可能是 filtered item 的 name。
+    // 3. 如果当前 input item 是 merged item，那么一定是子 input item 的 name。
+    const inputItems = getInputItems(mergedItem) || [];
+    const mergedProperties: PropertyInstance[] = [];
+    const itemPropertyMap = new Map<string, { [key: string]: PropertyInstance }>();
+    const mergedPropertyMap: { [k: string]: PropertyInstance } = Object.fromEntries(mergedItem.commonProperties?.map(prop => [prop.name, prop]) || []);
 
-        // defaultValue 的取值情况：
-        // 1. inputEntity 是个普通 entity，那就在当前 record 上获取 defaultValue。
-        // 2. inputEntity 是个 filtered entity，那就在 root base entity 上获取 defaultValue。
-        // 3. inputEntity 是个 merged entity，那就在子孙 input entity 的 root base entity（可能就是子孙自己，取决于它是不是 filtered） 上获取 defaultValue。
-        // 4. inputEntity 如果是个 merged entity，并且 prop 是用来区分 input item 的，那 defaultValue 就是应该是 transform 时构造出来的。
-        
-        const inputItems = getInputItems(mergedItem) || [];
-        const mergedProperties: PropertyInstance[] = [];
-        const itemPropertyMap = new Map<string, {[key: string]: PropertyInstance}>();
-        const mergedPropertyMap: {[k: string]: PropertyInstance} = Object.fromEntries(mergedItem.commonProperties?.map(prop => [prop.name, prop]) || []);
-        
-        // 收集所有同名 properties。
-        // 如果这个 item 已经是 filtered item，那么就从 base item 获取 properties。
-        for (const inputItem of inputItems) {
-            let sourceItem = inputItem;
-            
-            // 如果是 filtered item，需要从 base item 获取 properties
-            if (isEntity(sourceItem)) {
-                while ((sourceItem as EntityInstance).baseEntity && sourceItem.properties.length === 0) {
-                    sourceItem = (sourceItem as EntityInstance).baseEntity as EntityInstance;
-                }
-            } else if (isRelation(sourceItem)) {
-                while ((sourceItem as RelationInstance).baseRelation && sourceItem.properties.length === 0) {
-                    sourceItem = (sourceItem as RelationInstance).baseRelation as RelationInstance;
+    // 收集所有同名 properties。
+    // 如果这个 item 已经是 filtered item，那么就从 base item 获取 properties。
+    for (const inputItem of inputItems) {
+        let sourceItem: MergedItem = inputItem;
+        while (getBaseItem(sourceItem) && sourceItem.properties.length === 0) {
+            sourceItem = getBaseItem(sourceItem)!;
+        }
+
+        const propertyMap = Object.fromEntries(
+            sourceItem.properties
+                .filter(prop => prop.name !== MERGED_TYPE_ATTR)
+                .map(prop => [prop.name, prop])
+        );
+        itemPropertyMap.set(getItemName(inputItem), propertyMap);
+
+        // 合并 property map
+        Object.assign(mergedPropertyMap, propertyMap);
+
+        const isInputItemMergedItem = !!getInputItems(inputItem);
+        // 递归处理所有子孙节点
+        const childItemNames = [...(itemTree.get(getItemName(inputItem)) || [])];
+        while (childItemNames.length) {
+            const childItemName = childItemNames.shift()!;
+            if (!isInputItemMergedItem) {
+                // 如果不是 merged item，就只有 filtered item 了，所有 filtered item 的 property map 都是继承自 source item 的。
+                itemPropertyMap.set(childItemName, propertyMap);
+            } else {
+                // merged item 的 sub 是自己的。
+                const childItem = refContainer.getEntityByName(childItemName) || refContainer.getRelationByName(childItemName);
+                const isChildInputItemMergedItem = childItem && !!getInputItems(childItem);
+                if (childItem && !isChildInputItemMergedItem) {
+                    const childItemPropertyMap = Object.fromEntries(
+                        childItem.properties
+                            .filter(prop => prop.name !== MERGED_TYPE_ATTR)
+                            .map(prop => [prop.name, prop])
+                    );
+                    itemPropertyMap.set(childItemName, childItemPropertyMap);
+                    // 继续合并
+                    Object.assign(mergedPropertyMap, childItemPropertyMap);
                 }
             }
-
-            const propertyMap = Object.fromEntries(sourceItem.properties.map(prop => [prop.name, prop]));
-            itemPropertyMap.set(inputItem.name!, propertyMap);
-
-            // 合并 property map
-            Object.assign(mergedPropertyMap, propertyMap);
-
-            const isInputItemMergedItem = (inputItem as EntityInstance).inputEntities || (inputItem as RelationInstance).inputRelations;
-            // 递归处理所有子孙节点 
-            const childItemNames = [...(itemTree.get(inputItem.name!) || [])];
-            while(childItemNames.length) {
-                const childItemName = childItemNames.shift()!;
-                if (!isInputItemMergedItem) {
-                    // 如果不是 merged item， 就只有 filtered item 了，所有 filtered item 的 property map 都是继承自 source item 的。
-                    itemPropertyMap.set(childItemName, propertyMap);
-                } else {
-                    // merged item 的 sub 是自己的。
-                    const childItem = refContainer.getEntityByName(childItemName) || refContainer.getRelationByName(childItemName);
-                    const isChildInputItemMergedItem = (childItem as EntityInstance).inputEntities || (childItem as RelationInstance).inputRelations;
-                    if (!isChildInputItemMergedItem) {
-                        const childItemPropertyMap = Object.fromEntries(childItem!.properties.map(prop => [prop.name, prop]));
-                        itemPropertyMap.set(childItemName, childItemPropertyMap);
-                        // 继续合并
-                        Object.assign(mergedPropertyMap, childItemPropertyMap);
-                    }
-                }
-                childItemNames.push(...(itemTree.get(childItemName) || []));
-            }
+            childItemNames.push(...(itemTree.get(childItemName) || []));
         }
-        
-        // 为每个 property 创建合并版本
-        for (const propName of Object.keys(mergedPropertyMap)) {
-            
-            const mergedProp = Property.clone(mergedPropertyMap[propName], true);
-            
-            // 创建新的 defaultValue
-            mergedProp.defaultValue = (record: any, itemName: string) => {
-                // 从 itemPropertyMap 中找 defaultValue
-                const property = itemPropertyMap.get(itemName)?.[propName];
-                if (property?.defaultValue) {
-                    return property.defaultValue(record, itemName);
-                }
-                
-                return undefined;
-            };
-            
-            mergedProperties.push(mergedProp);
-        }
-        
-        return mergedProperties;
     }
-    
+
+    // 为每个 property 创建合并版本
+    for (const propName of Object.keys(mergedPropertyMap)) {
+        const mergedProp = Property.clone(mergedPropertyMap[propName], true);
+
+        // 创建新的 defaultValue：按创建时使用的名字分发
+        mergedProp.defaultValue = (record: any, itemName: string) => {
+            const property = itemPropertyMap.get(itemName)?.[propName];
+            if (property?.defaultValue) {
+                return property.defaultValue(record, itemName);
+            }
+            return undefined;
+        };
+
+        mergedProperties.push(mergedProp);
+    }
+
+    return mergedProperties;
+}
+
 /**
- * 转换 merged item（entity 或 relation）
+ * 转换 merged item（entity 或 relation）本体。
+ * - 有 filtered input：生成虚拟物理 base（持有 properties），merged item 成为其 filtered 视图。
+ * - 全部是普通 input：merged item 自身就是物理 base（不生成虚拟 base）。
  */
 function transformMergedItem<T extends MergedItem>(
-        mergedItem: T,
-        inputFieldName: string,
-        itemTree: Map<string, string[]>,
-        refContainer: RefContainer
-    ): [T, T] {
-        
-        // 创建 input type property
-        const inputTypeProperty = createInputTypeProperty(
-            inputFieldName,
-            mergedItem,
-            itemTree
-        );
-        
-        // 合并 properties。
-        // 特别注意这里，虽然用户在创建 merged entity 或 relation 时，不能指定 properties，
-        // 但是 computation 可能有往记录上绑定 state 的需求。
-        const mergedProperties = [
-            ...mergeProperties(
-                mergedItem,
-                itemTree,
-                refContainer
-            ),
-            inputTypeProperty,
-            ...mergedItem.properties,
-        ]
-        
-        if (isEntity(mergedItem)) {
-            // Entity 的处理
-            const entity = refContainer.getEntityByName(mergedItem.name!)!;
-            const transformedEntity = Entity.create({
-                name: entity.name,
+    mergedItem: T,
+    mergedProperties: PropertyInstance[],
+    memberCondition: MatchExpressionData | undefined,
+): [T, T] {
+    if (isEntity(mergedItem)) {
+        const transformedEntity = Entity.create({ name: mergedItem.name });
+
+        if (memberCondition) {
+            const virtualBaseEntity = Entity.create({
+                name: `${mergedItem.name}_base`,
+                properties: mergedProperties,
             });
-            
-            let virtualBaseEntity: undefined | EntityInstance = undefined;
-            
-            // 如果有 filtered input entity，则需要创建虚拟的 base entity
-            if (entity.inputEntities?.some(inputEntity => inputEntity.baseEntity)) {
-                virtualBaseEntity = Entity.create({
-                    name: `${entity.name}_base`,
-                    properties: mergedProperties,
-                });
-                transformedEntity.baseEntity = virtualBaseEntity;
-                // 任意一个 input entity 都符合
-                transformedEntity.matchExpression = MatchExp.fromArray(
-                    entity.inputEntities!.map(inputEntity => ({
-                        key: inputFieldName,
-                        value: ['contains', inputEntity.name]
-                    }))
-                );
-            } else {
-                transformedEntity.properties = mergedProperties;
-            }
-            
-            return [transformedEntity as T, (virtualBaseEntity || transformedEntity) as T];
-        } else {
-            // Relation 的处理
-            const relation = refContainer.getRelationByName(mergedItem.name!)!;
-            const transformedRelation = Relation.create({
-                name: relation.name,
+            transformedEntity.baseEntity = virtualBaseEntity;
+            transformedEntity.matchExpression = memberCondition;
+            return [transformedEntity as T, virtualBaseEntity as T];
+        }
+
+        transformedEntity.properties = mergedProperties;
+        return [transformedEntity as T, transformedEntity as T];
+    } else {
+        const relation = mergedItem as RelationInstance;
+        const relationName = getItemName(relation);
+        const transformedRelation = Relation.create({
+            name: relation.name,
+            source: relation.source,
+            sourceProperty: relation.sourceProperty,
+            target: relation.target,
+            targetProperty: relation.targetProperty,
+            type: relation.type,
+            isTargetReliance: relation.isTargetReliance
+        });
+
+        if (memberCondition) {
+            const virtualBaseRelation = Relation.create({
+                name: `__${relationName}_base`,
                 source: relation.source,
-                sourceProperty: relation.sourceProperty,
+                sourceProperty: `__${relation.sourceProperty}_base`,
                 target: relation.target,
-                targetProperty: relation.targetProperty,
+                targetProperty: `__${relation.targetProperty}_base`,
                 type: relation.type,
-                isTargetReliance: relation.isTargetReliance
+                isTargetReliance: relation.isTargetReliance,
+                properties: mergedProperties
             });
-            
-            let virtualBaseRelation: undefined | RelationInstance = undefined;
-            
-            // 如果有 filtered input relation，则需要创建虚拟的 base relation
-            if (relation.inputRelations?.some(inputRelation => inputRelation.baseRelation)) {
-                const baseRelationName = relation.name || 
-                    `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`;
-                    
-                virtualBaseRelation = Relation.create({
-                    name: `__${baseRelationName}_base`,
-                    source: relation.source,
-                    sourceProperty: `__${relation.sourceProperty}_base`,
-                    target: relation.target,
-                    targetProperty: `__${relation.targetProperty}_base`,
-                    type: relation.type,
-                    isTargetReliance: relation.isTargetReliance,
-                    properties: mergedProperties
-                });
-                
-                transformedRelation.baseRelation = virtualBaseRelation;
-                transformedRelation.sourceProperty = relation.sourceProperty;
-                transformedRelation.targetProperty = relation.targetProperty;
-                
-                // 任意一个 input relation 都符合
-                transformedRelation.matchExpression = MatchExp.fromArray(
-                    relation.inputRelations!.map(inputRelation => {
-                        const inputRelationName = getItemName(inputRelation);
-                        return {
-                            key: inputFieldName,
-                            value: ['contains', inputRelationName]
-                        };
-                    })
-                );
-            } else {
-                transformedRelation.properties = mergedProperties;
-            }
-            
-            return [transformedRelation as T, (virtualBaseRelation || transformedRelation) as T];
+
+            transformedRelation.baseRelation = virtualBaseRelation;
+            transformedRelation.matchExpression = memberCondition;
+            return [transformedRelation as T, virtualBaseRelation as T];
         }
+
+        transformedRelation.properties = mergedProperties;
+        return [transformedRelation as T, transformedRelation as T];
     }
-    
-/**
- * 从 input item 创建 filtered item
- */
-export function createFilteredItemFromInput<T extends MergedItem>(
-        inputItem: T,
-        baseItem: T,
-        inputFieldName: string
-    ): [T, T] {
-        if (isEntity(inputItem)) {
-            // Entity 的处理
-            const inputEntity = inputItem as EntityInstance;
-            const baseEntity = baseItem as EntityInstance;
-            
-            // 如果 input entity 已经是 filtered entity，需要找到它的 root base entity
-            let rootBase = inputEntity;
-            if (inputEntity.baseEntity) {
-                while ((rootBase as EntityInstance).baseEntity) {
-                    rootBase = (rootBase as EntityInstance).baseEntity as EntityInstance;
-                }
-            }
-            
-            // 创建新的 filtered entity
-            const filteredEntity = Entity.clone(rootBase as EntityInstance, true);
-            filteredEntity.baseEntity = baseEntity;
-            filteredEntity.matchExpression = MatchExp.atom({
-                key: inputFieldName,
-                value: ['contains', inputEntity.name]
-            });
-            
-            return [filteredEntity as T, rootBase as T];
-        } else {
-            // Relation 的处理
-            const inputRelation = inputItem as RelationInstance;
-            const baseRelation = baseItem as RelationInstance;
-            const inputRelationName = getItemName(inputRelation);
-            
-            // 如果 input relation 已经是 filtered relation，直接返回
-            if (inputRelation.baseRelation) {
-                return [inputRelation as T, getRootBaseRelation(inputRelation) as T];
-            } else {
-                // 创建一个 filtered relation
-                const filteredRelation = Relation.create({
-                    name: inputRelationName,
-                    baseRelation: baseRelation,
-                    sourceProperty: inputRelation.sourceProperty,
-                    targetProperty: inputRelation.targetProperty,
-                    matchExpression: MatchExp.atom({
-                        key: inputFieldName,
-                        value: ['contains', inputRelationName]
-                    })
-                });
-                
-                return [filteredRelation as T, inputRelation as T];
-            }
-        }
-    }
-    
-/**
- * 获取 relation 的根 base relation
- */
-function getRootBaseRelation(relation: RelationInstance): RelationInstance {
-        let current = relation;
-        while (current.baseRelation) {
-            current = current.baseRelation;
-        }
-        return current;
-    }
-    
-// 辅助方法
-function isEntity(item: MergedItem): item is EntityInstance {
-        return 'inputEntities' in item || !('sourceProperty' in item);
-    }
-    
-function isRelation(item: MergedItem): item is RelationInstance {
-        return 'sourceProperty' in item;
-    }
-    
-function getInputItems(item: MergedItem): MergedItem[]|undefined {
-        if (isEntity(item)) {
-            return (item as EntityInstance).inputEntities;
-        } else {
-            return (item as RelationInstance).inputRelations;
-        }
-    }
-    
-function getItemName(item: MergedItem): string {
-        if (isEntity(item)) {
-            return (item as EntityInstance).name;
-        } else {
-            const relation = item as RelationInstance;
-            return relation.name!
-        }
-    }
+}
