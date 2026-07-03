@@ -4,6 +4,8 @@ import { EntityInstance } from './Entity.js';
 import type { ComputationInstance } from './types.js';
 import type { ConstraintInstance } from './Constraint.js';
 
+const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
+
 export interface RelationInstance extends IInstance {
   name?: string;
   source: EntityInstance | RelationInstance;
@@ -262,6 +264,18 @@ export class Relation implements RelationInstance {
   };
   
   static create(args: RelationCreateArgs, options?: { uuid?: string }): RelationInstance {
+    // 强制执行 nameFormat 约束：显式提供的 name 会被用作表名/字段名/别名直接进入 SQL，必须严格校验。
+    // 未显式提供 name 时使用 computed name（由 source/target 名和 property 名拼接，各部分单独校验）。
+    if (args.name !== undefined && (typeof args.name !== 'string' || !validNameFormatExp.test(args.name))) {
+      throw new Error(`Relation name "${args.name}" is invalid. Relation names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+    if (args.sourceProperty !== undefined && !validNameFormatExp.test(args.sourceProperty)) {
+      throw new Error(`Relation sourceProperty "${args.sourceProperty}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+    if (args.targetProperty !== undefined && !validNameFormatExp.test(args.targetProperty)) {
+      throw new Error(`Relation targetProperty "${args.targetProperty}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+
     const instance = new Relation(args, options);
     
     // 检查 uuid 是否重复

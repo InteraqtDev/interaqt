@@ -6,7 +6,7 @@ import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { assert } from "../utils.js";
 import { SQLBuilder } from "./SQLBuilder.js";
 import { FilteredEntityManager } from "./FilteredEntityManager.js";
-import type { Record } from "./RecordQueryAgent.js";
+import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 import type { QueryExecutor } from "./QueryExecutor.js";
 
 /**
@@ -30,10 +30,8 @@ export class DeletionExecutor {
         private queryExecutor: QueryExecutor,
         filteredEntityManager: FilteredEntityManager,
         sqlBuilder: SQLBuilder,
-        private helper: {
-            findRecords: (entityQuery: RecordQuery, queryName: string) => Promise<Record[]>,
-            relocateCombinedRecordDataForLink: (linkName: string, matchExpression: MatchExpressionData, moveSource: boolean, events?: RecordMutationEvent[]) => Promise<Record[]>
-        }
+        // CAUTION executor 之间的互相回调通过 RecordOperationAgent 显式契约进行（见 RecordQueryAgent）。
+        private agent: RecordOperationAgent
     ) {
         this.sqlBuilder = sqlBuilder
         this.filteredEntityManager = filteredEntityManager
@@ -54,7 +52,7 @@ export class DeletionExecutor {
                 true
             )
         })
-        const records = await this.helper.findRecords(deleteQuery, `find record for deleting ${recordName}`)
+        const records = await this.agent.findRecords(deleteQuery, `find record for deleting ${recordName}`)
 
         // 注意下面使用的都是 deleteQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
         // CAUTION 我们应该先删除关系，再删除关联实体。按照下面的顺序就能保证事件顺序的正确。
@@ -66,15 +64,12 @@ export class DeletionExecutor {
             const relianceEvents: RecordMutationEvent[] = []
             await this.deleteDifferentTableReliance(deleteQuery.recordName, records, relianceEvents)
             // 删除自身、有生命周期依赖的合表 record、合表到当前 record 的关系数据。
-            const sameRowRecordEvents: RecordMutationEvent[] = []
-            await this.deleteRecordSameRowData(deleteQuery.recordName, records, sameRowRecordEvents, inSameRowDataOp)
+            // CAUTION 这里按结构分组收集事件（关系/级联事件 与 当前 record 删除事件分开），
+            //  而不是依赖"事件数组的最后 N 条一定是 record 删除事件"这种脆弱的位置约定。
+            const { linkAndCascadeEvents, recordDeleteEvents } = await this.deleteRecordSameRowDataGrouped(deleteQuery.recordName, records, inSameRowDataOp)
 
-            // 1. recordEvents 除了最后一个外全都是关系删除事件。
-            // 2. relianceEvents 中都是 reliance 删除事件，可能包含关系删除事件。
-            // 3. 最后 recordEvents 是 record 删除事件。
-            const relationEvents = sameRowRecordEvents.slice(0, sameRowRecordEvents.length - records.length)
-            const recordEvents = sameRowRecordEvents.slice(sameRowRecordEvents.length - records.length)
-            events?.push(...relationEvents, ...relianceEvents, ...recordEvents)
+            // 事件顺序：先关系删除事件，再 reliance 删除事件，最后是 record 本身的删除事件。
+            events?.push(...linkAndCascadeEvents, ...relianceEvents, ...recordDeleteEvents)
         }
 
         return records
@@ -85,6 +80,19 @@ export class DeletionExecutor {
      * 这里会把同表的 reliance，以及 reliance 的 reliance 都删除掉
      */
     async deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp = false): Promise<Record[]> {
+        const { linkAndCascadeEvents, recordDeleteEvents } = await this.deleteRecordSameRowDataGrouped(recordName, records, inSameRowDataOp)
+        events?.push(...linkAndCascadeEvents, ...recordDeleteEvents)
+        return records as Record[]
+    }
+
+    /**
+     * 删除记录同行数据的实际实现。
+     * 事件按结构分组返回：
+     * - linkAndCascadeEvents：关系（link）删除事件、同表 reliance 级联删除事件、filtered entity 删除事件。
+     * - recordDeleteEvents：当前批次 record 本身的删除事件（与传入 records 一一对应）。
+     */
+    private async deleteRecordSameRowDataGrouped(recordName: string, records: EntityIdRef[], inSameRowDataOp = false): Promise<{ linkAndCascadeEvents: RecordMutationEvent[], recordDeleteEvents: RecordMutationEvent[] }> {
+        const linkAndCascadeEvents: RecordMutationEvent[] = []
         const recordInfo = this.map.getRecordInfo(recordName)
 
         for (let record of records) {
@@ -101,7 +109,7 @@ export class DeletionExecutor {
                         modifier: {limit: 1}
                     }
                 )
-                const recordWithSameRowData = await this.helper.findRecords(recordWithSameRowDataQuery, `find record with same row data for delete ${recordName}`)
+                const recordWithSameRowData = await this.agent.findRecords(recordWithSameRowDataQuery, `find record with same row data for delete ${recordName}`)
                 const hasSameRowData = recordInfo.notRelianceCombined.some(info => {
                     return !!recordWithSameRowData[0]?.[info.attributeName]?.id
                 })
@@ -127,7 +135,7 @@ export class DeletionExecutor {
                 // 只要真正存在这个数据才要删除
                 if (record[relianceInfo.attributeName]?.id) {
                     // 和 reliance 的 link record 的事件
-                    events?.push({
+                    linkAndCascadeEvents.push({
                         type: 'delete',
                         recordName: relianceInfo.linkName,
                         record: {
@@ -141,7 +149,7 @@ export class DeletionExecutor {
                         },
                     })
 
-                    await this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, events)
+                    await this.handleDeletedRecordReliance(relianceInfo.recordName, record[relianceInfo.attributeName]!, linkAndCascadeEvents)
                 }
             }
 
@@ -149,7 +157,7 @@ export class DeletionExecutor {
             recordInfo.mergedRecordAttributes.forEach(attributeInfo => {
                 if (record[attributeInfo.attributeName]?.id) {
                     // 记录和自己合并的 link 事件
-                    events?.push({
+                    linkAndCascadeEvents.push({
                         type: 'delete',
                         recordName: attributeInfo.linkName,
                         // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
@@ -170,7 +178,7 @@ export class DeletionExecutor {
                 if (recordInfo.isRelation && (attributeInfo.attributeName === 'target' || attributeInfo.attributeName === 'source')) return
                 if (record[attributeInfo.attributeName]?.id === undefined) return
                 // 记录和自己合并的 link 事件
-                events?.push({
+                linkAndCascadeEvents.push({
                     type: 'delete',
                     recordName: attributeInfo.linkName,
                     // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
@@ -198,7 +206,7 @@ export class DeletionExecutor {
                 for (const filteredEntity of filteredEntities) {
                     if (currentFlags[filteredEntity.name] === true) {
                         // 记录属于这个 filtered entity，生成删除事件
-                        events?.push({
+                        linkAndCascadeEvents.push({
                             type: 'delete',
                             recordName: filteredEntity.name,
                             record: { ...record }
@@ -207,13 +215,13 @@ export class DeletionExecutor {
                 }
             }
         }
-        
-        events?.push(...records.map(record => ({
+
+        const recordDeleteEvents = records.map(record => ({
             type: 'delete',
             recordName: recordName,
             record,
-        }) as RecordMutationEvent))
-        return records
+        }) as RecordMutationEvent)
+        return { linkAndCascadeEvents, recordDeleteEvents }
     }
 
     /**
@@ -284,7 +292,7 @@ export class DeletionExecutor {
         assert(!linkInfo.isTargetReliance, `cannot unlink reliance data, you can only delete record, ${linkName}`)
 
         if (linkInfo.isCombined()) {
-            return this.helper.relocateCombinedRecordDataForLink(linkName, matchExpressionData, moveSource, events)
+            return this.agent.relocateCombinedRecordDataForLink(linkName, matchExpressionData, moveSource, events)
         }
 
         return this.deleteRecord(linkName, matchExpressionData, events)

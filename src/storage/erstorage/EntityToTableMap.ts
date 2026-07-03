@@ -118,6 +118,10 @@ type TableAndAliasStack = {
 }[]
 
 export class EntityToTableMap {
+    // CAUTION 元数据缓存：MapData 在 setup 完成后不可变，RecordInfo/AttributeInfo 只是它的只读视图，
+    //  热路径（每次查询/变更都会反复调用 getRecordInfo/getInfoByPath）不应该每次都新建对象、做字符串拆解。
+    private recordInfoCache = new Map<string, RecordInfo>()
+    private infoByPathCache = new Map<string, AttributeInfo|undefined>()
     constructor(public data: MapData, public aliasManager?: AliasManager) {}
     
     getRecord(recordName:string) {
@@ -130,7 +134,12 @@ export class EntityToTableMap {
         return this.data.records[recordName].attributes[this.getAttributeAndSymmetricDirection(attributeName)[0]]
     }
     getRecordInfo(recordName:string) {
-        return new RecordInfo(recordName, this)
+        let info = this.recordInfoCache.get(recordName)
+        if (!info) {
+            info = new RecordInfo(recordName, this)
+            this.recordInfoCache.set(recordName, info)
+        }
+        return info
     }
     getInfo(entityName: string, attribute: string) : AttributeInfo{
         const result = this.getInfoByPath([entityName, ...(attribute.split('.'))])
@@ -152,6 +161,16 @@ export class EntityToTableMap {
     }
 
     getInfoByPath(namePath: string[]): AttributeInfo|undefined {
+        const cacheKey = namePath.join('.')
+        if (this.infoByPathCache.has(cacheKey)) {
+            return this.infoByPathCache.get(cacheKey)
+        }
+        const result = this.computeInfoByPath(namePath)
+        this.infoByPathCache.set(cacheKey, result)
+        return result
+    }
+
+    private computeInfoByPath(namePath: string[]): AttributeInfo|undefined {
         const [entityName, ...attributivePath] = namePath
         assert(this.data.records[entityName], `entity ${entityName} not found`)
         assert(attributivePath.length > 0, 'getInfoByPath should have a name path.')
@@ -244,8 +263,9 @@ export class EntityToTableMap {
 
                 // 处理 symmetric 中的:
                 const rawCurrentTableAlias = `${lastTableAlias}_${currentAttributeName}${symmetricDirection ? `_${symmetricDirection.toUpperCase()}` : ''}`
-                // 使用预生成的别名或原始名称（如果没有 aliasManager）
-                const currentTableAlias = this.aliasManager?.getTableAlias(rawCurrentTableAlias) || rawCurrentTableAlias
+                // CAUTION 优先使用预生成别名；超过预生成深度的路径在这里运行时兜底注册。
+                //  不能直接落回原始长名：PG 会静默截断 >63 字节的标识符，两条长路径截断后可能同名碰撞产生错误 JOIN。
+                const currentTableAlias = this.aliasManager?.registerTablePath(rawCurrentTableAlias) || rawCurrentTableAlias
 
                 // CAUTION 一定要先处理 linkAlias，因为依赖于上一次 tableAlias。
                 if (info.isMergedWithParent() || info.isLinkMergedWithParent()) {
@@ -254,9 +274,9 @@ export class EntityToTableMap {
                     // link 没有合并的情况也要生成新的 alias。否则就和 lastTableAlias 同名
                 } else if (info.isLinkIsolated()){
                     // link 表独立，给个新名字
-                    // CAUTION symmetric 路径要手动指定关系
+                    // CAUTION symmetric 路径要手动指定关系。超过预生成深度的路径运行时兜底注册（理由同上）。
                     const rawRelAlias = `REL_${rawCurrentTableAlias}`
-                    relationTableAlias = this.aliasManager?.getTableAlias(rawRelAlias) || rawRelAlias
+                    relationTableAlias = this.aliasManager?.registerTablePath(rawRelAlias) || rawRelAlias
                 } else {
                     // link 表合并了，名字和当前一样。
                     relationTableAlias = currentTableAlias
@@ -425,106 +445,83 @@ export class EntityToTableMap {
 
         return [valueAttributes, entityAttributes, entityIdAttributes]
     }
-    // 获取压缩后的路径
-    getShrinkedAttribute(entityName:string, attributeName: string):string {
-        // 将路径分割成数组
+    /**
+     * 获取压缩后的路径。
+     *
+     * 把路径中 `attr.&.source` / `attr.&.target` 这种"先进入关系，再回到关系端点"的段压缩掉：
+     * 当端点（source/target）指向的实体与 `attr` 本身指向的实体相同时，`attr.&.<endpoint>` 与 `attr` 等价。
+     * 例如 `owner.&.target.name`（owner 指向关系的 target 实体）压缩为 `owner.name`；
+     * 而 `owner.&.source.name`（回到关系的另一端）无法压缩，原样保留。
+     *
+     * 该函数被 filtered relation 的 rebase（MatchExp.rebase）依赖。
+     */
+    getShrinkedAttribute(entityName: string, attributeName: string): string {
         const pathParts = attributeName.split('.');
         const result: string[] = [];
+        // currentEntity 跟踪 result 尾部对应的实体。空字符串表示已进入无法继续解析的上下文（如 link 的反向端点）。
         let currentEntity = entityName;
-        let previousEntity = entityName; // 保存前一个实体名称
+        // previousEntity 是 result 最后一个属性段所属的实体，用于解析该属性对应的关系信息。
+        let previousEntity = entityName;
         let i = 0;
-        
+
         while (i < pathParts.length) {
             const part = pathParts[i];
-            
-            // 如果当前部分是 & 符号
-            if (part === LINK_SYMBOL && i > 0 && i < pathParts.length - 1) {
+            const isMiddleLinkSymbol = part === LINK_SYMBOL && i > 0 && i < pathParts.length - 1;
+
+            if (isMiddleLinkSymbol) {
                 const previousAttr = result[result.length - 1];
                 const nextPart = pathParts[i + 1];
-                
-                // 如果下一个部分是 source 或 target
+
                 if (nextPart === 'source' || nextPart === 'target') {
-                        // 使用前一个实体来获取关系信息
-                        const relationInfo = this.getInfo(previousEntity, previousAttr);
-                        
-                        if (relationInfo.isRecord) {
-                            // 获取关系的详细信息
-                            const linkInfo = relationInfo.getLinkInfo().data;
-                            
-                            // 确定关系属性指向的实体
-                            let relationPointsTo: string;
-                            if (relationInfo.isRecordSource()) {
-                                // 如果是 source，则指向关系的 target
-                                relationPointsTo = linkInfo.targetRecord;
-                            } else {
-                                // 如果不是 source，则指向关系的 source
-                                relationPointsTo = linkInfo.sourceRecord;
-                            }
-                            
-                            // 确定 source/target 指向的实体
-                            let sourceTargetPointsTo: string;
-                            if (nextPart === 'source') {
-                                sourceTargetPointsTo = linkInfo.sourceRecord;
-                            } else {
-                                sourceTargetPointsTo = linkInfo.targetRecord;
-                            }
-                            
-                            // 如果两者指向相同的实体，可以压缩
-                            if (relationPointsTo === sourceTargetPointsTo) {
-                                // 跳过 & 和 source/target
-                                i += 2;
-                                // currentEntity 保持为 relationPointsTo
-                                // previousEntity 不变，因为我们没有添加新的属性到结果
-                                continue;
-                            } else {
-                                // 如果不能压缩，更新 currentEntity 为 source/target 指向的实体
-                                currentEntity = sourceTargetPointsTo;
-                                previousEntity = currentEntity; // 更新 previousEntity
-                                currentEntity = '';
-                                previousEntity = ''; // 更新 previousEntity
-                                result.push(part);
-                                result.push(nextPart);
-                                i += 2;
-                                continue;
-                            }
+                    // 用前一个属性段判断 link 端点是否与该属性指向同一实体
+                    const relationInfo = this.getInfo(previousEntity, previousAttr);
+                    if (relationInfo.isRecord) {
+                        const linkData = relationInfo.getLinkInfo().data;
+                        // 关系属性指向的实体（站在 previousEntity 的角度看向另一端）
+                        const relationPointsTo = relationInfo.isRecordSource() ? linkData.targetRecord : linkData.sourceRecord;
+                        // source/target 端点指向的实体
+                        const endpointPointsTo = nextPart === 'source' ? linkData.sourceRecord : linkData.targetRecord;
+
+                        if (relationPointsTo === endpointPointsTo) {
+                            // `attr.&.<endpoint>` 与 `attr` 等价：跳过 & 和端点段，实体跟踪保持不变
+                            i += 2;
+                            continue;
                         }
+                        // 端点指向关系的另一端（回到了 previousEntity 一侧）：不能压缩，原样保留。
+                        // 此后路径处于反向端点上下文，无法用 getInfo 继续解析，停止实体跟踪。
+                        currentEntity = '';
+                        previousEntity = '';
+                        result.push(part, nextPart);
+                        i += 2;
+                        continue;
+                    }
+                    // 前一段不是 record 属性，无法判断，保留 & 继续处理后续段
                 } else {
+                    // & 后面不是 source/target（读取 link 自身的属性等）：进入 link 上下文，停止实体跟踪
                     currentEntity = '';
-                    previousEntity = ''; 
+                    previousEntity = '';
                 }
-                
-                // 如果不能压缩，保留 & 符号
+
                 result.push(part);
                 i++;
             } else if (part !== LINK_SYMBOL) {
-                // 保存当前实体作为前一个实体
                 previousEntity = currentEntity;
-                
-                // 更新当前实体
-                if(currentEntity) {
+                // 只在实体跟踪有效时解析。跟踪失效（''）时只做路径拼接。
+                if (currentEntity) {
                     const info = this.getInfo(currentEntity, part);
                     if (info.isRecord) {
                         currentEntity = info.recordName;
                     }
                 }
-                // try {
-                //     const info = this.getInfo(currentEntity, part);
-                //     if (info.isRecord) {
-                //         currentEntity = info.recordName;
-                //     }
-                // } catch (e) {
-                //     // 忽略错误
-                // }
-                
                 result.push(part);
                 i++;
             } else {
-                // 其他情况（比如 & 在开头或结尾）
+                // & 出现在路径开头或结尾：无压缩语义，原样保留
                 result.push(part);
                 i++;
             }
         }
-        
+
         return result.join('.');
     }
 }

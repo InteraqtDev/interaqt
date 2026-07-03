@@ -19,7 +19,27 @@ export type Record = EntityIdRef & {
     [k: string]: any
 }
 
-export class RecordQueryAgent {
+/**
+ * executor 之间互相回调所依赖的聚合操作契约。
+ *
+ * CAUTION CreationExecutor/UpdateExecutor/DeletionExecutor 与 RecordQueryAgent 本质上是同一个聚合，
+ *  按文件拆分只是物理组织。这里用显式接口取代原先手工拼装的函数字典（那种写法依赖
+ *  "恰好方法名匹配"的隐式约定），使循环回调成为受类型约束的显式契约。
+ */
+export interface RecordOperationAgent {
+    findRecords(entityQuery: RecordQuery, queryName?: string): Promise<Record[]>
+    createRecord(newEntityData: NewRecordData, queryName?: string, events?: RecordMutationEvent[]): Promise<EntityIdRef>
+    createRecordDependency(newRecordData: NewRecordData, events?: RecordMutationEvent[]): Promise<NewRecordData>
+    updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: RecordMutationEvent[]): Promise<Record[]>
+    unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, reason?: string, events?: RecordMutationEvent[]): Promise<Record[]>
+    deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp?: boolean): Promise<Record[]>
+    addLinkFromRecord(entity: string, attribute: string, entityId: string, relatedEntityId: string, attributes?: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef>
+    preprocessSameRowData(newEntityData: NewRecordData, isUpdate?: boolean, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData>
+    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string): Promise<{ [k: string]: RawEntityData }>
+    relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, events?: RecordMutationEvent[]): Promise<Record[]>
+}
+
+export class RecordQueryAgent implements RecordOperationAgent {
     getPlaceholder: () => PlaceholderGen
     private filteredEntityManager: FilteredEntityManager
     private sqlBuilder: SQLBuilder
@@ -30,32 +50,13 @@ export class RecordQueryAgent {
     
     constructor(public map: EntityToTableMap, public database: Database) {
         this.getPlaceholder = database.getPlaceholder || (() => (name?:string) => `?`)
+        // CAUTION filtered entity 依赖分析由 FilteredEntityManager 按 MapData 缓存，重复 new 不会重算。
         this.filteredEntityManager = new FilteredEntityManager(map, this)
         this.sqlBuilder = new SQLBuilder(map, database)
         this.queryExecutor = new QueryExecutor(map, database, this.sqlBuilder)
         this.creationExecutor = new CreationExecutor(map, database, this.queryExecutor, this.filteredEntityManager, this.sqlBuilder, this)
         this.deletionExecutor = new DeletionExecutor(map, database, this.queryExecutor, this.filteredEntityManager, this.sqlBuilder, this)
         this.updateExecutor = new UpdateExecutor(map, database, this.filteredEntityManager, this.sqlBuilder, this)
-        this.initializeFilteredEntityDependencies()
-    }
-    
-    /**
-     * 初始化所有 filtered entity 的依赖关系
-     */
-    private initializeFilteredEntityDependencies() {
-        const records = this.map.data.records
-        
-        for (const [recordName, recordData] of Object.entries(records)) {
-            // 统一判断：如果有 matchExpression 且 resolvedBaseRecordName 不指向自己，说明是 filtered entity
-            // 普通 entity 没有 matchExpression 或 resolvedBaseRecordName 指向自己
-            if (recordData.matchExpression && recordData.resolvedBaseRecordName && recordData.resolvedBaseRecordName !== recordName) {
-                this.filteredEntityManager.analyzeDependencies(
-                    recordName,
-                    recordData.resolvedBaseRecordName,
-                    recordData.resolvedMatchExpression || recordData.matchExpression
-                )
-            }
-        }
     }
 
     // 查 entity 和 查 relation 都是一样的。具体在 entityQuery 里面区别。
@@ -85,85 +86,11 @@ export class RecordQueryAgent {
         return this.creationExecutor.createRecord(newEntityData, queryName, events)
     }
 
-    // preprocessSameRowData 由于被 update 和 create 共同使用，保留在 RecordQueryAgent
-    // 但在创建场景下会通过 insertSameRowData 间接调用 CreationExecutor 的版本
+    // 委托给 CreationExecutor。
+    // CAUTION 创建/更新两个分支共用同一份实现（CreationExecutor.preprocessSameRowData），
+    //  不要在这里再复制一份，两份实现必然随时间分叉。
     async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData> {
-        if (!isUpdate) {
-            // 创建场景：委托给 CreationExecutor
-            return this.creationExecutor.preprocessSameRowData(newEntityData, isUpdate, events, oldRecord)
-        }
-        
-        // 更新场景：保留原逻辑
-        const newRawDataWithNewIds = newEntityData.getData()
-        if(isUpdate && !newRawDataWithNewIds.id) {
-            newRawDataWithNewIds.id = oldRecord!.id
-        }
-
-        // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
-        if (newEntityData.valueAttributes.length) {
-            const updatedFieldValues = newEntityData.getSameRowFieldAndValue(oldRecord)
-            const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
-            const valueAttributeNames = new Set(recordInfo.valueAttributes.map(attr => attr.attributeName))
-            const updateRecord = { ...newEntityData.getData() } as Record
-            updatedFieldValues.forEach(field => {
-                if (valueAttributeNames.has(field.name)) {
-                    updateRecord[field.name] = field.value
-                }
-            })
-            events?.push({
-                type: 'update',
-                recordName: newEntityData.recordName,
-                record: { ...updateRecord, id: oldRecord!.id },
-                oldRecord: oldRecord
-            })
-        }
-
-        // 1. 先为三表合一的新数据分配 id
-        for (let record of newEntityData.combinedNewRecords) {
-            newRawDataWithNewIds[record.info!.attributeName] = {
-                ...newRawDataWithNewIds[record.info!.attributeName],
-                id: await this.database.getAutoId(record.info!.recordName!),
-            }
-            events?.push({
-                type: 'create',
-                recordName: record.recordName,
-                record: newRawDataWithNewIds[record.info!.attributeName]
-            })
-        }
-
-        // 2. 为我要新建 三表合一、或者我 mergedLink 的 的 关系 record 分配 id.
-        for (let record of newEntityData.mergedLinkTargetNewRecords.concat(newEntityData.mergedLinkTargetRecordIdRefs, newEntityData.combinedNewRecords)) {
-            if (newRawDataWithNewIds[record.info!.attributeName].id !== oldRecord?.[record.info!.attributeName]?.id) {
-                newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] = {
-                    ...(newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] || {}),
-                    id: await this.database.getAutoId(record.info!.linkName!),
-                }
-
-                const linkRecord = {...newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]}
-                linkRecord[record.info!.isRecordSource() ? 'target' : 'source'] = record.getData()
-                linkRecord[record.info!.isRecordSource() ? 'source' : 'target'] = {...newRawDataWithNewIds}
-                delete linkRecord.target[LINK_SYMBOL]
-                delete linkRecord.source[LINK_SYMBOL]
-
-
-                events?.push({
-                    type: 'create',
-                    recordName: record.info!.linkName,
-                    record: linkRecord
-                })
-            }
-        }
-
-        const newEntityDataWithIds = newEntityData.merge(newRawDataWithNewIds)
-
-        // 2. 处理需要 flashOut 的数据
-        const flashOutRecordRasData: { [k: string]: RawEntityData } = await this.flashOutCombinedRecordsAndMergedLinks(
-            newEntityData,
-            events,
-            `finding combined records for ${newEntityData.recordName} to flash out, for ${isUpdate ? 'updating' : 'creation'} with data ${JSON.stringify(newEntityDataWithIds.getData())}`
-        )
-
-        return newEntityDataWithIds.merge(flashOutRecordRasData)
+        return this.creationExecutor.preprocessSameRowData(newEntityData, isUpdate, events, oldRecord)
     }
 
     /**

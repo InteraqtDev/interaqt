@@ -31,24 +31,20 @@ export class RecordQuery {
         const recordInfo = map.getRecordInfo(recordName)
         // 统一使用 resolvedBaseRecordName（普通 entity 指向自己，filtered entity 指向 base）
         const baseRecordName = recordInfo.resolvedBaseRecordName!;
-        
+
         // CAUTION 因为合表后可能用关联数据匹配到行。
-        const inputMatch = new MatchExp(baseRecordName, map, data.matchExpression, contextRootEntity)
-        let matchExpression = allowNull ? inputMatch: inputMatch.and({
+        // CAUTION filtered entity 的 resolvedMatchExpression 合并统一由 MatchExp 构造器负责
+        //  （用原始 recordName 构造即可），这里不要再合并一次，否则会产生双重 AND。
+        const inputMatch = new MatchExp(recordName, map, data.matchExpression, contextRootEntity)
+        const matchExpression = allowNull ? inputMatch : inputMatch.and({
             key: 'id',
             value: ['not', null]
         })
 
-        // 如果有 resolvedMatchExpression，说明是 filtered entity，需要合并过滤条件
-        let resolvedMatchExpression = matchExpression;
-        if (recordInfo.resolvedMatchExpression) {
-            resolvedMatchExpression = matchExpression.and(new MatchExp(baseRecordName, map, recordInfo.resolvedMatchExpression));
-        }
-
         return new RecordQuery(
             baseRecordName,
             map,
-            resolvedMatchExpression,
+            matchExpression,
             new AttributeQuery(baseRecordName, map, data.attributeQuery || [], parentRecord, attributeName),
             new Modifier(baseRecordName, map, data.modifier!),
             contextRootEntity,

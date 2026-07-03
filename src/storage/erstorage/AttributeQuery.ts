@@ -16,7 +16,6 @@ export class AttributeQuery {
 
     public fullQueryTree: RecordQueryTree
     public parentLinkRecordQuery?: RecordQuery
-    public id = Math.random()
     public static mergeAttributeQueryData(attributeQueryData: AttributeQueryData, otherAttributeQueryData: AttributeQueryData): AttributeQueryData {
 
         const allAttributeQueryData = [...attributeQueryData, ...otherAttributeQueryData]

@@ -1,6 +1,6 @@
 import { MatchExpressionData, MatchAtom, MatchExp } from "./MatchExp.js"
 import { BoolExp } from "@core"
-import { EntityToTableMap } from "./EntityToTableMap.js"
+import { EntityToTableMap, MapData } from "./EntityToTableMap.js"
 import { RecordQueryAgent } from "./RecordQueryAgent.js"
 import { RecordQuery } from "./RecordQuery.js"
 import { RecordMutationEvent } from "@runtime"
@@ -16,13 +16,43 @@ export interface FilteredEntityDependency {
     }[]
 }
 
+// CAUTION 依赖分析结果只由不可变的 MapData 决定，按 MapData 缓存。
+//  否则每次 new RecordQueryAgent / EntityQueryHandle（例如 migration 中的临时 handle）都会全量重算。
+const dependenciesByMapData = new WeakMap<MapData, Map<string, FilteredEntityDependency[]>>()
+
 /**
  * 管理 filtered entity 的所有功能，包括依赖分析、跨实体查询和级联事件处理
  */
 export class FilteredEntityManager {
-    private dependencies: Map<string, FilteredEntityDependency[]> = new Map()
-    
-    constructor(private map: EntityToTableMap, private queryAgent: RecordQueryAgent) {}
+    private dependencies: Map<string, FilteredEntityDependency[]>
+
+    constructor(private map: EntityToTableMap, private queryAgent: RecordQueryAgent) {
+        const cached = dependenciesByMapData.get(map.data)
+        if (cached) {
+            this.dependencies = cached
+        } else {
+            this.dependencies = new Map()
+            dependenciesByMapData.set(map.data, this.dependencies)
+            this.initializeDependencies()
+        }
+    }
+
+    /**
+     * 初始化所有 filtered entity 的依赖关系（每个 MapData 只计算一次）
+     */
+    private initializeDependencies() {
+        for (const [recordName, recordData] of Object.entries(this.map.data.records)) {
+            // 统一判断：如果有 matchExpression 且 resolvedBaseRecordName 不指向自己，说明是 filtered entity
+            // 普通 entity 没有 matchExpression 或 resolvedBaseRecordName 指向自己
+            if (recordData.matchExpression && recordData.resolvedBaseRecordName && recordData.resolvedBaseRecordName !== recordName) {
+                this.analyzeDependencies(
+                    recordName,
+                    recordData.resolvedBaseRecordName,
+                    recordData.resolvedMatchExpression || recordData.matchExpression
+                )
+            }
+        }
+    }
     
     // ============ 依赖管理功能 ============
     
@@ -40,20 +70,23 @@ export class FilteredEntityManager {
             dependencies
         }
         
-        // 注册依赖关系
-        for (const dep of dependencies) {
-            if (!this.dependencies.has(dep.entityName)) {
-                this.dependencies.set(dep.entityName, [])
+        // 注册依赖关系。
+        // CAUTION 同一个 dependency 在同一个实体名下只能注册一次。
+        //  谓词包含 base 自身属性时 dependencies 里也会出现 baseEntityName，
+        //  如果这里再无条件注册一次，update 时会对同一条记录做双倍的 membership 查询（结果幂等但白做）。
+        const entityNamesToRegister = new Set<string>(dependencies.map(dep => dep.entityName))
+        // 源实体自身也要注册（即使谓词没有直接引用它的属性）
+        entityNamesToRegister.add(baseEntityName)
+        for (const entityName of entityNamesToRegister) {
+            if (!this.dependencies.has(entityName)) {
+                this.dependencies.set(entityName, [])
             }
-            this.dependencies.get(dep.entityName)!.push(dependency)
+            const registered = this.dependencies.get(entityName)!
+            if (!registered.includes(dependency)) {
+                registered.push(dependency)
+            }
         }
-        
-        // 也注册源实体自身
-        if (!this.dependencies.has(baseEntityName)) {
-            this.dependencies.set(baseEntityName, [])
-        }
-        this.dependencies.get(baseEntityName)!.push(dependency)
-        
+
         return dependency
     }
     
@@ -140,10 +173,11 @@ export class FilteredEntityManager {
     }
     
     /**
-     * 清除所有依赖关系
+     * 清除所有依赖关系（同时失效按 MapData 共享的缓存）
      */
     clear() {
         this.dependencies.clear()
+        dependenciesByMapData.delete(this.map.data)
     }
     
     // ============ 跨实体查询功能 ============
@@ -214,25 +248,38 @@ export class FilteredEntityManager {
         entityName: string,
         matchExpression: MatchExpressionData
     ): Promise<boolean> {
+        const matchedIds = await this.checkRecordsMatchFilter([recordId], entityName, matchExpression)
+        return matchedIds.has(recordId)
+    }
+
+    /**
+     * 批量检查记录是否满足 filtered entity 的条件，返回满足条件的 id 集合。
+     * CAUTION 一次 membership 查询覆盖所有记录，避免每条记录一次查询的 N+1。
+     */
+    async checkRecordsMatchFilter(
+        recordIds: string[],
+        entityName: string,
+        matchExpression: MatchExpressionData
+    ): Promise<Set<string>> {
         if (!this.queryAgent) {
             throw new Error('QueryAgent not set in FilteredEntityManager')
         }
-        
-        
+        if (!recordIds.length) return new Set()
+
         const query = RecordQuery.create(entityName, this.map, {
             matchExpression: matchExpression.and({
                 key: 'id',
-                value: ['=', recordId]
+                value: ['in', recordIds]
             }),
-            modifier: { limit: 1 }
+            attributeQuery: ['id']
         })
-        
+
         const results = await this.queryAgent.findRecords(
             query,
-            `check if record ${recordId} matches filter condition`
+            `check if records [${recordIds.join(',')}] match filter condition`
         )
-        
-        return results.length > 0
+
+        return new Set(results.map(r => r.id))
     }
     
     // ============ 级联事件处理功能 ============
@@ -378,14 +425,12 @@ export class FilteredEntityManager {
                 changedAttributes
             )
             
-            // 更新每个受影响的源记录的 filtered entity 标记
-            for (const sourceRecord of affectedSourceRecords) {
-                await this.updateSingleFilteredEntityFlag(
-                    dependency,
-                    sourceRecord.id,
-                    events
-                )
-            }
+            // 批量更新所有受影响的源记录的 filtered entity 标记
+            await this.updateFilteredEntityFlagsForRecords(
+                dependency,
+                affectedSourceRecords.map(record => record.id),
+                events
+            )
         }
     }
     isFlagEqual(flag1: { [key: string]: boolean }, flag2: { [key: string]: boolean }): boolean {
@@ -396,78 +441,69 @@ export class FilteredEntityManager {
     }
     
     /**
-     * 更新单个依赖关系的 filtered entity 标记
+     * 批量更新单个依赖关系下多条记录的 filtered entity 标记。
+     * CAUTION 批量化：每个依赖只做一次"取当前标记"查询和一次 membership 查询，
+     *  只对标记真正变化的记录逐条 UPDATE（每条记录的 JSON 内容不同，无法合并成一条 UPDATE）。
      */
-    private async updateSingleFilteredEntityFlag(
+    private async updateFilteredEntityFlagsForRecords(
         dependency: FilteredEntityDependency,
-        recordId: string,
+        recordIds: string[],
         events: RecordMutationEvent[]
     ): Promise<void> {
+        if (!recordIds.length) return
+
         const recordInfo = this.map.getRecordInfo(dependency.baseEntityName)
-        // 获取记录当前的 __filtered_entities 状态
-        const currentRecord = await this.queryAgent.findRecords(
+        // 获取所有记录当前的 __filtered_entities 状态
+        const currentRecords = await this.queryAgent.findRecords(
             RecordQuery.create(dependency.baseEntityName, this.map, {
-                matchExpression: MatchExp.atom({ key: 'id', value: ['=', recordId] }),
+                matchExpression: MatchExp.atom({ key: 'id', value: ['in', recordIds] }),
                 attributeQuery: recordInfo.isRelation ? 
                     ['*', ['target', {attributeQuery: ['*']}], ['source', {attributeQuery: ['*']}]] : 
                     ['*']
             }),
-            `get current filtered entity flags for ${dependency.baseEntityName}:${recordId}`
+            `get current filtered entity flags for ${dependency.baseEntityName}`
         )
-        
-        if (currentRecord.length === 0) {
+
+        if (currentRecords.length === 0) {
             return
         }
-        
-        const record = currentRecord[0]
-        const currentFlags: { [key: string]: boolean } = record.__filtered_entities;
-        
-        // 检查记录是否满足 filtered entity 的条件
-        const matchesFilter = await this.checkRecordMatchesFilter(
-            recordId,
+
+        // 批量 membership 查询：一次查出所有仍然满足条件的记录
+        const matchedIds = await this.checkRecordsMatchFilter(
+            currentRecords.map(record => record.id),
             dependency.baseEntityName,
             dependency.matchExpression
         )
-        
-        const previouslyBelonged = currentFlags[dependency.filteredEntityName] === true
-        
-        // 如果状态发生变化，生成相应的事件
-        if (matchesFilter && !previouslyBelonged) {
-            // 记录现在属于这个 filtered entity
+
+        const filteredEntitiesAttribute = recordInfo.data.attributes['__filtered_entities']
+        const flagFieldName = filteredEntitiesAttribute && (filteredEntitiesAttribute as any).field
+
+        for (const record of currentRecords) {
+            // CAUTION __filtered_entities 可能为 NULL（存量数据/手工迁移的行），也可能是未反序列化的字符串。
+            //  这里必须归一化成对象，否则读取属性时会抛 TypeError。
+            const rawFlags = record.__filtered_entities
+            const currentFlags: { [key: string]: boolean } =
+                (typeof rawFlags === 'string' ? JSON.parse(rawFlags) : rawFlags) || {}
+
+            const matchesFilter = matchedIds.has(record.id)
+            const previouslyBelonged = currentFlags[dependency.filteredEntityName] === true
+
+            if (matchesFilter === previouslyBelonged) continue
+
+            // 状态发生变化：生成相应的事件并更新标记
             events.push({
-                type: 'create',
+                type: matchesFilter ? 'create' : 'delete',
                 recordName: dependency.filteredEntityName,
                 record: { ...record }
             })
-            
-            // 更新标记
-            currentFlags[dependency.filteredEntityName] = true
-        } else if (!matchesFilter && previouslyBelonged) {
-            // 记录不再属于这个 filtered entity
-            events.push({
-                type: 'delete',
-                recordName: dependency.filteredEntityName,
-                record: { ...record }
-            })
-            
-            // 更新标记
-            currentFlags[dependency.filteredEntityName] = false
-        }
-        
-        // 更新 __filtered_entities 字段
-        if (previouslyBelonged !== matchesFilter) {
-            // 获取 __filtered_entities 字段的实际数据库字段名
-            const recordInfo = this.map.getRecordInfo(dependency.baseEntityName);
-            const filteredEntitiesAttribute = recordInfo.data.attributes['__filtered_entities'];
-            
-            if (filteredEntitiesAttribute && (filteredEntitiesAttribute as any).field) {
-                const fieldName = (filteredEntitiesAttribute as any).field;
-                
+            currentFlags[dependency.filteredEntityName] = matchesFilter
+
+            if (flagFieldName) {
                 await this.queryAgent.updateRecordDataById(
                     dependency.baseEntityName,
-                    { id: recordId },
+                    { id: record.id },
                     [{
-                        field: fieldName,
+                        field: flagFieldName,
                         value: JSON.stringify(currentFlags)
                     }]
                 )

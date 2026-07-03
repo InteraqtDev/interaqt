@@ -156,21 +156,6 @@ export class DBSetup {
     }
 
 
-    resolveBaseSourceEntityAndFilter(entity: EntityInstance) {
-        const entityWithProps = entity
-        let baseEntity = (entityWithProps as any).baseEntity
-        let matchExpression = (entityWithProps as any).matchExpression
-        assert((baseEntity && matchExpression) || (!baseEntity && !matchExpression), `matchExpression is required for ${entityWithProps.name}`)
-        if (!(baseEntity && matchExpression)) return
-
-        while(baseEntity.baseEntity) {
-            baseEntity = baseEntity.baseEntity
-            matchExpression = matchExpression.and(baseEntity.filter)
-        }
-
-        return { baseEntity, matchExpression }
-    }
-
     /**
      * 验证 filtered entity 的过滤条件中的路径不包含 x:n 关系
      */
@@ -686,7 +671,36 @@ export class DBSetup {
         return result
     }
 
+    /**
+     * 校验 entity/relation 的 name 满足 nameFormat 约束。
+     * CAUTION name 会被用作表名/字段名/别名直接插值进 SQL（如 CREATE TABLE "${name}"），
+     *  这里是 storage 的入口防线（Entity.create/Relation.create 已经先校验过一次，
+     *  但实例可能绕过 Klass 工厂直接构造，所以这里必须再校验）。
+     */
+    private static readonly VALID_NAME_FORMAT = /^[a-zA-Z0-9_]+$/
+    private validateRecordNames() {
+        this.entities.forEach(entity => {
+            if (typeof entity.name !== 'string' || !DBSetup.VALID_NAME_FORMAT.test(entity.name)) {
+                throw new Error(`Entity name "${entity.name}" is invalid. Entity names must match ${DBSetup.VALID_NAME_FORMAT} (letters, numbers and underscore only).`)
+            }
+        })
+        this.relations.forEach(relation => {
+            if (relation.name !== undefined && !DBSetup.VALID_NAME_FORMAT.test(relation.name)) {
+                throw new Error(`Relation name "${relation.name}" is invalid. Relation names must match ${DBSetup.VALID_NAME_FORMAT} (letters, numbers and underscore only).`)
+            }
+            if (!DBSetup.VALID_NAME_FORMAT.test(relation.sourceProperty)) {
+                throw new Error(`Relation sourceProperty "${relation.sourceProperty}" is invalid. Property names must match ${DBSetup.VALID_NAME_FORMAT} (letters, numbers and underscore only).`)
+            }
+            if (relation.targetProperty !== undefined && !DBSetup.VALID_NAME_FORMAT.test(relation.targetProperty)) {
+                throw new Error(`Relation targetProperty "${relation.targetProperty}" is invalid. Property names must match ${DBSetup.VALID_NAME_FORMAT} (letters, numbers and underscore only).`)
+            }
+        })
+    }
+
     buildMap() {
+        // -1. 校验所有 entity/relation 的 name（name 会直接进入 SQL，必须先于一切处理）
+        this.validateRecordNames();
+
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();
         
