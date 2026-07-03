@@ -1,5 +1,13 @@
 # 级联 Filtered Entity 实现总结
 
+> **⚠️ 架构更新说明（storage 深度分析报告第二节重构后）**：
+> 本文中所有关于 `__filtered_entities` 持久化标记列的描述已过时。filtered entity 的成员资格
+> 现在是**无状态**的：查询侧靠谓词重写（`resolvedMatchExpression`），事件侧靠变更前后谓词求值
+> 的 diff（`FilteredEntityManager` 的 before 快照 + settle 钩子），不存在任何持久化的成员标记列。
+> merged entity/relation 的 `__{Name}_input_entity` JSON tag 列也已被单一 `__type` 字符串判别列取代。
+> 最新机制见 `src/storage/erstorage/FilteredEntityManager.ts` 与 `src/storage/erstorage/MergedItemProcessor.ts`。
+
+
 ## 任务完成情况
 
 已成功实现了级联 filtered entity 功能，支持从 filtered entity 再派生出新的 filtered entity。

@@ -294,23 +294,31 @@ function processSingleMergedItem<T extends MergedItem>(
     );
 
     refContainer.replace(transformedItem, itemToTransform);
+    let registeredBaseItem: MergedItem = physicalBaseItem;
     if (physicalBaseItem !== transformedItem) {
-        refContainer.add(physicalBaseItem);
-        abstractNames.add(getItemName(physicalBaseItem));
+        // CAUTION RefContainer.add 会克隆传入实例，后续 rebase 必须引用容器中注册的克隆，
+        //  否则图中会残留"同名不同身份"的悬挂引用。
+        registeredBaseItem = refContainer.add(physicalBaseItem) as MergedItem;
+        if (isEntity(transformedItem)) {
+            (transformedItem as EntityInstance).baseEntity = registeredBaseItem as EntityInstance;
+        } else {
+            (transformedItem as RelationInstance).baseRelation = registeredBaseItem as RelationInstance;
+        }
+        abstractNames.add(getItemName(registeredBaseItem));
     }
 
     compiledByName.set(itemName, {
         memberCondition,
         hostedTypes,
-        physicalBaseName: getItemName(physicalBaseItem),
+        physicalBaseName: getItemName(registeredBaseItem),
     });
 
     // 4. 把每个 input 替换成物理 base 上的 filtered item
     //    rootBaseName -> 该 root base 承载的类型集合，用于保持 root base 的可查询性（IS-A 语义）。
     const rootsToRebase = new Map<string, MergedItem>();
     for (const { inputItem, memberCondition: inputCondition, rootToRebase } of inputMemberships) {
-        rebaseAsFilteredItem(getItemName(inputItem), physicalBaseItem, inputCondition, refContainer, isEntityType);
-        if (rootToRebase && getItemName(rootToRebase) !== getItemName(physicalBaseItem)) {
+        rebaseAsFilteredItem(getItemName(inputItem), registeredBaseItem, inputCondition, refContainer, isEntityType);
+        if (rootToRebase && getItemName(rootToRebase) !== getItemName(registeredBaseItem)) {
             rootsToRebase.set(getItemName(rootToRebase), rootToRebase);
         }
     }
@@ -319,7 +327,7 @@ function processSingleMergedItem<T extends MergedItem>(
     //    rebase 为物理 base 上的 filtered item，成员条件就是自己的类型判别（IS-A：包含所有子 input 的记录）。
     for (const [rootName] of rootsToRebase) {
         const rootCondition = MatchExp.atom({ key: MERGED_TYPE_ATTR, value: ['=', rootName] });
-        rebaseAsFilteredItem(rootName, physicalBaseItem, rootCondition, refContainer, isEntityType);
+        rebaseAsFilteredItem(rootName, registeredBaseItem, rootCondition, refContainer, isEntityType);
     }
 }
 

@@ -205,12 +205,26 @@ export class DBSetup {
     
     private currentFilteredEntityName?: string;
     /**
-     * 递归收集所有依赖于给定实体的 filtered entities（包括级联的）
+     * 获取 entity/relation 的有效名字（未命名 relation 使用自动生成名）。
+     */
+    private getItemEffectiveName(item: EntityInstance | RelationInstance): string {
+        if (isRelation(item)) {
+            const relation = item as RelationInstance
+            return relation.name || `${relation.source.name}_${relation.sourceProperty}_${relation.targetProperty}_${relation.target.name}`
+        }
+        return (item as EntityInstance).name
+    }
+    /**
+     * 递归收集所有依赖于给定实体的 filtered entities（包括级联的）。
+     * CAUTION 用名字而不是实例身份比较：merged item 处理阶段会克隆实体图
+     *  （RefContainer.add 会克隆虚拟 base），实例身份在图手术后不可靠，而名字全局唯一。
      */
     private collectAllFilteredEntities(entity: EntityInstance | RelationInstance): (EntityInstance | RelationInstance)[] {
-        const directFiltered = [...this.entities, ...this.relations].filter(e => 
-            (e as any).baseEntity === entity || (e as any).baseRelation === entity
-        );
+        const targetName = this.getItemEffectiveName(entity)
+        const directFiltered = [...this.entities, ...this.relations].filter(e => {
+            const base = (e as any).baseEntity || (e as any).baseRelation
+            return !!base && this.getItemEffectiveName(base) === targetName
+        });
         
         const allFiltered: (EntityInstance | RelationInstance)[] = [...directFiltered];
         

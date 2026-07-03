@@ -79,6 +79,10 @@ export class GlobalCountHandle implements DataBasedComputation {
         } else if (mutationEvent.type === 'delete') {
             const itemMatch = await this.state.isItemMatch.get(mutationEvent.record)
             delta = itemMatch ? -1 : 0
+            // CAUTION delete 事件不一定意味着物理行删除：filtered entity 的成员资格退出事件里，
+            //  底层行仍然存在，必须复位绑定状态，否则记录再次进入（create 事件）时 replace 会读到
+            //  陈旧的 true 导致增量为 0。物理删除场景下行已不存在，setInternal 会安全地忽略。
+            await this.state.isItemMatch.setInternal(mutationEvent.record, false)
         } else if (mutationEvent.type === 'update') {
             const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
             const { oldValue } = await this.state.isItemMatch.replace(mutationEvent.record, newItemMatch)

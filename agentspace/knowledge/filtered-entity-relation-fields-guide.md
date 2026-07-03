@@ -1,5 +1,13 @@
 # Filtered Entity 支持关联实体字段过滤的实现方案
 
+> **⚠️ 架构更新说明（storage 深度分析报告第二节重构后）**：
+> 本文中所有关于 `__filtered_entities` 持久化标记列的描述已过时。filtered entity 的成员资格
+> 现在是**无状态**的：查询侧靠谓词重写（`resolvedMatchExpression`），事件侧靠变更前后谓词求值
+> 的 diff（`FilteredEntityManager` 的 before 快照 + settle 钩子），不存在任何持久化的成员标记列。
+> merged entity/relation 的 `__{Name}_input_entity` JSON tag 列也已被单一 `__type` 字符串判别列取代。
+> 最新机制见 `src/storage/erstorage/FilteredEntityManager.ts` 与 `src/storage/erstorage/MergedItemProcessor.ts`。
+
+
 ## 概述
 
 当前 filtered entity 只支持基于源实体自身字段的过滤条件。本文档提出一个完整的方案，使 filtered entity 能够支持基于关联实体字段的过滤，例如"所有属于技术部门的活跃用户"（其中部门信息存储在关联的 Department 实体中）。

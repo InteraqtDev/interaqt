@@ -75,6 +75,9 @@ export class GlobalAnyHandle implements DataBasedComputation {
             // Get the old match status from state instead of recalculating
             const oldItemMatch = await this.state!.isItemMatch.get(mutationEvent.record)
             delta = oldItemMatch ? -1 : 0
+            // CAUTION delete 事件可能只是 filtered entity 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则记录再次进入时 replace 读到陈旧值导致增量错误。物理删除场景 setInternal 会安全忽略。
+            await this.state!.isItemMatch.setInternal(mutationEvent.record, false)
         } else if (mutationEvent.type === 'update') {
             // 拉取全量的 new record 数据，因为可能关联关系有变化。
             const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({

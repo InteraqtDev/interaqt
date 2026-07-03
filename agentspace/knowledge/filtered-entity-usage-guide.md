@@ -1,5 +1,13 @@
 # Filtered Entity 使用指南
 
+> **⚠️ 架构更新说明（storage 深度分析报告第二节重构后）**：
+> 本文中所有关于 `__filtered_entities` 持久化标记列的描述已过时。filtered entity 的成员资格
+> 现在是**无状态**的：查询侧靠谓词重写（`resolvedMatchExpression`），事件侧靠变更前后谓词求值
+> 的 diff（`FilteredEntityManager` 的 before 快照 + settle 钩子），不存在任何持久化的成员标记列。
+> merged entity/relation 的 `__{Name}_input_entity` JSON tag 列也已被单一 `__type` 字符串判别列取代。
+> 最新机制见 `src/storage/erstorage/FilteredEntityManager.ts` 与 `src/storage/erstorage/MergedItemProcessor.ts`。
+
+
 ## 什么是 Filtered Entity
 
 Filtered Entity 是 interaqt 框架提供的一个强大功能，它允许你创建基于现有实体的条件子集，而无需创建新的数据表。可以将其理解为数据库视图（View）的概念，但具有响应式更新的能力。
