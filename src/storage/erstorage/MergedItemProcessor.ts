@@ -153,16 +153,75 @@ function processSingleMergedItem<T extends MergedItem>(
 
         // 处理 input items。让所有 input item 都是 virtual base item 的 filtered item。
         if (inputItems) {
+            // rootBaseName -> 共享该 root base 的 input 名称集合，用于修复被 input 覆盖的 root base 身份
+            const rootBaseToInputs = new Map<string, string[]>();
             for (const inputItem of inputItems) {
                 processInputItem(
                     inputItem,
                     virtualBaseItem!,
                     inputTypeFieldName,
                     refContainer,
-                    isEntity
+                    isEntity,
+                    rootBaseToInputs
                 );
             }
+
+            // CAUTION 修复 F3：filtered input 的 root base entity（例如 CustomerBase）必须保留自身身份。
+            //  旧实现直接把 root base 的槽位替换成"带 input tag 的 filtered entity"，导致：
+            //  1) 通过 root base 名创建的记录在任何实体里都查不到（黑洞）；
+            //  2) root base 丢失了自己的谓词。
+            //  这里为每个 distinct root base 单独生成一个 filtered entity，成员条件是
+            //  "tag 属于自己或其任一子 input"，从而保持可查询与 IS-A 语义。
+            if (isEntity) {
+                for (const [rootBaseName, inputNames] of rootBaseToInputs) {
+                    rebaseRootBaseEntity(rootBaseName, inputNames, virtualBaseItem as EntityInstance, inputTypeFieldName, refContainer);
+                }
+            }
         }
+    }
+
+/**
+ * 计算 filtered entity 从自身到 root base（不含）的完整谓词，并返回 root base。
+ */
+function collectFilteredEntityChain(inputEntity: EntityInstance): { rootBase: EntityInstance, match: MatchExpressionData | undefined } {
+        let current: EntityInstance = inputEntity;
+        let match: MatchExpressionData | undefined = undefined;
+        while (current.baseEntity) {
+            const currentMatch = (current as any).matchExpression as MatchExpressionData | undefined;
+            if (currentMatch) {
+                match = match ? match.and(currentMatch) : currentMatch;
+            }
+            current = current.baseEntity as EntityInstance;
+        }
+        return { rootBase: current, match };
+}
+
+/**
+ * 为 filtered input 的 root base entity 重新生成 filtered entity，使其保留自身可查询性。
+ */
+function rebaseRootBaseEntity(
+        rootBaseName: string,
+        inputNames: string[],
+        virtualBaseItem: EntityInstance,
+        inputFieldName: string,
+        refContainer: RefContainer
+    ): void {
+        // root base 就是 virtual base 本身时无需处理
+        if (rootBaseName === virtualBaseItem.name) return;
+        const existing = refContainer.getEntityByName(rootBaseName);
+        // root base 未作为独立实体注册（匿名 base）则无需处理
+        if (!existing) return;
+
+        // 成员条件：tag 属于 root base 自己，或其任一子 input（IS-A 语义）
+        const tagNames = [rootBaseName, ...inputNames];
+        const rootFiltered = Entity.clone(existing, true);
+        rootFiltered.name = rootBaseName;
+        rootFiltered.baseEntity = virtualBaseItem;
+        rootFiltered.matchExpression = MatchExp.fromArray(
+            tagNames.map(name => ({ key: inputFieldName, value: ['contains', name] as [string, any] }))
+        );
+        rootFiltered.inputEntities = undefined;
+        refContainer.replace(rootFiltered, existing);
     }
     
 /**
@@ -173,29 +232,82 @@ function processInputItem(
         virtualBaseItem: MergedItem,
         inputTypeFieldName: string,
         refContainer: RefContainer,
-        isEntity: boolean
+        isEntity: boolean,
+        rootBaseToInputs?: Map<string, string[]>
     ): void {
+        if (isEntity) {
+            processInputEntity(
+                inputItem as EntityInstance,
+                virtualBaseItem as EntityInstance,
+                inputTypeFieldName,
+                refContainer,
+                rootBaseToInputs
+            );
+            return;
+        }
+
+        // Relation 处理（保持原有逻辑）
         const [filteredItem, baseItem] = createFilteredItemFromInput(
             inputItem,
             virtualBaseItem,
             inputTypeFieldName
         );
-        
+
         // Relation 特殊处理：检查是否就是 input 本身
-        if (!isEntity && filteredItem === inputItem) {
+        if (filteredItem === inputItem) {
             return;
         }
-        
-        // 获取 base item 的名称
+
         const baseItemName = getItemName(baseItem);
-        
-        // 查找并替换已存在的 item
-        const existingItem = isEntity 
-            ? refContainer.getEntityByName(baseItemName)
-            : refContainer.getRelationByName(baseItemName);
-            
+        const existingItem = refContainer.getRelationByName(baseItemName);
         if (existingItem) {
             refContainer.replace(filteredItem, existingItem);
+        }
+    }
+
+/**
+ * 处理 merged entity 的单个 input entity。
+ * - 普通 input：克隆自身，rebase 到 virtual base，成员条件为 tag contains(自身名)。
+ * - filtered input：rebase input 自身到 virtual base，成员条件为 (自身完整谓词) AND tag contains(自身名)，
+ *   谓词得以保留（修复 F3'）；同时记录其 root base，稍后由 rebaseRootBaseEntity 保留 root base 的可查询性（修复 F3）。
+ */
+function processInputEntity(
+        inputEntity: EntityInstance,
+        virtualBaseItem: EntityInstance,
+        inputFieldName: string,
+        refContainer: RefContainer,
+        rootBaseToInputs?: Map<string, string[]>
+    ): void {
+        const inputName = inputEntity.name;
+        const existing = refContainer.getEntityByName(inputName);
+        if (!existing) return;
+
+        const tagAtom = MatchExp.atom({ key: inputFieldName, value: ['contains', inputName] });
+
+        if (inputEntity.baseEntity) {
+            // filtered input：保留其自身谓词，并直接 rebase 到 virtual base
+            const { rootBase, match } = collectFilteredEntityChain(inputEntity);
+            const filtered = Entity.clone(rootBase, true);
+            filtered.name = inputName;
+            filtered.baseEntity = virtualBaseItem;
+            filtered.matchExpression = match ? match.and(tagAtom) : tagAtom;
+            filtered.inputEntities = undefined;
+            refContainer.replace(filtered, existing);
+
+            // 记录 root base，稍后统一保留其身份
+            if (rootBaseToInputs && rootBase.name !== inputName) {
+                const list = rootBaseToInputs.get(rootBase.name) || [];
+                list.push(inputName);
+                rootBaseToInputs.set(rootBase.name, list);
+            }
+        } else {
+            // 普通 input：克隆自身作为 virtual base 的 filtered entity
+            const filtered = Entity.clone(inputEntity, true);
+            filtered.name = inputName;
+            filtered.baseEntity = virtualBaseItem;
+            filtered.matchExpression = tagAtom;
+            filtered.inputEntities = undefined;
+            refContainer.replace(filtered, existing);
         }
     }
     

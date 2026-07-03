@@ -172,6 +172,9 @@ export class RecordQueryAgent {
      */
     async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = ''): Promise<{ [k: string]: RawEntityData }> {
         const result: { [k: string]: RawEntityData } = {}
+        // CAUTION 没有需要抢夺的三表合一记录时必须直接返回。
+        //  否则下面的 match 为 undefined，会生成 WHERE 1=1 的全表查询，导致每次 create/update 都全表扫描。
+        if (!newEntityData.combinedRecordIdRefs.length) return result
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
         let match: MatchExpressionData | undefined
         // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
@@ -302,7 +305,7 @@ export class RecordQueryAgent {
         return this.creationExecutor.addLinkFromRecord(entity, attribute, entityId, relatedEntityId, attributes, events)
     }
 
-    // 委托给 CreationExecutor
+    // 委托给 CreationExecutor（传播在 CreationExecutor.addLink 内统一处理，覆盖 addLinkFromRecord 等所有入口）
     async addLink(linkName: string, sourceId: string, targetId: string, attributes: RawEntityData = {}, moveSource = false, events?: RecordMutationEvent[]) {
         return this.creationExecutor.addLink(linkName, sourceId, targetId, attributes, moveSource, events)
     }
@@ -310,7 +313,17 @@ export class RecordQueryAgent {
 
     // 委托给 DeletionExecutor
     async unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, reason = '', events?: RecordMutationEvent[]): Promise<Record[]> {
-        return this.deletionExecutor.unlink(linkName, matchExpressionData, moveSource, reason, events)
+        const removedLinks = await this.deletionExecutor.unlink(linkName, matchExpressionData, moveSource, reason, events)
+        // CAUTION 关系解除同样会改变依赖该关系的 filtered entity 的成员资格，逐条传播受影响的两端实体。
+        for (const link of removedLinks) {
+            await this.filteredEntityManager.propagateLinkChange(
+                linkName,
+                link.source?.id,
+                link.target?.id,
+                events
+            )
+        }
+        return removedLinks
     }
 
     /**

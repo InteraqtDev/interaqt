@@ -67,21 +67,46 @@ export class QueryExecutor {
     /**
      * 结构化原始返回结果
      * @param rawReturns 数据库返回的原始结果
-     * @param JSONFields JSON 字段列表
+     * @param recordName 根记录名（用于解析各级路径上的 JSON 字段）
      * @param fieldAliasMap 字段别名映射
      * @returns 结构化的 Record 数组
      */
     private structureRawReturns(
         rawReturns: { [k: string]: unknown }[],
-        JSONFields: string[],
+        recordName: string,
         fieldAliasMap: FieldAliasMap
     ): Record[] {
+        // CAUTION JSON 反序列化必须按完整路径解析字段类型，不能只看根记录的 JSONFields。
+        //  否则关联记录（x:1 JOIN 查出）上的 JSON 字段在 SQLite/MySQL 这类返回字符串的 driver 上不会被解析，
+        //  导致同一 API 在不同 driver 下返回类型不一致。
+        const rootJSONFields = this.map.getRecordInfo(recordName).JSONFields
+        const jsonPathCache = new Map<string, boolean>()
+        const isJSONPath = (attributePath: string[]): boolean => {
+            if (attributePath.length === 1) return rootJSONFields.includes(attributePath[0])
+            const cacheKey = attributePath.join('.')
+            const cached = jsonPathCache.get(cacheKey)
+            if (cached !== undefined) return cached
+            let result = false
+            try {
+                const info = this.map.getInfoByPath([recordName, ...attributePath])
+                if (info && info.isValue) {
+                    const data = info.data as { collection?: boolean, type?: string }
+                    result = !!data.collection || data.type === 'object' || data.type === 'json'
+                }
+            } catch (e) {
+                // 无法解析的路径（例如别名等特殊字段）保持原样返回
+                result = false
+            }
+            jsonPathCache.set(cacheKey, result)
+            return result
+        }
+
         return rawReturns.map(rawReturn => {
             const obj = {}
             Object.entries(rawReturn).forEach(([key, value]) => {
                 // CAUTION 注意这里去掉了最开始的 entityName
                 const attributePath = fieldAliasMap.getPath(key)!.slice(1, Infinity)
-                if (attributePath.length === 1 && JSONFields.includes(attributePath[0]) && typeof value === 'string') {
+                if (typeof value === 'string' && isJSONPath(attributePath)) {
                     value = JSON.parse(value)
                 }
                 if (value !== null) {
@@ -90,6 +115,25 @@ export class QueryExecutor {
             })
             return obj as Record
         })
+    }
+
+    /**
+     * 去除完全相同的原始行（等价于 SQL DISTINCT）
+     * 用于消除 match 中出现 x:n 路径时 LEFT JOIN 产生的 fan-out 重复。
+     * 因为 SELECT 始终包含各级记录的 id，真正不同的记录必然有列差异，所以完全相同的行一定是重复行。
+     */
+    private dedupeIdenticalRows(rawReturns: { [k: string]: unknown }[]): { [k: string]: unknown }[] {
+        if (rawReturns.length < 2) return rawReturns
+        const seen = new Set<string>()
+        const result: { [k: string]: unknown }[] = []
+        for (const row of rawReturns) {
+            // 用稳定的 key 序列化，避免键顺序影响判等
+            const key = JSON.stringify(Object.keys(row).sort().map(k => [k, row[k]]))
+            if (seen.has(key)) continue
+            seen.add(key)
+            result.push(row)
+        }
+        return result
     }
 
     /**
@@ -138,13 +182,20 @@ export class QueryExecutor {
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
         const [querySQL, params, fieldAliasMap] = this.sqlBuilder.buildXToOneFindQuery(entityQuery, '')
-        const supportsForUpdate = this.database.constructor.name !== 'SQLiteDB'
+        // CAUTION 能力判断优先使用 driver 的显式声明，仅在未声明时退回旧的启发式判断（兼容外部 driver）。
+        const supportsForUpdate = this.database.supportsSelectForUpdate ?? (this.database.constructor.name !== 'SQLiteDB')
+        // CAUTION FOR UPDATE 必须限定主表（FOR UPDATE OF <主表别名>）。
+        //  因为 x:1 关联查询使用 LEFT JOIN，PostgreSQL 不允许对 outer join 的可空侧加锁。
         const rawReturns: { [k: string]: unknown }[] = await this.database.query(
-            forUpdate && supportsForUpdate ? `${querySQL}\nFOR UPDATE` : querySQL,
+            forUpdate && supportsForUpdate ? `${querySQL}\nFOR UPDATE OF "${entityQuery.recordName}"` : querySQL,
             params,
             queryName
         )
-        const records = this.structureRawReturns(rawReturns, this.map.getRecordInfo(entityQuery.recordName).JSONFields, fieldAliasMap)
+        // CAUTION 通过 x:n 路径做 match 时，LEFT JOIN 会让同一条根记录产生多行完全相同的结果（fan-out）。
+        //  这里按"整行完全相同"去重（等价于 SQL DISTINCT 的语义）。
+        //  不会误伤合法数据：SELECT 永远包含各级记录（含关系记录）的 id 字段，真正不同的行必然有字段差异。
+        const dedupedRawReturns = this.dedupeIdenticalRows(rawReturns)
+        const records = this.structureRawReturns(dedupedRawReturns, entityQuery.recordName, fieldAliasMap)
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context

@@ -80,53 +80,54 @@ export class FilteredEntityManager {
             const matchAtom = boolExp.data as MatchAtom
             const key = matchAtom.key
             const pathParts = key.split('.')
-            
-            // 如果路径只有一个部分，说明是源实体自身的属性
-            if (pathParts.length === 1) {
-                const existing = dependencies.find(d => d.entityName === entityName && d.path.length === 0)
+
+            const addDependency = (depEntityName: string, depPath: string[], attribute: string) => {
+                const existing = dependencies.find(d =>
+                    d.entityName === depEntityName &&
+                    JSON.stringify(d.path) === JSON.stringify(depPath)
+                )
                 if (existing) {
-                    if (!existing.attributes.includes(pathParts[0])) {
-                        existing.attributes.push(pathParts[0])
+                    if (!existing.attributes.includes(attribute)) {
+                        existing.attributes.push(attribute)
                     }
                 } else {
                     dependencies.push({
-                        entityName,
-                        path: [],
-                        attributes: [pathParts[0]]
+                        entityName: depEntityName,
+                        path: depPath,
+                        attributes: [attribute]
                     })
                 }
+            }
+
+            // 如果路径只有一个部分，说明是源实体自身的属性
+            if (pathParts.length === 1) {
+                addDependency(entityName, [], pathParts[0])
             } else {
-                // 路径包含多个部分，需要解析关联实体
+                // 路径包含多个部分（跨实体过滤）。这里要登记两类依赖：
+                // 1. 末端值属性所在实体的该属性（例如 team.department.budget -> Department.budget）
+                // 2. 路径上"每一段关系"本身。因为关系（link）的建立/解除同样会改变成员资格，
+                //    而之前的实现只登记了末端属性，忽略了关系边，导致关系变更时 filtered entity
+                //    的标记和事件不更新（脏状态）。
                 const fullPath = [entityName].concat(pathParts)
-                
-                // 获取路径中每个节点的信息
-                for (let i = 1; i < fullPath.length - 1; i++) {
-                    const currentPath = fullPath.slice(0, i + 1)
-                    const info = this.map.getInfoByPath(currentPath)
-                    
+
+                // 逐段登记关系依赖：owner 实体的关系属性变化会影响成员资格。
+                // i 对应关系段在 pathParts 中的下标；owner 是该关系所属实体，ownerPath 是从 base 到 owner 的路径。
+                let ownerEntity = entityName
+                for (let i = 0; i < pathParts.length - 1; i++) {
+                    const relationAttr = pathParts[i]
+                    const ownerPath = pathParts.slice(0, i) // 从 base 到 owner 的关系路径
+                    const info = this.map.getInfoByPath(fullPath.slice(0, i + 2))
+                    // 关系段本身作为依赖：owner.relationAttr 变化 -> 需要反查回 base 重新求值
+                    addDependency(ownerEntity, ownerPath, relationAttr)
                     if (info && info.isRecord) {
-                        const depEntityName = info.recordName
-                        const depPath = pathParts.slice(0, i)
-                        const attribute = pathParts[pathParts.length - 1]
-                        
-                        const existing = dependencies.find(d => 
-                            d.entityName === depEntityName && 
-                            JSON.stringify(d.path) === JSON.stringify(depPath)
-                        )
-                        
-                        if (existing) {
-                            if (!existing.attributes.includes(attribute)) {
-                                existing.attributes.push(attribute)
-                            }
-                        } else {
-                            dependencies.push({
-                                entityName: depEntityName,
-                                path: depPath,
-                                attributes: [attribute]
-                            })
-                        }
+                        ownerEntity = info.recordName
                     }
                 }
+
+                // 末端值属性：所在实体是路径倒数第二段指向的实体（即上面循环结束时的 ownerEntity）
+                const valueAttribute = pathParts[pathParts.length - 1]
+                const valuePath = pathParts.slice(0, pathParts.length - 1)
+                addDependency(ownerEntity, valuePath, valueAttribute)
             }
         }
     }
@@ -173,6 +174,17 @@ export class FilteredEntityManager {
             return [{ id: changedRecordId }]
         }
         
+        return this.findSourceRecordsByReversePath(dependency, depInfo, changedRecordId)
+    }
+
+    /**
+     * 根据依赖路径反向查询受影响的源记录（path.length > 0 的跨实体场景）
+     */
+    private async findSourceRecordsByReversePath(
+        dependency: FilteredEntityDependency,
+        depInfo: FilteredEntityDependency['dependencies'][number],
+        changedRecordId: string
+    ): Promise<{ id: string }[]> {
         // 构建反向查询，从变更的实体查找到源实体
         // path 已经是从源实体到目标实体的关系路径
         // 例如：对于 User 依赖 Team.type，path = ['team']
@@ -263,6 +275,36 @@ export class FilteredEntityManager {
         return result;
     }
     
+    /**
+     * 关系（link）建立/解除后，重新评估依赖该关系的 filtered entity。
+     * CAUTION 关系的变化同样会改变成员资格（例如 filter 为 team.type='tech'，用户换了 team）。
+     *  但关系变更不会经过实体的 update/create/delete，所以这里显式在 link 变更处传播。
+     *  依赖 __filtered_entities 标记的幂等性：即使与实体 update 路径重复触发，也只会在标记真正变化时产生一次事件。
+     * @param linkName 关系名
+     * @param sourceId 关系 source 端实体 id
+     * @param targetId 关系 target 端实体 id
+     */
+    async propagateLinkChange(
+        linkName: string,
+        sourceId: string | undefined,
+        targetId: string | undefined,
+        events: RecordMutationEvent[] = []
+    ): Promise<void> {
+        const link = this.map.data.links[linkName]
+        if (!link) return
+        // 虚拟 link（relation 与 entity 之间的）不承载真实关系语义，跳过。
+        if (link.isSourceRelation) return
+
+        // source 端：owner 实体是 sourceRecord，关系属性是 sourceProperty
+        if (sourceId !== undefined && link.sourceRecord && link.sourceProperty) {
+            await this.updateFilteredEntityFlags(link.sourceRecord, sourceId, events, undefined, false, [link.sourceProperty])
+        }
+        // target 端：owner 实体是 targetRecord，关系属性是 targetProperty（可能不存在）
+        if (targetId !== undefined && link.targetRecord && link.targetProperty) {
+            await this.updateFilteredEntityFlags(link.targetRecord, targetId, events, undefined, false, [link.targetProperty])
+        }
+    }
+
     /**
      * 更新记录的 filtered entity 标记（主入口方法）
      */

@@ -255,7 +255,11 @@ export class MatchExp {
         return [fieldValue, fieldParams!]
     }
 
-    buildFieldMatchExpression(p: PlaceholderGen, db?: Database): BoolExp<FieldMatchAtom> | null {
+    // CAUTION fnMatchHandler 必须在遍历原子时"就地"处理函数匹配（EXIST 子查询）。
+    //  因为对于 PostgreSQL 这类使用编号占位符（$1/$2...）的数据库，占位符的分配顺序必须和
+    //  buildWhereClause 收集参数的树序完全一致。如果先给所有值原子分配编号、再回头给 EXIST
+    //  内层子查询分配，EXIST 之后的值原子编号就会和参数数组错位，导致查询结果静默错误。
+    buildFieldMatchExpression(p: PlaceholderGen, db?: Database, fnMatchHandler?: (atomData: FieldMatchAtom) => FieldMatchAtom): BoolExp<FieldMatchAtom> | null {
         if (!this.data) return null
         // 1. 所有 key 要 build 成 field
         // 2. x:n 关系中的 EXIST 要增加查询范围限制，要把 value 中对上层引用也 build 成 field。
@@ -314,27 +318,28 @@ export class MatchExp {
 
                 // CAUTION 函数匹配的情况不管了，因为可能未来涉及到使用 cursor 实现更强的功能，这就涉及到查询计划的修改了。统统扔到上层去做。
                 //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。
+                const handleFnMatch = fnMatchHandler || ((data: FieldMatchAtom) => data)
                 if (!symmetricPaths) {
-                    return {
+                    return handleFnMatch({
                         ...exp.data,
                         namePath,
                         isFunctionMatch: true,
-                    }
+                    })
                 }
 
                 const sourceNamePath = [this.entityName].concat(sourcePath!)
                 const targetNamePath = [this.entityName].concat(targetPath!)
                 assert(sourceNamePath!.length === namePath.length, `symmetric entity match can only be last, ${sourceNamePath} ${namePath}`)
 
-                return BoolExp.atom<FieldMatchAtom>({
+                return BoolExp.atom<FieldMatchAtom>(handleFnMatch({
                     ...exp.data,
                     namePath:sourceNamePath!,
                     isFunctionMatch: true,
-                }).or({
+                })).or(handleFnMatch({
                     ...exp.data,
                     namePath:targetNamePath!,
                     isFunctionMatch: true,
-                })
+                }))
 
             }
         })

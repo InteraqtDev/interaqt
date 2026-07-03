@@ -26,6 +26,8 @@ export class MysqlDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     db!: Connection
+    // MySQL 8.0+ 支持 SELECT ... FOR UPDATE OF <alias>
+    supportsSelectForUpdate = true
     transactionCapability: TransactionCapability = {
         transactions: false,
         isolationLevels: [],
@@ -163,9 +165,10 @@ export class MysqlDB implements Database{
         if (fieldType === 'JSON') {
             if (value[0].toLowerCase() === 'contains') {
                 const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
+                // CAUTION 匹配值必须走参数绑定，不能字符串拼接进 SQL（否则存在 SQL 注入）。
                 return {
-                    fieldValue: `IS NOT NULL AND JSON_CONTAINS(${fieldNameWithQuotes}, '${JSON.stringify(value[1])}', '$')`,
-                    fieldParams: []
+                    fieldValue: `IS NOT NULL AND JSON_CONTAINS(${fieldNameWithQuotes}, ${p()}, '$')`,
+                    fieldParams: [JSON.stringify(value[1])]
                 }
             }
         }
