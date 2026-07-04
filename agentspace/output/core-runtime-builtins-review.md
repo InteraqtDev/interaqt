@@ -3,7 +3,7 @@
 - 日期:2026-07-04
 - 基线 commit:`f6eb89d`(main,detached at `df1a9eb`)
 - 范围:`src/core`、`src/runtime`、`src/builtins` 三个包(约 20,000 行),`src/storage` 仅在追溯问题根因时交叉阅读
-- 方法:三个包并行深度探查 + 人工精读关键执行路径(Controller.dispatch、Scheduler、transaction、ComputationSourceMap、各 computation handle、InteractionCall/ActivityCall)+ **对每个致命判定编写最小复现测试实际运行验证**
+- 方法:三个包并行深度探查 + 人工精读关键执行路径(Controller.dispatch、Scheduler、transaction、ComputationSourceMap、各 computation handle、InteractionCall/ActivityCall)+ **对致命判定编写最小复现测试实际运行验证**(验证覆盖范围与例外见第二节开头)
 - 测试基线:当前全量测试 **1636 passed / 26 skipped,全绿**。下述致命问题均不在现有断言覆盖范围内
 - 复现测试:本次 review 为 F1/F2/F3/F5/F6/F7/F8(a) 编写的复现测试已提交为 `tests/runtime/review-repro-{guards,activity,computations}.spec.ts`(以 `test.fails` 标注,详见第五节)
 
@@ -31,7 +31,7 @@ Controller.dispatch(EventSource, args)
 
 ## 二、致命问题(Fatal)
 
-除 F8(需要真实 PostgreSQL 并发,见该条说明)外,**所有 F 级问题均已由可运行的复现测试实际确认**。复现测试已提交进仓库(`tests/runtime/review-repro-*.spec.ts`),全部用 `test.fails` 标注"断言正确行为、当前必然失败":今天套件保持全绿,任何一个 bug 被修复后对应测试会自动转红提醒移除 `.fails`。
+**每个 F 级条目都至少有一个可运行的复现测试实际确认**,例外与保留精确说明如下:F8(b)(并发 read-modify-write)在真实 PostgreSQL 上未能稳定触发,按观察到的实际行为如实记录于该条;F6 的 5 个子项中,子项 2、5 仅有源码级确认(未编写测试),子项 1、3、4 有测试确认。复现测试已提交进仓库(`tests/runtime/review-repro-*.spec.ts`),全部用 `test.fails` 标注"断言正确行为、当前必然失败":今天套件保持全绿,任何一个 bug 被修复后对应测试会自动转红提醒移除 `.fails`。
 
 > **勘误**:初版报告中的 F4(PropertyCount + callback 双重计数 / computed 属性不触发 / HardDeletion 崩溃)**已在 main 上修复**(commits `0875658`、`06375f0`),`count-callback.spec.ts` 中的 BUG 注释是过期残留——测试断言的是正确值且全部通过。初版报告误读了"测试通过"的含义,该条已撤销,详见第 2.5 节。
 
@@ -63,7 +63,7 @@ storage 的 update 事件 `record` 只包含本次变更的值字段(`src/storag
 - `src/runtime/computations/Count.ts` L86–89(GlobalCount update 分支)
 - `src/runtime/computations/Every.ts` L84–87(GlobalEvery update 分支)
 
-直接把 `mutationEvent.record` 传给用户 callback。callback 若依赖任何**未在本次 update 中出现**的字段,读到 `undefined`,增量 delta 计算错误,且结果被写入 `isItemMatch` bound state,**错误会持久化并污染后续增量**。
+直接把 `mutationEvent.record` 传给用户 callback。callback 若依赖任何**未在本次 update 中出现**的字段,读到 `undefined`,增量 delta 计算错误。错误的 match 结果同时被写入 `isItemMatch` bound state(state 与错误判定自洽),**聚合值将保持错误,直到该记录下一次恰好携带全部相关字段的 update 或一次全量重算才会被纠正**。
 
 **复现已确认(两例)**:callback 为 `t.status === 'active' && t.score > 50`,只 update `status` 字段 → Count 应为 1 实际为 0;Every 应为 true 实际为 false。复现测试:`tests/runtime/review-repro-computations.spec.ts`。
 
@@ -99,7 +99,7 @@ MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.
 
 - **图构建**(L230–240):`Gateway.is(sourceNode)` 检查的是 `_type === 'Gateway'`,但 `sourceNode` 是图节点包装 `{ content, next: [], prev: [], uuid }`,没有 `_type`,恒为 false。于是 GatewayNode 的 `next: []` 数组被 `sourceNode.next = targetNode` 直接覆盖成单节点,**并行分支拓扑丢失**。已核实 `Gateway.is` 实现(`Gateway.ts` L69–70)确认此判断不可能为真。
 - **状态推进**(L96–105):`transferToNext` 会把 GatewayNode 当作普通状态节点写入 `current`,而 `isInteractionAvailable` 只匹配 Interaction/Group 的 uuid,Gateway 的 uuid 永远无法被 dispatch 命中 → **Activity 永久卡死在 Gateway 上**。
-- 另有 L225–226 的 `rawGatewayToNode` map 声明后从未写入(gateway 实际存进了 `rawToNode`,查找侥幸成立),属于同一块代码质量问题的佐证。
+- 另有 `rawGatewayToNode` map(L193 声明,L225–226 读取)从未被写入——gateway 节点实际存进了 `rawToNode`,查找靠第一个 `||` 分支侥幸成立,属于同一块代码质量问题的佐证。
 
 **复现已确认(两例)**,见 `tests/runtime/review-repro-activity.spec.ts`:
 - F5a(状态卡死):`step1 → gateway → step2` 的线性 Activity,完成 step1 后 dispatch step2 → `Error: interaction ... not available`,Activity 永久卡死。
@@ -153,7 +153,7 @@ Activity 路径的 `fullGuardWithUserRef`(`ActivityCall.ts` L340–346)对 `attr
 | S3 | **global dict 变更触发依赖它的 property 计算时全表扫描 `['*']`** | `Scheduler.ts` L451–464 | 对每个依赖该 dict 的 property computation 做 host entity 全表 find 且在事务内,大表下是延迟与锁放大的隐患 |
 | S4 | **`computeOldRecord` 对关联路径返回 `{...newRecord}` 占位** | `Scheduler.ts` L440–446(带 FIXME) | 关联实体变更时 oldRecord 是当前记录副本,依赖 old/new diff 的下游判断(如 membership 变化)可能误判 |
 | S5 | **Property 级聚合在 relation delete 时不复位 per-item bound state** | `Summation.ts` L235–238、`WeightedSummation.ts` L204–207、`Count.ts` L232–242 | Global 路径在 `dd5feef` 中已修复并加了 CAUTION 注释,property 路径行为不对称;filtered relation 成员资格退出后再进入会读到陈旧 state |
-| S6 | **`Controller.addEventListener`/`callbacks` 是死代码** | `Controller.ts` L568、L734–739 | 从未被读取;`agentspace/knowledge/filtered-entity-usage-guide.md` 还在描述该 API。删除或接入 |
+| S6 | **`Controller.addEventListener`/`callbacks` 是死代码** | `Controller.ts` L568、L734–739 | `callbacks` 只写不读;另外 `agentspace/knowledge/filtered-entity-usage-guide.md` L252/256 示例的 `system.addEventListener(recordName, type, cb)` 在 System/MonoSystem 上**根本不存在**(签名也与 Controller 版不同),文档描述的是虚构 API。删除或接入,并修文档 |
 | S7 | **GlobalAverage 对 null 字段的语义**:null 计 0 且计入分母 | `Average.ts` L63–77 | 与 SQL `AVG`(忽略 null)不同,应文档化或改为不计 count |
 | S8 | **manifest/migration log 写入用字符串拼接 SQL** | `MonoSystem.ts` L1323–1331 等 | 目前 value 是框架生成的 hash/JSON,风险低,但属于埋雷,应统一参数化 |
 
