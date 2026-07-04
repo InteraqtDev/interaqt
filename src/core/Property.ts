@@ -1,6 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { PropertyTypes } from './RealDictionary.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { ComputationInstance } from './types.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
@@ -85,6 +85,11 @@ export class Property implements PropertyInstance {
   };
   
   static create(args: PropertyCreateArgs, options?: { uuid?: string }): PropertyInstance {
+    // 强制执行 format 约束：property 名会被用作 SQL 列名/别名，必须严格校验。
+    if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
+      throw new Error(`Property name "${args.name}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+
     const instance = new Property(args, options);
     
     // 检查 uuid 是否重复
@@ -98,25 +103,10 @@ export class Property implements PropertyInstance {
   }
   
   static stringify(instance: PropertyInstance): string {
-    const args: PropertyCreateArgs = {
-      name: instance.name,
-      type: instance.type,
-      collection: instance.collection,
-      
-      
-      defaultValue: instance.defaultValue ? stringifyAttribute(instance.defaultValue) as Function : undefined,
-      computed: instance.computed || undefined
-    };
-    
-    const data: SerializedData<PropertyCreateArgs> = {
-      type: 'Property',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
+  // CAUTION clone 不注册进全局 registry，与 Entity.clone / Relation.clone 语义一致。
   static clone(instance: PropertyInstance, deep: boolean): PropertyInstance {
     const args: PropertyCreateArgs = {
       name: instance.name,
@@ -127,7 +117,7 @@ export class Property implements PropertyInstance {
     if (instance.computed !== undefined) args.computed = instance.computed;
     if (instance.computation !== undefined) args.computation = instance.computation;
     
-    return this.create(args);
+    return new Property(args);
   }
   
     static is(obj: unknown): obj is PropertyInstance {
@@ -140,16 +130,6 @@ export class Property implements PropertyInstance {
   
   static parse(json: string): PropertyInstance {
     const data: SerializedData<PropertyCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.defaultValue === 'string' && raw.defaultValue.startsWith('func::')) {
-      args.defaultValue = new Function('return ' + raw.defaultValue.substring(6))();
-    }
-    if (typeof raw.computed === 'string' && raw.computed.startsWith('func::')) {
-      args.computed = new Function('return ' + raw.computed.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

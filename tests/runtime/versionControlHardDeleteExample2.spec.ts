@@ -58,12 +58,14 @@ describe('Version Control Example with Hard Delete', () => {
     });
 
     // Publish style interaction
+    // styleId carries a SQLite-generated record id, which is a number at runtime
+    // (PayloadItem.type is enforced by checkPayload).
     const PublishStyle = Interaction.create({
       name: 'PublishStyle',
       action: Action.create({ name: 'publishStyle' }),
       payload: Payload.create({
         items: [
-          PayloadItem.create({ name: 'styleId', type: 'string', required: true })
+          PayloadItem.create({ name: 'styleId', type: 'number', required: true })
         ]
       })
     });
@@ -84,7 +86,7 @@ describe('Version Control Example with Hard Delete', () => {
       action: Action.create({ name: 'offlineStyle' }),
       payload: Payload.create({
         items: [
-          PayloadItem.create({ name: 'styleId', type: 'string', required: true })
+          PayloadItem.create({ name: 'styleId', type: 'number', required: true })
         ]
       })
     });

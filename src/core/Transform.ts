@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { ComputationRecord, AttributeQueryData } from './types.js';
 
 const PHASE_BEFORE_ALL = 0
@@ -65,6 +65,11 @@ export class Transform implements TransformInstance {
       collection: false as const,
       required: true as const
     },
+    eventDeps: {
+      instanceType: {} as unknown as {[key: string]: EventDep},
+      collection: false as const,
+      required: false as const
+    },
     attributeQuery: {
       instanceType: {} as unknown as AttributeQueryData,
       collection: false as const,
@@ -91,24 +96,13 @@ export class Transform implements TransformInstance {
   }
   
   static stringify(instance: TransformInstance): string {
-    const args: TransformCreateArgs = {
-      record: stringifyAttribute(instance.record) as ComputationRecord,
-      callback: stringifyAttribute(instance.callback) as Function
-    };
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
-    
-    const data: SerializedData<TransformCreateArgs> = {
-      type: 'Transform',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: TransformInstance, deep: boolean): TransformInstance {
     return this.create({
       record: instance.record,
+      eventDeps: instance.eventDeps,
       attributeQuery: instance.attributeQuery,
       callback: instance.callback
     });
@@ -123,18 +117,7 @@ export class Transform implements TransformInstance {
   }
   
   static parse(json: string): TransformInstance {
-    const data = JSON.parse(json) as SerializedData<{
-      record: ComputationRecord | string;
-      attributeQuery?: AttributeQueryData;
-      callback: Function | string;
-    }>;
-    const args = { ...data.public } as { record: ComputationRecord | string; attributeQuery?: AttributeQueryData; callback: Function | string; };
-    
-    // 反序列化函数
-    if (typeof args.callback === 'string' && args.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + args.callback.substring(6))();
-    }
-    
-    return this.create(args as TransformCreateArgs, data.options);
+    const data = JSON.parse(json) as SerializedData<TransformCreateArgs>;
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

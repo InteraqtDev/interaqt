@@ -234,9 +234,7 @@ export class InteractionGuardError extends Error {
 
 function buildInteractionGuard(interaction: InteractionInstance): (this: Controller, args: InteractionEventArgs) => Promise<void> {
   return async function(this: Controller, args: InteractionEventArgs) {
-    await checkCondition(this, interaction, args);
-    await checkUser(this, interaction, args);
-    await checkPayload(this, interaction, args);
+    await runInteractionGuard(this, interaction, args);
   };
 }
 
@@ -260,6 +258,28 @@ function buildInteractionResolve(interaction: InteractionInstance): (this: Contr
 // Guard checks only need storage access and the ignoreGuard flag; using a structural
 // type keeps them callable from both Controller and the activity runtime wrappers.
 export type GuardController = { system: { storage: any }, ignoreGuard?: boolean }
+
+// isRef user attributives can only be resolved inside an activity, where previously
+// saved refs are available. The activity runtime provides this hook.
+export type CheckUserRefHandle = (attributive: AttributiveInstance) => Promise<boolean> | boolean
+
+export type InteractionGuardOptions = {
+  checkUserRef?: CheckUserRefHandle
+}
+
+// The single guard runner shared by standalone interactions (buildInteractionGuard)
+// and activity-wrapped interactions (ActivityCall.fullGuardWithUserRef), so the two
+// paths cannot drift apart.
+export async function runInteractionGuard(
+  controller: GuardController,
+  interaction: InteractionInstance,
+  args: InteractionEventArgs,
+  options?: InteractionGuardOptions
+): Promise<void> {
+  await checkCondition(controller, interaction, args);
+  await checkUser(controller, interaction, args, options?.checkUserRef);
+  await checkPayload(controller, interaction, args);
+}
 
 export async function checkCondition(controller: GuardController, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (!interaction.conditions) return;
@@ -317,7 +337,7 @@ export async function checkAttributive(controller: GuardController, attributive:
   return result;
 }
 
-async function checkUser(controller: Controller, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
+async function checkUser(controller: GuardController, interaction: InteractionInstance, eventArgs: InteractionEventArgs, checkUserRef?: CheckUserRefHandle) {
   if (!interaction.userAttributives) return;
 
   const userAttributiveCombined = Attributives.is(interaction.userAttributives)
@@ -325,10 +345,14 @@ async function checkUser(controller: Controller, interaction: InteractionInstanc
     : BoolExp.atom<AttributiveInstance>(interaction.userAttributives as AttributiveInstance);
 
   const checkHandle = (attributive: AttributiveInstance) => {
-    // `isRef` means "must be the specific user bound in the activity refs".
-    // A standalone interaction has no activity refs, so evaluating it here would
-    // silently degrade to an unrelated role check — reject the definition instead.
     if (attributive.isRef) {
+      // `isRef` means "must be the specific user bound in the activity refs".
+      // Inside an activity the runtime provides checkUserRef; outside, there are no
+      // refs, so evaluating it would silently degrade to an unrelated role check —
+      // reject the definition instead.
+      if (checkUserRef) {
+        return checkUserRef(attributive);
+      }
       throw new InteractionGuardError(
         `Attributive '${attributive.name ?? '(unnamed)'}' has isRef: true, which can only be checked inside an activity. Use it on an activity interaction, or remove isRef for a standalone interaction.`,
         { type: 'isRef attributive outside activity', checkType: 'user' }
@@ -346,6 +370,16 @@ async function checkUser(controller: Controller, interaction: InteractionInstanc
     });
   }
 }
+
+// Runtime checks for the primitive payload types a PayloadItem can declare.
+// Non-primitive declarations (e.g. 'Entity'/'Relation') are validated through
+// `base`/concept checks below instead.
+const payloadPrimitiveTypeChecks: Record<string, (value: unknown) => boolean> = {
+  string: value => typeof value === 'string',
+  number: value => typeof value === 'number',
+  boolean: value => typeof value === 'boolean',
+  object: value => value !== null && typeof value === 'object',
+};
 
 export async function checkPayload(controller: GuardController, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   const payload = eventArgs.payload || {};
@@ -379,6 +413,20 @@ export async function checkPayload(controller: GuardController, interaction: Int
         `Payload validation failed for field '${payloadDef.name}': data is not array`,
         { type: `${payloadDef.name} data is not array`, checkType: 'payload' }
       );
+    }
+
+    // enforce the declared primitive type: `type: 'string'` must reject objects etc.
+    const primitiveTypeCheck = payloadPrimitiveTypeChecks[payloadDef.type];
+    if (primitiveTypeCheck) {
+      const itemsToCheck = payloadDef.isCollection ? (payloadItem as unknown[]) : [payloadItem];
+      for (const item of itemsToCheck) {
+        if (!primitiveTypeCheck(item)) {
+          throw new InteractionGuardError(
+            `Payload validation failed for field '${payloadDef.name}': expected ${payloadDef.type}, got ${item === null ? 'null' : typeof item}`,
+            { type: `${payloadDef.name} type mismatch`, checkType: 'payload' }
+          );
+        }
+      }
     }
 
     if (payloadDef.isCollection) {

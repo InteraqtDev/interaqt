@@ -652,7 +652,7 @@ import {
   Expression, Inequality, Equation, MathResolver,
 
   // Validation & conditions
-  Attributive, Attributives, DataAttributive, DataAttributives,
+  Attributive, Attributives,
   Condition, Conditions,
 
   // Data policy

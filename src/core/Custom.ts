@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { DataDep } from './Computation.js';
 
 export type CustomConcurrency = 'serializable' | 'atomic-safe';
@@ -162,28 +162,7 @@ export class Custom implements CustomInstance {
   }
   
   static stringify(instance: CustomInstance): string {
-    const args: Record<string, unknown> = {
-      name: instance.name
-    };
-    if (instance.dataDeps !== undefined) args.dataDeps = stringifyAttribute(instance.dataDeps);
-    if (instance.incrementalDataDeps !== undefined) args.incrementalDataDeps = stringifyAttribute(instance.incrementalDataDeps);
-    if (instance.planIncremental !== undefined) args.planIncremental = stringifyAttribute(instance.planIncremental);
-    if (instance.compute !== undefined) args.compute = stringifyAttribute(instance.compute);
-    if (instance.incrementalCompute !== undefined) args.incrementalCompute = stringifyAttribute(instance.incrementalCompute);
-    if (instance.incrementalPatchCompute !== undefined) args.incrementalPatchCompute = stringifyAttribute(instance.incrementalPatchCompute);
-    if (instance.createState !== undefined) args.createState = stringifyAttribute(instance.createState);
-    if (instance.getInitialValue !== undefined) args.getInitialValue = stringifyAttribute(instance.getInitialValue);
-    if (instance.asyncReturn !== undefined) args.asyncReturn = stringifyAttribute(instance.asyncReturn);
-    if (instance.useLastValue !== undefined) args.useLastValue = instance.useLastValue;
-    if (instance.concurrency !== undefined) args.concurrency = instance.concurrency;
-    
-    const data: SerializedData<Record<string, unknown>> = {
-      type: 'Custom',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: CustomInstance, deep: boolean): CustomInstance {
@@ -212,17 +191,7 @@ export class Custom implements CustomInstance {
   }
   
   static parse(json: string): CustomInstance {
-    const data = JSON.parse(json) as SerializedData<Record<string, unknown>>;
-    const args = { ...data.public } as Record<string, unknown>;
-    
-    // 反序列化函数
-    const functionFields = ['compute', 'incrementalCompute', 'incrementalPatchCompute', 'createState', 'getInitialValue', 'asyncReturn', 'planIncremental'];
-    functionFields.forEach(field => {
-      if (typeof args[field] === 'string' && args[field].startsWith('func::')) {
-        args[field] = new Function('return ' + args[field].substring(6))();
-      }
-    });
-    
-    return this.create(args as unknown as CustomCreateArgs, data.options);
+    const data = JSON.parse(json) as SerializedData<CustomCreateArgs>;
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

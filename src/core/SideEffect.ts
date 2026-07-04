@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 export interface SideEffectInstance extends IInstance {
   name: string;
@@ -57,18 +57,7 @@ export class SideEffect implements SideEffectInstance {
   }
   
   static stringify(instance: SideEffectInstance): string {
-    const args: SideEffectCreateArgs = {
-      name: instance.name,
-      handle: stringifyAttribute(instance.handle) as Function
-    };
-    
-    const data: SerializedData<SideEffectCreateArgs> = {
-      type: 'SideEffect',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: SideEffectInstance, deep: boolean): SideEffectInstance {
@@ -88,13 +77,6 @@ export class SideEffect implements SideEffectInstance {
   
   static parse(json: string): SideEffectInstance {
     const data: SerializedData<SideEffectCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.handle === 'string' && raw.handle.startsWith('func::')) {
-      args.handle = new Function('return ' + raw.handle.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

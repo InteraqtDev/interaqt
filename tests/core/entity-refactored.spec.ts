@@ -50,6 +50,8 @@ describe("Entity System Refactored - compatibility test", () => {
       });
 
       const stringified = Property.stringify(prop);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      clearAllInstances(Property);
       const parsed = Property.parse(stringified);
 
       expect(parsed.name).toBe("age");
@@ -231,6 +233,7 @@ describe("Entity System Refactored - compatibility test", () => {
       });
 
       const stringified = Relation.stringify(relation);
+      clearAllInstances(Relation);
       const parsed = Relation.parse(stringified);
 
       expect(parsed.type).toBe("n:n");

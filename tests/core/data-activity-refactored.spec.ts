@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "vitest";
 import { clearAllInstances } from "@core";
 import {
-  DataAttributive, DataPolicy, Activity, ActivityGroup, Transfer,
+  DataPolicy, Activity, ActivityGroup, Transfer,
   Interaction, Gateway, Event, Action
 } from "interaqt";
 
@@ -13,7 +13,7 @@ describe("Data and Activity Classes Refactored", () => {
   beforeEach(() => {
     // 清空实例列表
     clearAllInstances(
-      DataAttributive, DataPolicy,
+      DataPolicy,
       Activity, ActivityGroup, Transfer,
       Interaction, Gateway, Event, Action
     );
@@ -26,41 +26,6 @@ describe("Data and Activity Classes Refactored", () => {
   });
 
   describe("Data Classes", () => {
-    describe("DataAttributive", () => {
-      test("should create data attributive instance", () => {
-        const dataAttr = DataAttributive.create({
-          content: (data: any) => data.timestamp
-        });
-
-        expect(dataAttr.content).toBeDefined();
-        expect(dataAttr.uuid).toBeDefined();
-        expect(dataAttr._type).toBe("DataAttributive");
-      });
-
-      test("should create data attributive with name", () => {
-        const dataAttr = DataAttributive.create({
-          content: (data: any) => new Date(data.timestamp),
-          name: "timestamp"
-        });
-
-        expect(dataAttr.name).toBe("timestamp");
-      });
-
-      test("should stringify and parse data attributive", () => {
-        const original = DataAttributive.create({
-          content: () => Date.now(),
-          name: "currentTime"
-        });
-        
-        const stringified = DataAttributive.stringify(original);
-        const parsed = DataAttributive.parse(stringified);
-
-        expect(parsed.name).toBe("currentTime");
-        expect(parsed.content).toBeDefined();
-        expect(typeof parsed.content).toBe("function");
-      });
-    });
-
     describe("DataPolicy", () => {
       test("should create data policy instance with match", () => {
         const policy = DataPolicy.create({
@@ -251,7 +216,6 @@ describe("Data and Activity Classes Refactored", () => {
 
   describe("Common functionality", () => {
     test("should have isKlass marker", () => {
-      expect(DataAttributive.isKlass).toBe(true);
       expect(DataPolicy.isKlass).toBe(true);
       expect(Activity.isKlass).toBe(true);
       expect(ActivityGroup.isKlass).toBe(true);
@@ -259,7 +223,6 @@ describe("Data and Activity Classes Refactored", () => {
     });
 
     test("should have displayName", () => {
-      expect(DataAttributive.displayName).toBe("DataAttributive");
       expect(DataPolicy.displayName).toBe("DataPolicy");
       expect(Activity.displayName).toBe("Activity");
       expect(ActivityGroup.displayName).toBe("ActivityGroup");
@@ -267,13 +230,11 @@ describe("Data and Activity Classes Refactored", () => {
     });
 
     test("should track instances", () => {
-      const da1 = DataAttributive.create({ content: () => 1 });
       const dp1 = DataPolicy.create({ match: { key: "status", value: ["=", "active"] } });
       const a1 = Activity.create({ name: "A1" });
       const ag1 = ActivityGroup.create({ type: "seq" });
       const t1 = Transfer.create({ name: "t1", source: testInteraction, target: testGateway });
 
-      expect(DataAttributive.instances).toHaveLength(1);
       expect(DataPolicy.instances).toHaveLength(1);
       expect(Activity.instances).toHaveLength(1);
       expect(ActivityGroup.instances).toHaveLength(1);
@@ -281,16 +242,13 @@ describe("Data and Activity Classes Refactored", () => {
     });
 
     test("should use is() for type checking", () => {
-      const dataAttr = DataAttributive.create({ content: () => 1 });
       const dataPolicy = DataPolicy.create({ match: { key: "status", value: ["=", "active"] } });
       const activity = Activity.create({ name: "A" });
       
-      expect(DataAttributive.is(dataAttr)).toBe(true);
-      expect(DataAttributive.is(dataPolicy)).toBe(false);
       expect(DataPolicy.is(dataPolicy)).toBe(true);
       expect(DataPolicy.is(activity)).toBe(false);
       expect(Activity.is(activity)).toBe(true);
-      expect(Activity.is(dataAttr)).toBe(false);
+      expect(Activity.is(dataPolicy)).toBe(false);
     });
 
     test("should prevent duplicate UUIDs", () => {

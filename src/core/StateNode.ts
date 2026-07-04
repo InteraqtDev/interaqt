@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 // StateNode 实例接口
 export interface StateNodeInstance extends IInstance {
@@ -59,18 +60,7 @@ export class StateNode implements StateNodeInstance {
   }
 
   static stringify(instance: StateNodeInstance): string {
-    const args: StateNodeCreateArgs = {
-      name: instance.name
-    };
-    if (instance.computeValue !== undefined) args.computeValue = instance.computeValue;
-    
-    const data: SerializedData<StateNodeCreateArgs> = {
-      type: 'StateNode',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
 
   static clone(instance: StateNodeInstance, deep: boolean): StateNodeInstance {
@@ -92,6 +82,6 @@ export class StateNode implements StateNodeInstance {
 
   static parse(json: string): StateNodeInstance {
     const data: SerializedData<StateNodeCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

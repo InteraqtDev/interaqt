@@ -45,6 +45,8 @@ describe("Core Domain Classes Refactored", () => {
       });
       
       const stringified = Property.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      clearAllInstances(Property);
       const parsed = Property.parse(stringified);
 
       expect(parsed.name).toBe("status");

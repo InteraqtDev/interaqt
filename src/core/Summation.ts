@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData } from './types.js';
 
 export interface SummationInstance extends IInstance {
@@ -45,6 +45,11 @@ export class Summation implements SummationInstance {
       collection: false as const,
       required: true as const
     },
+    property: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
+    },
     direction: {
       type: 'string' as const,
       collection: false as const,
@@ -71,23 +76,13 @@ export class Summation implements SummationInstance {
   }
   
   static stringify(instance: SummationInstance): string {
-    const args: SummationCreateArgs = {
-      record: instance.record,
-      attributeQuery: stringifyAttribute(instance.attributeQuery) as AttributeQueryData
-    };
-    
-    const data: SerializedData<SummationCreateArgs> = {
-      type: 'Summation',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: SummationInstance, deep: boolean): SummationInstance {
     return this.create({
       record: instance.record,
+      property: instance.property,
       direction: instance.direction,
       attributeQuery: instance.attributeQuery
     });
@@ -103,6 +98,6 @@ export class Summation implements SummationInstance {
   
   static parse(json: string): SummationInstance {
     const data: SerializedData<SummationCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData } from './types.js';
 
 export interface AverageInstance extends IInstance {
@@ -45,6 +45,11 @@ export class Average implements AverageInstance {
       collection: false as const,
       required: true as const
     },
+    property: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
+    },
     direction: {
       type: 'string' as const,
       collection: false as const,
@@ -71,23 +76,13 @@ export class Average implements AverageInstance {
   }
   
   static stringify(instance: AverageInstance): string {
-    const args: AverageCreateArgs = {
-      record: instance.record,
-      attributeQuery: stringifyAttribute(instance.attributeQuery) as AttributeQueryData
-    };
-    
-    const data: SerializedData<AverageCreateArgs> = {
-      type: 'Average',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: AverageInstance, deep: boolean): AverageInstance {
     return this.create({
       record: instance.record,
+      property: instance.property,
       direction: instance.direction,
       attributeQuery: instance.attributeQuery
     });
@@ -103,6 +98,6 @@ export class Average implements AverageInstance {
   
   static parse(json: string): AverageInstance {
     const data: SerializedData<AverageCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

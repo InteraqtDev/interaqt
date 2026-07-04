@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { StateNodeInstance } from './StateNode.js';
 import { StateTransferInstance } from './StateTransfer.js';
 
@@ -67,18 +68,7 @@ export class StateMachine implements StateMachineInstance {
   }
   
   static stringify(instance: StateMachineInstance): string {
-    const args: StateMachineCreateArgs = {
-      states: instance.states,
-      transfers: instance.transfers,
-      initialState: instance.initialState
-    };
-    const data: SerializedData<StateMachineCreateArgs> = {
-      type: 'StateMachine',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: StateMachineInstance, deep: boolean): StateMachineInstance {
@@ -99,6 +89,6 @@ export class StateMachine implements StateMachineInstance {
   
   static parse(json: string): StateMachineInstance {
     const data: SerializedData<StateMachineCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

@@ -16,7 +16,7 @@ import type { TransformInstance } from './Transform';
 import type { StateMachineInstance } from './StateMachine';
 import type { RealTimeInstance } from './RealTime';
 import type { DictionaryInstance } from './RealDictionary';
-import { CustomInstance } from './Custom';
+import type { CustomInstance } from './Custom';
 import type { ScopedSequenceInstance } from './ScopedSequence';
 
 export type {
