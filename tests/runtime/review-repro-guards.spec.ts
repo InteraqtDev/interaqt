@@ -1,5 +1,5 @@
 /**
- * Reproduction tests for review findings F1 / F6 / F7
+ * Reproduction tests for review findings F1 / F5 / F6
  * (agentspace/output/core-runtime-builtins-review.md).
  *
  * Every test asserts the CORRECT behavior and is marked `test.fails`:
@@ -53,10 +53,10 @@ describe('F1: checkPayload early return', () => {
     });
 });
 
-describe('F6: guard chain fail-open', () => {
+describe('F5: guard chain fail-open', () => {
     // BUG: checkConcept returns true for any Attributive base without ever
     // calling its content - payload-level attributive checks are a no-op.
-    test.fails('F6-1: payload item with an Attributive base executes the attributive', async () => {
+    test.fails('F5-1: payload item with an Attributive base executes the attributive', async () => {
         const RejectEverything = Attributive.create({
             name: 'RejectEverything',
             content: function () { return false; },
@@ -79,7 +79,7 @@ describe('F6: guard chain fail-open', () => {
 
     // BUG: isRef payloads are only shape-checked ({id}); the referenced record
     // is never verified to exist (or to belong to the declared entity).
-    test.fails('F6-3: isRef payload referencing a nonexistent record is rejected', async () => {
+    test.fails('F5-3: isRef payload referencing a nonexistent record is rejected', async () => {
         const Doc = Entity.create({ name: 'F6Doc', properties: [Property.create({ name: 'title', type: 'string' })] });
         const interaction = Interaction.create({
             name: 'f6IsRef',
@@ -100,7 +100,7 @@ describe('F6: guard chain fail-open', () => {
     // BUG: `if (result === undefined) return true` - an attributive callback
     // that forgets to return grants access (fail-open). Thrown exceptions are
     // fail-closed, undefined is not; the two should be consistent.
-    test.fails('F6-4: attributive callback returning undefined is fail-closed', async () => {
+    test.fails('F5-4: attributive callback returning undefined is fail-closed', async () => {
         const ForgotReturn = Attributive.create({
             name: 'ForgotReturn',
             content: function (this: any, user: any) {
@@ -121,7 +121,7 @@ describe('F6: guard chain fail-open', () => {
     });
 });
 
-describe('F7: isRef attributive on a standalone interaction', () => {
+describe('F6: isRef attributive on a standalone interaction', () => {
     // isRef semantics = "must be the specific user bound in the activity refs".
     // BUG: standalone checkUser has no isRef branch, so the attributive runs
     // as a plain role check (`user.roles.includes('Approver')`). Outside an

@@ -1,6 +1,6 @@
 /**
- * Reproduction tests for review findings F5 (Gateway broken) and
- * F8b/S18 (any-group pruning discarded)
+ * Reproduction tests for review findings F4 (Gateway broken) and
+ * F7(a)/S18 (any-group pruning discarded)
  * (agentspace/output/core-runtime-builtins-review.md).
  *
  * Every test asserts the CORRECT behavior and is marked `test.fails`:
@@ -36,11 +36,11 @@ async function buildActivityController(activity: any) {
     return { controller, system, user, activityManager };
 }
 
-describe('F5: Activity Gateway', () => {
+describe('F4: Activity Gateway', () => {
     // BUG: transferToNext parks the persisted state on the GatewayNode's uuid.
     // isInteractionAvailable only ever matches Interaction/Group uuids, and a
     // Gateway uuid can never be dispatched, so the activity is stuck forever.
-    test.fails('F5a: linear activity with a gateway in the middle can proceed past the gateway', async () => {
+    test.fails('F4a: linear activity with a gateway in the middle can proceed past the gateway', async () => {
         const step1 = makeInteraction('gwStep1');
         const step2 = makeInteraction('gwStep2');
         const gw = Gateway.create({ name: 'gw1' });
@@ -72,7 +72,7 @@ describe('F5: Activity Gateway', () => {
     // (which has no `_type`), so it is always false and `sourceNode.next = targetNode`
     // overwrites the GatewayNode's `next: []` array - only the last outgoing
     // edge survives, destroying fork topology.
-    test.fails('F5b: gateway with two outgoing transfers keeps both edges in the graph', async () => {
+    test.fails('F4b: gateway with two outgoing transfers keeps both edges in the graph', async () => {
         const a = makeInteraction('gwA');
         const b = makeInteraction('gwB');
         const c = makeInteraction('gwC');
@@ -100,7 +100,7 @@ describe('F5: Activity Gateway', () => {
     });
 });
 
-describe('F8b/S18: any-group exclusivity with multi-step branches', () => {
+describe('F7(a)/S18: any-group exclusivity with multi-step branches', () => {
     // BUG: AnyActivityStateNode.onChange returns `{ children: <pruned> }` but
     // nothing consumes the return value, so after one branch of an 'any' group
     // advances, sibling branches remain live. Mutually exclusive branches can
