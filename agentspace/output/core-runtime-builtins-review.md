@@ -25,7 +25,7 @@ Controller.dispatch(EventSource, args)
 
 同步计算的触发机制:每个 Computation 声明 `dataDeps`,`ComputationSourceMapManager` 把它们编译成「(recordName, 事件类型) → computation」的 source map;storage 的每次 mutation 产生 `RecordMutationEvent`,`Scheduler` 在**同一事务内**同步匹配 source map、计算脏记录、执行增量(`incrementalCompute`)或全量(`compute`,强制 SERIALIZABLE)计算并写回,写回又产生新的 mutation 形成级联。异步计算通过 task 记录 + `handleAsyncReturn` 独立事务应用。
 
-分层 `builtins → runtime → storage → core` 基本被遵守(见 M-1 例外)。事务边界、post-commit 副作用隔离、`RequireSerializableRetry` 升级、filtered entity 成员资格 delete 时复位 bound state(`dd5feef` 修复)等近期工作质量较高。
+分层 `builtins → runtime → storage → core` 被遵守(唯一例外 M-1 已修复,见下文)。事务边界、post-commit 副作用隔离、`RequireSerializableRetry` 升级、filtered entity 成员资格 delete 时复位 bound state(`dd5feef` 修复)等近期工作质量较高。
 
 **总体结论:架构和事务模型是健康的。**review 发现的致命问题(增量计算的 partial-record 错误、guard 链 fail-open、Activity 的 Gateway/`any` 组运行时缺陷)均已修复(见文首维护说明);遗留的是下述显著问题与债务清理项。
 
