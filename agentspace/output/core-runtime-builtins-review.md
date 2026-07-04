@@ -4,7 +4,8 @@
 - 基线 commit:`f6eb89d`(main,detached at `df1a9eb`)
 - 范围:`src/core`、`src/runtime`、`src/builtins` 三个包(约 20,000 行),`src/storage` 仅在追溯问题根因时交叉阅读
 - 方法:三个包并行深度探查 + 人工精读关键执行路径(Controller.dispatch、Scheduler、transaction、ComputationSourceMap、各 computation handle、InteractionCall/ActivityCall)+ **对每个致命判定编写最小复现测试实际运行验证**
-- 测试基线:当前全量测试 **1636 passed / 26 skipped,全绿**。下述致命问题均不在现有断言覆盖范围内(部分测试甚至以"验证 bug 存在"的方式把错误行为断言为通过)
+- 测试基线:当前全量测试 **1636 passed / 26 skipped,全绿**。下述致命问题均不在现有断言覆盖范围内
+- 复现测试:本次 review 为 F1/F2/F3/F5/F6/F7/F8(a) 编写的复现测试已提交为 `tests/runtime/review-repro-{guards,activity,computations}.spec.ts`(以 `test.fails` 标注,详见第五节)
 
 ---
 
@@ -24,13 +25,15 @@ Controller.dispatch(EventSource, args)
 
 分层 `builtins → runtime → storage → core` 基本被遵守(见 M-1 例外)。事务边界、post-commit 副作用隔离、`RequireSerializableRetry` 升级、filtered entity 成员资格 delete 时复位 bound state(`dd5feef` 修复)等近期工作质量较高。
 
-**总体结论:架构和事务模型是健康的;致命问题集中在两处 —— (1) 增量计算在"update 事件只携带变更字段"这一事实下的多处错误,(2) builtins 的 guard/校验链存在多个 fail-open 和一个提前 return 的硬 bug。Activity 的 Gateway 支持实际上是坏的。**
+**总体结论:架构和事务模型是健康的;致命问题集中在三处 —— (1) 增量计算在"update 事件只携带变更字段"这一事实下的多处错误,(2) builtins 的 guard/校验链存在多个 fail-open 和一个提前 return 的硬 bug,(3) Activity 运行时:Gateway 支持实际上是坏的,`any` 组的互斥剪枝失效可确定性双花。**
 
 ---
 
 ## 二、致命问题(Fatal)
 
-以下 F1–F4 均由本次 review 编写的最小复现测试**实际运行确认**;F5–F8 由源码逻辑链路确认。
+除 F8(需要真实 PostgreSQL 并发,见该条说明)外,**所有 F 级问题均已由可运行的复现测试实际确认**。复现测试已提交进仓库(`tests/runtime/review-repro-*.spec.ts`),全部用 `test.fails` 标注"断言正确行为、当前必然失败":今天套件保持全绿,任何一个 bug 被修复后对应测试会自动转红提醒移除 `.fails`。
+
+> **勘误**:初版报告中的 F4(PropertyCount + callback 双重计数 / computed 属性不触发 / HardDeletion 崩溃)**已在 main 上修复**(commits `0875658`、`06375f0`),`count-callback.spec.ts` 中的 BUG 注释是过期残留——测试断言的是正确值且全部通过。初版报告误读了"测试通过"的含义,该条已撤销,详见第 2.5 节。
 
 ### F1. `checkPayload` 遇到"缺失的可选字段"时提前 `return`,跳过其后所有校验(含 required)
 
@@ -62,7 +65,7 @@ storage 的 update 事件 `record` 只包含本次变更的值字段(`src/storag
 
 直接把 `mutationEvent.record` 传给用户 callback。callback 若依赖任何**未在本次 update 中出现**的字段,读到 `undefined`,增量 delta 计算错误,且结果被写入 `isItemMatch` bound state,**错误会持久化并污染后续增量**。
 
-**复现已确认(两例)**:callback 为 `t.status === 'active' && t.score > 50`,只 update `status` 字段 → Count 应为 1 实际为 0;Every 应为 true 实际为 false。
+**复现已确认(两例)**:callback 为 `t.status === 'active' && t.score > 50`,只 update `status` 字段 → Count 应为 1 实际为 0;Every 应为 true 实际为 false。复现测试:`tests/runtime/review-repro-computations.spec.ts`。
 
 对比:`Any.ts` L81–90 和 `Summation`/`Average`/`WeightedSummation` 的同路径都已改为先 `findOne` 拉全量(Any 中有明确注释"拉取全量的 new record 数据"),**Count/Every 是被遗漏的两个**。修复方式与 Any 完全一致。
 
@@ -76,19 +79,19 @@ MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.
 
 当 `relatedAttribute` 为 `['students']`(关联实体自身字段更新的常见形态)时,`slice(2)` 得空数组,match key 变成 `'id'` —— 用**学生实体的 id 去匹配关系记录的 id**。两类 id 一旦不一致,`findOne` 返回 `undefined`,下一行 `newRelationWithEntity[this.isSource ? 'target' : 'source']` 抛 `Cannot read properties of undefined (reading 'target')`,**整个 dispatch 事务被 abort**。
 
-**复现已确认**:先创建 3 个学生再建立关系(让关系 id ≠ 实体 id),update 学生 score → `ComputationError: ... Cannot read properties of undefined (reading 'target')`。
+**复现已确认**:先创建 3 个学生再建立关系(让关系 id ≠ 实体 id),update 学生 score → `ComputationError: ... Cannot read properties of undefined (reading 'target')`。复现测试:`tests/runtime/review-repro-computations.spec.ts`。
 
 现有测试 `averageUpdatePath.spec.ts` 恰好在关系 id 与实体 id 巧合相等的场景下通过(每张表各自从 1 开始自增,测试里第一个学生配第一条关系)。`Summation.ts` L242–247 和 `Count.ts` L248–253 有正确的三分支 key 构造逻辑,Average 应复用同一实现(建议抽取共享的 `buildRelationMatchKey`)。
 
-### F4. PropertyCount + callback 生态存在系统性错误(双重计数 / computed 属性不触发 / HardDeletion 崩溃)
+### F4.(已撤销)PropertyCount + callback 双重计数 / computed 属性不触发 / HardDeletion 崩溃 —— **已在 main 上修复**
 
-仓库中 `tests/runtime/count-callback.spec.ts` 与 `count-hard-deletion.spec.ts` 以"断言错误行为"的方式记录了三个 bug,本次运行确认它们**仍然全部存在**:
+初版报告将此列为致命现存问题,**经重新核实予以撤销**:
 
-1. **双重计数**:创建带 StateMachine 属性的子实体时,先产生 relation create 事件(+1),随后 StateMachine 初始值写入产生 update 事件再次匹配(+1),1 个 child 计成 2、3 个计成 6(`Count.ts` L212–268,create 与 update 两个分支对同一逻辑事件各计一次 delta,`isItemMatchCount.replace` 的去重在 create 用 `relationRecord`、update 用 `newRelationWithEntity` 作为 key,行为不对齐)。
-2. **computed 属性变化不触发重算**:callback 依赖 `isActive`(由 `_status` 派生的 computed 属性)时,mutation event 只含 `_status`,`ComputationSourceMap.shouldTriggerUpdateComputation`(L205–209)按声明的 attributes 过滤后不触发,Count 永久失真。source map 需要把 computed 属性反解为其源字段注册监听,或在文档中明确禁止 callback 依赖 computed 属性并在 setup 时校验报错。
-3. **HardDeletionProperty 与 Count callback 组合**在 relation delete 路径读取 bound state 失败(`count-hard-deletion.spec.ts` 记录的 `TypeError: Cannot read properties of undefined`),且 delete 分支(`Count.ts` L232–242)不像 GlobalCount(L85)那样复位 `isItemMatchCount`,membership 退出后再进入会读到陈旧值。
+- `tests/runtime/count-callback.spec.ts` 与 `count-hard-deletion.spec.ts` 断言的是**正确值**(`toBe(0)`/`toBe(1)`/`toBe(3)`),且当前**全部通过**——即框架行为已正确。
+- 修复对应 commits:`0875658 fix: propagate computed updates to count callbacks`、`06375f0 fix: use record instead of oldRecord in Count delete event handling`,均已在 HEAD 祖先链上。
+- 这两个测试文件头部的大段 "BUG ... This assertion FAILS" 注释是修复前的过期残留,极具误导性(本次 review 的初版判读即被其误导)。**建议清理这些注释**,并把文件更名为常规回归测试。
 
-这三个问题共同指向:**PropertyCount 的 callback 增量路径需要整体重写**,与 Summation/Average 的 per-item bound state 模式对齐,并对"一次 dispatch 内同一 relation 的多个事件"做幂等处理。
+保留的关注点:PropertyCount 的 relation delete 分支(`Count.ts` L232–242)仍不像 GlobalCount(L85)那样在减 delta 后复位 `isItemMatchCount`,filtered relation 成员资格"退出→再进入"场景下有陈旧 state 风险(归入 S5)。
 
 ### F5. Activity Gateway 全链路损坏(图构建 + 状态推进)
 
@@ -97,6 +100,10 @@ MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.
 - **图构建**(L230–240):`Gateway.is(sourceNode)` 检查的是 `_type === 'Gateway'`,但 `sourceNode` 是图节点包装 `{ content, next: [], prev: [], uuid }`,没有 `_type`,恒为 false。于是 GatewayNode 的 `next: []` 数组被 `sourceNode.next = targetNode` 直接覆盖成单节点,**并行分支拓扑丢失**。已核实 `Gateway.is` 实现(`Gateway.ts` L69–70)确认此判断不可能为真。
 - **状态推进**(L96–105):`transferToNext` 会把 GatewayNode 当作普通状态节点写入 `current`,而 `isInteractionAvailable` 只匹配 Interaction/Group 的 uuid,Gateway 的 uuid 永远无法被 dispatch 命中 → **Activity 永久卡死在 Gateway 上**。
 - 另有 L225–226 的 `rawGatewayToNode` map 声明后从未写入(gateway 实际存进了 `rawToNode`,查找侥幸成立),属于同一块代码质量问题的佐证。
+
+**复现已确认(两例)**,见 `tests/runtime/review-repro-activity.spec.ts`:
+- F5a(状态卡死):`step1 → gateway → step2` 的线性 Activity,完成 step1 后 dispatch step2 → `Error: interaction ... not available`,Activity 永久卡死。
+- F5b(拓扑丢失):gateway 两条出边,构图后 `gatewayNode.next` 不是含 2 条边的数组,而是被覆盖成单个节点。
 
 现状:tests 中没有任何"执行经过 Gateway 的 Activity"的运行时测试(仅 core 层的结构测试)。**建议:要么完整实现(gateway 自动跳过 + 并行边),要么在 `Activity.create` 中对含 transfers 指向 Gateway 的定义直接抛"not supported",不要让用户静默得到坏状态机。**
 
@@ -110,15 +117,28 @@ MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.
 4. **回调返回 `undefined` 视为通过**(L277–278、L301–302,`ActivityCall.ts` L408 同):Condition/Attributive 回调若忘写 `return`,静默放行。异常是 fail-closed(catch → false),但 `undefined` 是 fail-open,与之不一致。
 5. **`DerivedConcept.attributive` 分支为死代码**(L401–407):if/else 两个分支完全相同,derived attributive 从不执行。
 
+**复现已确认(1/3/4 三例)**,见 `tests/runtime/review-repro-guards.spec.ts`:
+- F6-1:payload base 为 content 恒返回 `false` 的 Attributive,dispatch 依然成功(attributive 从未执行)。
+- F6-3:`isRef` payload 传不存在的 id `'no-such-id-999'`,guard 放行,dispatch 无错误。
+- F6-4:attributive 回调忘写 `return`(返回 `undefined`),权限检查静默通过。
+
 按项目"explicit control"原则,guard 链应统一 fail-closed:`undefined`、未知类型、无 content 的 attributive 出现在权限位上都应显式报错而非放行。
 
 ### F7. `isRef` Attributive 在独立 Interaction 中语义静默降级
 
 Activity 路径的 `fullGuardWithUserRef`(`ActivityCall.ts` L340–346)对 `attributive.isRef` 走 `checkUserRef`(对比 activity refs 中记录的用户 id);而独立 Interaction 的 `checkUser`(`Interaction.ts` L307–316)**没有 isRef 分支**,`createUserRoleAttributive({ name: 'B', isRef: true })` 会被当成 `user.roles.includes('B')` 的角色检查执行。开发者以为在做"必须是流程中绑定的那个人"的身份校验,实际执行的是完全不同的检查。无 `activityId` 场景下遇到 isRef attributive 应显式抛错(fail-closed)。
 
-### F8. Activity 状态推进无并发控制,可双花
+**复现已确认**,见 `tests/runtime/review-repro-guards.spec.ts`:userAttributives 为 `isRef: true` 的 'Approver',一个恰好持有名为 `'Approver'` 的**角色**的无关用户 dispatch 成功——身份绑定检查被静默降级为角色检查。
 
-`ActivityCall.ts` `checkActivityState`(L318–323)与 `completeInteractionState`(L362–368)是经典 read-modify-write:两个并发 dispatch 可同时通过可用性检查、各自推进并末写胜出。对 `any` 组(如 approve/reject 二选一)意味着**互斥分支可以都被执行**,由 Transform 等下游计算造成的业务副作用无法回收。dispatch 事务默认 READ COMMITTED,不足以阻止这种丢失更新。修复:state 增加版本号做条件 update(CAS),失败抛 `RequireSerializableRetry` 或业务错误。
+### F8. Activity `any` 组互斥性失效:剪枝丢失(确定性复现)+ 并发 read-modify-write(设计缺陷)
+
+本条在复现过程中拆成两个层次:
+
+**(a) 确定性复现 —— `any` 组剪枝结果被丢弃(即 S18 的升级)。** `AnyActivityStateNode.onChange`(`ActivityCall.ts` L416–426)返回 `{ children: <过滤后的分支> }`,但**没有任何调用方消费这个返回值**(基类 `onChange` 返回 void,`transferToNext` L104 不接收)。只要 `any` 组的分支是多步序列,一条分支推进后兄弟分支依然可用——**互斥分支可以被顺序地全部执行完,不需要任何并发**。
+
+**复现已确认**,见 `tests/runtime/review-repro-activity.spec.ts`:`any` 组含 approve1→approve2 与 reject1→reject2 两条两步分支,完成 approve1 后 dispatch reject1、reject2 全部成功,XOR 语义完全失效。这把原 S18 从 significant 升级为 fatal 级别的确定性双花。
+
+**(b) 并发 read-modify-write。** `checkActivityState`(L318–323)与 `completeInteractionState`(L362–368)是经典 read-modify-write,无版本号/CAS。对单步分支的 `any` 组(如 friend-request 的 approve/reject),双花需要两个事务在对方 commit 前完成同一状态快照的读取。**本次在真实 PostgreSQL 16 上用 `Promise.all` 并发 dispatch 未能稳定触发**:观察到的行为是后到者在 `completeInteractionState` 重读时拿到已推进的状态,`findStateNode(uuid)!` 返回 `undefined` 后抛 `TypeError: Cannot read properties of undefined (reading 'complete')`——即当前实现"侥幸"以一个**未处理的 TypeError**(而非清晰的 `ActivityStateError`)挡住了这条竞争路径,且窗口是否可穿越取决于 guard 读与状态写的时序,属于时序运气而非设计保证。结论:(a) 已是确定性 bug 必须修;(b) 的修复(state 版本号条件 update,失败给出明确业务错误)应与 (a) 一起做,顺带消除这个 TypeError。
 
 ---
 
@@ -155,7 +175,7 @@ Activity 路径的 `fullGuardWithUserRef`(`ActivityCall.ts` L340–346)对 `attr
 | # | 问题 | 位置 | 说明 |
 |---|------|------|------|
 | S17 | **`saveUserRefs` 对 `isCollection` payload 取 `.id` 得 undefined** | `ActivityCall.ts` L379–385 | collection 时 `payloadItem` 是数组,`(payloadItem as {id}).id` 为 undefined,refs 被污染;且 `checkUserRef`(L392–396)对数组 refs 用 `===` 比较恒 false。collection itemRef 从未真正工作过 |
-| S18 | **`AnyActivityStateNode.onChange` 返回值被丢弃** | `ActivityCall.ts` L416–426 | `return { children: filter(...) }` 无人消费(基类 `onChange` 返回 void,`transferToNext` 不接收),多步 `any` 分支中一条路径前进后兄弟分支仍可用,违反 XOR 语义 |
+| S18 | **`AnyActivityStateNode.onChange` 返回值被丢弃** | `ActivityCall.ts` L416–426 | 已升级并入 F8(a):确定性双花,见 `review-repro-activity.spec.ts` 复现 |
 | S19 | **`findStateNode` 嵌套 Group 时多取一层 `.current`** | `ActivityCall.ts` L90–95 | `find(child => child.findStateNode(uuid))?.current` 返回的是 seq 的 current 而非命中的 state node,嵌套 group 下 `completeInteraction` 会拿错节点 |
 | S20 | **`PayloadItem.type` 声明了但从不校验** | `checkPayload` 全函数 | runtime 类型检查缺失,`type: 'string'` 传对象也通过 |
 | S21 | **`DataAttributive`/`DataAttributives` 定义并导出但零接入** | `Data.ts` | `retrieveData` 只使用 `dataPolicy.match`,DataAttributive 是悬空 API,要么接入 `GetAction` 的 resolve 链,要么移除 |
@@ -171,32 +191,36 @@ Activity 路径的 `fullGuardWithUserRef`(`ActivityCall.ts` L340–346)对 `attr
 ## 四、修复优先级建议
 
 **P0(安全/正确性,改动小、收益大,建议立即修):**
-1. F1 `checkPayload` 的 `return` → `continue`(一行)+ 补字段顺序回归测试。
+1. F1 `checkPayload` 的 `return` → `continue`(一行)。
 2. F2 GlobalCount/GlobalEvery update 路径改为 findOne 拉全量(照抄 Any 的实现,各约 5 行)。
 3. F3 PropertyAverage 复用 Summation 的 relationMatchKey 三分支逻辑(建议抽公共函数,一并消除三处重复)。
 4. F6 中的 1/2/5(checkConcept 的三处 fail-open,均为局部小改)。
+5. F8(a) `any` 组剪枝:让 `transferToNext` 消费 `onChange` 的返回值或改为 `onChange` 内直接修改 `this.children`。
 
 **P1(需要设计,但属于框架可信度基石):**
-5. F4 PropertyCount callback 增量路径重写(以仓库中现成的 bug 断言测试翻转为验收标准)。
 6. F7 isRef 语义统一 + F6-4 `undefined` fail-closed(可能破坏依赖隐式放行的现有用户,需要 changelog)。
-7. F8 Activity state 乐观锁。
+7. F8(b) Activity state 版本号 CAS,顺带把并发落败路径的 `TypeError` 换成明确错误。
 8. S9 Relation `isTargetReliance` 覆盖修复。
 
 **P2(债务清理):**
 9. F5 Gateway:短期在 create 时禁用并报错,长期决定是否完整实现。
 10. S10/S11/S12 序列化与 registry 一致性(或正式废弃这条管道)。
-11. S1 计算拓扑排序、S3 global-dep 全表扫描、S17–S19 Activity 细节、M-1 分层违规。
-
-**流程建议**:`count-callback.spec.ts` 这类"断言 bug 行为使测试通过"的做法会让全绿的 CI 掩盖已知致命缺陷,建议改用 `test.fails`(vitest 原生支持"预期失败"),修复后测试会自动报红提醒翻转断言。
+11. S1 计算拓扑排序、S3 global-dep 全表扫描、S17/S19 Activity 细节、M-1 分层违规。
+12. 清理 `count-callback.spec.ts` / `count-hard-deletion.spec.ts` 中过期的 BUG 注释(见 F4 勘误)。
 
 ---
 
-## 五、复现测试(核实记录)
+## 五、复现测试
 
-以下测试在本次 review 中编写并实际运行(未提交进仓库),可直接用作修复的验收用例:
+**已提交进仓库**(全部 `test.fails` 标注:断言正确行为、当前必然失败,套件保持全绿;bug 修复后对应测试转红提醒移除 `.fails`):
 
-1. **F1**:payload 定义 `[note(optional), title(required)]`,空 payload dispatch → `error === undefined`(应报 title missing)。
-2. **F2-Count**:callback `status==='active' && score>50`,只 update `status` → count 为 0(应为 1)。
-3. **F2-Every**:同构造 → every 为 false(应为 true)。
-4. **F3**:关系 id 与实体 id 错开后 update 关联实体字段 → `ComputationError ... Cannot read properties of undefined (reading 'target')`。
-5. **F4**:直接运行仓库自带 `tests/runtime/count-callback.spec.ts` 与 `count-hard-deletion.spec.ts`,5+1 个"bug 验证"断言全部通过,确认三个 bug 现存。
+| 文件 | 覆盖 | 内容 |
+|------|------|------|
+| `tests/runtime/review-repro-guards.spec.ts` | F1、F6-1/3/4、F7 | 可选字段提前 return 绕过必填;Attributive base 不执行;isRef 不存在 id 放行;`undefined` fail-open;isRef 降级为角色检查 |
+| `tests/runtime/review-repro-activity.spec.ts` | F5a、F5b、F8(a) | Gateway 卡死;Gateway 出边被覆盖;`any` 组剪枝失效顺序双花 |
+| `tests/runtime/review-repro-computations.spec.ts` | F2×2、F3 | GlobalCount/GlobalEvery partial record;PropertyAverage match key 崩溃 |
+
+**未提交的核实记录**:
+
+- **F8(b) 并发路径**:在本机安装 PostgreSQL 16,用 `Promise.all` 并发 dispatch `any` 组两个互斥分支(附带拉长 guard 与 afterDispatch 窗口的延时),未能稳定穿越竞争窗口:后到者在 `completeInteractionState` 重读时状态已推进,`findStateNode(uuid)!` 为 `undefined`,抛 `TypeError: Cannot read properties of undefined (reading 'complete')` 使 dispatch 回滚。即互斥性目前由一个未处理的 TypeError"侥幸"守住,不是设计保证;确定性的双花走 F8(a) 已复现。
+- **F4 勘误核实**:重跑 `count-callback.spec.ts`(5 个测试)与 `count-hard-deletion.spec.ts`(1 个测试),断言均为正确值且全部通过;`git merge-base --is-ancestor` 确认修复 commits `0875658`、`06375f0` 在 HEAD 祖先链上。
