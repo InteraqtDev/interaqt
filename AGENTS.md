@@ -1,0 +1,376 @@
+# interaqt — Agent Instructions
+
+Cross-tool instructions for AI coding agents working on this repository.
+
+## Project overview
+
+interaqt is a **declarative reactive backend framework**. Its core idea is to build applications by declaring what data *is*, not by operating on data directly.
+
+### Core principle
+
+> **Stop thinking "how to operate on data"; start thinking "what data essentially is."**
+
+### Tech stack
+
+- **Backend**: interaqt (reactive backend framework)
+- **Frontend** (in example apps): Axii (reactive frontend framework)
+- **Language**: TypeScript (strict mode)
+- **Paradigm**: declarative + reactive programming
+- **Databases**: SQLite, PostgreSQL, MySQL, PGLite
+
+This repo is the **framework itself**, not an application. Every change has amplified downstream impact — prefer elegance, consistency, minimal surface area, and clear error messages.
+
+## Quick orientation
+
+### 1. Mindset shift (most important)
+
+#### ❌ Imperative thinking
+
+```typescript
+// Wrong: thinking about "how to operate on data"
+async function likePost(userId, postId) {
+  await createLike(userId, postId);
+  const count = await countLikes(postId);
+  await updatePost(postId, { likeCount: count });
+}
+```
+
+#### ✅ interaqt declarative thinking
+
+```typescript
+// Right: declare "what data is"
+const Post = Entity.create({
+  name: 'Post',
+  properties: [
+    Property.create({
+      name: 'likeCount',
+      // likeCount IS the number of like relationships
+      computation: Count.create({ record: LikeRelation })
+    })
+  ]
+});
+```
+
+### 2. Concept flow
+
+```
+User dispatches Interaction (e.g. LikePost)
+    ↓
+System creates/updates Relation (Like)
+    ↓
+Related Computation runs (e.g. Count)
+    ↓
+Property updates automatically (likeCount +1)
+    ↓
+Data persists to database
+```
+
+## Repository layout
+
+```
+interaqt/
+├── src/
+│   ├── core/       # Entity, Relation, Property, computations (pure definitions)
+│   ├── runtime/    # Controller, System, Scheduler, computation handles
+│   ├── storage/    # ERStorage, SQL builder, query executors
+│   ├── builtins/   # Interaction, Activity, User
+│   └── drivers/    # SQLite, PostgreSQL, PGLite, MySQL
+├── tests/          # Vitest specs (runtime, storage, core)
+├── agent/          # Example-app generation workflow and usage guides
+├── agentspace/     # Framework knowledge base and agent prompts
+└── .cursor/rules/  # Cursor-specific layered rules
+```
+
+Dependency direction: `builtins → runtime → storage → core`. Never import upward.
+
+## Core concepts
+
+### Entity
+
+The basic unit of data, e.g. `User`, `Post`, `Comment`.
+
+```typescript
+const User = Entity.create({
+  name: 'User',
+  properties: [
+    Property.create({ name: 'name', type: 'string' }),
+    Property.create({ name: 'email', type: 'string' })
+  ]
+});
+```
+
+### Relation
+
+Connections between entities; relations are special entities.
+
+```typescript
+// The system auto-detects symmetric relations when
+// source === target and sourceProperty === targetProperty
+const Friendship = Relation.create({
+  source: User,
+  sourceProperty: 'friends',
+  target: User,
+  targetProperty: 'friends',
+  type: 'n:n'
+});
+```
+
+### Interaction
+
+User-triggered events — the **only source** of data changes in the system.
+
+```typescript
+const CreatePost = Interaction.create({
+  name: 'CreatePost',
+  action: Action.create({ name: 'createPost' }),
+  payload: Payload.create({
+    items: [
+      PayloadItem.create({ name: 'title', type: 'string' }),
+      PayloadItem.create({ name: 'content', type: 'string' })
+    ]
+  })
+});
+```
+
+### Computation
+
+Values derived automatically from other data:
+
+- **Count** — count records
+- **WeightedSummation** — weighted sum
+- **Every / Any** — boolean conditions
+- **Transform** — custom derivation (creates new records only)
+- **StateMachine** — state transitions in response to interactions
+
+### Activity
+
+An ordered composition of related Interactions for complex workflows.
+
+### Other key types
+
+| Concept | Role |
+|---------|------|
+| **EventSource** | Base for all event-driven triggers |
+| **Controller.dispatch()** | Single entry point for triggering any EventSource |
+| **Property** | Fields on entities, optionally backed by computations |
+
+Flow: `Interaction → Event → Computation → Data`
+
+## Naming and imports
+
+The project name is always **interaqt** (all lowercase). Never InterAQT, interAQT, etc.
+
+```typescript
+import { Entity, Property, Relation, Controller, MonoSystem } from 'interaqt'
+```
+
+Path aliases: `@core`, `@runtime`, `@storage`, `@drivers` (see `tsconfig.json`).
+
+Do **not** import from `@interaqt/runtime`, `InterAQT`, or `interAQT`.
+
+### Naming conventions
+
+- **Entity**: PascalCase, singular (`User`, `Post`)
+- **Relation**: descriptive (`UserFollowUser`, `UserLikePost`)
+- **Interaction**: verb + noun (`CreatePost`, `LikePost`)
+- **Property**: camelCase (`userName`, `postCount`)
+
+## Development conventions
+
+### File organization (application projects)
+
+```
+project/
+├── src/
+│   ├── entities.ts
+│   ├── relations.ts
+│   ├── interactions.ts
+│   ├── activities.ts
+│   └── index.ts
+├── tests/
+└── frontend/          # Axii, if applicable
+```
+
+### Explicit control
+
+Never add implicit behavior, auto-completion, or magic defaults. All behavior must be explicitly declared.
+
+### Klass pattern
+
+Core types use: interface → CreateArgs → `Entity.create(args)` → static registry (`instances`, `isKlass`, `displayName`) → `toData()` / `fromData()`.
+
+### Testing
+
+- Test through **Interactions** (`controller.dispatch`), not direct storage mutations
+- Every Interaction and every computed property should have tests
+- Always specify **attributeQuery** in `storage.find` / `findOne` (use `['*']` for all fields)
+- Use **PGLiteDB** for tests when possible
+- File naming: `*.spec.ts`
+- Do not manually set entity IDs — let the framework generate them
+- Always `await controller.setup(true)` before dispatching
+
+## Common patterns
+
+### Count
+
+```typescript
+Property.create({
+  name: 'followerCount',
+  computation: Count.create({
+    record: Relation.create({ source: '*', target: User })
+  })
+})
+```
+
+### StateMachine
+
+```typescript
+Property.create({
+  name: 'status',
+  computation: StateMachine.create({
+    states: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    transitions: [
+      { from: 'pending', to: 'approved', on: 'ApproveRequest' },
+      { from: 'pending', to: 'rejected', on: 'RejectRequest' }
+    ]
+  })
+})
+```
+
+### Permission control (Attributive)
+
+```typescript
+const DeletePost = Interaction.create({
+  name: 'DeletePost',
+  attributives: {
+    target: (user, { payload }) =>
+      user.id === payload.post.author.id
+  }
+});
+```
+
+## Debugging
+
+### Enable reactive computation logging
+
+```typescript
+controller.system.logger.level = 'debug';
+```
+
+### Inspect mutation events
+
+```typescript
+system.storage.listen((events) => {
+  console.log('Mutation events:', events);
+});
+```
+
+### Assert computed properties in tests
+
+```typescript
+const user = await system.storage.findOne(
+  'User',
+  MatchExp.atom({ key: 'id', value: ['=', userId] }),
+  undefined,
+  ['*']
+);
+expect(user.followerCount).toBe(expectedCount);
+```
+
+## Build and test commands
+
+```bash
+npm install
+npm test                    # all tests
+npm run test:runtime        # runtime layer
+npm run test:storage        # storage layer
+npm run test:core           # core layer
+npm run check               # tsc --noEmit
+npm run build               # vite library build → dist/
+```
+
+## Guidelines and pitfalls
+
+### Avoid imperative thinking
+
+- ❌ Do not think in terms of "steps to update data"
+- ✅ Think in terms of "what data is defined to be"
+
+### Use Interactions correctly
+
+- Interactions declare what users *can* do
+- Do not embed business logic in Interaction handlers
+- Use Computations to react to Interactions
+
+### Performance
+
+- Use FilteredEntity for query optimization
+- Use async computations judiciously
+- Avoid circular computation dependencies
+
+### Database compatibility
+
+- PGLite does not support `GENERATED ALWAYS AS IDENTITY`
+- PGLite requires single-quoted string defaults
+- Avoid dynamic functions in `defaultValue`
+
+### Common pitfalls
+
+1. **Transform** creates new entities/relations; it does not update existing ones — use **StateMachine** for property updates
+2. Always define state nodes before using them in StateMachine
+3. Nested `controller.dispatch()` inside a transaction throws `NestedDispatchError`
+
+## Knowledge base
+
+| Path | Contents |
+|------|----------|
+| `agent/agentspace/knowledge/usage/` | Usage guides (mindset, entities, interactions, computations, testing) |
+| `agent/agentspace/knowledge/generator/` | Code generation guides |
+| `agentspace/knowledge/` | Technical deep-dives (filtered entities, cascade, storage) |
+| `src/storage/USAGE_GUIDE.md` | Storage layer usage |
+| `src/storage/IMPLEMENTATION_DETAILS.md` | Storage internals |
+
+Start with:
+
+1. `agent/agentspace/knowledge/usage/00-mindset-shift.md`
+2. `agent/agentspace/knowledge/usage/01-core-concepts.md`
+
+Test references: `tests/runtime/`, `tests/storage/`
+
+## Development workflow
+
+1. **Understand requirements** — identify entities, relations, and interactions
+2. **Define data model** — create Entities and Relations
+3. **Declare computations** — define derived data with Computation
+4. **Define interactions** — create Interactions and Activities
+5. **Write tests** — cover all behavior through dispatch
+6. **Build frontend** — use Axii in example apps when applicable
+
+## FAQ
+
+**Q: How do I update data?**
+A: Do not think "update" — declare what data *is*. The framework handles propagation.
+
+**Q: How do I handle complex business logic?**
+A: Compose Interactions with Activities; manage state with StateMachine.
+
+**Q: How do I optimize performance?**
+A: Use FilteredEntity, design computations carefully, avoid unnecessary derivations.
+
+**Q: How do I debug reactive computations?**
+A: Enable logging, listen to mutation events, write thorough dispatch-based tests.
+
+## Agent output
+
+Place research documents, design proposals, and analysis reports in `agentspace/output/` by default.
+
+## Tool-specific configuration
+
+- **Cursor**: layered rules in `.cursor/rules/` (architecture, testing, storage, build)
+- **Claude Code**: see `CLAUDE.md` at repo root
+- **Example-app generation**: see `agent/CLAUDE.md`
+
+---
+
+**Remember**: in interaqt you declare what data is; the framework handles all propagation and persistence. Stop thinking "how to operate"; start thinking "what it is."
