@@ -13,6 +13,10 @@ import {
 } from '../../src/builtins/interaction/Interaction.js';
 import { Conditions } from '../../src/builtins/interaction/Conditions.js';
 
+// checkPayload only touches storage for isRef+Entity payloads; these edge-path
+// tests exercise pure validation logic, so a minimal stub is enough.
+const guardControllerStub = { system: { storage: {} } };
+
 describe('checkPayload with concept validation', () => {
     test('checkPayload passes when payload has base Entity and valid object data', async () => {
         const UserEntity = Entity.create({ name: 'PayloadUser' });
@@ -30,7 +34,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { user: { name: 'Alice' } },
             })
@@ -53,7 +57,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { userData: null },
             })
@@ -77,7 +81,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { items: [{ name: 'a' }, { name: 'b' }] },
             })
@@ -98,7 +102,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { unknown: 'value' },
             })
@@ -120,7 +124,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: {},
             })
@@ -142,7 +146,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { items: 'not-an-array' },
             })
@@ -165,7 +169,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { refs: [{ name: 'no-id' }] },
             })
@@ -187,7 +191,7 @@ describe('checkPayload with concept validation', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { ref: { name: 'no-id' } },
             })
@@ -282,7 +286,7 @@ describe('checkPayload with DerivedConcept and ConceptAlias', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { item: { name: 'valid-data' } },
             })
@@ -312,7 +316,7 @@ describe('checkPayload with DerivedConcept and ConceptAlias', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { multi: { data: 'some-value' } },
             })
@@ -341,7 +345,7 @@ describe('checkPayload with DerivedConcept and ConceptAlias', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { noMatch: 42 },
             })
@@ -365,7 +369,7 @@ describe('checkPayload with DerivedConcept and ConceptAlias', () => {
         });
 
         await expect(
-            checkPayload(null, interaction, {
+            checkPayload(guardControllerStub, interaction, {
                 user: { id: 'u1' },
                 payload: { attrItem: { data: 'x' } },
             })

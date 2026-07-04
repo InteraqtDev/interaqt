@@ -1,7 +1,7 @@
 import { ActivityGroup, ActivityGroupInstance, ActivityInstance, TransferInstance } from '../Activity.js';
 import { Attributive, AttributiveInstance, Attributives } from '../Attributive.js';
 import { Gateway, GatewayInstance } from '../Gateway.js';
-import { InteractionInstance, InteractionEventArgs, InteractionGuardError, EventUser, checkCondition as interactionCheckCondition, checkPayload as interactionCheckPayload } from '../Interaction.js';
+import { InteractionInstance, InteractionEventArgs, InteractionGuardError, EventUser, checkCondition as interactionCheckCondition, checkPayload as interactionCheckPayload, checkAttributive } from '../Interaction.js';
 import { assert } from "@runtime";
 import { MatchExp } from "@storage";
 import { BoolExp, ExpressionData } from "@core";
@@ -171,7 +171,10 @@ class ActivityState{
         return this.root.isInteractionAvailable(uuid)
     }
     completeInteraction(uuid: string) {
-        const stateNode = this.root.findStateNode(uuid)!
+        const stateNode = this.root.findStateNode(uuid)
+        if (!stateNode) {
+            throw new Error(`interaction ${uuid} is not available in the current activity state; it may have been completed by a concurrent dispatch`)
+        }
         stateNode.complete()
         return true
     }
@@ -190,19 +193,22 @@ export class ActivityCall {
         this.graph = this.buildGraph(activity)
     }
     buildGraph(activity: ActivityInstance, parentGroup?: ActivityGroupNode) : Seq {
-        const rawGatewayToNode = new Map<GatewayInstance, GatewayNode>()
+        // CAUTION Gateway control flow (fork/join/conditional branching) is not implemented
+        //  by the activity runtime: the state machine tracks a single `current` node per
+        //  sequence, and Gateway definitions carry no branching conditions. Building a graph
+        //  through a Gateway would silently produce a broken state machine (the activity
+        //  gets stuck on a node that can never be dispatched), so reject the definition
+        //  explicitly. Use ActivityGroup (type 'any' / 'every' / 'race') to model branches.
+        if (activity.gateways?.length || activity.transfers?.some(t => Gateway.is(t.source) || Gateway.is(t.target))) {
+            throw new Error(`Activity "${activity.name}" uses Gateway nodes, which are not supported by the activity runtime. Model branching with ActivityGroup (type 'any'/'every'/'race') instead.`)
+        }
+
         const seq = {}
 
         for(let interaction of activity.interactions!) {
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
             this.rawToNode.set(interaction, node)
-        }
-
-        for(let gateway of activity.gateways!) {
-            const node: GatewayNode = { content: gateway, next: [], prev: [], uuid: gateway.uuid }
-            this.uuidToNode.set(gateway.uuid, node)
-            this.rawToNode.set(gateway, node)
         }
 
         for(let group of activity.groups!) {
@@ -222,22 +228,13 @@ export class ActivityCall {
         const candidateEnd = new Set<InteractionInstance|ActivityGroupInstance>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
 
         activity.transfers?.forEach((transfer:TransferInstance) => {
-            const sourceNode = (this.rawToNode.get(transfer.source as InteractionInstance) || rawGatewayToNode.get(transfer.source as InteractionInstance))!
-            const targetNode = (this.rawToNode.get(transfer.target as InteractionInstance) || rawGatewayToNode.get(transfer.target as GatewayInstance))!
+            const sourceNode = this.rawToNode.get(transfer.source as InteractionInstance)! as InteractionNode|ActivityGroupNode
+            const targetNode = this.rawToNode.get(transfer.target as InteractionInstance)! as InteractionNode|ActivityGroupNode
 
             assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstance).name!}`)
-            assert(!!targetNode, `cannot find target ${(transfer.source as InteractionInstance).name!}`)
-            if (Gateway.is(sourceNode)) {
-                (sourceNode as GatewayNode).next.push(targetNode)
-            } else {
-                sourceNode.next = targetNode
-            }
-
-            if (Gateway.is(targetNode)) {
-                (targetNode as GatewayNode).prev.push(sourceNode)
-            } else {
-                targetNode.prev = sourceNode
-            }
+            assert(!!targetNode, `cannot find target ${(transfer.target as InteractionInstance).name!}`)
+            sourceNode.next = targetNode
+            targetNode.prev = sourceNode
 
             candidateEnd.delete(transfer.source as InteractionInstance)
             candidateStart.delete(transfer.target as InteractionInstance)
@@ -262,6 +259,7 @@ export class ActivityCall {
             name: this.activity.name,
             uuid: this.activity.uuid,
             state: initialStateData,
+            stateVersion: 0,
             refs: {},
         })
         return {
@@ -341,7 +339,7 @@ export class ActivityCall {
                 if (attributive.isRef) {
                     return this.checkUserRef(controller, attributive, args.user, args.activityId!)
                 } else {
-                    return checkAttributiveContent(controller, attributive, args, args.user)
+                    return checkAttributive(controller, attributive, args, args.user)
                 }
             }
             const result = await userAttributiveCombined.evaluateAsync(checkHandle)
@@ -360,11 +358,26 @@ export class ActivityCall {
     }
 
     async completeInteractionState(storage: StorageAccess, activityId: string, interactionUuid: string) {
-        const state = new ActivityState(await this.getState(storage, activityId), this)
-        const stateCompleteResult = state.completeInteraction(interactionUuid)
-        assert(stateCompleteResult, 'change activity state failed')
+        const activity = await this.getActivity(storage, activityId)
+        const state = new ActivityState(activity.state, this)
+        state.completeInteraction(interactionUuid)
         const nextState = state.toJSON()
-        await this.setActivity(storage, activityId, { 'state': nextState })
+
+        // CAUTION optimistic concurrency control: state advancement is a read-modify-write,
+        //  so the write is conditioned on the version we read. A concurrent dispatch that
+        //  advanced the state in between makes this update match zero rows — fail with a
+        //  clear error (aborting this transaction) instead of silently losing an update.
+        const currentVersion = activity.stateVersion ?? 0
+        const match = MatchExp.atom({ key: 'id', value: ['=', activityId] })
+            .and({ key: 'stateVersion', value: ['=', currentVersion] })
+        const updated = await storage.system.storage.update(
+            ActivityCall.ACTIVITY_RECORD,
+            match,
+            { state: nextState, stateVersion: currentVersion + 1 }
+        )
+        if (!updated || (Array.isArray(updated) && updated.length === 0)) {
+            throw new Error(`activity ${activityId} state was modified concurrently while completing interaction ${interactionUuid}; the dispatch has been aborted and can be retried`)
+        }
     }
 
     async saveUserRefs(storage: StorageAccess, activityId: string, interaction: InteractionInstance, interactionEventArgs: InteractionEventArgs) {
@@ -397,31 +410,23 @@ export class ActivityCall {
 }
 
 
-async function checkAttributiveContent(controller: StorageAccess, attributive: AttributiveInstance, eventArgs: InteractionEventArgs, target: any): Promise<boolean> {
-    if ((attributive as any).content) {
-        let result
-        try {
-            result = await (attributive as any).content.call(controller, target, eventArgs)
-        } catch (_e) {
-            result = false
-        }
-        if (result === undefined) return true
-        return result
-    }
-    return true
-}
-
-
 class AnyActivityStateNode extends InteractionState{
     onChange(childPrevUUID: string, childNextUUID? : string) {
         if (this.graph.isStartNode(childPrevUUID)) {
             if (childNextUUID) {
-                return {
-                    children: this.children!.filter(childSeq => childSeq.current?.node!.uuid === childNextUUID)
-                }
+                // 'any' is an exclusive choice: once one branch advances past its head,
+                // the sibling branches must be pruned so they can no longer be dispatched.
+                this.children = this.children!.filter(childSeq => childSeq.current?.node!.uuid === childNextUUID)
             } else {
+                // single-step branch completed: the whole group completes immediately
                 this.complete()
+                return
             }
+        }
+        // multi-step branch: after pruning, the group completes when the surviving
+        // branch runs to its end.
+        if (this.isGroupCompleted()) {
+            this.complete()
         }
     }
 }

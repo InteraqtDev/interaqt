@@ -368,7 +368,8 @@ describe('condition checks', () => {
             const incompleteCondition = Condition.create({
                 name: 'incompleteCondition',
                 content: async function(this: Controller, event: any) {
-                    // Returns undefined - framework treats as true (passes)
+                    // Returns undefined - fail-closed: guard callbacks must
+                    // explicitly return a boolean
                     return undefined as any
                 }
             })
@@ -389,11 +390,15 @@ describe('condition checks', () => {
 
             const user = await system.storage.create('User', { name: 'TestUser' })
 
-            // Framework treats undefined as true (condition passes)
+            // fail-closed: undefined is rejected with a clear message instead of
+            // silently passing the guard
             const result = await controller.dispatch(IncompleteInteraction, {
                 user: user
             })
-            expect(result.error).toBeUndefined()
+            expect(result.error).toBeDefined()
+            const conditionError = result.error as ConditionError
+            expect(conditionError.type).toBe('condition check failed')
+            expect(conditionError.error.error).toContain('returned undefined')
         })
     })
 })

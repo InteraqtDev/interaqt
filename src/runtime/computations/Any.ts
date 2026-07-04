@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Any } from "@core";
 import { Controller } from "../Controller.js";
 import { AnyInstance, RelationInstance } from "@core";
-import { ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { buildRelationSideMatchKey, ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
@@ -219,12 +219,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
             // 关联关系或者关联实体的更新
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。
-            const relationMatchKey = mutationEvent.relatedAttribute[1] === '&' ? 
-                mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
-                (mutationEvent.relatedAttribute.length === 1 ? 
-                    `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
-                    `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
-                )
+            const relationMatchKey = buildRelationSideMatchKey(mutationEvent.relatedAttribute, this.isSource ? 'target' : 'source')
 
             const relationMatch = MatchExp.atom({
                 key: relationMatchKey,
