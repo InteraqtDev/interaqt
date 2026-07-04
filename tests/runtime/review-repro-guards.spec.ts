@@ -1,10 +1,16 @@
 /**
- * Reproduction tests for review findings F1 / F5 / F6
+ * Regression tests for review findings F1 / F5 / F6
  * (agentspace/output/core-runtime-builtins-review.md).
  *
- * Every test asserts the CORRECT behavior and is marked `test.fails`:
- * it passes today because the bug makes the assertion fail. When a bug is
- * fixed, the corresponding test will turn red - remove `.fails` then.
+ * Originally committed as failing-by-design (`test.fails`) reproductions;
+ * the bugs are fixed, so these now assert the correct guard-chain behavior:
+ * - F1: a missing optional payload field must not skip later field checks
+ * - F5: the guard chain is fail-closed (attributive base executes, unknown
+ *   concept types are rejected, isRef payloads must reference existing
+ *   records, undefined callback results are rejected, derived-concept
+ *   attributives execute)
+ * - F6: isRef user attributives are rejected outside an activity instead of
+ *   silently degrading to a role check
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -29,12 +35,8 @@ async function buildController(interaction: any, entities: any[] = []) {
     return { controller, system };
 }
 
-describe('F1: checkPayload early return', () => {
-    // BUG: `if (payloadItem === undefined) return;` in checkPayload should be
-    // `continue`. A missing OPTIONAL field defined before a REQUIRED field
-    // aborts the whole loop, skipping the required check (and every other
-    // check for the remaining fields).
-    test.fails('missing optional field before a required field must not bypass the required check', async () => {
+describe('F1: checkPayload must not stop at a missing optional field', () => {
+    test('missing optional field before a required field must not bypass the required check', async () => {
         const interaction = Interaction.create({
             name: 'f1CreateItem',
             action: Action.create({ name: 'f1CreateItem' }),
@@ -49,21 +51,23 @@ describe('F1: checkPayload early return', () => {
 
         const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: {} });
         expect(res.error).toBeTruthy();
+
+        // providing the required field (still omitting the optional one) passes
+        const ok = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { title: 'hello' } });
+        expect(ok.error).toBeUndefined();
         await system.destroy();
     });
 });
 
-describe('F5: guard chain fail-open', () => {
-    // BUG: checkConcept returns true for any Attributive base without ever
-    // calling its content - payload-level attributive checks are a no-op.
-    test.fails('F5-1: payload item with an Attributive base executes the attributive', async () => {
+describe('F5: guard chain is fail-closed', () => {
+    test('F5-1: payload item with an Attributive base executes the attributive', async () => {
         const RejectEverything = Attributive.create({
             name: 'RejectEverything',
             content: function () { return false; },
         });
         const interaction = Interaction.create({
-            name: 'f6AttributiveBase',
-            action: Action.create({ name: 'f6AttributiveBase' }),
+            name: 'f5AttributiveBase',
+            action: Action.create({ name: 'f5AttributiveBase' }),
             payload: Payload.create({
                 items: [
                     PayloadItem.create({ name: 'thing', type: 'Entity', base: RejectEverything as any }),
@@ -77,13 +81,49 @@ describe('F5: guard chain fail-open', () => {
         await system.destroy();
     });
 
-    // BUG: isRef payloads are only shape-checked ({id}); the referenced record
-    // is never verified to exist (or to belong to the declared entity).
-    test.fails('F5-3: isRef payload referencing a nonexistent record is rejected', async () => {
-        const Doc = Entity.create({ name: 'F6Doc', properties: [Property.create({ name: 'title', type: 'string' })] });
+    test('F5-1b: payload item with an accepting Attributive base passes', async () => {
+        const AcceptEverything = Attributive.create({
+            name: 'AcceptEverything',
+            content: function () { return true; },
+        });
         const interaction = Interaction.create({
-            name: 'f6IsRef',
-            action: Action.create({ name: 'f6IsRef' }),
+            name: 'f5AttributiveBaseOk',
+            action: Action.create({ name: 'f5AttributiveBaseOk' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({ name: 'thing', type: 'Entity', base: AcceptEverything as any }),
+                ],
+            }),
+        });
+        const { controller, system } = await buildController(interaction);
+
+        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { thing: { foo: 1 } } });
+        expect(res.error).toBeUndefined();
+        await system.destroy();
+    });
+
+    test('F5-2: unknown concept type as payload base is rejected instead of silently passing', async () => {
+        const interaction = Interaction.create({
+            name: 'f5UnknownConcept',
+            action: Action.create({ name: 'f5UnknownConcept' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({ name: 'thing', type: 'Entity', base: { name: 'NotAConcept' } as any }),
+                ],
+            }),
+        });
+        const { controller, system } = await buildController(interaction);
+
+        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { thing: { foo: 1 } } });
+        expect(res.error).toBeTruthy();
+        await system.destroy();
+    });
+
+    test('F5-3: isRef payload referencing a nonexistent record is rejected', async () => {
+        const Doc = Entity.create({ name: 'F5Doc', properties: [Property.create({ name: 'title', type: 'string' })] });
+        const interaction = Interaction.create({
+            name: 'f5IsRef',
+            action: Action.create({ name: 'f5IsRef' }),
             payload: Payload.create({
                 items: [
                     PayloadItem.create({ name: 'doc', type: 'Entity', base: Doc, isRef: true }),
@@ -92,15 +132,17 @@ describe('F5: guard chain fail-open', () => {
         });
         const { controller, system } = await buildController(interaction, [Doc]);
 
-        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { id: 'no-such-id-999' } } });
-        expect(res.error).toBeTruthy();
+        const bad = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { id: 'no-such-id-999' } } });
+        expect(bad.error).toBeTruthy();
+
+        // an existing record passes
+        const doc = await system.storage.create('F5Doc', { title: 't' });
+        const ok = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { id: doc.id } } });
+        expect(ok.error).toBeUndefined();
         await system.destroy();
     });
 
-    // BUG: `if (result === undefined) return true` - an attributive callback
-    // that forgets to return grants access (fail-open). Thrown exceptions are
-    // fail-closed, undefined is not; the two should be consistent.
-    test.fails('F5-4: attributive callback returning undefined is fail-closed', async () => {
+    test('F5-4: attributive callback returning undefined is fail-closed', async () => {
         const ForgotReturn = Attributive.create({
             name: 'ForgotReturn',
             content: function (this: any, user: any) {
@@ -109,8 +151,8 @@ describe('F5: guard chain fail-open', () => {
             },
         });
         const interaction = Interaction.create({
-            name: 'f6Undefined',
-            action: Action.create({ name: 'f6Undefined' }),
+            name: 'f5Undefined',
+            action: Action.create({ name: 'f5Undefined' }),
             userAttributives: ForgotReturn,
         });
         const { controller, system } = await buildController(interaction);
@@ -119,19 +161,40 @@ describe('F5: guard chain fail-open', () => {
         expect(res.error).toBeTruthy();
         await system.destroy();
     });
+
+    test('F5-5: DerivedConcept attributive is executed, not skipped', async () => {
+        const Doc = Entity.create({ name: 'F5DerivedDoc', properties: [Property.create({ name: 'title', type: 'string' })] });
+        const RejectEverything = Attributive.create({
+            name: 'F5DerivedReject',
+            content: function () { return false; },
+        });
+        const derivedConcept = { name: 'RejectedDoc', base: Doc, attributive: RejectEverything };
+        const interaction = Interaction.create({
+            name: 'f5Derived',
+            action: Action.create({ name: 'f5Derived' }),
+            payload: Payload.create({
+                items: [
+                    PayloadItem.create({ name: 'doc', type: 'Entity', base: derivedConcept as any }),
+                ],
+            }),
+        });
+        const { controller, system } = await buildController(interaction, [Doc]);
+
+        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { title: 't' } } });
+        expect(res.error).toBeTruthy();
+        await system.destroy();
+    });
 });
 
 describe('F6: isRef attributive on a standalone interaction', () => {
     // isRef semantics = "must be the specific user bound in the activity refs".
-    // BUG: standalone checkUser has no isRef branch, so the attributive runs
-    // as a plain role check (`user.roles.includes('Approver')`). Outside an
-    // activity there are no refs, so an isRef attributive should be rejected
-    // (fail-closed) instead of silently changing meaning.
-    test.fails('isRef userAttributive outside an activity must not degrade to a role check', async () => {
+    // A standalone interaction has no refs context, so an isRef attributive must be
+    // rejected (fail-closed) instead of silently degrading into a role check.
+    test('isRef userAttributive outside an activity must not degrade to a role check', async () => {
         const boundApprover = createUserRoleAttributive({ name: 'Approver', isRef: true });
         const interaction = Interaction.create({
-            name: 'f7IsRefStandalone',
-            action: Action.create({ name: 'f7IsRefStandalone' }),
+            name: 'f6IsRefStandalone',
+            action: Action.create({ name: 'f6IsRefStandalone' }),
             userAttributives: boundApprover,
         });
         const { controller, system } = await buildController(interaction);

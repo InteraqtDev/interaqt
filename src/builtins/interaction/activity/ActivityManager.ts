@@ -26,6 +26,13 @@ export const ActivityStateEntity = Entity.create({
             type: 'object',
             collection: false,
         }),
+        // optimistic-lock version for `state`: bumped on every state advancement so a
+        // concurrent read-modify-write can be detected instead of silently lost.
+        Property.create({
+            name: 'stateVersion',
+            type: 'number',
+            collection: false,
+        }),
         Property.create({
             name: 'refs',
             type: 'object',

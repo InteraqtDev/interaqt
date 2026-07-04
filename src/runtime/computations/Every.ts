@@ -1,6 +1,6 @@
 import { PropertyDataContext } from "./Computation.js";
 import { Every } from "@core";
-import { ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EveryInstance, RelationInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./Computation.js";
@@ -82,8 +82,14 @@ export class GlobalEveryHandle implements DataBasedComputation {
             //  否则记录再次进入时 replace 读到陈旧值导致增量错误。物理删除场景 setInternal 会安全忽略。
             await this.state!.isItemMatch.setInternal(mutationEvent.record, false)
         } else if (mutationEvent.type === 'update') {
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-            const { oldValue } = await this.state!.isItemMatch.replace(mutationEvent.record, newItemMatch)
+            // CAUTION update 事件的 record 只携带本次变更的字段，callback 可能依赖其他字段，
+            //  必须拉取全量的 new record 数据再判断（与 Any/Summation 的 update 路径一致）。
+            const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', mutationEvent.record!.id]
+            }), undefined, this.args.attributeQuery)
+            const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps)
+            const { oldValue } = await this.state!.isItemMatch.replace(newRecord, newItemMatch)
             matchDelta = Number(newItemMatch) - Number(!!oldValue)
         }
 
@@ -240,12 +246,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。
         
-            const relationMatchKey = mutationEvent.relatedAttribute[1] === LINK_SYMBOL ? 
-                mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
-                (mutationEvent.relatedAttribute.length ===1 ? 
-                    `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
-                    `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
-                )
+            const relationMatchKey = buildRelationSideMatchKey(mutationEvent.relatedAttribute, this.isSource ? 'target' : 'source')
 
             const relationMatch = MatchExp.atom({
                 key: relationMatchKey,

@@ -4,7 +4,7 @@ import {
     type ComputationRecord
 } from "@core";
 import { Controller } from "../Controller";
-import { AttributeQueryData, MatchExp, MatchExpressionData, ModifierData } from "@storage";
+import { AttributeQueryData, LINK_SYMBOL, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { type ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
 import type { EtityMutationEvent } from "../ComputationSourceMap.js";
 
@@ -277,6 +277,24 @@ export type DataDepEventContext = {
 export function externalDataDepKeys(dataDeps: Record<string, DataDep>, primaryKeys: string[]) {
     const primary = new Set(primaryKeys)
     return Object.keys(dataDeps).filter(key => !primary.has(key))
+}
+
+/**
+ * property 级增量计算处理 update 事件时，需要把「从当前 dataContext 出发」的 relatedAttribute
+ * 转换成「从关联关系出发」的 match key，用 relatedMutationEvent.oldRecord.id 反查关系记录。
+ * 三种形态：
+ *  - relatedAttribute[1] 是 LINK_SYMBOL('&')：更新发生在关系自身的字段上，去掉前两段即为关系上的路径；
+ *  - 长度为 1（如 ['students']）：更新发生在关联实体自身的字段上，用 `source/target.id` 匹配；
+ *  - 更长：更新发生在关联实体再关联的记录上，用 `source/target.<剩余路径>.id` 匹配。
+ */
+export function buildRelationSideMatchKey(relatedAttribute: string[], relationSide: 'source' | 'target'): string {
+    if (relatedAttribute[1] === LINK_SYMBOL) {
+        return relatedAttribute.slice(2).concat('id').join('.')
+    }
+    if (relatedAttribute.length === 1) {
+        return `${relationSide}.id`
+    }
+    return `${relationSide}.${relatedAttribute.slice(1).concat('id').join('.')}`
 }
 
 export function defaultDataBasedIncrementalPlan(

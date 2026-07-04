@@ -1,11 +1,18 @@
 /**
- * Reproduction tests for review findings F4 (Gateway broken) and
- * F7(a)/S18 (any-group pruning discarded)
+ * Regression tests for review findings F4 (Gateway) and F7 (any-group
+ * exclusivity + concurrent state advancement)
  * (agentspace/output/core-runtime-builtins-review.md).
  *
- * Every test asserts the CORRECT behavior and is marked `test.fails`:
- * it passes today because the bug makes the assertion fail. When a bug is
- * fixed, the corresponding test will turn red - remove `.fails` then.
+ * Originally committed as failing-by-design (`test.fails`) reproductions;
+ * the bugs are fixed, so these now assert the correct behavior:
+ * - F4: Gateway control flow is not implemented by the activity runtime, so
+ *   building the runtime state machine for an activity that uses Gateway
+ *   nodes fails loudly instead of silently producing a stuck state machine.
+ * - F7(a): 'any' groups are exclusive - once one branch advances, sibling
+ *   branches are pruned and can no longer be dispatched.
+ * - F7(b): activity state advancement is guarded by an optimistic version
+ *   (stateVersion); a lost-update or an already-advanced state produces a
+ *   clear error instead of an unhandled TypeError.
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -14,6 +21,7 @@ import {
     Interaction, Action, Activity, ActivityGroup, Transfer, Gateway, ActivityManager,
 } from 'interaqt';
 import { SQLiteDB } from '@drivers';
+import { MatchExp } from '@storage';
 
 function makeInteraction(name: string) {
     return Interaction.create({ name, action: Action.create({ name }) });
@@ -36,11 +44,12 @@ async function buildActivityController(activity: any) {
     return { controller, system, user, activityManager };
 }
 
-describe('F4: Activity Gateway', () => {
-    // BUG: transferToNext parks the persisted state on the GatewayNode's uuid.
-    // isInteractionAvailable only ever matches Interaction/Group uuids, and a
-    // Gateway uuid can never be dispatched, so the activity is stuck forever.
-    test.fails('F4a: linear activity with a gateway in the middle can proceed past the gateway', async () => {
+describe('F4: Activity Gateway is explicitly rejected by the runtime', () => {
+    // Gateway definitions carry no branching conditions and the activity state
+    // machine tracks a single current node per sequence, so Gateway control flow
+    // cannot be executed. Building the runtime must fail loudly instead of
+    // producing an activity that gets stuck on an undispatchable node.
+    test('an activity routed through a gateway is rejected when building the runtime', () => {
         const step1 = makeInteraction('gwStep1');
         const step2 = makeInteraction('gwStep2');
         const gw = Gateway.create({ name: 'gw1' });
@@ -53,59 +62,27 @@ describe('F4: Activity Gateway', () => {
                 Transfer.create({ name: 't2', source: gw, target: step2 }),
             ],
         });
-        const { controller, system, user } = await buildActivityController(activity);
 
-        const step1ES = controller.findEventSourceByName('gatewayLinear:gwStep1')!;
-        const step2ES = controller.findEventSourceByName('gatewayLinear:gwStep2')!;
-
-        const res1 = await controller.dispatch(step1ES, { user });
-        expect(res1.error).toBeUndefined();
-        const activityId = res1.context!.activityId as string;
-
-        // Gateway should be transparent: step2 must now be available.
-        const res2 = await controller.dispatch(step2ES, { user, activityId });
-        expect(res2.error).toBeUndefined();
-        await system.destroy();
+        expect(() => new ActivityManager([activity])).toThrowError(/Gateway/);
     });
 
-    // BUG: in buildGraph, `Gateway.is(sourceNode)` tests the graph-node wrapper
-    // (which has no `_type`), so it is always false and `sourceNode.next = targetNode`
-    // overwrites the GatewayNode's `next: []` array - only the last outgoing
-    // edge survives, destroying fork topology.
-    test.fails('F4b: gateway with two outgoing transfers keeps both edges in the graph', async () => {
-        const a = makeInteraction('gwA');
-        const b = makeInteraction('gwB');
-        const c = makeInteraction('gwC');
-        const d = makeInteraction('gwD');
-        const gw = Gateway.create({ name: 'gwFork' });
+    test('a gateway declared but unused in transfers is also rejected', () => {
+        const a = makeInteraction('gwOnlyA');
+        const b = makeInteraction('gwOnlyB');
+        const gw = Gateway.create({ name: 'gwUnusedInTransfers' });
         const activity = Activity.create({
-            name: 'gatewayFork',
-            interactions: [a, b, c, d],
+            name: 'gatewayDeclared',
+            interactions: [a, b],
             gateways: [gw],
-            transfers: [
-                Transfer.create({ name: 'f1', source: a, target: gw }),
-                Transfer.create({ name: 'f2', source: gw, target: b }),
-                Transfer.create({ name: 'f3', source: gw, target: c }),
-                Transfer.create({ name: 'f4', source: b, target: d }),
-                Transfer.create({ name: 'f5', source: c, target: d }),
-            ],
+            transfers: [Transfer.create({ name: 't', source: a, target: b })],
         });
 
-        const activityManager = new ActivityManager([activity]);
-        const activityCall = activityManager.getActivityCallByName('gatewayFork')!;
-        const gwNode = activityCall.getNodeByUUID(gw.uuid)! as any;
-
-        expect(Array.isArray(gwNode.next)).toBe(true);
-        expect(gwNode.next.length).toBe(2);
+        expect(() => new ActivityManager([activity])).toThrowError(/Gateway/);
     });
 });
 
-describe('F7(a)/S18: any-group exclusivity with multi-step branches', () => {
-    // BUG: AnyActivityStateNode.onChange returns `{ children: <pruned> }` but
-    // nothing consumes the return value, so after one branch of an 'any' group
-    // advances, sibling branches remain live. Mutually exclusive branches can
-    // then BOTH be executed to completion - sequentially, no concurrency needed.
-    test.fails('advancing one branch of an any-group prunes the sibling branch', async () => {
+describe('F7(a): any-group exclusivity with multi-step branches', () => {
+    test('advancing one branch of an any-group prunes the sibling branch', async () => {
         const send = makeInteraction('xorSend');
         const approve1 = makeInteraction('xorApprove1');
         const approve2 = makeInteraction('xorApprove2');
@@ -134,11 +111,13 @@ describe('F7(a)/S18: any-group exclusivity with multi-step branches', () => {
             groups: [responseGroup],
             transfers: [Transfer.create({ name: 't', source: send, target: responseGroup })],
         });
-        const { controller, system, user } = await buildActivityController(activity);
+        const { controller, system, user, activityManager } = await buildActivityController(activity);
 
         const sendES = controller.findEventSourceByName('xorActivity:xorSend')!;
         const approve1ES = controller.findEventSourceByName('xorActivity:xorApprove1')!;
+        const approve2ES = controller.findEventSourceByName('xorActivity:xorApprove2')!;
         const reject1ES = controller.findEventSourceByName('xorActivity:xorReject1')!;
+        const reject2ES = controller.findEventSourceByName('xorActivity:xorReject2')!;
 
         const res1 = await controller.dispatch(sendES, { user });
         expect(res1.error).toBeUndefined();
@@ -151,6 +130,95 @@ describe('F7(a)/S18: any-group exclusivity with multi-step branches', () => {
         // 'any' = exclusive choice; the reject branch must no longer be available.
         const res3 = await controller.dispatch(reject1ES, { user, activityId });
         expect(res3.error).toBeTruthy();
+        const res4 = await controller.dispatch(reject2ES, { user, activityId });
+        expect(res4.error).toBeTruthy();
+
+        // The surviving branch keeps working and completes the group (and here the
+        // whole activity, since the group is the tail).
+        const res5 = await controller.dispatch(approve2ES, { user, activityId });
+        expect(res5.error).toBeUndefined();
+
+        const activityCall = activityManager.getActivityCallByName('xorActivity')!;
+        const finalState = await activityCall.getState(controller, activityId);
+        expect(finalState.current).toBeUndefined();
+        await system.destroy();
+    });
+});
+
+describe('F7(b): activity state advancement is version-guarded', () => {
+    async function buildTwoStepActivity() {
+        const step1 = makeInteraction('casStep1');
+        const step2 = makeInteraction('casStep2');
+        const activity = Activity.create({
+            name: 'casActivity',
+            interactions: [step1, step2],
+            transfers: [Transfer.create({ name: 't', source: step1, target: step2 })],
+        });
+        const built = await buildActivityController(activity);
+        return { ...built, step1, step2 };
+    }
+
+    test('stateVersion increments on every state advancement', async () => {
+        const { controller, system, user } = await buildTwoStepActivity();
+        const step1ES = controller.findEventSourceByName('casActivity:casStep1')!;
+        const step2ES = controller.findEventSourceByName('casActivity:casStep2')!;
+
+        const res1 = await controller.dispatch(step1ES, { user });
+        expect(res1.error).toBeUndefined();
+        const activityId = res1.context!.activityId as string;
+
+        let record = await system.storage.findOne('_Activity_',
+            MatchExp.atom({ key: 'id', value: ['=', activityId] }), undefined, ['*']);
+        expect(record.stateVersion).toBe(1);
+
+        const res2 = await controller.dispatch(step2ES, { user, activityId });
+        expect(res2.error).toBeUndefined();
+
+        record = await system.storage.findOne('_Activity_',
+            MatchExp.atom({ key: 'id', value: ['=', activityId] }), undefined, ['*']);
+        expect(record.stateVersion).toBe(2);
+        await system.destroy();
+    });
+
+    test('completing an interaction that is no longer in the state fails with a clear error, not a TypeError', async () => {
+        const { controller, system, user, activityManager, step1 } = await buildTwoStepActivity();
+        const step1ES = controller.findEventSourceByName('casActivity:casStep1')!;
+
+        const res1 = await controller.dispatch(step1ES, { user });
+        expect(res1.error).toBeUndefined();
+        const activityId = res1.context!.activityId as string;
+
+        // Simulate the loser of a concurrent race: the state has already advanced
+        // past step1, so completing it again must produce a clear business error
+        // (previously: `TypeError: Cannot read properties of undefined (reading 'complete')`).
+        const activityCall = activityManager.getActivityCallByName('casActivity')!;
+        await expect(activityCall.completeInteractionState(controller, activityId, step1.uuid))
+            .rejects.toThrowError(/not available/);
+        await system.destroy();
+    });
+
+    test('a concurrent state bump makes the conditional update fail with a clear error', async () => {
+        const { controller, system, user, activityManager, step2 } = await buildTwoStepActivity();
+        const step1ES = controller.findEventSourceByName('casActivity:casStep1')!;
+
+        const res1 = await controller.dispatch(step1ES, { user });
+        expect(res1.error).toBeUndefined();
+        const activityId = res1.context!.activityId as string;
+
+        // Simulate a lost update: another dispatch bumped stateVersion between our
+        // read and write. Intercept getActivity to return a stale version.
+        const activityCall = activityManager.getActivityCallByName('casActivity')!;
+        const originalGetActivity = activityCall.getActivity.bind(activityCall);
+        activityCall.getActivity = async (storage: any, id: string) => {
+            const activity = await originalGetActivity(storage, id);
+            return { ...activity, stateVersion: (activity.stateVersion ?? 0) - 1 };
+        };
+        try {
+            await expect(activityCall.completeInteractionState(controller, activityId, step2.uuid))
+                .rejects.toThrowError(/concurrently/);
+        } finally {
+            activityCall.getActivity = originalGetActivity;
+        }
         await system.destroy();
     });
 });

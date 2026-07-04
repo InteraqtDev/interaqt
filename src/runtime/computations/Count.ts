@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Count } from "@core";
 import { Controller } from "../Controller.js";
 import { CountInstance, EntityInstance, RelationInstance } from "@core";
-import { ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
@@ -84,9 +84,18 @@ export class GlobalCountHandle implements DataBasedComputation {
             //  陈旧的 true 导致增量为 0。物理删除场景下行已不存在，setInternal 会安全地忽略。
             await this.state.isItemMatch.setInternal(mutationEvent.record, false)
         } else if (mutationEvent.type === 'update') {
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-            const { oldValue } = await this.state.isItemMatch.replace(mutationEvent.record, newItemMatch)
-            delta = Number(newItemMatch) - Number(!!oldValue)
+            // 没有 callback 时所有记录恒匹配，字段更新不会改变计数。
+            if (this.args.callback) {
+                // CAUTION update 事件的 record 只携带本次变更的字段，callback 可能依赖其他字段，
+                //  必须拉取全量的 new record 数据再判断（与 Any/Summation 的 update 路径一致）。
+                const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
+                    key: 'id',
+                    value: ['=', mutationEvent.record!.id]
+                }), undefined, this.args.attributeQuery)
+                const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps)
+                const { oldValue } = await this.state.isItemMatch.replace(newRecord, newItemMatch)
+                delta = Number(newItemMatch) - Number(!!oldValue)
+            }
         }
         
         const count = await this.state.count.increment(delta)
@@ -245,12 +254,7 @@ export class PropertyCountHandle implements DataBasedComputation {
             if(this.callback) {
                 // relatedAttribute 是从当前 dataContext 出发
                 // 现在要把匹配的 key 改成从关联关系出发。
-                const relationMatchKey = mutationEvent.relatedAttribute[1] === LINK_SYMBOL ? 
-                    mutationEvent.relatedAttribute.slice(2).concat('id').join('.') : // 从2开始就是关联关系的字段了
-                    (mutationEvent.relatedAttribute.length === 1 ? 
-                        `${this.isSource ? 'target' : 'source'}.id` : // 只有1个字段，就是关联实体的 id
-                        `${this.isSource ? 'target' : 'source'}.${mutationEvent.relatedAttribute.slice(1).concat('id').join('.')}` // 有多个字段，就是关联实体再关联上的字段
-                    )
+                const relationMatchKey = buildRelationSideMatchKey(mutationEvent.relatedAttribute, this.isSource ? 'target' : 'source')
                 
                 const newRelationWithEntity = await this.controller.system.storage.findOne(
                     this.relation.name!, 

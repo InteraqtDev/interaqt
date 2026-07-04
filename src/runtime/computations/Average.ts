@@ -1,7 +1,7 @@
 import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Average, AverageInstance, RelationInstance, EntityInstance } from "@core";
 import { Controller } from "../Controller.js";
-import { ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, RecordBoundState, GlobalBoundState, IncrementalPlan, RecordsDataDep } from "./Computation.js";
+import { buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, RecordBoundState, GlobalBoundState, IncrementalPlan, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
@@ -285,9 +285,11 @@ export class PropertyAverageHandle implements DataBasedComputation {
             countDelta = -1;
         } else if (relatedMutationEvent.type === 'update') {
             // 可能是关系更新也可能是关联实体更新
+            // relatedAttribute 是从当前 dataContext 出发，要转换成从关联关系出发的 match key。
+            const relationMatchKey = buildRelationSideMatchKey(mutationEvent.relatedAttribute, this.isSource ? 'target' : 'source')
             const newRelationWithEntity = await this.controller.system.storage.findOne(
                 this.relation.name!, 
-                MatchExp.atom({key: mutationEvent.relatedAttribute.slice(2).concat('id').join('.'), value: ['=', relatedMutationEvent.oldRecord!.id]}), 
+                MatchExp.atom({key: relationMatchKey, value: ['=', relatedMutationEvent.oldRecord!.id]}), 
                 undefined, 
                 this.relationAttributeQuery
             );

@@ -1,11 +1,14 @@
 /**
- * Reproduction tests for review findings F2 (partial-record callbacks) and
+ * Regression tests for review findings F2 (partial-record callbacks) and
  * F3 (PropertyAverage relation match key)
  * (agentspace/output/core-runtime-builtins-review.md).
  *
- * Every test asserts the CORRECT behavior and is marked `test.fails`:
- * it passes today because the bug makes the assertion fail. When a bug is
- * fixed, the corresponding test will turn red - remove `.fails` then.
+ * Originally committed as failing-by-design (`test.fails`) reproductions;
+ * the bugs are fixed, so these now assert the correct behavior:
+ * - F2: GlobalCount/GlobalEvery re-fetch the full record on update instead of
+ *   passing the partial (changed-fields-only) event record to the callback.
+ * - F3: PropertyAverage builds the relation match key with the shared
+ *   three-way logic instead of always slicing the relatedAttribute path.
  */
 import { describe, expect, test } from 'vitest';
 import {
@@ -16,11 +19,10 @@ import { SQLiteDB } from '@drivers';
 import { MatchExp } from '@storage';
 
 describe('F2: GlobalCount/GlobalEvery incremental update uses the partial update record', () => {
-    // BUG: storage update events carry only the changed fields in `record`.
-    // GlobalCount's update branch passes that partial record straight to the
-    // user callback; any field not part of this update reads as undefined.
-    // (GlobalAny/GlobalSummation already re-fetch the full record - see Any.ts.)
-    test.fails('GlobalCount callback sees the full record on update', async () => {
+    // Storage update events carry only the changed fields in `record`; the
+    // update branch must re-fetch the full record before calling the user
+    // callback (same as GlobalAny/GlobalSummation).
+    test('GlobalCount callback sees the full record on update', async () => {
         const Task = Entity.create({
             name: 'F2CountTask',
             properties: [
@@ -52,7 +54,7 @@ describe('F2: GlobalCount/GlobalEvery incremental update uses the partial update
         await system.destroy();
     });
 
-    test.fails('GlobalEvery callback sees the full record on update', async () => {
+    test('GlobalEvery callback sees the full record on update', async () => {
         const Task = Entity.create({
             name: 'F2EveryTask',
             properties: [
@@ -86,15 +88,11 @@ describe('F2: GlobalCount/GlobalEvery incremental update uses the partial update
 });
 
 describe('F3: PropertyAverage update path builds a wrong relation match key', () => {
-    // BUG: the update branch always uses `relatedAttribute.slice(2)` for the
-    // match key. For a related-entity field update relatedAttribute is
-    // ['students'], so the key becomes plain 'id' - matching the RELATION's id
-    // against the STUDENT's id. Whenever those ids diverge (here: extra
-    // students created before the relation), findOne returns undefined and the
-    // computation throws `Cannot read properties of undefined (reading 'target')`,
-    // aborting the whole dispatch/update transaction.
-    // (Summation/Count build the key correctly with a three-way branch.)
-    test.fails('updating a related entity field recomputes the average when relation ids diverge from entity ids', async () => {
+    // For a related-entity field update relatedAttribute is ['students'], so the
+    // match key must be `target.id` (relation side), not a plain 'id' that would
+    // match the RELATION's id against the STUDENT's id. The scenario creates extra
+    // students first so relation ids diverge from entity ids.
+    test('updating a related entity field recomputes the average when relation ids diverge from entity ids', async () => {
         const Teacher = Entity.create({ name: 'F3Teacher', properties: [Property.create({ name: 'name', type: 'string' })] });
         const Student = Entity.create({ name: 'F3Student', properties: [Property.create({ name: 'score', type: 'number' })] });
         const rel = Relation.create({
