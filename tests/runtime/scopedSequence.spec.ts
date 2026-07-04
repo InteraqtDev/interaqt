@@ -11,6 +11,7 @@ import {
   ScopedSequence,
   type ScopedSequenceMatchAtom,
   UniqueConstraint,
+  clearAllInstances,
   createMigrationManifest,
   readMigrationManifest,
   writeMigrationManifest,
@@ -182,8 +183,11 @@ describe("ScopedSequence", () => {
       },
     });
 
-    const parsed = ScopedSequence.parse(ScopedSequence.stringify(sequence));
+    const json = ScopedSequence.stringify(sequence);
     const cloned = ScopedSequence.clone(sequence);
+    // parse preserves the uuid (identity round-trip), so clear the registry first
+    clearAllInstances(ScopedSequence);
+    const parsed = ScopedSequence.parse(json);
     expect(JSON.parse(ScopedSequence.stringify(parsed)).public.match).toEqual(rawMatch);
     expect(JSON.parse(ScopedSequence.stringify(cloned)).public.match).toEqual(rawMatch);
     expect(JSON.parse(ScopedSequence.stringify(parsed)).public.initializeFrom.match).toEqual(rawMatch);

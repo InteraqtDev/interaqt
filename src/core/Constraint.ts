@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -99,6 +100,11 @@ export class UniqueConstraint implements UniqueConstraintInstance {
   };
 
   static create(args: UniqueConstraintCreateArgs, options?: { uuid?: string }): UniqueConstraintInstance {
+    // 强制执行 nameFormat 约束：constraint 名会进入数据库对象名/错误信息，必须严格校验。
+    if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
+      throw new Error(`UniqueConstraint name "${args.name}" is invalid. Constraint names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+
     const instance = new UniqueConstraint(args, options);
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
@@ -109,20 +115,7 @@ export class UniqueConstraint implements UniqueConstraintInstance {
   }
 
   static stringify(instance: UniqueConstraintInstance): string {
-    const args: UniqueConstraintCreateArgs = {
-      name: instance.name,
-      properties: instance.properties,
-      where: instance.where,
-      violationCode: instance.violationCode,
-    };
-
-    const data: SerializedData<UniqueConstraintCreateArgs> = {
-      type: 'UniqueConstraint',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
 
   static clone(instance: UniqueConstraintInstance): UniqueConstraintInstance {
@@ -144,7 +137,7 @@ export class UniqueConstraint implements UniqueConstraintInstance {
 
   static parse(json: string): UniqueConstraintInstance {
     const data: SerializedData<UniqueConstraintCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 
@@ -187,6 +180,11 @@ export class NonNullConstraint implements NonNullConstraintInstance {
   };
 
   static create(args: NonNullConstraintCreateArgs, options?: { uuid?: string }): NonNullConstraintInstance {
+    // 强制执行 nameFormat 约束：constraint 名会进入数据库对象名/错误信息，必须严格校验。
+    if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
+      throw new Error(`NonNullConstraint name "${args.name}" is invalid. Constraint names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+
     const instance = new NonNullConstraint(args, options);
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
@@ -197,19 +195,7 @@ export class NonNullConstraint implements NonNullConstraintInstance {
   }
 
   static stringify(instance: NonNullConstraintInstance): string {
-    const args: NonNullConstraintCreateArgs = {
-      name: instance.name,
-      property: instance.property,
-      violationCode: instance.violationCode,
-    };
-
-    const data: SerializedData<NonNullConstraintCreateArgs> = {
-      type: 'NonNullConstraint',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
 
   static clone(instance: NonNullConstraintInstance): NonNullConstraintInstance {
@@ -230,6 +216,6 @@ export class NonNullConstraint implements NonNullConstraintInstance {
 
   static parse(json: string): NonNullConstraintInstance {
     const data: SerializedData<NonNullConstraintCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }

@@ -1,6 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import type { AttributeQueryData, DataDependencies } from './types.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 export interface RealTimeInstance extends IInstance {
   attributeQuery?: AttributeQueryData; // AttributeQueryData
@@ -76,20 +76,7 @@ export class RealTime implements RealTimeInstance {
   }
   
   static stringify(instance: RealTimeInstance): string {
-    const args: Partial<RealTimeCreateArgs> = {
-      callback: stringifyAttribute(instance.callback) as Function
-    };
-    if (instance.attributeQuery !== undefined) args.attributeQuery = stringifyAttribute(instance.attributeQuery) as AttributeQueryData;
-    if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
-    if (instance.nextRecomputeTime !== undefined) args.nextRecomputeTime = stringifyAttribute(instance.nextRecomputeTime) as Function;
-    
-    const data: SerializedData<Partial<RealTimeCreateArgs>> = {
-      type: 'RealTimeValue',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: RealTimeInstance, deep: boolean): RealTimeInstance {
@@ -112,22 +99,7 @@ export class RealTime implements RealTimeInstance {
   }
   
   static parse(json: string): RealTimeInstance {
-    const data = JSON.parse(json) as SerializedData<{
-      attributeQuery?: AttributeQueryData;
-      dataDeps?: DataDependencies;
-      nextRecomputeTime?: Function | string;
-      callback: Function | string;
-    }>;
-    const args = { ...data.public };
-    
-    // 反序列化函数
-    if (typeof args.callback === 'string' && args.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + args.callback.substring(6))();
-    }
-    if (typeof args.nextRecomputeTime === 'string' && args.nextRecomputeTime.startsWith('func::')) {
-      args.nextRecomputeTime = new Function('return ' + args.nextRecomputeTime.substring(6))();
-    }
-    
-    return this.create(args as RealTimeCreateArgs, data.options);
+    const data = JSON.parse(json) as SerializedData<RealTimeCreateArgs>;
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

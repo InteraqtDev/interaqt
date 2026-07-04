@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 import { Entity } from './Entity.js';
 import { Relation } from './Relation.js';
@@ -55,6 +55,11 @@ export class Count implements CountInstance {
       collection: false as const,
       required: true as const
     },
+    property: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
+    },
     direction: {
       type: 'string' as const,
       collection: false as const,
@@ -91,21 +96,7 @@ export class Count implements CountInstance {
   }
   
   static stringify(instance: CountInstance): string {
-    const args: CountCreateArgs = {
-      record: instance.record,
-      direction: instance.direction,
-      attributeQuery: instance.attributeQuery ? stringifyAttribute(instance.attributeQuery) as AttributeQueryData : undefined,
-      dataDeps: instance.dataDeps,
-      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : undefined
-    };
-    
-    const data: SerializedData<CountCreateArgs> = {
-      type: 'Count',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: CountInstance, deep: boolean): CountInstance {
@@ -123,6 +114,7 @@ export class Count implements CountInstance {
     
     return this.create({
       record: record,
+      property: instance.property,
       direction: instance.direction,
       callback: instance.callback,
       attributeQuery: instance.attributeQuery,
@@ -140,13 +132,6 @@ export class Count implements CountInstance {
   
   static parse(json: string): CountInstance {
     const data: SerializedData<CountCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.callback === 'string' && raw.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + raw.callback.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }

@@ -1,6 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import type { AttributeQueryData, DataDependencies, EntityInstance, RelationInstance } from './types.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 export interface AnyInstance extends IInstance {
   record?: EntityInstance | RelationInstance;
@@ -94,22 +94,7 @@ export class Any implements AnyInstance {
   }
   
   static stringify(instance: AnyInstance): string {
-    const args: AnyCreateArgs = {
-      record: instance.record,
-      property: instance.property,
-      attributeQuery: instance.attributeQuery,
-      
-      dataDeps: instance.dataDeps,
-      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : (() => {})
-    };
-    
-    const data: SerializedData<AnyCreateArgs> = {
-      type: 'Any',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: AnyInstance, deep: boolean): AnyInstance {
@@ -133,13 +118,6 @@ export class Any implements AnyInstance {
   
   static parse(json: string): AnyInstance {
     const data: SerializedData<AnyCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.callback === 'string' && raw.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + raw.callback.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

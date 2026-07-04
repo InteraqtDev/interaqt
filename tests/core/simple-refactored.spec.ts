@@ -106,6 +106,8 @@ describe("Simple Objects Refactored - compatibility test", () => {
         collection: false
       });
       const stringified = Dictionary.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      clearAllInstances(Dictionary);
       const parsed = Dictionary.parse(stringified);
 
       expect(parsed.name).toBe("TestDict");

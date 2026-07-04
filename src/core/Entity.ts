@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { PropertyInstance } from './Property.js';
 import type { ComputationInstance } from './types.js';
 import type { RelationInstance } from './Relation.js';
@@ -148,26 +149,12 @@ export class Entity implements EntityInstance {
   }
   
   static stringify(instance: EntityInstance): string {
-    const args: EntityCreateArgs = {
-      name: instance.name,
-      properties: instance.properties,
-      computation: instance.computation,
-      baseEntity: instance.baseEntity,
-      matchExpression: instance.matchExpression,
-      inputEntities: instance.inputEntities,
-      commonProperties: instance.commonProperties,
-      constraints: instance.constraints
-    };
-    
-    const data: SerializedData<EntityCreateArgs> = {
-      type: 'Entity',
-      options: { uuid: instance.uuid },
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
+  // CAUTION clone 不注册进全局 registry（Entity.instances）：clone 是运行时图手术
+  //  （RefContainer / Setup）用的工作副本，注册会污染 stringifyAllInstances 输出并跨测试泄漏。
+  //  Relation.clone / Property.clone 遵循同样的语义。
   static clone(instance: EntityInstance, deep: boolean): EntityInstance {
     const args: EntityCreateArgs = {
       name: instance.name,
@@ -180,7 +167,7 @@ export class Entity implements EntityInstance {
       constraints: instance.constraints
     };
     
-    return this.create(args);
+    return new Entity(args);
   }
   
   static is(obj: unknown): obj is EntityInstance {
@@ -210,6 +197,6 @@ export class Entity implements EntityInstance {
   
   static parse(json: string): EntityInstance {
     const data: SerializedData<EntityCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

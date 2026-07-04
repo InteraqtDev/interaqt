@@ -6,7 +6,7 @@ import {
 import { 
   Action, PayloadItem, Payload,
   Interaction, Gateway, Event, Activity, ActivityGroup, Transfer,
-  Condition, Conditions, DataAttributive, DataAttributives,
+  Condition, Conditions,
   DataPolicy, Attributive, Attributives
 } from "interaqt";
 
@@ -231,38 +231,6 @@ describe("Interaction System - createClass functionality", () => {
 
       expect(conditions.content).toBeDefined();
       expect(conditions._type).toBe("Conditions");
-    });
-  });
-
-  describe("DataAttributive", () => {
-    test("should create data attributive", () => {
-      const attr = DataAttributive.create({
-        name: "userId",
-        content: (ctx: any) => ctx.user.id
-      });
-
-      expect(attr.name).toBe("userId");
-      expect(attr.content).toBeDefined();
-      expect(attr._type).toBe("DataAttributive");
-    });
-
-    test("should create data attributives collection", () => {
-      const attr1 = DataAttributive.create({
-        name: "attr1",
-        content: () => "value1"
-      });
-
-      const atom = BoolAtomData.create({
-        type: "atom",
-        data: attr1 as any
-      });
-
-      const attrs = DataAttributives.create({
-        content: atom
-      });
-
-      expect(attrs.content).toBeDefined();
-      expect(attrs._type).toBe("DataAttributives");
     });
   });
 

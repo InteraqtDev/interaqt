@@ -1,4 +1,5 @@
 import { generateUUID, IInstance, SerializedData } from './interfaces.js';
+import { stringifyInstance } from './utils.js';
 import { Entity, type EntityInstance } from './Entity.js';
 import { BoolExp, type ExpressionData } from './BoolExp.js';
 
@@ -62,17 +63,27 @@ export interface ScopedSequenceCreateArgs {
   initializeFrom?: ScopedSequenceInitializer;
 }
 
+// 旧序列化格式；stringify 现在统一使用 stringifyAttribute 的 `uuid::` 编码，
+// parse 保留对旧格式的解析能力。
 type SerializedEntityRef = {
   _type: 'EntityRef';
   name: string;
   uuid?: string;
 };
 
-function serializeEntityRef(entity: EntityInstance): SerializedEntityRef {
-  return { _type: 'EntityRef', name: entity.name!, uuid: entity.uuid };
-}
-
-function deserializeEntityRef(ref: SerializedEntityRef): EntityInstance {
+function deserializeEntityRef(ref: SerializedEntityRef | string | EntityInstance): EntityInstance {
+  if (Entity.is(ref)) return ref;
+  if (typeof ref === 'string') {
+    if (!ref.startsWith('uuid::')) {
+      throw new Error(`ScopedSequence cannot restore Entity reference "${ref}" during parse`);
+    }
+    const uuid = ref.substring(6);
+    const entity = Entity.instances.find(item => item.uuid === uuid);
+    if (!entity) {
+      throw new Error(`ScopedSequence cannot restore Entity reference "uuid::${uuid}" during parse`);
+    }
+    return entity;
+  }
   const entity = ref.uuid
     ? Entity.instances.find(item => item.uuid === ref.uuid)
     : Entity.instances.find(item => item.name === ref.name);
@@ -183,25 +194,13 @@ function validateScopedSequenceMatchExpression(
   });
 }
 
-function serializeScopeItem(item: ScopedSequenceScopeItem) {
-  return item.type === 'ref' ? { ...item, base: serializeEntityRef(item.base) } : item;
-}
-
-function deserializeScopeItem(item: ScopedSequenceScopeItem | (Omit<Extract<ScopedSequenceScopeItem, { type: 'ref' }>, 'base'> & { base: SerializedEntityRef })) {
-  return item.type === 'ref' && (item.base as SerializedEntityRef)._type === 'EntityRef'
-    ? { ...item, base: deserializeEntityRef(item.base as SerializedEntityRef) }
+function deserializeScopeItem(item: ScopedSequenceScopeItem | (Omit<Extract<ScopedSequenceScopeItem, { type: 'ref' }>, 'base'> & { base: SerializedEntityRef | string })) {
+  return item.type === 'ref'
+    ? { ...item, base: deserializeEntityRef(item.base as SerializedEntityRef | string | EntityInstance) }
     : item as ScopedSequenceScopeItem;
 }
 
-function serializeInitializer(initializer: ScopedSequenceInitializer | undefined) {
-  return initializer ? {
-    ...initializer,
-    record: serializeEntityRef(initializer.record),
-    match: normalizeScopedSequenceMatchExpression(initializer.match),
-  } : undefined;
-}
-
-function deserializeInitializer(initializer: (Omit<ScopedSequenceInitializer, 'record'> & { record: SerializedEntityRef }) | undefined) {
+function deserializeInitializer(initializer: (Omit<ScopedSequenceInitializer, 'record'> & { record: SerializedEntityRef | string }) | undefined) {
   return initializer ? { ...initializer, record: deserializeEntityRef(initializer.record) } : undefined;
 }
 
@@ -357,21 +356,9 @@ export class ScopedSequence implements ScopedSequenceInstance {
   }
 
   static stringify(instance: ScopedSequenceInstance): string {
-    const data: SerializedData<ScopedSequenceCreateArgs> = {
-      type: 'ScopedSequence',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: {
-        name: instance.name,
-        scope: instance.scope.map(serializeScopeItem) as ScopedSequenceScopeItem[],
-        match: normalizeScopedSequenceMatchExpression(instance.match),
-        initialValue: instance.initialValue,
-        step: instance.step,
-        allowManualValue: instance.allowManualValue,
-        initializeFrom: serializeInitializer(instance.initializeFrom) as ScopedSequenceInitializer | undefined,
-      },
-    };
-    return JSON.stringify(data);
+    // match/initializeFrom.match 在构造时已 normalize，直接使用统一的实例编码
+    // （Entity 引用 -> `uuid::<uuid>`）。
+    return stringifyInstance(this, instance);
   }
 
   static clone(instance: ScopedSequenceInstance): ScopedSequenceInstance {
@@ -399,7 +386,7 @@ export class ScopedSequence implements ScopedSequenceInstance {
     return this.create({
       ...data.public,
       scope: data.public.scope.map(deserializeScopeItem),
-      initializeFrom: deserializeInitializer(data.public.initializeFrom as unknown as (Omit<ScopedSequenceInitializer, 'record'> & { record: SerializedEntityRef }) | undefined),
-    }, data.options);
+      initializeFrom: deserializeInitializer(data.public.initializeFrom as unknown as (Omit<ScopedSequenceInitializer, 'record'> & { record: SerializedEntityRef | string }) | undefined),
+    }, { ...data.options, uuid: data.uuid });
   }
 }

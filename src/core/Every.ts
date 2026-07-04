@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 
 export interface EveryInstance extends IInstance {
@@ -57,6 +57,11 @@ export class Every implements EveryInstance {
       collection: false as const,
       required: true as const
     },
+    property: {
+      type: 'string' as const,
+      collection: false as const,
+      required: false as const
+    },
     direction: {
       type: 'string' as const,
       collection: false as const,
@@ -98,21 +103,7 @@ export class Every implements EveryInstance {
   }
   
   static stringify(instance: EveryInstance): string {
-    const args: EveryCreateArgs = {
-      record: instance.record,
-      attributeQuery: instance.attributeQuery ? stringifyAttribute(instance.attributeQuery) as AttributeQueryData : undefined,
-      
-      dataDeps: instance.dataDeps,
-      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : (() => true)
-    };
-    
-    const data: SerializedData<EveryCreateArgs> = {
-      type: 'Every',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: EveryInstance, deep: boolean): EveryInstance {
@@ -120,6 +111,7 @@ export class Every implements EveryInstance {
       record: instance.record,
       callback: instance.callback
     };
+    if (instance.property !== undefined) args.property = instance.property;
     if (instance.direction !== undefined) args.direction = instance.direction;
     if (instance.attributeQuery !== undefined) args.attributeQuery = instance.attributeQuery;
     if (instance.dataDeps !== undefined) args.dataDeps = instance.dataDeps;
@@ -138,13 +130,6 @@ export class Every implements EveryInstance {
   
   static parse(json: string): EveryInstance {
     const data: SerializedData<EveryCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.callback === 'string' && raw.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + raw.callback.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

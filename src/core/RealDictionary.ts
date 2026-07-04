@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { ComputationInstance } from './types.js';
 
 export enum PropertyTypes {
@@ -96,6 +97,11 @@ export class Dictionary implements DictionaryInstance {
   };
   
   static create(args: DictionaryCreateArgs, options?: { uuid?: string }): DictionaryInstance {
+    // 强制执行 format 约束：dictionary 名会被用作全局状态记录键，必须严格校验。
+    if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
+      throw new Error(`Dictionary name "${args.name}" is invalid. Dictionary names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+
     const instance = new Dictionary(args, options);
     
     // 检查 uuid 是否重复
@@ -109,22 +115,7 @@ export class Dictionary implements DictionaryInstance {
   }
   
   static stringify(instance: DictionaryInstance): string {
-    const args: DictionaryCreateArgs = {
-      name: instance.name,
-      type: instance.type,
-      collection: instance.collection
-    };
-    if (instance.args !== undefined) args.args = instance.args;
-    if (instance.defaultValue !== undefined) args.defaultValue = instance.defaultValue;
-    if (instance.computation !== undefined) args.computation = instance.computation;
-    
-    const data: SerializedData<DictionaryCreateArgs> = {
-      type: 'Dictionary',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: DictionaryInstance, deep: boolean): DictionaryInstance {
@@ -150,6 +141,6 @@ export class Dictionary implements DictionaryInstance {
   
   static parse(json: string): DictionaryInstance {
     const data: SerializedData<DictionaryCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

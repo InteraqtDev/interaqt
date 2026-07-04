@@ -87,6 +87,8 @@ describe("Support Classes Refactored", () => {
       });
       
       const stringified = SideEffect.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      clearAllInstances(SideEffect);
       const parsed = SideEffect.parse(stringified);
 
       expect(parsed.name).toBe("LogActivity");

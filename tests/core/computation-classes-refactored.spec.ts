@@ -63,6 +63,8 @@ describe("Computation Classes Refactored", () => {
       });
       
       const stringified = Count.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      clearAllInstances(Count);
       const parsed = Count.parse(stringified);
 
       expect(parsed.direction).toBe("source");
@@ -114,6 +116,7 @@ describe("Computation Classes Refactored", () => {
       });
       
       const stringified = Summation.stringify(original);
+      clearAllInstances(Summation);
       const parsed = Summation.parse(stringified);
 
       expect(parsed.attributeQuery).toEqual(["score"]);
@@ -151,6 +154,7 @@ describe("Computation Classes Refactored", () => {
       });
       
       const stringified = Average.stringify(original);
+      clearAllInstances(Average);
       const parsed = Average.parse(stringified);
 
       expect(parsed.attributeQuery).toEqual(["age"]);

@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 // BoolAtomData
 export interface BoolAtomDataInstance extends IInstance {
@@ -58,6 +58,9 @@ export class BoolAtomData implements BoolAtomDataInstance {
     return instance;
   }
   
+  static stringify(instance: BoolAtomDataInstance): string {
+    return stringifyInstance(this, instance);
+  }
   
   static clone(instance: BoolAtomDataInstance, deep: boolean): BoolAtomDataInstance {
     const args: BoolAtomDataCreateArgs = {
@@ -76,6 +79,10 @@ export class BoolAtomData implements BoolAtomDataInstance {
     return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
   }
   
+  static parse(json: string): BoolAtomDataInstance {
+    const data: SerializedData<BoolAtomDataCreateArgs> = JSON.parse(json);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
+  }
 }
 
 // BoolExpressionData
@@ -156,20 +163,7 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   }
   
   static stringify(instance: BoolExpressionDataInstance): string {
-    const args: BoolExpressionDataCreateArgs = {
-      type: instance.type,
-      operator: instance.operator,
-      left: stringifyAttribute(instance.left) as BoolAtomDataInstance | BoolExpressionDataInstance,
-      right: instance.right ? stringifyAttribute(instance.right) as BoolAtomDataInstance | BoolExpressionDataInstance : undefined
-    };
-    
-    const data: SerializedData<BoolExpressionDataCreateArgs> = {
-      type: 'BoolExpressionData',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: BoolExpressionDataInstance, deep: boolean): BoolExpressionDataInstance {
@@ -193,7 +187,7 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   
   static parse(json: string): BoolExpressionDataInstance {
     const data: SerializedData<BoolExpressionDataCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 
@@ -228,21 +222,23 @@ export class BoolExp<T> {
     return new BoolExp<U>({ type: 'atom', data })
   }
   
+  // CAUTION only null/undefined are treated as "no atom": falsy values like 0/false/''
+  //  are legal atom data and must be kept.
   public static and<U>(...atomValues:U[]) {
-    const atomValueWithoutUndefined = atomValues.filter(v => !!v)
-    if (atomValueWithoutUndefined.length === 0) {
+    const atomValueWithoutEmpty = atomValues.filter(v => v != null)
+    if (atomValueWithoutEmpty.length === 0) {
       return undefined
     }
-    const [first, ...rest] = atomValueWithoutUndefined
+    const [first, ...rest] = atomValueWithoutEmpty
     return rest.reduce((acc, cur) => acc.and(cur), first instanceof BoolExp ? first : new BoolExp<U>(BoolExp.standardizeData<U>(first)))
   }
   
   public static or<U>(...atomValues:U[]) {
-    const atomValueWithoutUndefined = atomValues.filter(v => !!v)
-    if (atomValueWithoutUndefined.length === 0) {
+    const atomValueWithoutEmpty = atomValues.filter(v => v != null)
+    if (atomValueWithoutEmpty.length === 0) {
       return undefined
     }
-    const [first, ...rest] = atomValueWithoutUndefined
+    const [first, ...rest] = atomValueWithoutEmpty
     return rest.reduce((acc, cur) => acc.or(cur), first instanceof BoolExp ? first : BoolExp.atom(first))
   }
   
@@ -387,6 +383,11 @@ export class BoolExp<T> {
     if (this.isAtom()) {
       const data = (this.raw as AtomData<T>).data
       const resultOrErrorMessage = atomHandle(data)
+      // fail-closed: an async handler passed to the sync entry point would otherwise be
+      // evaluated as a truthy Promise and silently make every atom pass.
+      if (resultOrErrorMessage instanceof Promise) {
+        throw new Error('BoolExp.evaluate received a Promise from the atom handler. Use evaluateAsync for async handlers.')
+      }
       if (typeof resultOrErrorMessage === 'string') {
         return { data, inverse, stack, error: resultOrErrorMessage }
       }

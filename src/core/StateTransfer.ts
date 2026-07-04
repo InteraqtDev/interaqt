@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { StateNodeInstance } from './StateNode.js';
 // Partial RecordMutationEvent type for trigger matching
 export type RecordMutationEventPattern = {
@@ -83,20 +84,7 @@ export class StateTransfer implements StateTransferInstance {
   }
   
   static stringify(instance: StateTransferInstance): string {
-    const args: StateTransferCreateArgs = {
-      trigger: instance.trigger,
-      current: instance.current,
-      next: instance.next
-    };
-    if (instance.computeTarget !== undefined) args.computeTarget = instance.computeTarget;
-    
-    const data: SerializedData<StateTransferCreateArgs> = {
-      type: 'StateTransfer',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: StateTransferInstance, deep: boolean): StateTransferInstance {
@@ -118,6 +106,6 @@ export class StateTransfer implements StateTransferInstance {
   
   static parse(json: string): StateTransferInstance {
     const data: SerializedData<StateTransferCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

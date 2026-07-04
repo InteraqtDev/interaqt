@@ -4,7 +4,7 @@ import {
 } from "@core";
 import {
   Attributive, Attributives,
-  Conditions, DataAttributives
+  Conditions
 } from "interaqt";
 
 describe("Bool and Attributive Classes Refactored", () => {
@@ -13,7 +13,7 @@ describe("Bool and Attributive Classes Refactored", () => {
     clearAllInstances(
       BoolAtomData, BoolExpressionData,
       Attributive, Attributives,
-      Conditions, DataAttributives
+      Conditions
     );
   });
 
@@ -183,24 +183,6 @@ describe("Bool and Attributive Classes Refactored", () => {
     });
   });
 
-  describe("DataAttributives", () => {
-    test("should create data attributives instance", () => {
-      const dataAttrs = DataAttributives.create({});
-
-      expect(dataAttrs.content).toBeUndefined();
-      expect(dataAttrs._type).toBe("DataAttributives");
-    });
-
-    test("should create data attributives with content", () => {
-      const atom = BoolAtomData.create({ data: { content: () => true } });
-      const dataAttrs = DataAttributives.create({
-        content: atom
-      });
-
-      expect(dataAttrs.content).toBe(atom);
-    });
-  });
-
   describe("Common functionality", () => {
     test("should have isKlass marker", () => {
       expect(BoolAtomData.isKlass).toBe(true);
@@ -208,7 +190,6 @@ describe("Bool and Attributive Classes Refactored", () => {
       expect(Attributive.isKlass).toBe(true);
       expect(Attributives.isKlass).toBe(true);
       expect(Conditions.isKlass).toBe(true);
-      expect(DataAttributives.isKlass).toBe(true);
     });
 
     test("should have displayName", () => {
@@ -217,7 +198,6 @@ describe("Bool and Attributive Classes Refactored", () => {
       expect(Attributive.displayName).toBe("Attributive");
       expect(Attributives.displayName).toBe("Attributives");
       expect(Conditions.displayName).toBe("Conditions");
-      expect(DataAttributives.displayName).toBe("DataAttributives");
     });
 
     test("should track instances", () => {
@@ -227,14 +207,12 @@ describe("Bool and Attributive Classes Refactored", () => {
       const attr1 = Attributive.create({ content: () => true });
       const attrs1 = Attributives.create({});
       const cond1 = Conditions.create({});
-      const dataAttrs1 = DataAttributives.create({});
 
       expect(BoolAtomData.instances).toHaveLength(2);
       expect(BoolExpressionData.instances).toHaveLength(1);
       expect(Attributive.instances).toHaveLength(1);
       expect(Attributives.instances).toHaveLength(1);
       expect(Conditions.instances).toHaveLength(1);
-      expect(DataAttributives.instances).toHaveLength(1);
     });
 
     test("should use is() for type checking", () => {

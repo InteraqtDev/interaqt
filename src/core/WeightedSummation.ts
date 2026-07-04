@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyAttribute } from './utils.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 
 export interface WeightedSummationInstance extends IInstance {
@@ -94,24 +94,7 @@ export class WeightedSummation implements WeightedSummationInstance {
   }
   
   static stringify(instance: WeightedSummationInstance): string {
-    const args: WeightedSummationCreateArgs = {
-      record: instance.record,
-      property: instance.property,
-      direction: instance.direction,
-      attributeQuery: instance.attributeQuery ? stringifyAttribute(instance.attributeQuery) as AttributeQueryData : undefined,
-      
-      
-      dataDeps: instance.dataDeps,
-      callback: instance.callback ? stringifyAttribute(instance.callback) as Function : (() => 1)
-    };
-    
-    const data: SerializedData<WeightedSummationCreateArgs> = {
-      type: 'WeightedSummation',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: WeightedSummationInstance, deep: boolean): WeightedSummationInstance {
@@ -135,13 +118,6 @@ export class WeightedSummation implements WeightedSummationInstance {
   
   static parse(json: string): WeightedSummationInstance {
     const data: SerializedData<WeightedSummationCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.callback === 'string' && raw.callback.startsWith('func::')) {
-      args.callback = new Function('return ' + raw.callback.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

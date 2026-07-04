@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { PropertyInstance, Property } from './Property.js';
 import { EntityInstance } from './Entity.js';
 import type { ComputationInstance } from './types.js';
@@ -105,13 +106,19 @@ export class Relation implements RelationInstance {
         }
       }
       
+      // Inheriting isTargetReliance from inputRelations that disagree would be
+      // ambiguous: deletion semantics apply to the merged relation as a whole.
+      if (args.isTargetReliance === undefined && args.inputRelations.some(r => r.isTargetReliance !== firstRelation.isTargetReliance)) {
+        throw new Error('All inputRelations must have the same isTargetReliance, or the merged relation must declare isTargetReliance explicitly');
+      }
+
       this.inputRelations = args.inputRelations;
       this.source = firstRelation.source;
       this.target = firstRelation.target;
       this.sourceProperty = args.sourceProperty;
       this.targetProperty = args.targetProperty;
       this.type = firstRelation.type; // Inherit type from first input relation
-      this.isTargetReliance = firstRelation.isTargetReliance;
+      this.isTargetReliance = args.isTargetReliance ?? firstRelation.isTargetReliance;
       this._name = args.name;
       this.commonProperties = args.commonProperties;
     }
@@ -128,7 +135,7 @@ export class Relation implements RelationInstance {
       this.sourceProperty = args.sourceProperty;
       this.target = args.baseRelation.target;
       this.targetProperty = args.targetProperty;
-      this.isTargetReliance = args.baseRelation.isTargetReliance;
+      this.isTargetReliance = args.isTargetReliance ?? args.baseRelation.isTargetReliance;
       this.type = args.baseRelation.type;
       this._name = args.name; // name is optional for filtered relation
     } else {
@@ -144,10 +151,13 @@ export class Relation implements RelationInstance {
       this.type = args.type;
       // Use provided name or leave undefined (will use computed name)
       this._name = args.name;
+      this.isTargetReliance = args.isTargetReliance ?? false;
     }
     
     // Common fields
-    this.isTargetReliance = args.isTargetReliance ?? false;
+    // CAUTION isTargetReliance is assigned per branch above: merged/filtered relations
+    //  inherit it from inputRelations/baseRelation unless explicitly overridden, so it
+    //  must not be unconditionally reset here.
     this.computation = args.computation;
     this.properties = args.properties || [];
     this.constraints = args.constraints;
@@ -228,6 +238,11 @@ export class Relation implements RelationInstance {
       collection: false as const,
       required: false as const,
     },
+    commonProperties: {
+      type: 'Property' as const,
+      collection: true as const,
+      required: false as const,
+    },
     inputRelations: {
       type: 'Relation' as const,
       collection: true as const,
@@ -289,46 +304,27 @@ export class Relation implements RelationInstance {
   }
   
   static stringify(instance: RelationInstance): string {
-    const args: RelationCreateArgs = {
-      sourceProperty: instance.sourceProperty,
-      targetProperty: instance.targetProperty,
-      isTargetReliance: instance.isTargetReliance,
-      type: instance.type,
-      properties: instance.properties,
-      constraints: instance.constraints
-    };
-    
-    // Only include source and target if not a merged relation
-    if (!instance.inputRelations) {
-      args.source = instance.source;
-      args.target = instance.target;
+    const json = stringifyInstance(this, instance);
+    // Merged relation 的 source/target 继承自 inputRelations，create 禁止显式传入。
+    if (instance.inputRelations) {
+      const data = JSON.parse(json) as SerializedData<Record<string, unknown>>;
+      delete data.public.source;
+      delete data.public.target;
+      return JSON.stringify(data);
     }
-    
-    const name = instance instanceof Relation ? instance.name : instance.name;
-    if (name !== undefined) args.name = name;
-    
-    if (instance.computation !== undefined) args.computation = instance.computation;
-    if (instance.baseRelation !== undefined) args.baseRelation = instance.baseRelation;
-    if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
-    if (instance.inputRelations !== undefined) args.inputRelations = instance.inputRelations;
-    
-    const data: SerializedData<RelationCreateArgs> = {
-      type: 'Relation',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    
-    return JSON.stringify(data);
+    return json;
   }
   
+  // CAUTION clone 不注册进全局 registry，也不复用原实例的显式 uuid（否则两个实例共享身份）。
+  //  与 Entity.clone / Property.clone 语义一致。
   static clone(instance: RelationInstance, deep = false): RelationInstance {
     const args: RelationCreateArgs = {
       sourceProperty: instance.sourceProperty,
       targetProperty: instance.targetProperty,
       isTargetReliance: instance.isTargetReliance,
       type: instance.type,
-      properties: instance.properties?.map(p => Property.clone(p, deep)),
+      // 浅 clone 与 Entity.clone 一致：共享 property 实例；深 clone 时才复制。
+      properties: deep ? instance.properties?.map(p => Property.clone(p, deep)) : [...(instance.properties || [])],
       constraints: instance.constraints
     };
     
@@ -338,7 +334,7 @@ export class Relation implements RelationInstance {
       args.target = instance.target;
     }
     
-    const name = instance instanceof Relation ? instance.name : instance.name;
+    const name = instance.name;
     if (name !== undefined) args.name = name;
     
     if (instance.computation !== undefined) args.computation = instance.computation; // Note: This is a reference, not a deep clone
@@ -346,7 +342,7 @@ export class Relation implements RelationInstance {
     if (instance.matchExpression !== undefined) args.matchExpression = instance.matchExpression;
     if (instance.inputRelations !== undefined) args.inputRelations = instance.inputRelations;
     
-    return new Relation(args, instance._options);
+    return new Relation(args);
   }
   
   static is(obj: unknown): obj is RelationInstance {
@@ -359,6 +355,6 @@ export class Relation implements RelationInstance {
   
   static parse(json: string): RelationInstance {
     const data: SerializedData<RelationCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

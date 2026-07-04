@@ -88,9 +88,12 @@ describe('stringifyAttribute', () => {
         expect(result).toMatch(/^func::/);
     });
 
-    test('returns arrays as-is', () => {
+    test('encodes arrays element-wise', () => {
         const arr = [1, 2, 3];
-        expect(stringifyAttribute(arr)).toBe(arr);
+        expect(stringifyAttribute(arr)).toEqual([1, 2, 3]);
+
+        const entity = Entity.create({ name: 'InArray' });
+        expect(stringifyAttribute([entity, 42])).toEqual([`uuid::${entity.uuid}`, 42]);
     });
 
     test('serializes Klass instances with uuid:: prefix', () => {
@@ -107,9 +110,17 @@ describe('stringifyAttribute', () => {
         expect(stringifyAttribute(undefined)).toBe(undefined);
     });
 
-    test('returns plain objects as-is', () => {
+    test('encodes plain objects value-wise', () => {
         const obj = { key: 'val' };
-        expect(stringifyAttribute(obj)).toBe(obj);
+        expect(stringifyAttribute(obj)).toEqual({ key: 'val' });
+
+        const entity = Entity.create({ name: 'InObject' });
+        const fn = () => 1;
+        expect(stringifyAttribute({ ref: entity, cb: fn, n: 2 })).toEqual({
+            ref: `uuid::${entity.uuid}`,
+            cb: `func::${fn.toString()}`,
+            n: 2,
+        });
     });
 });
 
@@ -217,13 +228,22 @@ describe('createInstances and createInstancesFromString', () => {
         expect(result.get(uuid)).toBeTruthy();
     });
 
-    test('createInstances warns for unknown types', () => {
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const result = createInstances([
+    test('createInstances throws for unknown types instead of silently dropping data', () => {
+        expect(() => createInstances([
             { type: 'NonExistentKlass', uuid: 'x', public: {} },
-        ]);
-        expect(result.size).toBe(0);
-        expect(warnSpy).toHaveBeenCalled();
-        warnSpy.mockRestore();
+        ])).toThrow(/unknown class "NonExistentKlass"/);
+    });
+
+    test('createInstances throws for unresolvable references', () => {
+        expect(() => createInstances([
+            { type: 'Entity', uuid: 'e-with-dangling-ref', public: { name: 'Dangling', properties: ['uuid::missing-prop'] } },
+        ])).toThrow(/uuid::missing-prop/);
+    });
+
+    test('createInstances throws for duplicate uuids in input', () => {
+        expect(() => createInstances([
+            { type: 'Entity', uuid: 'dup', public: { name: 'A' } },
+            { type: 'Entity', uuid: 'dup', public: { name: 'B' } },
+        ])).toThrow(/Duplicate uuid/);
     });
 });

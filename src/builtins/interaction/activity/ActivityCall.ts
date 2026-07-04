@@ -1,10 +1,9 @@
 import { ActivityGroup, ActivityGroupInstance, ActivityInstance, TransferInstance } from '../Activity.js';
-import { Attributive, AttributiveInstance, Attributives } from '../Attributive.js';
+import { Attributive, AttributiveInstance } from '../Attributive.js';
 import { Gateway, GatewayInstance } from '../Gateway.js';
-import { InteractionInstance, InteractionEventArgs, InteractionGuardError, EventUser, checkCondition as interactionCheckCondition, checkPayload as interactionCheckPayload, checkAttributive } from '../Interaction.js';
+import { InteractionInstance, InteractionEventArgs, EventUser, runInteractionGuard } from '../Interaction.js';
 import { assert } from "@runtime";
-import { MatchExp } from "@storage";
-import { BoolExp, ExpressionData } from "@core";
+import { BoolExp } from "@core";
 
 
 export type Seq = {
@@ -91,7 +90,13 @@ class ActivitySeqState {
         if (!this.current) return undefined
 
         if (this.current?.node!.uuid === uuid) return this.current!
-        return (this.current!.children as ActivitySeqState[])?.find(child => child.findStateNode(uuid))?.current
+        // CAUTION 必须返回子树中命中的节点本身，而不是子序列的 current：
+        //  嵌套 group 时命中的节点可能在更深层，`.current` 会拿到错误的节点。
+        for (const child of (this.current!.children as ActivitySeqState[]) || []) {
+            const found = child.findStateNode(uuid)
+            if (found) return found
+        }
+        return undefined
     }
     transferToNext(uuid: string) {
         const node = this.graph.getNodeByUUID(uuid) as InteractionLikeNodeBase
@@ -130,6 +135,8 @@ class InteractionState {
 
         if (isGroup) {
             const GroupStateNode = InteractionState.GroupStateNodeType.get(node!.content.type!)!
+            // buildGraph 已在定义期校验 group type，这里理论上不会缺失。
+            assert(!!GroupStateNode, `unknown ActivityGroup type "${node!.content.type}"`)
             const groupState = new GroupStateNode(node!, graph, parent)
 
             groupState.isGroup = true
@@ -212,6 +219,12 @@ export class ActivityCall {
         }
 
         for(let group of activity.groups!) {
+            // fail-fast: an unknown group type would otherwise crash at dispatch time
+            // with `new undefined()` deep inside the state machine.
+            if (!InteractionState.GroupStateNodeType.has(group.type!)) {
+                const supported = Array.from(InteractionState.GroupStateNodeType.keys()).map(t => `'${t}'`).join(', ')
+                throw new Error(`ActivityGroup type "${group.type}" in activity "${activity.name}" is not supported. Supported types: ${supported}.`)
+            }
             const node: ActivityGroupNode = {
                 uuid: group.uuid,
                 content: group,
@@ -274,7 +287,9 @@ export class ActivityCall {
         return (await this.getActivity(storage, activityId))?.state
     }
     async getActivity(storage: StorageAccess, activityId: string) {
-        const match = MatchExp.atom({
+        // CAUTION builtins 不允许直接依赖 @storage（分层：builtins → runtime → storage → core）。
+        //  storage 的 MatchExpressionData 就是 BoolExp<MatchAtom>，直接用 @core 的 BoolExp 构造。
+        const match = BoolExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
@@ -282,7 +297,7 @@ export class ActivityCall {
         return results.map((a: any) => ({ ...a, state: a.state, refs: a.refs }))[0]
     }
     async setActivity(storage: StorageAccess, activityId: string, value: any) {
-        const match = MatchExp.atom({
+        const match = BoolExp.atom({
             key: 'id',
             value: ['=', activityId],
         })
@@ -320,41 +335,12 @@ export class ActivityCall {
         }
     }
 
+    // 与独立 interaction 的 guard 共用同一个 runner（runInteractionGuard），
+    // 仅额外提供 activity refs 的 isRef 解析。
     async fullGuardWithUserRef(controller: StorageAccess, interaction: InteractionInstance, args: InteractionEventArgs) {
-        if (!controller.ignoreGuard && interaction.conditions) {
-            await interactionCheckCondition(controller, interaction, args)
-        }
-
-        if (interaction.userAttributives) {
-            const userAttributiveCombined =
-                Attributives.is(interaction.userAttributives) ?
-                    BoolExp.fromValue<AttributiveInstance>(
-                        interaction.userAttributives!.content! as ExpressionData<AttributiveInstance>
-                    ) :
-                    BoolExp.atom<AttributiveInstance>(
-                        interaction.userAttributives as AttributiveInstance
-                    )
-
-            const checkHandle = (attributive: AttributiveInstance) => {
-                if (attributive.isRef) {
-                    return this.checkUserRef(controller, attributive, args.user, args.activityId!)
-                } else {
-                    return checkAttributive(controller, attributive, args, args.user)
-                }
-            }
-            const result = await userAttributiveCombined.evaluateAsync(checkHandle)
-            if (result !== true) {
-                throw new InteractionGuardError('User check failed', {
-                    type: 'check user failed',
-                    checkType: 'user',
-                    error: result,
-                })
-            }
-        }
-
-        if (interaction.payload) {
-            await interactionCheckPayload(controller, interaction, args)
-        }
+        await runInteractionGuard(controller, interaction, args, {
+            checkUserRef: (attributive: AttributiveInstance) => this.checkUserRef(controller, attributive, args.user, args.activityId!)
+        })
     }
 
     async completeInteractionState(storage: StorageAccess, activityId: string, interactionUuid: string) {
@@ -368,7 +354,7 @@ export class ActivityCall {
         //  advanced the state in between makes this update match zero rows — fail with a
         //  clear error (aborting this transaction) instead of silently losing an update.
         const currentVersion = activity.stateVersion ?? 0
-        const match = MatchExp.atom({ key: 'id', value: ['=', activityId] })
+        const match = BoolExp.atom({ key: 'id', value: ['=', activityId] })
             .and({ key: 'stateVersion', value: ['=', currentVersion] })
         const updated = await storage.system.storage.update(
             ActivityCall.ACTIVITY_RECORD,
@@ -390,9 +376,10 @@ export class ActivityCall {
             if (Attributive.is(payloadDef.itemRef) && payloadDef.itemRef?.name && interactionEventArgs.payload![payloadDef.name!]) {
                 const payloadItem = interactionEventArgs.payload![payloadDef.name!]
                 if (payloadDef.isCollection) {
+                    // collection payload 是数组，必须逐项取 id，否则 refs 里存的是 undefined
                     if(!refs[payloadDef.itemRef!.name!]) refs[payloadDef.itemRef!.name!] = []
 
-                    refs[payloadDef.itemRef!.name!].push((payloadItem as {id: string}).id)
+                    refs[payloadDef.itemRef!.name!].push(...(payloadItem as {id: string}[]).map(item => item.id))
                 } else {
                     refs[payloadDef.itemRef!.name!] = (payloadItem as {id: string}).id
                 }
@@ -405,7 +392,12 @@ export class ActivityCall {
     checkUserRef = async (storage: StorageAccess, attributive: AttributiveInstance, eventUser: EventUser, activityId: string): Promise<boolean> => {
         assert(attributive.isRef, 'attributive must be ref')
         const refs = (await this.getActivity(storage, activityId))?.refs
-        return refs[attributive.name!] === eventUser.id
+        const ref = refs?.[attributive.name!]
+        // collection itemRef 保存的是 id 数组：按成员资格判断
+        if (Array.isArray(ref)) {
+            return ref.includes(eventUser.id)
+        }
+        return ref === eventUser.id
     }
 }
 
