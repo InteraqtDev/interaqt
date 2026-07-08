@@ -223,6 +223,7 @@ export interface System {
     beginMigration?: (modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount?: number) => Promise<MigrationRunState>
     updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>
     finishMigration?: (migrationId: string, status: 'succeeded' | 'failed', error?: unknown) => Promise<void>
+    releaseMigrationLock?: () => Promise<void>
     readMigrationManifest?: () => Promise<MigrationManifest | undefined>
     writeMigrationManifest?: (manifest: MigrationManifest) => Promise<void>
 }

@@ -269,6 +269,16 @@ export class Controller {
         }
     }
 
+    // Recovery path for a migration process that died without releasing the
+    // bookkeeping lock. Only call after confirming no migration is running.
+    async forceReleaseMigrationLock() {
+        const migrationSystem = this.system as System & {
+            releaseMigrationLock?: () => Promise<void>
+        }
+        assert(typeof migrationSystem.releaseMigrationLock === 'function', 'Current system does not support migration lock release')
+        await migrationSystem.releaseMigrationLock!()
+    }
+
     async createMigrationBaseline() {
         const states = this.scheduler.createStates()
         const internalRequirements = this.scheduler.createInternalSchemaRequirements()

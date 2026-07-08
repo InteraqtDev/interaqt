@@ -4269,6 +4269,94 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("migration bookkeeping statements are parameterized instead of interpolated", async () => {
+        const calls: Array<{ kind: string; sql: string; params: unknown[] }> = [];
+        const stubDb = {
+            logger: { info() {}, error() {}, child() { return this; } },
+            schemaDialect: { name: "mysql" as const },
+            async open() {},
+            async scheme(sql: string) { calls.push({ kind: "scheme", sql, params: [] }); return undefined; },
+            async query(sql: string, params: unknown[] = []) { calls.push({ kind: "query", sql, params }); return []; },
+            async update(sql: string, params: unknown[] = []) { calls.push({ kind: "update", sql, params }); return []; },
+            async insert() { return { id: "" }; },
+            async delete() { return []; },
+            async close() {},
+        };
+        const system = new MonoSystem(stubDb as any);
+        // Backslash sequences corrupt interpolated literals under MySQL escaping.
+        const hostile = `back\\slash 'quote' "double" \\' end\\`;
+
+        await system.writeMigrationManifest({ hostileField: hostile } as any);
+        await system.beginMigration("model-hash", "diff-hash", { reason: hostile }, 1);
+        await system.updateMigrationPhase("migration-id", "schema-applied");
+        await system.finishMigration("migration-id", "failed", new Error(hostile));
+
+        const statements = calls.filter(call => call.kind !== "scheme");
+        expect(statements.length).toBeGreaterThan(0);
+        for (const call of statements) {
+            expect(call.sql).not.toContain("back\\slash");
+            expect(call.sql).not.toContain(hostile);
+        }
+        const manifestWrite = calls.find(call => call.kind === "update" && call.sql.includes("__interaqt_migration_manifest"))!;
+        expect(String(manifestWrite.params[1])).toContain("back\\\\slash");
+        const logWrite = calls.find(call => call.kind === "update" && call.sql.includes("INSERT INTO \"__interaqt_migration_log\""))!;
+        expect(String(logWrite.params[3])).toContain("back\\\\slash");
+        const finishWrite = calls.find(call => call.kind === "update" && call.sql.includes("SET \"status\""))!;
+        expect(String(finishWrite.params[1])).toContain("back\\slash");
+    });
+
+    test("migration manifest with quotes and backslashes round-trips through storage", async () => {
+        const db = new PGLiteDB();
+        const Product = new Entity({
+            name: "MigrationHostileManifestProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-hostile-manifest-name" })],
+        }, { uuid: "migration-hostile-manifest-product" });
+        const system = new MonoSystem(db);
+        system.conceptClass = KlassByName;
+        const controller = new Controller({ system, entities: [Product], relations: [] });
+        await controller.setup(true);
+
+        const manifest = await readMigrationManifest(controller);
+        const hostile = structuredClone(manifest!);
+        (hostile as any).hostileField = `back\\slash 'quote' "double" \\' end\\`;
+        await writeMigrationManifest(controller, hostile);
+        const restored = await readMigrationManifest(controller);
+        expect(restored).toEqual(hostile);
+        await db.close();
+    });
+
+    test("crashed migration lock can be force released and migration retried", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationLockRecoveryProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-lock-recovery-name" })],
+        }, { uuid: "migration-lock-recovery-product" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1], relations: [] }).setup(true);
+
+        // Simulate a migration process that died while holding the lock.
+        await db.scheme(`INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', 'crashed-migration')`);
+
+        const ProductV2 = new Entity({
+            name: "MigrationLockRecoveryProduct",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-lock-recovery-name" }),
+                new Property({ name: "tag", type: "string" }, { uuid: "migration-lock-recovery-tag" }),
+            ],
+        }, { uuid: "migration-lock-recovery-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/Migration is already running: crashed-migration.*forceReleaseMigrationLock/s);
+
+        await controllerV2.forceReleaseMigrationLock();
+        await migrateWithApproval(controllerV2);
+        const record = await systemV2.storage.create("MigrationLockRecoveryProduct", { name: "n", tag: "t" });
+        expect(record.id).toBeDefined();
+        await db.close();
+    });
+
     test("migration resume ignores failed runs with a different approved diff hash", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
