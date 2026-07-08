@@ -164,8 +164,10 @@ export class RecordQueryTree {
             }
             this.parentLinkQueryTree.addRecord(rest, subTree)
         } else {
+            // CAUTION 与 addField / 长度为 1 的分支一致：已存在的子树必须合并而不是覆盖，
+            //  否则同一父节点下的多个 match 分支（如 leader.profile 和 leader.settings）会互相丢失。
             const info = this.map.getInfo(this.recordName, name)
-            this.records[name] = new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
+            if (!this.records[name]) this.records[name] = new RecordQueryTree(info.recordName, this.map, this.recordName, name, undefined, this)
             this.records[name].addRecord(rest, subTree)
         }
     }

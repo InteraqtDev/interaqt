@@ -584,10 +584,10 @@ describe('Any computed handle', () => {
       ['id', 'name', 'hasAnyBlockedTask', 'hasHighPriorityOverdue']
     );
     
-    // Any returns 1 when there's a match, 0 when no match
-    expect(project1Data.hasAnyBlockedTask).toBe(1); // task3 is blocked
+    // Any returns true when there's a match, false when no match（跨 driver 归一化为 boolean）
+    expect(project1Data.hasAnyBlockedTask).toBe(true); // task3 is blocked
     // task2 is high priority, active (not archived), and overdue
-    expect(project1Data.hasHighPriorityOverdue).toBe(1); // task2 matches
+    expect(project1Data.hasHighPriorityOverdue).toBe(true); // task2 matches
     
     // Archive the overdue high-priority task
     await system.storage.update('ProjectTask',
@@ -602,10 +602,10 @@ describe('Any computed handle', () => {
       ['id', 'name', 'hasAnyBlockedTask', 'hasHighPriorityOverdue']
     );
     
-    // Any returns 1 when there's a match
-    expect(project1Data2.hasAnyBlockedTask).toBe(1); // task3 is still blocked
+    // Any returns true when there's a match
+    expect(project1Data2.hasAnyBlockedTask).toBe(true); // task3 is still blocked
     // task2 is now archived, no active high priority overdue tasks
-    expect(project1Data2.hasHighPriorityOverdue).toBe(0); // No matches after archiving
+    expect(project1Data2.hasHighPriorityOverdue).toBe(false); // No matches after archiving
     
     // Unblock task3
     await system.storage.update('Task',
@@ -621,9 +621,9 @@ describe('Any computed handle', () => {
     );
     
     // Any returns 0 when there's no match
-    expect(project1Data3.hasAnyBlockedTask).toBe(0); // No blocked tasks
+    expect(project1Data3.hasAnyBlockedTask).toBe(false); // No blocked tasks
     // Still no active high priority overdue tasks
-    expect(project1Data3.hasHighPriorityOverdue).toBe(0); // No matches
+    expect(project1Data3.hasHighPriorityOverdue).toBe(false); // No matches
     
     // Make task1 overdue
     await system.storage.update('Task',
@@ -639,9 +639,9 @@ describe('Any computed handle', () => {
     );
     
     // Any returns 0 when there's no match, 1 when there's a match
-    expect(project1Data4.hasAnyBlockedTask).toBe(0); // Still no blocked tasks
+    expect(project1Data4.hasAnyBlockedTask).toBe(false); // Still no blocked tasks
     // task1 is now overdue, high priority, and active
-    expect(project1Data4.hasHighPriorityOverdue).toBe(1); // task1 now matches
+    expect(project1Data4.hasHighPriorityOverdue).toBe(true); // task1 now matches
   });
 
   test('should calculate any for merged entity correctly', async () => {
@@ -904,13 +904,13 @@ describe('Any computed handle', () => {
       priority: 'low'
     });
 
-    // Initially no tasks assigned, should be false (0)
+    // Initially no tasks assigned, should be false
     let teamData = await system.storage.findOne('Team',
       MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
       undefined,
       ['id', 'name', 'hasUrgentTask']
     );
-    expect(teamData.hasUrgentTask).toBe(0);
+    expect(teamData.hasUrgentTask).toBe(false);
 
     // Assign a high priority task through assigned relation
     await system.storage.create('TeamAssignedTask', {
@@ -918,13 +918,13 @@ describe('Any computed handle', () => {
       target: { id: task1.id }
     });
 
-    // Should now be true (1) (has high priority, non-completed task)
+    // Should now be true (has high priority, non-completed task)
     teamData = await system.storage.findOne('Team',
       MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
       undefined,
       ['id', 'name', 'hasUrgentTask']
     );
-    expect(teamData.hasUrgentTask).toBe(1);
+    expect(teamData.hasUrgentTask).toBe(true);
 
     // Add more tasks through reviewing relation
     await system.storage.create('TeamReviewingTask', {
@@ -937,13 +937,13 @@ describe('Any computed handle', () => {
       target: { id: task3.id }
     });
 
-    // Should still be true (1)
+    // Should still be true
     teamData = await system.storage.findOne('Team',
       MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
       undefined,
       ['id', 'name', 'hasUrgentTask']
     );
-    expect(teamData.hasUrgentTask).toBe(1);
+    expect(teamData.hasUrgentTask).toBe(true);
 
     // Complete the high priority task
     await system.storage.update('Task',
@@ -951,12 +951,12 @@ describe('Any computed handle', () => {
       { status: 'completed' }
     );
 
-    // Should now be false (0) (no more high priority non-completed tasks)
+    // Should now be false (no more high priority non-completed tasks)
     teamData = await system.storage.findOne('Team',
       MatchExp.atom({ key: 'id', value: ['=', team1.id] }),
       undefined,
       ['id', 'name', 'hasUrgentTask']
     );
-    expect(teamData.hasUrgentTask).toBe(0);
+    expect(teamData.hasUrgentTask).toBe(false);
   });
 }); 

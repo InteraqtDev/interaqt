@@ -206,6 +206,7 @@ export class MatchExp {
         let fieldValue =''
         let fieldParams:unknown[] = []
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
+        const lowerOp = typeof value[0] === 'string' ? value[0].toLowerCase() : value[0]
 
         if (simpleOp.includes(value[0])) {
             if (isReferenceValue) {
@@ -213,10 +214,26 @@ export class MatchExp {
                 const referenceField = this.getReferenceFieldValue(value[1])
                 fieldValue = `${value[0]} "${referenceField.split('.')[0]}"."${referenceField.split('.')[1]}"`
                 fieldParams = []
+            } else if (value[1] === null) {
+                // CAUTION SQL 里 `col = NULL` / `col != NULL` 永远是 UNKNOWN（不匹配任何行），
+                //  必须翻译成 IS NULL / IS NOT NULL，与 scopedSequenceMatch 的内存求值语义保持一致。
+                if (value[0] === '=') {
+                    fieldValue = `IS NULL`
+                } else if (value[0] === '!=') {
+                    fieldValue = `IS NOT NULL`
+                } else {
+                    throw new Error(`match operator '${value[0]}' does not support null for key "${key}". Use ['=', null] (IS NULL) or ['!=', null] (IS NOT NULL)`)
+                }
+                fieldParams = []
             } else {
                 fieldValue = `${value[0]} ${p()}`
                 fieldParams = [value[1]]
             }
+        } else if (lowerOp === 'is null' || lowerOp === 'is not null') {
+            if (value[1] !== null) {
+                throw new Error(`match operator '${value[0]}' requires null as its value, got: ${JSON.stringify(value[1])} for key "${key}"`)
+            }
+            fieldValue = lowerOp === 'is null' ? `IS NULL` : `IS NOT NULL`
         } else if (value[0] === 'not') {
             // CAUTION 'not' 只支持 null（表示 IS NOT NULL）。
             //  其他值会生成 `"field" not $1` 这种非法 SQL，必须显式报错。
@@ -237,6 +254,20 @@ export class MatchExp {
                 fieldParams = []
             } else {
                 fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
+                fieldParams = value[1]
+            }
+        } else if (lowerOp === 'not in') {
+            assert(!isReferenceValue, 'reference value cannot use NOT IN to match')
+            if (!Array.isArray(value[1])) {
+                throw new Error(`match operator 'not in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
+            }
+            if (value[1].length === 0) {
+                // 空集合的 NOT IN 语义上恒为 true（任何值都不在空集合中）。
+                // 依赖 buildWhereClause 对原子加括号，保证 OR 不会泄漏到外层表达式。
+                fieldValue = `NOT IN (NULL) OR 1=1`
+                fieldParams = []
+            } else {
+                fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`
                 fieldParams = value[1]
             }
         } else if (value[0].toLowerCase() === 'between') {

@@ -258,8 +258,8 @@ export class RecordQueryAgent implements RecordOperationAgent {
     /**
      * 查找树形结构的两个数据间的 path - 委托给 QueryExecutor
      */
-    async findPath(recordName: string, attributePathStr: string, startRecordId: string, endRecordId: string, limitLength?: number): Promise<Record[] | undefined> {
-        return this.queryExecutor.findPath(recordName, attributePathStr, startRecordId, endRecordId, limitLength)
+    async findPath(recordName: string, attributePathStr: string, startRecordId: string, endRecordId: string): Promise<Record[] | undefined> {
+        return this.queryExecutor.findPath(recordName, attributePathStr, startRecordId, endRecordId)
     }
 
 }

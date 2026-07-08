@@ -2,6 +2,7 @@ import { Database } from "@runtime"
 import { EntityToTableMap } from "./EntityToTableMap.js"
 import { SQLBuilder } from "./SQLBuilder.js"
 import { RecordQuery, RecordQueryTree, LINK_SYMBOL } from "./RecordQuery.js"
+import { Modifier } from "./Modifier.js"
 import { FieldAliasMap } from "./util/FieldAliasMap.js"
 import { RecursiveContext, ROOT_LABEL } from "./util/RecursiveContext.js"
 import { setByPath, assert } from "../utils.js"
@@ -76,28 +77,27 @@ export class QueryExecutor {
         recordName: string,
         fieldAliasMap: FieldAliasMap
     ): Record[] {
-        // CAUTION JSON 反序列化必须按完整路径解析字段类型，不能只看根记录的 JSONFields。
-        //  否则关联记录（x:1 JOIN 查出）上的 JSON 字段在 SQLite/MySQL 这类返回字符串的 driver 上不会被解析，
-        //  导致同一 API 在不同 driver 下返回类型不一致。
-        const rootJSONFields = this.map.getRecordInfo(recordName).JSONFields
-        const jsonPathCache = new Map<string, boolean>()
-        const isJSONPath = (attributePath: string[]): boolean => {
-            if (attributePath.length === 1) return rootJSONFields.includes(attributePath[0])
+        // CAUTION 值类型归一化必须按完整路径解析字段类型，不能只看根记录的字段列表。
+        //  否则关联记录（x:1 JOIN 查出）上的字段在 SQLite/MySQL 这类 driver 上不会被归一化，
+        //  导致同一 API 在不同 driver 下返回类型不一致：
+        //  - JSON 字段：SQLite/MySQL 返回字符串，需要 JSON.parse
+        //  - boolean 字段：SQLite/MySQL 以 0/1 数字存储，需要转回 boolean（PG/PGLite 是原生 BOOLEAN）
+        const valueTypeCache = new Map<string, string | undefined>()
+        const resolveValueType = (attributePath: string[]): string | undefined => {
             const cacheKey = attributePath.join('.')
-            const cached = jsonPathCache.get(cacheKey)
-            if (cached !== undefined) return cached
-            let result = false
+            if (valueTypeCache.has(cacheKey)) return valueTypeCache.get(cacheKey)
+            let result: string | undefined
             try {
                 const info = this.map.getInfoByPath([recordName, ...attributePath])
                 if (info && info.isValue) {
                     const data = info.data as { collection?: boolean, type?: string }
-                    result = !!data.collection || data.type === 'object' || data.type === 'json'
+                    result = (!!data.collection || data.type === 'object' || data.type === 'json') ? 'json' : data.type
                 }
             } catch (e) {
                 // 无法解析的路径（例如别名等特殊字段）保持原样返回
-                result = false
+                result = undefined
             }
-            jsonPathCache.set(cacheKey, result)
+            valueTypeCache.set(cacheKey, result)
             return result
         }
 
@@ -106,8 +106,15 @@ export class QueryExecutor {
             Object.entries(rawReturn).forEach(([key, value]) => {
                 // CAUTION 注意这里去掉了最开始的 entityName
                 const attributePath = fieldAliasMap.getPath(key)!.slice(1, Infinity)
-                if (typeof value === 'string' && isJSONPath(attributePath)) {
-                    value = JSON.parse(value)
+                const valueType = resolveValueType(attributePath)
+                if (typeof value === 'string' && valueType === 'json') {
+                    try {
+                        value = JSON.parse(value)
+                    } catch (e) {
+                        throw new Error(`Failed to parse JSON field "${recordName}.${attributePath.join('.')}": ${e instanceof Error ? e.message : String(e)}. Raw value: ${(value as string).slice(0, 200)}`)
+                    }
+                } else if (typeof value === 'number' && valueType === 'boolean') {
+                    value = value !== 0
                 }
                 if (value !== null) {
                     setByPath(obj, attributePath, value)
@@ -181,7 +188,31 @@ export class QueryExecutor {
         // 0. 这里只通过合表或者 join  处理了 x:1 的关联查询，包括了 parentLinkRecordQuery 上字段的查询，以及从 parentLink 发出可以看做是 x:1 的关联字段查询。
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
-        const [querySQL, params, fieldAliasMap] = this.sqlBuilder.buildXToOneFindQuery(entityQuery, '')
+
+        // CAUTION match/orderBy 走 x:n 路径时 LEFT JOIN 会 fan-out：SQL 的 LIMIT/OFFSET 限制的是
+        //  原始行数而不是去重后的根记录数，直接下推会导致分页结果错误（返回数量不足 / 跳过记录）。
+        //  这里把 LIMIT/OFFSET 从 SQL 中剥离，改在 dedupe 之后按根记录应用。
+        //  例外：limit === 1 且无 offset（findOne 热路径）时首条原始行必然对应第一条根记录，可以安全下推。
+        const paginationModifier = entityQuery.modifier
+        const needsPostPagination = (
+            (paginationModifier.limit !== undefined || paginationModifier.offset !== undefined) &&
+            !(paginationModifier.limit === 1 && !paginationModifier.offset) &&
+            (
+                this.queryTreeHasXToManyPath(entityQuery.matchExpression.xToOneQueryTree) ||
+                this.queryTreeHasXToManyPath(entityQuery.modifier.xToOneQueryTree)
+            )
+        )
+        const sqlEntityQuery = needsPostPagination
+            ? entityQuery.derive({
+                modifier: new Modifier(paginationModifier.recordName, this.map, {
+                    ...(paginationModifier.data || {}),
+                    limit: undefined,
+                    offset: undefined,
+                })
+            })
+            : entityQuery
+
+        const [querySQL, params, fieldAliasMap] = this.sqlBuilder.buildXToOneFindQuery(sqlEntityQuery, '')
         // CAUTION 能力判断优先使用 driver 的显式声明，仅在未声明时退回旧的启发式判断（兼容外部 driver）。
         const supportsForUpdate = this.database.supportsSelectForUpdate ?? (this.database.constructor.name !== 'SQLiteDB')
         // CAUTION FOR UPDATE 必须限定主表（FOR UPDATE OF <主表别名>）。
@@ -194,7 +225,14 @@ export class QueryExecutor {
         // CAUTION 通过 x:n 路径做 match 时，LEFT JOIN 会让同一条根记录产生多行完全相同的结果（fan-out）。
         //  这里按"整行完全相同"去重（等价于 SQL DISTINCT 的语义）。
         //  不会误伤合法数据：SELECT 永远包含各级记录（含关系记录）的 id 字段，真正不同的行必然有字段差异。
-        const dedupedRawReturns = this.dedupeIdenticalRows(rawReturns)
+        let dedupedRawReturns = this.dedupeIdenticalRows(rawReturns)
+        if (needsPostPagination) {
+            const start = paginationModifier.offset || 0
+            dedupedRawReturns = dedupedRawReturns.slice(
+                start,
+                paginationModifier.limit !== undefined ? start + paginationModifier.limit : undefined
+            )
+        }
         const records = this.structureRawReturns(dedupedRawReturns, entityQuery.recordName, fieldAliasMap)
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
@@ -294,6 +332,20 @@ export class QueryExecutor {
             }
         }
         return records
+    }
+
+    /**
+     * 判断查询树中是否存在 x:n 路径（会导致 LEFT JOIN fan-out）。
+     * 用于决定 LIMIT/OFFSET 是否可以安全下推到 SQL。
+     * 保守判定：树中只要出现 x:n 关联节点（即使实际生成 EXIST 子查询而没有产生 join fan-out）
+     * 都会返回 true，代价只是分页退化为查询后切片，不影响正确性。
+     */
+    private queryTreeHasXToManyPath(tree: RecordQueryTree): boolean {
+        for (const child of Object.values(tree.records)) {
+            if (child.info?.isXToMany) return true
+            if (this.queryTreeHasXToManyPath(child)) return true
+        }
+        return false
     }
 
     /**
@@ -579,8 +631,7 @@ export class QueryExecutor {
         recordName: string, 
         attributePathStr: string, 
         startRecordId: string, 
-        endRecordId: string, 
-        limitLength?: number
+        endRecordId: string
     ): Promise<Record[] | undefined> {
         const attributePathAndLast = attributePathStr.split('.')
         const endAttribute = attributePathAndLast.at(-1)!

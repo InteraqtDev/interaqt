@@ -257,7 +257,7 @@ describe('Long column name tests', () => {
         expect(foundUser).toBeDefined()
         expect(foundUser.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe('Test Value')
         expect(foundUser.anotherExtremelyLongPropertyNameDesignedToTestTheColumnNameShorteningFunctionality).toBe(42)
-        expect(foundUser.yetAnotherSuperLongPropertyNameToEnsureOurHashBasedShorteningWorksCorrectly).toBe(1) // SQLite stores boolean as 1/0
+        expect(foundUser.yetAnotherSuperLongPropertyNameToEnsureOurHashBasedShorteningWorksCorrectly).toBe(true) // 存储层按字段类型把 SQLite 的 1/0 归一化回 boolean
 
         // UPDATE - Test updating entity with long property names
         const updateData = {
@@ -290,7 +290,7 @@ describe('Long column name tests', () => {
         
         expect(updatedUser.thisIsAVeryLongPropertyNameThatExceedsThePostgreSQLColumnNameLimitOf63Characters).toBe('Updated Value')
         expect(updatedUser.anotherExtremelyLongPropertyNameDesignedToTestTheColumnNameShorteningFunctionality).toBe(99)
-        expect(updatedUser.yetAnotherSuperLongPropertyNameToEnsureOurHashBasedShorteningWorksCorrectly).toBe(0) // SQLite stores boolean as 1/0
+        expect(updatedUser.yetAnotherSuperLongPropertyNameToEnsureOurHashBasedShorteningWorksCorrectly).toBe(false) // 存储层按字段类型把 SQLite 的 1/0 归一化回 boolean
 
         // DELETE - Test deleting entity with long property names
         await entityQueryHandle.delete(
