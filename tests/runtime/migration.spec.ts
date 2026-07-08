@@ -4158,6 +4158,56 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("defaultValue backfill does not trigger StateMachine transitions on the same record", async () => {
+        const db = new PGLiteDB();
+        const build = (withNote: boolean) => {
+            const open = new StateNode({ name: "open" }, { uuid: "migration-backfill-sm-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-backfill-sm-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationBackfillSmTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                        computeTarget: (event: any) => ({ id: event.record.id }),
+                    }, { uuid: "migration-backfill-sm-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-backfill-sm-lifecycle" });
+            return new Entity({
+                name: "MigrationBackfillSmTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-backfill-sm-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-backfill-sm-status" }),
+                    ...(withNote ? [new Property({ name: "note", type: "string", defaultValue: () => "n/a" }, { uuid: "migration-backfill-sm-note" })] : []),
+                ],
+            }, { uuid: "migration-backfill-sm-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [build(false)], relations: [] });
+        await controllerV1.setup(true);
+        await systemV1.storage.create("MigrationBackfillSmTicket", { title: "t" });
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const statusBefore = (await systemV1.storage.find("MigrationBackfillSmTicket", undefined, undefined, ["status"]))[0].status;
+        const plan = await controllerV2.migrate({ approvedDiff });
+        expect(plan.rebuildPlan).toEqual([]);
+        expect(plan.factPropertyBackfills).toEqual([{ recordName: "MigrationBackfillSmTicket", propertyName: "note" }]);
+
+        const tickets = await systemV2.storage.find("MigrationBackfillSmTicket", undefined, undefined, ["title", "status", "note"]);
+        expect(tickets).toHaveLength(1);
+        expect(tickets[0].note).toBe("n/a");
+        // The backfill update must not fire the update-triggered transition:
+        // status stays exactly what it was before migration.
+        expect(tickets[0].status).toBe(statusBefore);
+        await db.close();
+    });
+
     test("new non-null property with defaultValue passes constraint verification through backfill", async () => {
         const db = new PGLiteDB();
         const build = (withStatus: boolean) => new Entity({
