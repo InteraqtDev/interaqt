@@ -108,6 +108,7 @@ describe('MonoSystem setup edge cases', () => {
                     trigger: { recordName: 'NonExistentEntity', type: 'update' },
                     current: active,
                     next: inactive,
+                    computeTarget: (event: any) => ({ id: event.record.id }),
                 })
             ],
             initialState: active

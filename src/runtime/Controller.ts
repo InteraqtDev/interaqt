@@ -544,6 +544,33 @@ export class Controller {
             }
         }   
     }
+    /**
+     * Apply a property computation's initial value to a freshly created record.
+     *
+     * The initial value is part of the record's creation semantics, not a business update:
+     * the write goes through the internal write path (the host record's own update event is
+     * neither dispatched to mutation listeners nor added to effects), so computations that
+     * listen to the host record's update events (e.g. StateMachine transfers) are not
+     * spuriously triggered by it. The written field values — including any recomputed
+     * `computed` properties — are folded back into `record` (the create mutation event's
+     * record), so downstream consumers observe the initial value as part of the create event.
+     * Derived events (e.g. filtered-entity membership changes) are still dispatched normally.
+     */
+    async applyInitialValue(dataContext: PropertyDataContext, result: unknown, record: Record<string, unknown>) {
+        if (result instanceof ComputationResultSkip) return
+
+        if (dataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
+            await this.system.storage.delete(dataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))
+            return
+        }
+        const events: RecordMutationEvent[] = []
+        await this.system.storage.updateInternal(dataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}), {[dataContext.id.name]: result}, events)
+        for (const event of events) {
+            if (event.type === 'update' && event.recordName === dataContext.host.name && event.record?.id === record.id) {
+                Object.assign(record, event.record)
+            }
+        }
+    }
     async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: Record<string, unknown>) {
         if (patch instanceof ComputationResultSkip||patch === undefined) return
 

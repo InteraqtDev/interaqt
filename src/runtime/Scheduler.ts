@@ -327,7 +327,9 @@ export class Scheduler {
                             if (mutationEvent.type === 'create' && mutationEvent.recordName === propertyDataContext.host.name) {
                                 const defaultValue = await computation.getInitialValue?.(mutationEvent.record)
                                 if (defaultValue !== undefined) {
-                                    await this.controller.applyResult(propertyDataContext, defaultValue, mutationEvent.record)
+                                    // 初始值回写属于创建语义，走内部写路径并把结果并入 create 事件的 record，
+                                    // 不产生可被计算消费的业务 update 事件（否则会误触发监听宿主 update 的 StateMachine 等计算）。
+                                    await this.controller.applyInitialValue(propertyDataContext, defaultValue, mutationEvent.record!)
                                 }
                             }
                         }
