@@ -37,7 +37,9 @@ import {
     createMigrationManifest,
     getApprovedEmptyFactRecordRemovals,
     getChangedComputationsFromApprovedDiff,
+    backfillNewFactPropertyDefaults,
     getDestructiveDeletionScope,
+    getNewFactPropertyBackfills,
     getNewFilteredDataContexts,
     getRecomputeBlockingChanges,
     getScopedSequenceNoSeedOperations,
@@ -415,6 +417,7 @@ export class Controller {
         const readHandle = createMigrationReadHandle(this, schemaPlan)
         await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest, readHandle)
         await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, planningPreviousManifest, readHandle)
+        const factPropertyBackfills = getNewFactPropertyBackfills(this, planningPreviousManifest, nextManifest)
         const plan: MigrationPlan = {
             mode: 'compute',
             dryRun: migrationOptions.dryRun === true,
@@ -422,6 +425,7 @@ export class Controller {
             rebuildPlan,
             scopedSequenceSeedOperations,
             scopedSequenceNoSeedOperations,
+            factPropertyBackfills,
             schemaPlan: {
                 schema: executionSchemaPlan.schema,
                 preRecomputeDDL: executionSchemaPlan.preRecomputeDDL,
@@ -459,6 +463,7 @@ export class Controller {
             if (!reached(phase, 'manifest-written')) {
                 await this.system.storage.runInTransaction({ name: 'migration recompute', isolation: 'SERIALIZABLE' }, async () => {
                     if (!reached(phase, 'computation-applied')) {
+                        await backfillNewFactPropertyDefaults(this, factPropertyBackfills)
                         const filteredEvents = await recomputeFilteredMemberships(this, planningPreviousManifest, nextManifest)
                         await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest)
                         await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents, planningPreviousManifest)

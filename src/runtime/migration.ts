@@ -494,10 +494,16 @@ export type MigrationPlan = {
     rebuildPlan: ComputationRebuildItem[];
     scopedSequenceSeedOperations: ScopedSequenceSeedOperation[];
     scopedSequenceNoSeedOperations: ScopedSequenceNoSeedOperation[];
+    factPropertyBackfills: FactPropertyBackfill[];
     schemaPlan?: Omit<MigrationSchemaPlan, "internal">;
     blockingChanges: string[];
     deletionScope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>;
     approvedDiffHash?: string;
+};
+
+export type FactPropertyBackfill = {
+    recordName: string;
+    propertyName: string;
 };
 
 export type ScopedSequenceSeedOperation = {
@@ -2157,17 +2163,36 @@ function recordOutputNode(manifest: MigrationManifest, recordName: string): stri
 
 // A dependency on a filtered record is fed by its base record's output, so the
 // dependency must be registered on the whole resolved base chain as well.
-function recordDepNodes(manifest: MigrationManifest, recordName: string): string[] {
-    const nodes: string[] = [];
+function recordChainNames(manifest: MigrationManifest, recordName: string): string[] {
+    const names: string[] = [];
     const seen = new Set<string>();
     let current: string | undefined = recordName;
     while (current && !seen.has(current)) {
         seen.add(current);
-        nodes.push(recordOutputNode(manifest, current));
+        names.push(current);
         const storageRecord = manifest.storage.records.find(item => item.recordName === current);
         current = storageRecord?.isFiltered ? storageRecord.resolvedBaseRecordName : undefined;
     }
-    return nodes;
+    return names;
+}
+
+function recordDepNodes(manifest: MigrationManifest, recordName: string): string[] {
+    return recordChainNames(manifest, recordName).map(name => recordOutputNode(manifest, name));
+}
+
+// A records dependency reads the queried properties too, so it must also be
+// registered on their (possibly computed) property nodes and on relation
+// nodes reachable through the attribute query.
+function recordAttributeDepNodes(manifest: MigrationManifest, recordName: string, attributes: unknown[]): string[] {
+    return recordChainNames(manifest, recordName).flatMap(name => {
+        const record = manifest.records.find(item => item.name === name);
+        const propertyNodes = attributes.includes("*")
+            ? (record?.properties || []).map(property => `property:${name}.${property.name}`)
+            : attributes
+                .filter((item): item is string => typeof item === "string" && item !== "*" && item !== "id")
+                .map(attribute => `property:${name}.${attribute}`);
+        return [...propertyNodes, ...relationDepNodes(manifest, name, attributes)];
+    });
 }
 
 function relationDepNodes(manifest: MigrationManifest, hostName: string, attributes: unknown[]): string[] {
@@ -2196,7 +2221,13 @@ function relationDepNodes(manifest: MigrationManifest, hostName: string, attribu
 
 function depNodes(dep: { type: string; source?: string; attributeQuery?: unknown }, computation: ComputationManifest, manifest: MigrationManifest) {
     if (dep.type === "global" && dep.source) return [`global:${dep.source}`];
-    if (dep.type === "records" && dep.source) return recordDepNodes(manifest, dep.source);
+    if (dep.type === "records" && dep.source) {
+        const attributes = Array.isArray(dep.attributeQuery) ? dep.attributeQuery : [];
+        return [
+            ...recordDepNodes(manifest, dep.source),
+            ...recordAttributeDepNodes(manifest, dep.source, attributes),
+        ];
+    }
     if (dep.type === "property") {
         const match = computation.dataContext.match(/^property:([^.]*)\./);
         if (!match) return [];
@@ -2345,7 +2376,7 @@ export function getStorageBlockingChanges(oldManifest: MigrationManifest, newMan
     for (const newRecord of newManifest.storage.records) {
         const oldRecord = oldRecords.get(newRecord.recordName);
         if (!oldRecord) continue;
-        if (oldRecord.tableName !== newRecord.tableName && !newRecord.attributes.some(attr => attr.startsWith("_"))) {
+        if (oldRecord.tableName !== newRecord.tableName) {
             blocking.push({
                 kind: "physical-path-move",
                 logicalPath: newRecord.recordName,
@@ -2740,6 +2771,53 @@ export async function seedScopedSequenceInitializers(controller: Controller, app
                 value: group.max,
                 mode: "max",
             });
+        }
+    }
+}
+
+// New plain fact properties are created as NULL columns by additive DDL, but
+// their declared defaultValue is the framework's create-time semantics. Existing
+// rows must be backfilled so reads and post-recompute non-null constraint
+// verification see the declared default instead of NULL.
+export function getNewFactPropertyBackfills(controller: Controller, previousManifest: MigrationManifest, nextManifest: MigrationManifest): FactPropertyBackfill[] {
+    const previousRecords = new Map(previousManifest.records.map(record => [record.id, record]));
+    const filteredRecordNames = new Set(nextManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
+    const backfills: FactPropertyBackfill[] = [];
+    for (const record of nextManifest.records) {
+        if (filteredRecordNames.has(record.name)) continue;
+        const previousProperties = new Set((previousRecords.get(record.id)?.properties || []).map(property => property.id));
+        for (const property of record.properties) {
+            if (previousProperties.has(property.id) || property.computed) continue;
+            const definition = findFactPropertyDefinition(controller, record.name, property.name);
+            if (typeof definition?.defaultValue !== "function") continue;
+            backfills.push({ recordName: record.name, propertyName: property.name });
+        }
+    }
+    return backfills;
+}
+
+function findFactPropertyDefinition(controller: Controller, recordName: string, propertyName: string) {
+    const host = controller.entities.find(entity => entity.name === recordName) ||
+        controller.relations.find(relation => relation.name === recordName);
+    return host?.properties?.find(property => property.name === propertyName);
+}
+
+export async function backfillNewFactPropertyDefaults(controller: Controller, backfills: FactPropertyBackfill[]) {
+    for (const backfill of backfills) {
+        const definition = findFactPropertyDefinition(controller, backfill.recordName, backfill.propertyName);
+        if (typeof definition?.defaultValue !== "function") {
+            throw new MigrationError(`Cannot backfill ${backfill.recordName}.${backfill.propertyName}: property has no defaultValue`);
+        }
+        const records = await controller.system.storage.find(backfill.recordName, undefined, undefined, ["*"]);
+        for (const record of records) {
+            if (record[backfill.propertyName] !== undefined && record[backfill.propertyName] !== null) continue;
+            const value = definition.defaultValue(record, backfill.recordName);
+            if (value === undefined) continue;
+            await controller.system.storage.update(
+                backfill.recordName,
+                MatchExp.atom({ key: "id", value: ["=", record.id] }),
+                { [backfill.propertyName]: value },
+            );
         }
     }
 }

@@ -802,6 +802,61 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("changed property computation recomputes aggregations whose records dep queries the property", async () => {
+        const db = new PGLiteDB();
+        const build = (factor: number) => {
+            const Product = new Entity({
+                name: "MigrationRecordsDepProduct",
+                properties: [
+                    new Property({ name: "price", type: "number" }, { uuid: "migration-records-dep-price" }),
+                    new Property({
+                        name: "adjusted",
+                        type: "number",
+                        computation: new Custom({
+                            name: "MigrationRecordsDepAdjusted",
+                            dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                            compute: factor === 1
+                                ? (async (_deps: any, record: any) => record.price * 1)
+                                : (async (_deps: any, record: any) => record.price * 2),
+                        }, { uuid: "migration-records-dep-adjusted-computation" }),
+                    }, { uuid: "migration-records-dep-adjusted" }),
+                ],
+            }, { uuid: "migration-records-dep-product" });
+            const total = new Dictionary({
+                name: "migrationRecordsDepTotal",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: Product,
+                    attributeQuery: ["adjusted"],
+                }, { uuid: "migration-records-dep-total-computation" }),
+            }, { uuid: "migration-records-dep-total" });
+            return { entities: [Product], dict: [total] };
+        };
+        const v1 = build(1);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: [], dict: v1.dict }).setup(true);
+        await systemV1.storage.create("MigrationRecordsDepProduct", { price: 10 });
+        await systemV1.storage.create("MigrationRecordsDepProduct", { price: 20 });
+        expect(await systemV1.storage.dict.get("migrationRecordsDepTotal")).toBe(30);
+
+        const v2 = build(2);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: [], dict: v2.dict });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                "computation:property:MigrationRecordsDepProduct.adjusted:Custom": "changed",
+            },
+        });
+        const plan = await controllerV2.migrate({ approvedDiff });
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationRecordsDepTotal");
+        expect(await systemV2.storage.dict.get("migrationRecordsDepTotal")).toBe(60);
+        await db.close();
+    });
+
     test("changed Transform output recomputes downstream aggregations over an existing filtered entity", async () => {
         const db = new PGLiteDB();
         const build = (factor: number) => {
@@ -1549,6 +1604,57 @@ describe("Data migration phase 1", () => {
         const plan = await dryRunWithApproval(controllerV2);
 
         expect(plan.blockingChanges.join("\n")).toMatch(/physical-path-move/);
+        await db.close();
+    });
+
+    test("dry-run blocks record table moves even when the record hosts computation state attributes", async () => {
+        const db = new PGLiteDB();
+        const build = () => {
+            const User = new Entity({
+                name: "MigrationStateMoveUser",
+                properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-state-move-user-name" })],
+            }, { uuid: "migration-state-move-user" });
+            const Post = new Entity({
+                name: "MigrationStateMovePost",
+                properties: [new Property({ name: "title", type: "string" }, { uuid: "migration-state-move-post-title" })],
+            }, { uuid: "migration-state-move-post" });
+            const rel = new Relation({
+                source: User,
+                sourceProperty: "posts",
+                target: Post,
+                targetProperty: "author",
+                name: "MigrationStateMoveAuthored",
+                type: "1:n",
+            }, { uuid: "migration-state-move-authored" });
+            // property Count injects record-bound state (underscore attributes) onto User
+            User.properties.push(new Property({
+                name: "postCount",
+                type: "number",
+                computation: new Count({ property: "posts" }, { uuid: "migration-state-move-count-computation" }),
+            }, { uuid: "migration-state-move-post-count" }));
+            return { entities: [User, Post], relations: [rel] };
+        };
+        const v1 = build();
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: v1.entities, relations: v1.relations });
+        await controllerV1.setup(true);
+
+        const manifest = await readMigrationManifest(controllerV1);
+        const tampered = structuredClone(manifest!);
+        const userRecord = tampered.storage.records.find(record => record.recordName === "MigrationStateMoveUser")!;
+        expect(userRecord.attributes.some(attribute => attribute.startsWith("_"))).toBe(true);
+        userRecord.tableName = "OldUserTableThatMoved";
+        tampered.modelHash = "migration-state-move-tampered-hash";
+        await writeMigrationManifest(controllerV1, tampered);
+
+        const v2 = build();
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: v2.relations });
+        const plan = await dryRunWithApproval(controllerV2);
+        expect(plan.blockingChanges.join("\n")).toMatch(/physical-path-move/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/MigrationStateMoveUser/);
         await db.close();
     });
 
@@ -3977,6 +4083,58 @@ describe("Data migration phase 1", () => {
             { eventRebuild: { probeLifecycleHandler: async () => "open" } },
             expectedDiffMissingEventRequirement,
         )).not.toThrow();
+        await db.close();
+    });
+
+    test("new plain property defaultValue is backfilled for existing rows", async () => {
+        const db = new PGLiteDB();
+        const build = (withStatus: boolean) => new Entity({
+            name: "MigrationDefaultBackfillDoc",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-default-backfill-title" }),
+                ...(withStatus ? [new Property({ name: "status", type: "string", defaultValue: () => "draft" }, { uuid: "migration-default-backfill-status" })] : []),
+            ],
+        }, { uuid: "migration-default-backfill-doc" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [build(false)], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationDefaultBackfillDoc", { title: "old" });
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        const plan = await migrateWithApproval(controllerV2);
+        expect(plan.factPropertyBackfills).toEqual([{ recordName: "MigrationDefaultBackfillDoc", propertyName: "status" }]);
+
+        const docs = await systemV2.storage.find("MigrationDefaultBackfillDoc", undefined, undefined, ["title", "status"]);
+        expect(docs.find(doc => doc.title === "old")?.status).toBe("draft");
+        await db.close();
+    });
+
+    test("new non-null property with defaultValue passes constraint verification through backfill", async () => {
+        const db = new PGLiteDB();
+        const build = (withStatus: boolean) => new Entity({
+            name: "MigrationDefaultNonNullDoc",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-default-non-null-title" }),
+                ...(withStatus ? [new Property({ name: "status", type: "string", defaultValue: () => "draft" }, { uuid: "migration-default-non-null-status" })] : []),
+            ],
+            constraints: withStatus ? [
+                new NonNullConstraint({ name: "default_non_null_status_required", property: "status" }, { uuid: "migration-default-non-null-constraint" }),
+            ] : [],
+        }, { uuid: "migration-default-non-null-doc" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [build(false)], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationDefaultNonNullDoc", { title: "old" });
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        await migrateWithApproval(controllerV2);
+
+        const docs = await systemV2.storage.find("MigrationDefaultNonNullDoc", undefined, undefined, ["title", "status"]);
+        expect(docs.find(doc => doc.title === "old")?.status).toBe("draft");
         await db.close();
     });
 

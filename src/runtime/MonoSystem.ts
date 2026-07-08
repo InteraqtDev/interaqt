@@ -1337,7 +1337,7 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     async hasExistingData(): Promise<boolean> {
         const storage = this.storage as MonoStorage
         const tables = await storage.getExistingTables()
-        const ignored = new Set(['_IDS_', '__interaqt_migration_manifest', '__interaqt_migration_log', '__interaqt_migration_lock'])
+        const ignored = new Set(['_IDS_', '__interaqt_migration_manifest', '__interaqt_migration_log', '__interaqt_migration_lock', '__interaqt_migration_operation_log'])
         for (const tableName of tables) {
             if (ignored.has(tableName)) continue
             const escaped = tableName.replace(/"/g, '""')
