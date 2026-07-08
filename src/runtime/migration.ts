@@ -2052,6 +2052,29 @@ function relationForAttribute(manifest: MigrationManifest, hostName: string, att
     );
 }
 
+function recordOutputNode(manifest: MigrationManifest, recordName: string): string {
+    const storageRecord = manifest.storage.records.find(item => item.recordName === recordName);
+    const isRelation = storageRecord
+        ? storageRecord.isRelation
+        : manifest.relations.some(relation => relation.name === recordName);
+    return `${isRelation ? "relation" : "entity"}:${recordName}`;
+}
+
+// A dependency on a filtered record is fed by its base record's output, so the
+// dependency must be registered on the whole resolved base chain as well.
+function recordDepNodes(manifest: MigrationManifest, recordName: string): string[] {
+    const nodes: string[] = [];
+    const seen = new Set<string>();
+    let current: string | undefined = recordName;
+    while (current && !seen.has(current)) {
+        seen.add(current);
+        nodes.push(recordOutputNode(manifest, current));
+        const storageRecord = manifest.storage.records.find(item => item.recordName === current);
+        current = storageRecord?.isFiltered ? storageRecord.resolvedBaseRecordName : undefined;
+    }
+    return nodes;
+}
+
 function relationDepNodes(manifest: MigrationManifest, hostName: string, attributes: unknown[]): string[] {
     return attributes.flatMap(attribute => {
         if (!Array.isArray(attribute) || typeof attribute[0] !== "string") return [];
@@ -2078,7 +2101,7 @@ function relationDepNodes(manifest: MigrationManifest, hostName: string, attribu
 
 function depNodes(dep: { type: string; source?: string; attributeQuery?: unknown }, computation: ComputationManifest, manifest: MigrationManifest) {
     if (dep.type === "global" && dep.source) return [`global:${dep.source}`];
-    if (dep.type === "records" && dep.source) return [`entity:${dep.source}`];
+    if (dep.type === "records" && dep.source) return recordDepNodes(manifest, dep.source);
     if (dep.type === "property") {
         const match = computation.dataContext.match(/^property:([^.]*)\./);
         if (!match) return [];
@@ -2089,13 +2112,13 @@ function depNodes(dep: { type: string; source?: string; attributeQuery?: unknown
             .filter((item): item is string => typeof item === "string" && item !== "*")
             .map(attribute => `property:${hostName}.${attribute}`);
         const nodes = [...propertyNodes, ...relationNodes];
-        return nodes.length ? nodes : [`entity:${hostName}`];
+        return nodes.length ? nodes : recordDepNodes(manifest, hostName);
     }
     return [];
 }
 
 function eventDepNodes(eventDep: { recordName: string; type: string }, manifest: MigrationManifest) {
-    const nodes = [`entity:${eventDep.recordName}`];
+    const nodes = recordDepNodes(manifest, eventDep.recordName);
     if (eventDep.type === "update") {
         const record = manifest.records.find(item => item.name === eventDep.recordName);
         nodes.push(...(record?.properties || []).map(property => `property:${eventDep.recordName}.${property.name}`));
@@ -2753,7 +2776,7 @@ export function getNewFilteredDataContexts(oldManifest: MigrationManifest, newMa
     const oldFiltered = new Set(oldManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
     return newManifest.storage.records
         .filter(record => record.isFiltered && !oldFiltered.has(record.recordName))
-        .map(record => `entity:${record.recordName}`);
+        .map(record => `${record.isRelation ? "relation" : "entity"}:${record.recordName}`);
 }
 
 export function createPlanBlockingMessages(changes: StorageBlockingChange[]) {

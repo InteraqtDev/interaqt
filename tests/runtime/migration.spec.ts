@@ -731,6 +731,133 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("changed Transform-derived relation recomputes downstream aggregations over the relation", async () => {
+        const db = new PGLiteDB();
+        const build = (factor: number) => {
+            const User = new Entity({
+                name: "MigrationRelationDownstreamUser",
+                properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-downstream-user-name" })],
+            }, { uuid: "migration-relation-downstream-user" });
+            const Item = new Entity({
+                name: "MigrationRelationDownstreamItem",
+                properties: [new Property({ name: "price", type: "number" }, { uuid: "migration-relation-downstream-item-price" })],
+            }, { uuid: "migration-relation-downstream-item" });
+            const creatorRel = new Relation({
+                source: Item,
+                sourceProperty: "creator",
+                target: User,
+                targetProperty: "created",
+                name: "MigrationRelationDownstreamCreator",
+                type: "n:1",
+            }, { uuid: "migration-relation-downstream-creator" });
+            const derivedRel = new Relation({
+                source: User,
+                sourceProperty: "items",
+                target: Item,
+                targetProperty: "owner",
+                name: "MigrationRelationDownstreamOwn",
+                type: "n:n",
+                properties: [new Property({ name: "weight", type: "number" }, { uuid: "migration-relation-downstream-own-weight" })],
+                computation: new Transform({
+                    record: Item,
+                    attributeQuery: ["id", "price", ["creator", { attributeQuery: ["id"] }]],
+                    callback: function (item: any) {
+                        return item.creator ? { source: item.creator, target: item, weight: item.price * factor } : null;
+                    },
+                }, { uuid: "migration-relation-downstream-own-transform" }),
+            }, { uuid: "migration-relation-downstream-own" });
+            const weightSum = new Dictionary({
+                name: "migrationRelationDownstreamWeightSum",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: derivedRel,
+                    attributeQuery: ["weight"],
+                }, { uuid: "migration-relation-downstream-weight-sum-computation" }),
+            }, { uuid: "migration-relation-downstream-weight-sum" });
+            return { entities: [User, Item], relations: [derivedRel, creatorRel], dict: [weightSum] };
+        };
+        const v1 = build(1);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: v1.relations, dict: v1.dict }).setup(true);
+        const user = await systemV1.storage.create("MigrationRelationDownstreamUser", { name: "u" });
+        await systemV1.storage.create("MigrationRelationDownstreamItem", { price: 10, creator: { id: user.id } });
+        await systemV1.storage.create("MigrationRelationDownstreamItem", { price: 20, creator: { id: user.id } });
+        expect(await systemV1.storage.dict.get("migrationRelationDownstreamWeightSum")).toBe(30);
+
+        const v2 = build(2);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: v2.relations, dict: v2.dict });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                "computation:relation:MigrationRelationDownstreamOwn:Transform": "changed",
+            },
+        });
+        const plan = await controllerV2.migrate({ approvedDiff });
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationRelationDownstreamWeightSum");
+        expect(await systemV2.storage.dict.get("migrationRelationDownstreamWeightSum")).toBe(60);
+        await db.close();
+    });
+
+    test("changed Transform output recomputes downstream aggregations over an existing filtered entity", async () => {
+        const db = new PGLiteDB();
+        const build = (factor: number) => {
+            const Product = new Entity({
+                name: "MigrationFilteredDownstreamProduct",
+                properties: [new Property({ name: "price", type: "number" }, { uuid: "migration-filtered-downstream-price" })],
+            }, { uuid: "migration-filtered-downstream-product" });
+            const Discount = new Entity({
+                name: "MigrationFilteredDownstreamDiscount",
+                properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-filtered-downstream-value" })],
+                computation: new Transform({
+                    record: Product,
+                    attributeQuery: ["id", "price"],
+                    callback: (item: any) => ({ value: item.price * factor }),
+                }, { uuid: "migration-filtered-downstream-transform" }),
+            }, { uuid: "migration-filtered-downstream-discount" });
+            const BigDiscount = new Entity({
+                name: "MigrationFilteredDownstreamBigDiscount",
+                baseEntity: Discount,
+                matchExpression: MatchExp.atom({ key: "value", value: [">", 15] }),
+            }, { uuid: "migration-filtered-downstream-big-discount" });
+            const bigSum = new Dictionary({
+                name: "migrationFilteredDownstreamBigSum",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: BigDiscount,
+                    attributeQuery: ["value"],
+                }, { uuid: "migration-filtered-downstream-big-sum-computation" }),
+            }, { uuid: "migration-filtered-downstream-big-sum" });
+            return { entities: [Product, Discount, BigDiscount], dict: [bigSum] };
+        };
+        const v1 = build(1);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: [], dict: v1.dict }).setup(true);
+        await systemV1.storage.create("MigrationFilteredDownstreamProduct", { price: 10 });
+        await systemV1.storage.create("MigrationFilteredDownstreamProduct", { price: 20 });
+        expect(await systemV1.storage.dict.get("migrationFilteredDownstreamBigSum")).toBe(20);
+
+        const v2 = build(2);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: [], dict: v2.dict });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                "computation:entity:MigrationFilteredDownstreamDiscount:Transform": "changed",
+            },
+        });
+        const plan = await controllerV2.migrate({ approvedDiff });
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationFilteredDownstreamBigSum");
+        expect(await systemV2.storage.dict.get("migrationFilteredDownstreamBigSum")).toBe(60);
+        await db.close();
+    });
+
     test("changed Transform output requires destructive opt-in before deleting stale derived rows", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
