@@ -362,7 +362,11 @@ describe("ScopedSequence", () => {
     const first = await controller.dispatch(model.CreateMedia, { payload: { project: PROJECT_1, prefix: "img" } });
     expect(first.error).toBeUndefined();
     expect(first.effects?.map(effect => `${effect.recordName}:${effect.type}:${effect.keys?.join(",") || "*"}`)).toContain("ScopedMatrixAMedia:create:*");
-    expect(first.effects?.some(effect => effect.recordName === "ScopedMatrixAMedia" && effect.type === "update")).toBe(true);
+    // the allocation is part of the creation semantics: it is folded into the create
+    // event's record instead of surfacing as a separate business update event
+    const createEffect = first.effects?.find(effect => effect.recordName === "ScopedMatrixAMedia" && effect.type === "create");
+    expect(createEffect?.record?.serialNumber).toBe(1);
+    expect(first.effects?.some(effect => effect.recordName === "ScopedMatrixAMedia" && effect.type === "update")).toBe(false);
 
     await controller.dispatch(model.CreateMedia, { payload: { project: PROJECT_1, prefix: "img" } });
     await controller.dispatch(model.CreateMedia, { payload: { project: PROJECT_1, prefix: "video" } });

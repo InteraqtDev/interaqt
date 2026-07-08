@@ -1,5 +1,10 @@
 # StateMachine 运行时旧 Bug 记录(main 上已存在,与 migration 修复无关)
 
+> **状态:已修复**(分支 `cursor/fix-statemachine-runtime-bugs-664d`)。两个 bug 均先在干净 main 上真实复现后修复:
+> - Bug 1 采用修复方向 1(explicit control):`PropertyStateMachineHandle` 构造时校验每个 transfer 必须提供 `computeTarget`,缺失时在 Controller 构建阶段抛出带宿主实体、属性、transfer 状态与 trigger 定位的错误。
+> - Bug 2 采用修复方向 1(internal 写路径):新增 `storage.updateInternal`(对应 `dict.setInternal` 的记录级写路径),初始值回写不再派发宿主记录自身的 update 事件,也不进入 effects;派生事件(filtered entity 成员资格)仍正常派发;回写结果(含重算的 computed 属性)并入 create 事件的 record,下游计算把初始值当作创建语义的一部分消费。
+> - 回归测试见 `tests/runtime/stateMachineInitialValue.spec.ts`。
+
 > 发现背景:在为 data-migration 修复(PR #15)编写"defaultValue 回填不得触发 StateMachine 转移"的安全测试时撞见。两个问题都已在**干净的 main worktree** 上复现确认,与迁移分支的任何改动无关,不在该 PR 范围内修复。建议各开一个独立 issue。
 
 ## Bug 1:属性 StateMachine 的 transfer 缺少 `computeTarget` 时,trigger 一触发即崩溃
