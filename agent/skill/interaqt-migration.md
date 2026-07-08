@@ -21,6 +21,8 @@ New plain fact properties with a declared `defaultValue` are backfilled for exis
 
 Manifests written by a different manifest generator version are rejected outright — there is no backward-compatible adoption. Startup, diff generation, and migration all fail with an explicit error. After verifying that the current definitions match the existing schema, re-baseline with `controller.createMigrationBaseline()`; if you also changed the model, re-baseline with the old model code first, then run a normal reviewed migration for the model change.
 
+Migration identity for computations requires an explicitly declared type name: a static `displayName` on the computation type (or handle class), or an `_type` string on the computation args. Class names are rejected because minified builds rewrite them. Changing a computation's type shows up in the diff as removed + added and goes through normal review and rebuild.
+
 `ScopedSequence` is migration-managed state, not a recomputable derivation. Adding or changing a scoped sequence requires an explicit seed/no-seed decision, and removing a scoped sequence declaration must be treated as an explicit migration review item because existing `_ScopedSequence_` counter rows are internal state and must not be silently discarded.
 
 Phase 1.5 does not guess or execute rename/copy/merge/split primitives. Rename candidates may be recorded for review, but compute-route migration will still obey physical layout and destructive-change safety gates.

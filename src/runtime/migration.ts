@@ -575,18 +575,6 @@ function stripIdentityUUID<T>(value: T): T {
     return output as T;
 }
 
-function stripUndefinedDeep<T>(value: T): T {
-    if (value === null || typeof value !== "object") return value;
-    if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
-    const record = value as Record<string, unknown>;
-    const output: Record<string, unknown> = {};
-    for (const key of Object.keys(record)) {
-        if (record[key] === undefined) continue;
-        output[key] = stripUndefinedDeep(record[key]);
-    }
-    return output as T;
-}
-
 function assertUniqueIdentities(identities: MigrationIdentity[]) {
     const seen = new Map<string, MigrationIdentity>();
     for (const identity of identities) {
@@ -606,15 +594,23 @@ export function dataContextPath(dataContext: DataContext): string {
     return `${dataContext.type}:${dataContext.id.name}`;
 }
 
-function computationSemanticType(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { _type?: string; constructor?: { displayName?: string; name?: string } } }) {
-    return computation.constructor?.computationType?.displayName ||
-        computation.constructor?.computationType?.name ||
+// Migration identity must never depend on class names: minifiers rewrite them,
+// which would make computation ids differ between builds of the same code.
+// Only explicitly declared names are accepted; anything else fails fast.
+function computationSemanticType(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { _type?: string; constructor?: { displayName?: string; name?: string } }; dataContext?: DataContext }) {
+    const semanticType = computation.constructor?.computationType?.displayName ||
         computation.args._type ||
         computation.args.constructor?.displayName ||
-        computation.args.constructor?.name ||
-        computation.constructor?.displayName ||
-        computation.constructor?.name ||
-        "UnknownComputation";
+        computation.constructor?.displayName;
+    if (!semanticType) {
+        const contextHint = computation.dataContext ? ` for ${dataContextPath(computation.dataContext)}` : "";
+        throw new AmbiguousComputationSignatureError(
+            `Cannot derive a stable migration identity${contextHint}: the computation type must declare an explicit name. ` +
+            `Set a static 'displayName' on the computation type (or handle class), or an '_type' string on the computation args. ` +
+            `Class names are not accepted because minified builds rewrite them.`,
+        );
+    }
+    return semanticType;
 }
 
 export function computationManifestId(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { uuid?: string; _type?: string; constructor?: { displayName?: string; name?: string } }; dataContext: DataContext }) {
@@ -972,59 +968,6 @@ export function getChangedComputations(oldManifest: MigrationManifest, newManife
     });
 }
 
-function normalizeComputationOwnershipProof(computation: ComputationManifest, ownerComputationId: string): ComputationManifest["ownershipProof"] {
-    if (!computation.ownershipProof) return undefined;
-    return {
-        ...computation.ownershipProof,
-        ownerComputationId,
-    };
-}
-
-function hasSameSemanticComputationShape(oldComputation: ComputationManifest, nextComputation: ComputationManifest) {
-    const oldFunctionHash = oldComputation.functionSignature?.hash;
-    const nextFunctionHash = nextComputation.functionSignature?.hash;
-    const hasStableUuid = oldComputation.identity.uuid !== undefined &&
-        oldComputation.identity.uuid === nextComputation.identity.uuid;
-    const hasMatchingFunctionHash = oldFunctionHash !== undefined && oldFunctionHash === nextFunctionHash;
-    if (!hasStableUuid && !hasMatchingFunctionHash) return false;
-    if (oldFunctionHash !== nextFunctionHash) return false;
-    return oldComputation.dataContext === nextComputation.dataContext &&
-        oldComputation.outputRecord === nextComputation.outputRecord &&
-        oldComputation.outputProperty === nextComputation.outputProperty &&
-        oldComputation.asyncReturn === nextComputation.asyncReturn &&
-        oldComputation.owner === nextComputation.owner &&
-        oldComputation.allocationSignature === nextComputation.allocationSignature &&
-        isEqualValue(stripUndefinedDeep(oldComputation.deps), stripUndefinedDeep(nextComputation.deps)) &&
-        isEqualValue(stripUndefinedDeep(oldComputation.eventDeps), stripUndefinedDeep(nextComputation.eventDeps)) &&
-        isEqualValue(stripUndefinedDeep(oldComputation.stateKeys), stripUndefinedDeep(nextComputation.stateKeys)) &&
-        isEqualValue(stripUndefinedDeep(oldComputation.boundStates), stripUndefinedDeep(nextComputation.boundStates)) &&
-        oldComputation.functionSignature?.hasFunction === nextComputation.functionSignature?.hasFunction &&
-        isEqualValue(oldComputation.functionSignature?.callbackPaths || [], nextComputation.functionSignature?.callbackPaths || []);
-}
-
-function normalizeLegacyComputationManifest(oldComputation: ComputationManifest, nextComputation: ComputationManifest): ComputationManifest {
-    const stateSignature = oldComputation.stateSignature;
-    const structuralSignature = nextComputation.structuralSignature;
-    return {
-        ...oldComputation,
-        id: nextComputation.id,
-        identity: {
-            ...oldComputation.identity,
-            key: nextComputation.id,
-            namePath: nextComputation.id,
-        },
-        type: nextComputation.type,
-        outputSignature: nextComputation.outputSignature,
-        stateSignature,
-        structuralSignature,
-        allocation: nextComputation.allocation,
-        allocationSignature: nextComputation.allocationSignature,
-        scopeSignature: nextComputation.scopeSignature,
-        signature: hash({ structuralSignature, stateSignature, functionHash: oldComputation.functionSignature?.hash, allocationSignature: nextComputation.allocationSignature }),
-        ownershipProof: normalizeComputationOwnershipProof(oldComputation, nextComputation.id),
-    };
-}
-
 // No backward compatibility: manifests written by a different generator version
 // are rejected outright. Signature collection semantics differ between
 // generators, so silently comparing or adopting them would hide real changes.
@@ -1038,30 +981,6 @@ export function assertManifestGeneratorCurrent(manifest: MigrationManifest) {
             { foundGeneratorVersion: manifest.frameworkVersion, expectedGeneratorVersion: MIGRATION_MANIFEST_GENERATOR_VERSION },
         );
     }
-}
-
-export function normalizePreviousComputationManifest(previousManifest: MigrationManifest, nextManifest: MigrationManifest): MigrationManifest {
-    const nextById = new Map(nextManifest.computations.map(item => [item.id, item]));
-    const usedNextIds = new Set<string>();
-    const normalizedComputations = previousManifest.computations.map(oldComputation => {
-        const sameId = nextById.get(oldComputation.id);
-        if (sameId) {
-            usedNextIds.add(sameId.id);
-            return oldComputation;
-        }
-        const semanticMatch = nextManifest.computations.find(nextComputation =>
-            !usedNextIds.has(nextComputation.id) &&
-            hasSameSemanticComputationShape(oldComputation, nextComputation)
-        );
-        if (!semanticMatch) return oldComputation;
-        usedNextIds.add(semanticMatch.id);
-        return normalizeLegacyComputationManifest(oldComputation, semanticMatch);
-    });
-    return {
-        ...previousManifest,
-        computations: normalizedComputations,
-        sequences: previousManifest.sequences || createScopedSequenceDeclarationManifests(normalizedComputations),
-    };
 }
 
 function requirementKey(requirement: MigrationDecisionRequirement) {

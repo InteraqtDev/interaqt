@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, createMigrationManifest, hashMigrationDiff, readMigrationManifest, validateApprovedDiff, writeMigrationManifest } from "interaqt";
+import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, computationManifestId, createMigrationManifest, hashMigrationDiff, readMigrationManifest, validateApprovedDiff, writeMigrationManifest } from "interaqt";
 import { PGLiteDB } from "@drivers";
 
 async function approveGeneratedMigrationDiff(controller: Controller, options: {
@@ -1822,80 +1822,22 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
-    test("legacy minified computation ids are normalized to stable semantic ids", async () => {
-        const db = new PGLiteDB();
-        const Product = new Entity({
-            name: "MigrationLegacyComputationProduct",
-            properties: [
-                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-computation-price" }),
-                new Property({
-                    name: "doublePrice",
-                    type: "number",
-                    computation: new Custom({
-                        name: "MigrationLegacyComputationDouble",
-                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
-                        compute: async (_deps: any, record: any) => record.price * 2,
-                    }, { uuid: "migration-legacy-computation-double" }),
-                }, { uuid: "migration-legacy-computation-double-price" }),
-            ],
-        }, { uuid: "migration-legacy-computation-product" });
-        const systemV1 = new MonoSystem(db);
-        systemV1.conceptClass = KlassByName;
-        const controllerV1 = new Controller({ system: systemV1, entities: [Product], relations: [] });
-        await controllerV1.setup(true);
-
-        const manifest = await readMigrationManifest(controllerV1);
-        const tampered = structuredClone(manifest!);
-        const computation = tampered.computations.find(item => item.dataContext === "property:MigrationLegacyComputationProduct.doublePrice")!;
-        computation.id = "computation:property:MigrationLegacyComputationProduct.doublePrice:Gr";
-        computation.identity = {
-            ...computation.identity,
-            key: computation.id,
-            namePath: computation.id,
+    test("computation identity requires an explicitly declared type name", () => {
+        const MinifiedArgs = class {
+            uuid = "minified-computation-uuid";
         };
-        computation.type = "Gr";
-        tampered.modelHash = "legacy-minified-computation-model-hash";
-        await writeMigrationManifest(controllerV1, tampered);
-
-        const ProductAgain = new Entity({
-            name: "MigrationLegacyComputationProduct",
-            properties: [
-                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-computation-price" }),
-                new Property({
-                    name: "doublePrice",
-                    type: "number",
-                    computation: new Custom({
-                        name: "MigrationLegacyComputationDouble",
-                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
-                        compute: async (_deps: any, record: any) => record.price * 2,
-                    }, { uuid: "migration-legacy-computation-double" }),
-                }, { uuid: "migration-legacy-computation-double-price" }),
-            ],
-        }, { uuid: "migration-legacy-computation-product" });
-        const systemV2 = new MonoSystem(db);
-        systemV2.conceptClass = KlassByName;
-        const controllerV2 = new Controller({ system: systemV2, entities: [ProductAgain], relations: [] });
-        const diff = await controllerV2.generateMigrationDiff();
-
-        expect(diff.changes.filter(change => change.kind === "computation")).toHaveLength(1);
-        expect(diff.changes.find(change => change.kind === "computation")).toMatchObject({
-            kind: "computation",
-            changeType: "unchanged",
-            recommendation: "needs-review",
-        });
-        expect(diff.requiredDecisions.filter(item => item.kind === "computation")).toHaveLength(1);
-        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
-            computationDecisions: {
-                [diff.requiredDecisions.find(item => item.kind === "computation")!.id]: "unchanged",
-            },
-        });
-        const plan = await controllerV2.migrate({ dryRun: true, approvedDiff });
-        expect(plan.changedComputations).toHaveLength(0);
-        expect(plan.rebuildPlan).toHaveLength(0);
-        await db.close();
+        const computation = {
+            constructor: class {},
+            args: new MinifiedArgs(),
+            dataContext: { type: "property", host: { name: "MinifiedHost" }, id: { name: "value" } },
+        };
+        // Class names are rewritten by minifiers, so they must never become
+        // migration identity. The manifest generator fails fast instead.
+        expect(() => computationManifestId(computation as any)).toThrow(/stable migration identity.*displayName/s);
+        expect(() => computationManifestId(computation as any)).toThrow(/property:MinifiedHost\.value/);
     });
 
-    test("legacy computation ids are not normalized when function hash changed", async () => {
+    test("changed computation type ids appear as removed plus added", async () => {
         const db = new PGLiteDB();
         const Product = new Entity({
             name: "MigrationLegacyChangedFunctionProduct",
