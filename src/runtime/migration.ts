@@ -12,6 +12,9 @@ import { matchesScopedSequenceRecord, scopedSequenceMatchAttributeQuery, scopedS
 
 export const MIGRATION_MANIFEST_CONCEPT = "_MigrationManifest_";
 export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
+// Generator "1" did not collect StateNode.computeValue / StateTransfer.computeTarget
+// into computation function signatures. Bump when signature collection semantics change.
+const MIGRATION_MANIFEST_GENERATOR_VERSION = "2";
 const HARD_DELETION_PROPERTY_NAME = "_isDeleted_";
 
 export class MigrationError extends Error {
@@ -726,14 +729,28 @@ function serializeState(computation: Computation): BoundStateManifest[] {
     });
 }
 
+// Model-graph references must not be traversed when collecting a computation's
+// own functions: they carry their own computations and would explode the walk
+// into the whole model.
+const MODEL_REFERENCE_TYPES = ["Entity", "Relation", "Property", "Dictionary"];
+// StateNode/StateTransfer belong to the computation itself, but their
+// `current`/`next`/`trigger` fields reference other model objects. Only their
+// own function-valued fields define the computation's semantics.
+const OWN_FUNCTION_FIELDS: Record<string, readonly string[]> = {
+    StateNode: ["computeValue"],
+    StateTransfer: ["computeTarget"],
+};
+
 function hasFunctionDeep(value: unknown, seen = new WeakSet<object>(), isRoot = true): boolean {
     if (typeof value === "function") return true;
     if (value === null || typeof value !== "object") return false;
     if (seen.has(value)) return false;
     seen.add(value);
     const record = value as Record<string, unknown>;
-    if (!isRoot && typeof record._type === "string" && ["Entity", "Relation", "Property", "Dictionary", "StateNode", "StateTransfer"].includes(record._type)) {
-        return false;
+    if (!isRoot && typeof record._type === "string") {
+        if (MODEL_REFERENCE_TYPES.includes(record._type)) return false;
+        const ownFunctionFields = OWN_FUNCTION_FIELDS[record._type];
+        if (ownFunctionFields) return ownFunctionFields.some(field => typeof record[field] === "function");
     }
     if (Array.isArray(value)) return value.some(item => hasFunctionDeep(item, seen, false));
     return Object.values(record).some(item => hasFunctionDeep(item, seen, false));
@@ -747,8 +764,14 @@ function collectFunctionText(value: unknown, path = "args", seen = new WeakSet<o
     if (seen.has(value)) return [];
     seen.add(value);
     const record = value as Record<string, unknown>;
-    if (typeof record._type === "string" && ["Entity", "Relation", "Property", "Dictionary", "StateNode", "StateTransfer"].includes(record._type)) {
-        return [];
+    if (typeof record._type === "string") {
+        if (MODEL_REFERENCE_TYPES.includes(record._type)) return [];
+        const ownFunctionFields = OWN_FUNCTION_FIELDS[record._type];
+        if (ownFunctionFields) {
+            return ownFunctionFields
+                .filter(field => typeof record[field] === "function")
+                .map(field => ({ path: `${path}.${field}`, text: (record[field] as Function).toString() }));
+        }
     }
     if (Array.isArray(value)) {
         return value.flatMap((item, index) => collectFunctionText(item, `${path}[${index}]`, seen));
@@ -924,7 +947,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
 
     return {
         version: 2,
-        frameworkVersion: "1",
+        frameworkVersion: MIGRATION_MANIFEST_GENERATOR_VERSION,
         modelHash: hash(model),
         records,
         relations,
@@ -996,14 +1019,44 @@ function normalizeLegacyComputationManifest(oldComputation: ComputationManifest,
     };
 }
 
+function isLegacyGeneratorManifest(manifest: MigrationManifest) {
+    return manifest.frameworkVersion !== MIGRATION_MANIFEST_GENERATOR_VERSION;
+}
+
+// Generator "1" could not see StateNode.computeValue / StateTransfer.computeTarget,
+// so legacy manifests miss exactly those callback paths. When the only signature
+// difference is such newly visible functions, adopt the next signature as the
+// baseline instead of reporting a false function change.
+function adoptNewlyVisibleFunctionSignature(oldComputation: ComputationManifest, nextComputation: ComputationManifest): ComputationManifest | undefined {
+    if (!nextComputation.functionSignature) return undefined;
+    if (oldComputation.functionSignature?.hash === nextComputation.functionSignature.hash) return undefined;
+    if (oldComputation.outputSignature !== nextComputation.outputSignature) return undefined;
+    if (oldComputation.stateSignature !== nextComputation.stateSignature) return undefined;
+    if (oldComputation.allocationSignature !== nextComputation.allocationSignature) return undefined;
+    const oldPaths = oldComputation.functionSignature?.callbackPaths || [];
+    const nextPaths = nextComputation.functionSignature.callbackPaths;
+    if (!oldPaths.every(path => nextPaths.includes(path))) return undefined;
+    const addedPaths = nextPaths.filter(path => !oldPaths.includes(path));
+    if (!addedPaths.length || !addedPaths.every(path => path.endsWith(".computeValue") || path.endsWith(".computeTarget"))) return undefined;
+    const stateSignature = oldComputation.stateSignature;
+    const structuralSignature = nextComputation.structuralSignature;
+    return {
+        ...oldComputation,
+        functionSignature: nextComputation.functionSignature,
+        structuralSignature,
+        signature: hash({ structuralSignature, stateSignature, functionHash: nextComputation.functionSignature.hash, allocationSignature: nextComputation.allocationSignature }),
+    };
+}
+
 export function normalizePreviousComputationManifest(previousManifest: MigrationManifest, nextManifest: MigrationManifest): MigrationManifest {
     const nextById = new Map(nextManifest.computations.map(item => [item.id, item]));
     const usedNextIds = new Set<string>();
+    const legacyGenerator = isLegacyGeneratorManifest(previousManifest);
     const normalizedComputations = previousManifest.computations.map(oldComputation => {
         const sameId = nextById.get(oldComputation.id);
         if (sameId) {
             usedNextIds.add(sameId.id);
-            return oldComputation;
+            return (legacyGenerator && adoptNewlyVisibleFunctionSignature(oldComputation, sameId)) || oldComputation;
         }
         const semanticMatch = nextManifest.computations.find(nextComputation =>
             !usedNextIds.has(nextComputation.id) &&
@@ -1015,9 +1068,43 @@ export function normalizePreviousComputationManifest(previousManifest: Migration
     });
     return {
         ...previousManifest,
+        frameworkVersion: MIGRATION_MANIFEST_GENERATOR_VERSION,
         computations: normalizedComputations,
         sequences: previousManifest.sequences || createScopedSequenceDeclarationManifests(normalizedComputations),
     };
+}
+
+function canonicalManifestModelHash(manifest: MigrationManifest) {
+    const hashComputations = manifest.computations.map(computation => ({
+        ...computation,
+        functionSignature: computation.functionSignature ? {
+            ...computation.functionSignature,
+            text: undefined,
+        } : undefined,
+    }));
+    const model = stripIdentityUUID({
+        records: manifest.records,
+        relations: manifest.relations,
+        dictionaries: manifest.dictionaries,
+        computations: hashComputations,
+        sequences: manifest.sequences,
+        storage: manifest.storage,
+    });
+    // Canonicalize exactly like manifest persistence does (drops undefined values
+    // and function values), so a stored manifest and a freshly generated one hash
+    // identically when they describe the same model.
+    return hash(JSON.parse(JSON.stringify(model)));
+}
+
+// setup(false) manifest validation: legacy manifests written by an older
+// generator may hash differently for reasons the generator itself introduced
+// (e.g. newly visible StateMachine functions). Normalize before concluding
+// that the model actually changed.
+export function isManifestModelCurrent(previousManifest: MigrationManifest, nextManifest: MigrationManifest) {
+    if (previousManifest.modelHash === nextManifest.modelHash) return true;
+    if (!isLegacyGeneratorManifest(previousManifest)) return false;
+    const normalizedPrevious = normalizePreviousComputationManifest(previousManifest, nextManifest);
+    return canonicalManifestModelHash(normalizedPrevious) === canonicalManifestModelHash(nextManifest);
 }
 
 function requirementKey(requirement: MigrationDecisionRequirement) {

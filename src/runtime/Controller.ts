@@ -54,6 +54,7 @@ import {
     MigrationRunState,
     MigrationPlan,
     MigrationSchemaPlan,
+    isManifestModelCurrent,
     normalizePreviousComputationManifest,
     readMigrationManifest,
     recomputeChangedComputations,
@@ -250,7 +251,7 @@ export class Controller {
             const schemaPlan = await prepareMigrationSchema.call(migrationSystem, this.entities, this.relations, states, { internalRequirements })
             const nextManifest = createMigrationManifest(this, schemaPlan.schema)
             const previousManifest = await readMigrationManifest(this)
-            if (previousManifest && previousManifest.modelHash !== nextManifest.modelHash) {
+            if (previousManifest && !isManifestModelCurrent(previousManifest, nextManifest)) {
                 throw new Error(`Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`)
             }
             if (!previousManifest && await this.system.hasExistingData?.()) {

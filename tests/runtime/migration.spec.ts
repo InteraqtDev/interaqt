@@ -3935,6 +3935,114 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("StateNode.computeValue changes are visible in the manifest and migration diff", async () => {
+        const db = new PGLiteDB();
+        const build = (computeValue: () => string) => {
+            const open = new StateNode({
+                name: "open",
+                computeValue,
+            }, { uuid: "migration-sm-function-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-function-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationSmFunctionTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                    }, { uuid: "migration-sm-function-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-sm-function-lifecycle" });
+            return new Entity({
+                name: "MigrationSmFunctionTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-sm-function-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-sm-function-status" }),
+                ],
+            }, { uuid: "migration-sm-function-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [build(() => "open-v1")], relations: [] });
+        await controllerV1.setup(true);
+        const manifestV1 = createMigrationManifest(controllerV1);
+        const computationV1 = manifestV1.computations.find(item => item.dataContext === "property:MigrationSmFunctionTicket.status")!;
+        expect(computationV1.functionSignature?.hasFunction).toBe(true);
+        expect(computationV1.functionSignature?.callbackPaths).toContain("args.initialState.computeValue");
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(() => "open-v2-changed")], relations: [] });
+        const computationV2 = createMigrationManifest(controllerV2).computations.find(item => item.dataContext === "property:MigrationSmFunctionTicket.status")!;
+        expect(computationV2.signature).not.toBe(computationV1.signature);
+
+        await expect(controllerV2.setup(false)).rejects.toThrow(/Model manifest mismatch/);
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.changes.find(change => change.kind === "computation" && change.dataContext === "property:MigrationSmFunctionTicket.status")).toMatchObject({
+            changeType: "possibly-changed",
+            recommendation: "needs-review",
+        });
+        await db.close();
+    });
+
+    test("legacy generator-1 manifests without StateMachine function signatures stay current", async () => {
+        const db = new PGLiteDB();
+        const build = () => {
+            const open = new StateNode({
+                name: "open",
+                computeValue: () => "open",
+            }, { uuid: "migration-sm-legacy-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-legacy-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationSmLegacyTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                    }, { uuid: "migration-sm-legacy-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-sm-legacy-lifecycle" });
+            return new Entity({
+                name: "MigrationSmLegacyTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-sm-legacy-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-sm-legacy-status" }),
+                ],
+            }, { uuid: "migration-sm-legacy-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [build()], relations: [] });
+        await controllerV1.setup(true);
+
+        // Simulate a manifest written by generator "1", which could not see
+        // StateNode.computeValue / StateTransfer.computeTarget.
+        const manifest = await readMigrationManifest(controllerV1);
+        const legacy = structuredClone(manifest!);
+        legacy.frameworkVersion = "1";
+        legacy.modelHash = "legacy-generator-model-hash";
+        const legacyComputation = legacy.computations.find(item => item.dataContext === "property:MigrationSmLegacyTicket.status")!;
+        legacyComputation.functionSignature = undefined;
+        await writeMigrationManifest(controllerV1, legacy);
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build()], relations: [] });
+        await controllerV2.setup(false);
+
+        const systemV3 = new MonoSystem(db);
+        systemV3.conceptClass = KlassByName;
+        const controllerV3 = new Controller({ system: systemV3, entities: [build()], relations: [] });
+        const diff = await controllerV3.generateMigrationDiff();
+        expect(diff.changes.find(change => change.kind === "computation" && change.dataContext === "property:MigrationSmLegacyTicket.status")).toMatchObject({
+            changeType: "unchanged",
+        });
+        await db.close();
+    });
+
     test("custom full compute contract is executed during migration", async () => {
         const db = new PGLiteDB();
         const TicketV1 = new Entity({
