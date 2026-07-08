@@ -83,7 +83,6 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
         // 如果没有定义增量计算，回退到全量计算
         return ComputationResult.fullRecompute('No incrementalCompute defined');
       }
-      this.incrementalComputeCallback = args.incrementalCompute;
     }
 
     if (args.incrementalPatchCompute) {

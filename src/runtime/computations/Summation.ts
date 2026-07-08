@@ -236,6 +236,9 @@ export class PropertySumHandle implements DataBasedComputation {
              // 关联关系的删除
              const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
              delta = -(oldResult ?? 0);
+             // CAUTION delete 事件可能只是 filtered relation 的成员资格退出（行仍存在），必须复位绑定状态，
+             //  否则关系再次进入时 replace 读到陈旧值导致增量错误（与 global 路径保持一致）。
+             await this.state!.itemResult.setInternal(relatedMutationEvent.record, 0);
         } else if (relatedMutationEvent.type === 'update') {
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。

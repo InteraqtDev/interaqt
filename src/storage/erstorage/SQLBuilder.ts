@@ -172,7 +172,10 @@ ${modifierClause}
                 sql = fieldMatchExp.data.fieldValue!
                 values.push(...fieldMatchExp.data.fieldParams!)
             } else {
-                sql = `"${this.withPrefix(prefix)}${fieldMatchExp.data.fieldName![0]}"."${fieldMatchExp.data.fieldName![1]}" ${fieldMatchExp.data.fieldValue}`
+                // CAUTION 原子必须加括号：fieldValue 可能是含 OR/AND 的复合表达式
+                //  （例如空集合 NOT IN 的恒真展开、driver 的 JSON contains 展开），
+                //  不加括号时其中的 OR 会因优先级泄漏到外层 AND/OR 组合中。
+                sql = `("${this.withPrefix(prefix)}${fieldMatchExp.data.fieldName![0]}"."${fieldMatchExp.data.fieldName![1]}" ${fieldMatchExp.data.fieldValue})`
                 values.push(...fieldMatchExp.data.fieldParams!)
             }
         } else {
@@ -252,10 +255,11 @@ ${modifierClause}
             }).join(',')}`)
         }
 
-        if (limit) {
+        // CAUTION 不能用 truthy 判断：LIMIT 0（返回空集）是合法语义。
+        if (limit !== undefined && limit !== null) {
             clauses.push(`LIMIT ${limit}`)
         }
-        if (offset) {
+        if (offset !== undefined && offset !== null && offset !== 0) {
             clauses.push(`OFFSET ${offset}`)
         }
 
@@ -540,24 +544,6 @@ WHERE "${recordInfo.idField}" = ${p()}
 `
         const params = [...fields.map(() => null), idRef.id]
         
-        return [sql, params]
-    }
-    
-    /**
-     * 构建批量 DELETE 语句（通过 WHERE 条件）
-     */
-    buildDeleteByWhereSQL(
-        recordName: string,
-        matchExp: BoolExp<FieldMatchAtom>
-    ): [string, unknown[]] {
-        const p = this.getPlaceholder()
-        const recordInfo = this.map.getRecordInfo(recordName)
-        const [whereClause, params] = this.buildWhereClause(matchExp, '', p)
-        
-        const sql = `
-DELETE FROM "${recordInfo.table}"
-WHERE ${whereClause}
-`
         return [sql, params]
     }
     

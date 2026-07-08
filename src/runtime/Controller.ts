@@ -1,6 +1,6 @@
 import { BoolExp, EntityInstance, RelationInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
 import { MatchExp } from "@storage";
-import { ComputationState, RecordMutationEvent, System, SystemCallback, SystemLogger } from "./System.js";
+import { ComputationState, RecordMutationEvent, System, SystemLogger } from "./System.js";
 import './computations/index.js';
 import { Computation, ComputationResult, ComputationResultSkip, ComputationResultPatch, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
@@ -18,6 +18,7 @@ import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
 import { SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
+import { asyncInteractionContext } from "./asyncInteractionContext.js";
 import { NestedDispatchError, RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
@@ -486,12 +487,15 @@ export class Controller {
                     if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'manifest-written')
                 })
             }
-            await this.scheduler.setup(false)
+            // CAUTION 成功状态必须在 manifest 事务提交后立刻落账：此后数据库已经是迁移完成状态，
+            //  再把后续步骤（scheduler.setup）的失败记成 migration failed 会让日志与实际状态矛盾，
+            //  干扰 resume 判断。scheduler.setup 的失败单独向上抛出。
             if (migrationRun) await migrationSystem.finishMigration?.(migrationRun.id, 'succeeded')
         } catch (error) {
             if (migrationRun) await migrationSystem.finishMigration?.(migrationRun.id, 'failed', error)
             throw error
         }
+        await this.scheduler.setup(false)
         return plan
     }
     
@@ -609,8 +613,6 @@ export class Controller {
             }
         }
     }
-    callbacks: Map<string, Set<SystemCallback>> = new Map()
-
     private cloneDispatchArgs<TArgs>(args: TArgs): TArgs {
         if (!args || typeof args !== 'object') return args
         const cloned = { ...(args as Record<string, unknown>) }
@@ -647,9 +649,18 @@ export class Controller {
                 nestedEventSourceName: eventSource.name,
             })
         }
+        // 建立 dispatch 级别的 interaction context：driver 的每条 SQL 日志都会读取 logContext，
+        // 使一次 dispatch 内的所有数据库操作可以按调用来源（args.context）关联排查。
+        const argsContext = (args as { context?: unknown } | undefined)?.context
+        const interactionContext: InteractionContext = {
+            logContext: {
+                eventSourceName: eventSource.name,
+                ...(argsContext && typeof argsContext === 'object' ? argsContext as Record<string, unknown> : {}),
+            }
+        }
         let result: DispatchResponse
         try {
-            result = await runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
+            result = await asyncInteractionContext.run(interactionContext, () => runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
                 const attemptArgs = this.cloneDispatchArgs(args)
                 const effectsContext = { effects: [] as RecordMutationEvent[] }
                 return asyncEffectsContext.run(effectsContext, async () => {
@@ -682,7 +693,7 @@ export class Controller {
                         })
                     })
                 })
-            })
+            }))
         } catch (e) {
             if (this.forceThrowDispatchError) throw e
             result = {
@@ -775,13 +786,6 @@ export class Controller {
             }
         }
     }
-    addEventListener(eventName: string, callback: SystemCallback) {
-        if (!this.callbacks.has(eventName)) {
-            this.callbacks.set(eventName, new Set());
-        }
-        this.callbacks.get(eventName)!.add(callback);
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findEventSourceByName(name: string): EventSourceInstance<any, any> | undefined {
         return this.eventSourcesByName.get(name)

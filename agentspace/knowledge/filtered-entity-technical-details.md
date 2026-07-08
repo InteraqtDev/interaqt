@@ -257,7 +257,7 @@ resolveBaseSourceEntityAndFilter(entity: EntityInstance) {
 // 处理 NULL 值的比较
 const nullSafeCondition = MatchExp.atom({
   key: 'status',
-  value: ['is', null]  // 使用 'is' 操作符处理 NULL
+  value: ['=', null]  // ['=', null] 会被翻译成 IS NULL
 }).or({
   key: 'status',
   value: ['=', 'active']

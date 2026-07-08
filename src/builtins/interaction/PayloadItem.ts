@@ -86,6 +86,11 @@ export class PayloadItem implements PayloadItemInstance {
   };
   
   static create(args: PayloadItemCreateArgs, options?: { uuid?: string }): PayloadItemInstance {
+    // CAUTION isRef 必须携带 base：guard 的存在性校验依赖 base 确定查询哪个 entity/relation。
+    //  没有 base 时校验退化成"有 .id 字段就通过"，任何伪造的 {id} 都能穿过 guard。
+    if (args.isRef && !args.base) {
+      throw new Error(`PayloadItem '${args.name}' has isRef: true but no base. Declare base (the referenced Entity/Relation) so the guard can verify the referenced record exists.`);
+    }
     const instance = new PayloadItem(args, options);
     
     // 检查 uuid 是否重复

@@ -11,7 +11,7 @@ import {
     ComputationProtocolError
 } from "./errors/index.js";
 import { Computation, ComputationClass, ComputationExecutionResult, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, DataDep, DataDepEventContext, EventBasedComputation, GlobalBoundState, IncrementalPlan, LastValuePolicy, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
-import { DICTIONARY_RECORD, type InternalSchemaRequirement, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
+import { DICTIONARY_RECORD, type InternalSchemaRequirement, RecordMutationCallback, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
 import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import {
     EntityEventSourceMap,
@@ -310,6 +310,21 @@ export class Scheduler {
         assert(!!computationHandle, `cannot find computation handle`)
         return computationHandle!.createStateData?.(...args) ?? {}
     }
+    // CAUTION setup() 可能在同一 controller 生命周期内被调用多次（重复 setup、migrate 之后的重建）。
+    //  mutation listener 的注册必须幂等：这里跟踪本 scheduler 注册过的所有 listener，
+    //  重新 setup 时先注销旧的，否则同一 mutation 会触发多次计算（Transform 直接撞唯一索引，
+    //  非幂等的增量计算会静默产生错误结果）。
+    private registeredMutationListeners: RecordMutationCallback[] = []
+    private registerMutationListener(callback: RecordMutationCallback) {
+        this.controller.system.storage.listen(callback)
+        this.registeredMutationListeners.push(callback)
+    }
+    private removeRegisteredMutationListeners() {
+        for (const callback of this.registeredMutationListeners) {
+            this.controller.system.storage.unlisten?.(callback)
+        }
+        this.registeredMutationListeners = []
+    }
     addMutationPropertyComputationDefaultValueListeners() {
         for(const computation of this.computationsHandles.values()) {
             if(computation.getInitialValue) {
@@ -322,7 +337,7 @@ export class Scheduler {
                     assert(!propertyDataContext.id.defaultValue, `${propertyDataContext.host.name}.${propertyDataContext.id.name} property shuold not has a defaultValue, because it will be overridden by computation`)
 
                     // TODO 未来合成一个 listener ?
-                    this.controller.system.storage.listen(async (mutationEvents) => {
+                    this.registerMutationListener(async (mutationEvents) => {
                         for(let mutationEvent of mutationEvents){
                             if (mutationEvent.type === 'create' && mutationEvent.recordName === propertyDataContext.host.name) {
                                 const defaultValue = await computation.getInitialValue?.(mutationEvent.record)
@@ -370,7 +385,7 @@ export class Scheduler {
         this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
-        this.controller.system.storage.listen(async (mutationEvents) => {
+        this.registerMutationListener(async (mutationEvents) => {
             for(let mutationEvent of mutationEvents){
                 const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                 if (sources.length > 0) {
@@ -1205,6 +1220,8 @@ export class Scheduler {
     
     async setup(createDefaultDictValue: boolean = false) {
         try {
+            // 幂等：重复 setup（或 migrate 后的重建）先注销上一次注册的 listener。
+            this.removeRegisteredMutationListeners()
             this.addMutationPropertyComputationDefaultValueListeners()
             this.addMutationComputationListeners()
             if (createDefaultDictValue) {   

@@ -18,7 +18,7 @@ export abstract class FrameworkError extends Error {
             causedBy?: Error
         } = {}
     ) {
-        super(`${message}. Caused by: ${options.causedBy?.message}`)
+        super(options.causedBy ? `${message}. Caused by: ${options.causedBy.message}` : message)
         
         this.name = this.constructor.name
         this.timestamp = new Date()

@@ -45,7 +45,8 @@ BoolExp.atom({ key: 'name', value: ['=', 'foo'] })
   .and(BoolExp.atom({ key: 'age', value: ['>', 18] }))
 ```
 
-Operators: `'='`, `'!='`, `'>'`, `'<'`, `'>='`, `'<='`, `'like'`, `'in'`, `'not in'`, `'is null'`, `'is not null'`
+Operators: `'='`, `'!='`, `'>'`, `'<'`, `'>='`, `'<='`, `'like'`, `'in'`, `'not in'`, `'between'`, `'is null'`, `'is not null'`.
+NULL matching: `['=', null]` → `IS NULL`, `['!=', null]` / `['not', null]` → `IS NOT NULL`.
 
 ## ERStorage Internals
 - `DBSetup` — creates tables from entity/relation definitions

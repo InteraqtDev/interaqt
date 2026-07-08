@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
             sql:finalSQL,
             params
         })
-        return  (await this.db.query(sql, params)).rows as T[]
+        return  (await this.db.query(finalSQL, params)).rows as T[]
         
     }
     async insert(sql:string, values:unknown[], name='')  {
