@@ -17,7 +17,9 @@ Migration supports additive schema changes, changed/new computation recompute, d
 
 New plain fact properties with a declared `defaultValue` are backfilled for existing rows during migration (before constraint verification), so a new non-null property with a default passes verification without manual SQL. Backfills are listed in the migration plan as `factPropertyBackfills`.
 
-`StateNode.computeValue` and `StateTransfer.computeTarget` are part of a StateMachine computation's function signature: changing them changes the model hash and shows up in the diff as a function change requiring review. Manifests written by older framework versions (generator "1") adopt the newly visible signatures automatically, so upgrading does not force a fake migration.
+`StateNode.computeValue` and `StateTransfer.computeTarget` are part of a StateMachine computation's function signature: changing them changes the model hash and shows up in the diff as a function change requiring review.
+
+Manifests written by a different manifest generator version are rejected outright — there is no backward-compatible adoption. Startup, diff generation, and migration all fail with an explicit error. After verifying that the current definitions match the existing schema, re-baseline with `controller.createMigrationBaseline()`; if you also changed the model, re-baseline with the old model code first, then run a normal reviewed migration for the model change.
 
 `ScopedSequence` is migration-managed state, not a recomputable derivation. Adding or changing a scoped sequence requires an explicit seed/no-seed decision, and removing a scoped sequence declaration must be treated as an explicit migration review item because existing `_ScopedSequence_` counter rows are internal state and must not be silently discarded.
 

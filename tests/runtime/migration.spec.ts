@@ -4286,7 +4286,7 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
-    test("legacy generator-1 manifests without StateMachine function signatures stay current", async () => {
+    test("manifests from an incompatible generator version are rejected and recovered via baseline", async () => {
         const db = new PGLiteDB();
         const build = () => {
             const open = new StateNode({
@@ -4328,18 +4328,22 @@ describe("Data migration phase 1", () => {
         legacyComputation.functionSignature = undefined;
         await writeMigrationManifest(controllerV1, legacy);
 
+        // No backward compatibility: both startup validation and diff
+        // generation refuse the old-generator manifest explicitly.
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [build()], relations: [] });
-        await controllerV2.setup(false);
+        await expect(controllerV2.setup(false)).rejects.toThrow(/incompatible interaqt manifest generator.*createMigrationBaseline/s);
+        await expect(controllerV2.generateMigrationDiff()).rejects.toThrow(/incompatible interaqt manifest generator/);
+        await expect(controllerV2.migrate({})).rejects.toThrow(/incompatible interaqt manifest generator/);
 
+        // Explicit recovery: re-baseline (definitions match the schema), then
+        // normal startup works again.
+        await controllerV2.createMigrationBaseline();
         const systemV3 = new MonoSystem(db);
         systemV3.conceptClass = KlassByName;
         const controllerV3 = new Controller({ system: systemV3, entities: [build()], relations: [] });
-        const diff = await controllerV3.generateMigrationDiff();
-        expect(diff.changes.find(change => change.kind === "computation" && change.dataContext === "property:MigrationSmLegacyTicket.status")).toMatchObject({
-            changeType: "unchanged",
-        });
+        await controllerV3.setup(false);
         await db.close();
     });
 

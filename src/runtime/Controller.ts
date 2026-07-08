@@ -56,7 +56,7 @@ import {
     MigrationRunState,
     MigrationPlan,
     MigrationSchemaPlan,
-    isManifestModelCurrent,
+    assertManifestGeneratorCurrent,
     normalizePreviousComputationManifest,
     readMigrationManifest,
     recomputeChangedComputations,
@@ -253,7 +253,10 @@ export class Controller {
             const schemaPlan = await prepareMigrationSchema.call(migrationSystem, this.entities, this.relations, states, { internalRequirements })
             const nextManifest = createMigrationManifest(this, schemaPlan.schema)
             const previousManifest = await readMigrationManifest(this)
-            if (previousManifest && !isManifestModelCurrent(previousManifest, nextManifest)) {
+            if (previousManifest) {
+                assertManifestGeneratorCurrent(previousManifest)
+            }
+            if (previousManifest && previousManifest.modelHash !== nextManifest.modelHash) {
                 throw new Error(`Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`)
             }
             if (!previousManifest && await this.system.hasExistingData?.()) {
@@ -312,6 +315,7 @@ export class Controller {
         if (!previousManifest) {
             throw new MigrationBaselineError('Migration baseline manifest not found. Run setup(true) with the current framework first or createMigrationBaseline().')
         }
+        assertManifestGeneratorCurrent(previousManifest)
         const nextManifest = createMigrationManifest(this, schemaPlan.schema, { includeFunctionText: options.includeFunctionText === true })
         return { states, migrationSystem, schemaPlan, previousManifest, nextManifest }
     }

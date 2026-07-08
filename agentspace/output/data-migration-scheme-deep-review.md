@@ -2,7 +2,7 @@
 
 > **修复状态(2026-07-08 追加)**:本文档发现的问题已在同分支后续 commit 中修复并全部有测试覆盖。
 > - F1(依赖图漏算):已修复 —— `depNodes`/`eventDepNodes` 按 manifest 使用正确的 entity/relation 前缀、解析 filtered base 链,`records` 依赖同时注册到其 attributeQuery 涉及的属性/关系节点;硬删除计算视为宿主 record 节点的变更源。回归测试覆盖 relation 下游、filtered entity 下游、records-dep 查询计算属性、硬删除下游 Count 四类场景。
-> - F2(StateMachine 函数不可见):已修复 —— `StateNode.computeValue`/`StateTransfer.computeTarget` 纳入函数签名;manifest generator 版本升到 "2",旧版 manifest 通过归一化自动采纳新签名,`setup(false)` 走 canonical hash 兜底比较,存量库无需假迁移。
+> - F2(StateMachine 函数不可见):已修复 —— `StateNode.computeValue`/`StateTransfer.computeTarget` 纳入函数签名;manifest generator 版本升到 "2"。按"不做向后兼容"的项目决策,旧版 generator 写出的 manifest 在启动/生成 diff/迁移时一律显式报错,恢复路径是核对 schema 一致后执行 `createMigrationBaseline()` 重建基线,不存在任何自动采纳逻辑。
 > - F3(簿记 SQL 拼接):已修复 —— manifest/log/lock/operation-log 全部改为参数化 DML(含 SQLite 占位符修正),用 stub MySQL 方言 db 验证参数化,PGLite 上验证含反斜杠/引号的 manifest 字节级 round-trip。
 > - I1(handler 仪式化):已修复 —— handler 决策要求只从 provisional rebuild plan 生成;执行期 blocking 检查同步收敛到 rebuildOutput 项。未变的 StateMachine 不再要求 handler。
 > - I2(defaultValue 不回填):已修复 —— 新增普通事实属性的声明默认值在重算前回填存量 NULL 行,plan 中以 `factPropertyBackfills` 呈现;非空约束场景有测试。

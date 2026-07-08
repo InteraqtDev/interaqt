@@ -1025,44 +1025,29 @@ function normalizeLegacyComputationManifest(oldComputation: ComputationManifest,
     };
 }
 
-function isLegacyGeneratorManifest(manifest: MigrationManifest) {
-    return manifest.frameworkVersion !== MIGRATION_MANIFEST_GENERATOR_VERSION;
-}
-
-// Generator "1" could not see StateNode.computeValue / StateTransfer.computeTarget,
-// so legacy manifests miss exactly those callback paths. When the only signature
-// difference is such newly visible functions, adopt the next signature as the
-// baseline instead of reporting a false function change.
-function adoptNewlyVisibleFunctionSignature(oldComputation: ComputationManifest, nextComputation: ComputationManifest): ComputationManifest | undefined {
-    if (!nextComputation.functionSignature) return undefined;
-    if (oldComputation.functionSignature?.hash === nextComputation.functionSignature.hash) return undefined;
-    if (oldComputation.outputSignature !== nextComputation.outputSignature) return undefined;
-    if (oldComputation.stateSignature !== nextComputation.stateSignature) return undefined;
-    if (oldComputation.allocationSignature !== nextComputation.allocationSignature) return undefined;
-    const oldPaths = oldComputation.functionSignature?.callbackPaths || [];
-    const nextPaths = nextComputation.functionSignature.callbackPaths;
-    if (!oldPaths.every(path => nextPaths.includes(path))) return undefined;
-    const addedPaths = nextPaths.filter(path => !oldPaths.includes(path));
-    if (!addedPaths.length || !addedPaths.every(path => path.endsWith(".computeValue") || path.endsWith(".computeTarget"))) return undefined;
-    const stateSignature = oldComputation.stateSignature;
-    const structuralSignature = nextComputation.structuralSignature;
-    return {
-        ...oldComputation,
-        functionSignature: nextComputation.functionSignature,
-        structuralSignature,
-        signature: hash({ structuralSignature, stateSignature, functionHash: nextComputation.functionSignature.hash, allocationSignature: nextComputation.allocationSignature }),
-    };
+// No backward compatibility: manifests written by a different generator version
+// are rejected outright. Signature collection semantics differ between
+// generators, so silently comparing or adopting them would hide real changes.
+// The explicit recovery path is controller.createMigrationBaseline() after
+// verifying that the current definitions match the existing schema.
+export function assertManifestGeneratorCurrent(manifest: MigrationManifest) {
+    if (manifest.frameworkVersion !== MIGRATION_MANIFEST_GENERATOR_VERSION) {
+        throw new MigrationBaselineError(
+            `Migration manifest was written by an incompatible interaqt manifest generator (found '${manifest.frameworkVersion}', expected '${MIGRATION_MANIFEST_GENERATOR_VERSION}'). ` +
+            `Verify that the current definitions match the existing schema, then re-baseline with controller.createMigrationBaseline().`,
+            { foundGeneratorVersion: manifest.frameworkVersion, expectedGeneratorVersion: MIGRATION_MANIFEST_GENERATOR_VERSION },
+        );
+    }
 }
 
 export function normalizePreviousComputationManifest(previousManifest: MigrationManifest, nextManifest: MigrationManifest): MigrationManifest {
     const nextById = new Map(nextManifest.computations.map(item => [item.id, item]));
     const usedNextIds = new Set<string>();
-    const legacyGenerator = isLegacyGeneratorManifest(previousManifest);
     const normalizedComputations = previousManifest.computations.map(oldComputation => {
         const sameId = nextById.get(oldComputation.id);
         if (sameId) {
             usedNextIds.add(sameId.id);
-            return (legacyGenerator && adoptNewlyVisibleFunctionSignature(oldComputation, sameId)) || oldComputation;
+            return oldComputation;
         }
         const semanticMatch = nextManifest.computations.find(nextComputation =>
             !usedNextIds.has(nextComputation.id) &&
@@ -1074,43 +1059,9 @@ export function normalizePreviousComputationManifest(previousManifest: Migration
     });
     return {
         ...previousManifest,
-        frameworkVersion: MIGRATION_MANIFEST_GENERATOR_VERSION,
         computations: normalizedComputations,
         sequences: previousManifest.sequences || createScopedSequenceDeclarationManifests(normalizedComputations),
     };
-}
-
-function canonicalManifestModelHash(manifest: MigrationManifest) {
-    const hashComputations = manifest.computations.map(computation => ({
-        ...computation,
-        functionSignature: computation.functionSignature ? {
-            ...computation.functionSignature,
-            text: undefined,
-        } : undefined,
-    }));
-    const model = stripIdentityUUID({
-        records: manifest.records,
-        relations: manifest.relations,
-        dictionaries: manifest.dictionaries,
-        computations: hashComputations,
-        sequences: manifest.sequences,
-        storage: manifest.storage,
-    });
-    // Canonicalize exactly like manifest persistence does (drops undefined values
-    // and function values), so a stored manifest and a freshly generated one hash
-    // identically when they describe the same model.
-    return hash(JSON.parse(JSON.stringify(model)));
-}
-
-// setup(false) manifest validation: legacy manifests written by an older
-// generator may hash differently for reasons the generator itself introduced
-// (e.g. newly visible StateMachine functions). Normalize before concluding
-// that the model actually changed.
-export function isManifestModelCurrent(previousManifest: MigrationManifest, nextManifest: MigrationManifest) {
-    if (previousManifest.modelHash === nextManifest.modelHash) return true;
-    if (!isLegacyGeneratorManifest(previousManifest)) return false;
-    const normalizedPrevious = normalizePreviousComputationManifest(previousManifest, nextManifest);
-    return canonicalManifestModelHash(normalizedPrevious) === canonicalManifestModelHash(nextManifest);
 }
 
 function requirementKey(requirement: MigrationDecisionRequirement) {
