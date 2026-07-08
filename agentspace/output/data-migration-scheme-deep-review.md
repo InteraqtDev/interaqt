@@ -1,5 +1,18 @@
 # Data Migration 方案深度 Review
 
+> **修复状态(2026-07-08 追加)**:本文档发现的问题已在同分支后续 commit 中修复并全部有测试覆盖。
+> - F1(依赖图漏算):已修复 —— `depNodes`/`eventDepNodes` 按 manifest 使用正确的 entity/relation 前缀、解析 filtered base 链,`records` 依赖同时注册到其 attributeQuery 涉及的属性/关系节点;硬删除计算视为宿主 record 节点的变更源。回归测试覆盖 relation 下游、filtered entity 下游、records-dep 查询计算属性、硬删除下游 Count 四类场景。
+> - F2(StateMachine 函数不可见):已修复 —— `StateNode.computeValue`/`StateTransfer.computeTarget` 纳入函数签名;manifest generator 版本升到 "2",旧版 manifest 通过归一化自动采纳新签名,`setup(false)` 走 canonical hash 兜底比较,存量库无需假迁移。
+> - F3(簿记 SQL 拼接):已修复 —— manifest/log/lock/operation-log 全部改为参数化 DML(含 SQLite 占位符修正),用 stub MySQL 方言 db 验证参数化,PGLite 上验证含反斜杠/引号的 manifest 字节级 round-trip。
+> - I1(handler 仪式化):已修复 —— handler 决策要求只从 provisional rebuild plan 生成;执行期 blocking 检查同步收敛到 rebuildOutput 项。未变的 StateMachine 不再要求 handler。
+> - I2(defaultValue 不回填):已修复 —— 新增普通事实属性的声明默认值在重算前回填存量 NULL 行,plan 中以 `factPropertyBackfills` 呈现;非空约束场景有测试。
+> - I4(锁卡死):已修复 —— 新增 `controller.forceReleaseMigrationLock()`,"already running" 错误信息给出恢复指引。
+> - I5(下划线豁免):已移除,含 Count 状态实体的表移动重新被 block(有回归测试)。
+> - I6(忽略清单):已补 `__interaqt_migration_operation_log`。
+> - I8(硬删除事件语义):疑点属实并已修复 —— 迁移中 `_isDeleted_` 为真时合成 `delete` 事件而非 `update`,下游 Count 正确递减;同时修复了带 dataDeps 的 `_isDeleted_` 计算在 diff 阶段(storage 未初始化)崩溃的问题。
+> - I3(规模化)仍为遗留改进项:全表载入内存与 diff 中罗列全量 id 的问题需要分批游标与 `count + checksum` 降级设计,属于独立的架构级改造,未在本轮修复。
+> - 文档 `agent/skill/interaqt-migration.md` 已同步更新。
+
 > Review 对象:`src/runtime/migration.ts`(约 3200 行)、`src/runtime/Controller.ts` 中 `setup/migrate/generateMigrationDiff/createMigrationBaseline`、`src/runtime/MonoSystem.ts` 中 schema 计划与迁移簿记,以及 `agent/skill/interaqt-migration.md` 描述的 Phase 1.5 两步审阅工作流。
 >
 > Review 方法:静态通读全部迁移代码 + 针对每个疑点编写可运行的 probe 测试在 PGLite 上实证(probe 均已复现后删除,复现代码内嵌在本文档中)。作为对照基线,官方 `tests/runtime/migration.spec.ts` 76 个用例全部通过。
