@@ -15,6 +15,14 @@ Phase 1.5 uses a two-step review workflow:
 
 Migration supports additive schema changes, changed/new computation recompute, downstream propagation, filtered membership rebuild, destructive-scope review, post-backfill constraint verification, and explicit fact-to-computation takeover.
 
+New plain fact properties with a declared `defaultValue` are backfilled for existing rows during migration (before constraint verification), so a new non-null property with a default passes verification without manual SQL. Backfills are listed in the migration plan as `factPropertyBackfills`.
+
+`StateNode.computeValue` and `StateTransfer.computeTarget` are part of a StateMachine computation's function signature: changing them changes the model hash and shows up in the diff as a function change requiring review.
+
+Manifests written by a different manifest generator version are rejected outright — there is no backward-compatible adoption. Startup, diff generation, and migration all fail with an explicit error. After verifying that the current definitions match the existing schema, re-baseline with `controller.createMigrationBaseline()`; if you also changed the model, re-baseline with the old model code first, then run a normal reviewed migration for the model change.
+
+Migration identity for computations requires an explicitly declared type name: a static `displayName` on the computation type (or handle class), or an `_type` string on the computation args. Class names are rejected because minified builds rewrite them. Changing a computation's type shows up in the diff as removed + added and goes through normal review and rebuild.
+
 `ScopedSequence` is migration-managed state, not a recomputable derivation. Adding or changing a scoped sequence requires an explicit seed/no-seed decision, and removing a scoped sequence declaration must be treated as an explicit migration review item because existing `_ScopedSequence_` counter rows are internal state and must not be silently discarded.
 
 Phase 1.5 does not guess or execute rename/copy/merge/split primitives. Rename candidates may be recorded for review, but compute-route migration will still obey physical layout and destructive-change safety gates.
@@ -327,9 +335,11 @@ Testing rules:
 
 ## Event and Async Handlers
 
-Event-based computations without full compute support require external rebuild handlers.
+Handler requirements are derived from the rebuild plan: only computations whose output will actually be rebuilt by this migration require handlers. Untouched event-based or async computations do not demand handler decisions.
 
-Async computations that return `ComputationResult.async()` require external completion handlers.
+Event-based computations (and computations without full compute support) in the rebuild plan require external rebuild handlers.
+
+Async computations in the rebuild plan that return `ComputationResult.async()` require external completion handlers.
 
 ```typescript
 const handlers = {
@@ -408,6 +418,8 @@ Resume is keyed by both `modelHash` and `approvedDiffHash`, so the same model wi
 
 Schema DDL, verification, post-recompute constraints, and manifest write use operation-log markers. Computation rebuild resume is phase-level, not per-computation checkpoint.
 
+If a migration process crashes while holding the bookkeeping lock, later runs fail with `Migration is already running: <id>`. After confirming no migration is actually running, call `controller.forceReleaseMigrationLock()` and retry; the failed run is then resumed through the normal resume path.
+
 ---
 
 ## Common Failure Messages
@@ -435,6 +447,10 @@ The approved diff references an event rebuild handler, but `migrate({ handlers }
 ### `Missing migration async completion handler`
 
 The approved diff references an async completion handler, but `migrate({ handlers })` did not provide it.
+
+### `Migration is already running`
+
+Another process holds the migration lock, or a previous migration crashed without releasing it. Confirm no migration is running, then call `controller.forceReleaseMigrationLock()` and retry.
 
 ### `physical-path-move`
 

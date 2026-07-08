@@ -37,7 +37,9 @@ import {
     createMigrationManifest,
     getApprovedEmptyFactRecordRemovals,
     getChangedComputationsFromApprovedDiff,
+    backfillNewFactPropertyDefaults,
     getDestructiveDeletionScope,
+    getNewFactPropertyBackfills,
     getNewFilteredDataContexts,
     getRecomputeBlockingChanges,
     getScopedSequenceNoSeedOperations,
@@ -54,7 +56,7 @@ import {
     MigrationRunState,
     MigrationPlan,
     MigrationSchemaPlan,
-    normalizePreviousComputationManifest,
+    assertManifestGeneratorCurrent,
     readMigrationManifest,
     recomputeChangedComputations,
     recomputeFilteredMemberships,
@@ -250,6 +252,9 @@ export class Controller {
             const schemaPlan = await prepareMigrationSchema.call(migrationSystem, this.entities, this.relations, states, { internalRequirements })
             const nextManifest = createMigrationManifest(this, schemaPlan.schema)
             const previousManifest = await readMigrationManifest(this)
+            if (previousManifest) {
+                assertManifestGeneratorCurrent(previousManifest)
+            }
             if (previousManifest && previousManifest.modelHash !== nextManifest.modelHash) {
                 throw new Error(`Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`)
             }
@@ -266,6 +271,16 @@ export class Controller {
         if (install) {
             await writeMigrationManifest(this, nextManifest)
         }
+    }
+
+    // Recovery path for a migration process that died without releasing the
+    // bookkeeping lock. Only call after confirming no migration is running.
+    async forceReleaseMigrationLock() {
+        const migrationSystem = this.system as System & {
+            releaseMigrationLock?: () => Promise<void>
+        }
+        assert(typeof migrationSystem.releaseMigrationLock === 'function', 'Current system does not support migration lock release')
+        await migrationSystem.releaseMigrationLock!()
     }
 
     async createMigrationBaseline() {
@@ -299,6 +314,7 @@ export class Controller {
         if (!previousManifest) {
             throw new MigrationBaselineError('Migration baseline manifest not found. Run setup(true) with the current framework first or createMigrationBaseline().')
         }
+        assertManifestGeneratorCurrent(previousManifest)
         const nextManifest = createMigrationManifest(this, schemaPlan.schema, { includeFunctionText: options.includeFunctionText === true })
         return { states, migrationSystem, schemaPlan, previousManifest, nextManifest }
     }
@@ -309,21 +325,21 @@ export class Controller {
         nextManifest: ReturnType<typeof createMigrationManifest>,
         options: GenerateMigrationDiffOptions = {},
     ): Promise<MigrationDiffFile> {
-        const planningPreviousManifest = normalizePreviousComputationManifest(previousManifest, nextManifest)
         const provisionalChangedComputations = nextManifest.computations.filter(next =>
-            !planningPreviousManifest.computations.some(previous => previous.id === next.id && previous.signature === next.signature)
+            !previousManifest.computations.some(previous => previous.id === next.id && previous.signature === next.signature)
         )
-        const changedDataContexts = getNewFilteredDataContexts(planningPreviousManifest, nextManifest)
+        const changedDataContexts = getNewFilteredDataContexts(previousManifest, nextManifest)
         const provisionalRebuildPlan = buildAffectedRebuildPlan(
-            planningPreviousManifest,
+            previousManifest,
             nextManifest,
             provisionalChangedComputations,
             changedDataContexts,
             { outputChangedIds: new Set(provisionalChangedComputations.map(item => item.id)) },
         )
         const storageBlockingChanges = getStorageBlockingChanges(previousManifest, nextManifest)
+        const readHandle = createMigrationReadHandle(this, schemaPlan)
         const destructiveScopes = options.includeDestructiveScope === true
-            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest)
+            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest, readHandle)
             : []
         const safety = {
             blockingChanges: [
@@ -332,10 +348,9 @@ export class Controller {
             ],
             destructiveScopes,
         }
-        const readHandle = createMigrationReadHandle(this, schemaPlan)
-        const takeoverDiff = await addComputationTakeoverReview(this, buildMigrationDiff(planningPreviousManifest, nextManifest, schemaPlan, safety), planningPreviousManifest, nextManifest, readHandle)
-        const cleanupDiff = await addEmptyFactRecordRemovalReview(this, takeoverDiff, planningPreviousManifest, nextManifest)
-        const scopedSequenceDiff = await addScopedSequenceNoSeedReview(this, cleanupDiff, planningPreviousManifest, nextManifest, readHandle)
+        const takeoverDiff = await addComputationTakeoverReview(this, buildMigrationDiff(previousManifest, nextManifest, schemaPlan, safety), previousManifest, nextManifest, readHandle)
+        const cleanupDiff = await addEmptyFactRecordRemovalReview(this, takeoverDiff, previousManifest, nextManifest)
+        const scopedSequenceDiff = await addScopedSequenceNoSeedReview(this, cleanupDiff, previousManifest, nextManifest, readHandle)
         return addMissingRebuildHandlerRequirements(scopedSequenceDiff, this, provisionalRebuildPlan)
     }
 
@@ -361,22 +376,21 @@ export class Controller {
         }
         assert(typeof migrationSystem.applyMigrationSchema === 'function', 'Current system does not support schema migration application')
         const { schemaPlan, previousManifest, nextManifest } = context
-        const planningPreviousManifest = normalizePreviousComputationManifest(previousManifest, nextManifest)
         const expectedDiff = await this.buildCurrentMigrationDiff(schemaPlan, previousManifest, nextManifest, { includeDestructiveScope: false })
-        validateApprovedDiff(migrationOptions.approvedDiff, planningPreviousManifest, nextManifest, migrationOptions.handlers, expectedDiff)
+        validateApprovedDiff(migrationOptions.approvedDiff, previousManifest, nextManifest, migrationOptions.handlers, expectedDiff)
         const approvedDiff = migrationOptions.approvedDiff!
         const approvedDiffHash = hashMigrationDiff(approvedDiff)
         const scopedSequenceSeedOperations = getScopedSequenceSeedOperations(approvedDiff)
         const scopedSequenceNoSeedOperations = getScopedSequenceNoSeedOperations(approvedDiff)
-        const approvedPlanning = getChangedComputationsFromApprovedDiff(planningPreviousManifest, nextManifest, approvedDiff)
+        const approvedPlanning = getChangedComputationsFromApprovedDiff(previousManifest, nextManifest, approvedDiff)
         const changedComputations = approvedPlanning.changedComputations
-        const changedDataContexts = getNewFilteredDataContexts(planningPreviousManifest, nextManifest)
-        const rebuildPlan = buildAffectedRebuildPlan(planningPreviousManifest, nextManifest, changedComputations, changedDataContexts, {
+        const changedDataContexts = getNewFilteredDataContexts(previousManifest, nextManifest)
+        const rebuildPlan = buildAffectedRebuildPlan(previousManifest, nextManifest, changedComputations, changedDataContexts, {
             outputChangedIds: approvedPlanning.outputChangedIds,
             stateOnlyIds: approvedPlanning.stateOnlyIds,
         })
-        const approvedEmptyFactRecordRemovals = await getApprovedEmptyFactRecordRemovals(this, migrationOptions.approvedDiff, planningPreviousManifest)
-        const emptyFactRecordRemovalOperations = createEmptyFactRecordRemovalOperations(planningPreviousManifest, approvedEmptyFactRecordRemovals)
+        const approvedEmptyFactRecordRemovals = await getApprovedEmptyFactRecordRemovals(this, migrationOptions.approvedDiff, previousManifest)
+        const emptyFactRecordRemovalOperations = createEmptyFactRecordRemovalOperations(previousManifest, approvedEmptyFactRecordRemovals)
         const executionSchemaPlan = {
             ...schemaPlan,
             postRecomputeDDL: [
@@ -390,7 +404,7 @@ export class Controller {
             this,
             rebuildPlan,
             migrationOptions,
-            planningPreviousManifest,
+            previousManifest,
         )
         const allBlockingChanges = [
             ...schemaPlan.blockingChanges,
@@ -399,11 +413,12 @@ export class Controller {
             ...recomputeBlockingChanges,
         ]
         const blockingChanges = createPlanBlockingMessages(allBlockingChanges)
-        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, planningPreviousManifest)
-        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
-        await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest, readHandle)
-        await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, planningPreviousManifest, readHandle)
+        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, previousManifest, readHandle)
+        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
+        await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest, readHandle)
+        await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, previousManifest, readHandle)
+        const factPropertyBackfills = getNewFactPropertyBackfills(this, previousManifest, nextManifest)
         const plan: MigrationPlan = {
             mode: 'compute',
             dryRun: migrationOptions.dryRun === true,
@@ -411,6 +426,7 @@ export class Controller {
             rebuildPlan,
             scopedSequenceSeedOperations,
             scopedSequenceNoSeedOperations,
+            factPropertyBackfills,
             schemaPlan: {
                 schema: executionSchemaPlan.schema,
                 preRecomputeDDL: executionSchemaPlan.preRecomputeDDL,
@@ -448,14 +464,15 @@ export class Controller {
             if (!reached(phase, 'manifest-written')) {
                 await this.system.storage.runInTransaction({ name: 'migration recompute', isolation: 'SERIALIZABLE' }, async () => {
                     if (!reached(phase, 'computation-applied')) {
-                        const filteredEvents = await recomputeFilteredMemberships(this, planningPreviousManifest, nextManifest)
-                        await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest)
-                        await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents, planningPreviousManifest)
-                        await seedScopedSequenceInitializers(this, approvedDiff, planningPreviousManifest)
+                        await backfillNewFactPropertyDefaults(this, factPropertyBackfills)
+                        const filteredEvents = await recomputeFilteredMemberships(this, previousManifest, nextManifest)
+                        await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest)
+                        await recomputeChangedComputations(this, rebuildPlan, migrationOptions, filteredEvents, previousManifest)
+                        await seedScopedSequenceInitializers(this, approvedDiff, previousManifest)
                         if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'computation-applied')
                     }
                     if (!reached(phase, 'constraints-applied')) {
-                        await assertApprovedEmptyFactRecordRemovalsStillEmpty(this, migrationOptions.approvedDiff, planningPreviousManifest)
+                        await assertApprovedEmptyFactRecordRemovalsStillEmpty(this, migrationOptions.approvedDiff, previousManifest)
                         await migrationSystem.verifyMigrationSchema?.(executionSchemaPlan, migrationRun?.id)
                         await migrationSystem.applyMigrationPostSchema?.(executionSchemaPlan, migrationRun?.id)
                         if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'constraints-applied')

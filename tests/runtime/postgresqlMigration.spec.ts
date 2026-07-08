@@ -480,7 +480,7 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     const controllerV2 = new Controller({ system: systemV2, entities: [SourceV2, UnsafeOutput], relations: [] });
     const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
 
-    await expect(controllerV2.migrate({ approvedDiff, dryRun: true })).rejects.toThrow(/Missing migration event rebuild handler/);
+    await expect(controllerV2.migrate({ approvedDiff, dryRun: true })).rejects.toThrow(/Missing migration (event rebuild|async completion) handler/);
     const plan = await controllerV2.migrate({
       approvedDiff,
       dryRun: true,

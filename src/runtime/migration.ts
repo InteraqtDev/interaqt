@@ -12,6 +12,9 @@ import { matchesScopedSequenceRecord, scopedSequenceMatchAttributeQuery, scopedS
 
 export const MIGRATION_MANIFEST_CONCEPT = "_MigrationManifest_";
 export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
+// Generator "1" did not collect StateNode.computeValue / StateTransfer.computeTarget
+// into computation function signatures. Bump when signature collection semantics change.
+const MIGRATION_MANIFEST_GENERATOR_VERSION = "2";
 const HARD_DELETION_PROPERTY_NAME = "_isDeleted_";
 
 export class MigrationError extends Error {
@@ -491,10 +494,16 @@ export type MigrationPlan = {
     rebuildPlan: ComputationRebuildItem[];
     scopedSequenceSeedOperations: ScopedSequenceSeedOperation[];
     scopedSequenceNoSeedOperations: ScopedSequenceNoSeedOperation[];
+    factPropertyBackfills: FactPropertyBackfill[];
     schemaPlan?: Omit<MigrationSchemaPlan, "internal">;
     blockingChanges: string[];
     deletionScope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>;
     approvedDiffHash?: string;
+};
+
+export type FactPropertyBackfill = {
+    recordName: string;
+    propertyName: string;
 };
 
 export type ScopedSequenceSeedOperation = {
@@ -566,18 +575,6 @@ function stripIdentityUUID<T>(value: T): T {
     return output as T;
 }
 
-function stripUndefinedDeep<T>(value: T): T {
-    if (value === null || typeof value !== "object") return value;
-    if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
-    const record = value as Record<string, unknown>;
-    const output: Record<string, unknown> = {};
-    for (const key of Object.keys(record)) {
-        if (record[key] === undefined) continue;
-        output[key] = stripUndefinedDeep(record[key]);
-    }
-    return output as T;
-}
-
 function assertUniqueIdentities(identities: MigrationIdentity[]) {
     const seen = new Map<string, MigrationIdentity>();
     for (const identity of identities) {
@@ -597,15 +594,23 @@ export function dataContextPath(dataContext: DataContext): string {
     return `${dataContext.type}:${dataContext.id.name}`;
 }
 
-function computationSemanticType(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { _type?: string; constructor?: { displayName?: string; name?: string } } }) {
-    return computation.constructor?.computationType?.displayName ||
-        computation.constructor?.computationType?.name ||
+// Migration identity must never depend on class names: minifiers rewrite them,
+// which would make computation ids differ between builds of the same code.
+// Only explicitly declared names are accepted; anything else fails fast.
+function computationSemanticType(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { _type?: string; constructor?: { displayName?: string; name?: string } }; dataContext?: DataContext }) {
+    const semanticType = computation.constructor?.computationType?.displayName ||
         computation.args._type ||
         computation.args.constructor?.displayName ||
-        computation.args.constructor?.name ||
-        computation.constructor?.displayName ||
-        computation.constructor?.name ||
-        "UnknownComputation";
+        computation.constructor?.displayName;
+    if (!semanticType) {
+        const contextHint = computation.dataContext ? ` for ${dataContextPath(computation.dataContext)}` : "";
+        throw new AmbiguousComputationSignatureError(
+            `Cannot derive a stable migration identity${contextHint}: the computation type must declare an explicit name. ` +
+            `Set a static 'displayName' on the computation type (or handle class), or an '_type' string on the computation args. ` +
+            `Class names are not accepted because minified builds rewrite them.`,
+        );
+    }
+    return semanticType;
 }
 
 export function computationManifestId(computation: { constructor?: { computationType?: { displayName?: string; name?: string }; displayName?: string; name?: string }; args: { uuid?: string; _type?: string; constructor?: { displayName?: string; name?: string } }; dataContext: DataContext }) {
@@ -726,14 +731,28 @@ function serializeState(computation: Computation): BoundStateManifest[] {
     });
 }
 
+// Model-graph references must not be traversed when collecting a computation's
+// own functions: they carry their own computations and would explode the walk
+// into the whole model.
+const MODEL_REFERENCE_TYPES = ["Entity", "Relation", "Property", "Dictionary"];
+// StateNode/StateTransfer belong to the computation itself, but their
+// `current`/`next`/`trigger` fields reference other model objects. Only their
+// own function-valued fields define the computation's semantics.
+const OWN_FUNCTION_FIELDS: Record<string, readonly string[]> = {
+    StateNode: ["computeValue"],
+    StateTransfer: ["computeTarget"],
+};
+
 function hasFunctionDeep(value: unknown, seen = new WeakSet<object>(), isRoot = true): boolean {
     if (typeof value === "function") return true;
     if (value === null || typeof value !== "object") return false;
     if (seen.has(value)) return false;
     seen.add(value);
     const record = value as Record<string, unknown>;
-    if (!isRoot && typeof record._type === "string" && ["Entity", "Relation", "Property", "Dictionary", "StateNode", "StateTransfer"].includes(record._type)) {
-        return false;
+    if (!isRoot && typeof record._type === "string") {
+        if (MODEL_REFERENCE_TYPES.includes(record._type)) return false;
+        const ownFunctionFields = OWN_FUNCTION_FIELDS[record._type];
+        if (ownFunctionFields) return ownFunctionFields.some(field => typeof record[field] === "function");
     }
     if (Array.isArray(value)) return value.some(item => hasFunctionDeep(item, seen, false));
     return Object.values(record).some(item => hasFunctionDeep(item, seen, false));
@@ -747,8 +766,14 @@ function collectFunctionText(value: unknown, path = "args", seen = new WeakSet<o
     if (seen.has(value)) return [];
     seen.add(value);
     const record = value as Record<string, unknown>;
-    if (typeof record._type === "string" && ["Entity", "Relation", "Property", "Dictionary", "StateNode", "StateTransfer"].includes(record._type)) {
-        return [];
+    if (typeof record._type === "string") {
+        if (MODEL_REFERENCE_TYPES.includes(record._type)) return [];
+        const ownFunctionFields = OWN_FUNCTION_FIELDS[record._type];
+        if (ownFunctionFields) {
+            return ownFunctionFields
+                .filter(field => typeof record[field] === "function")
+                .map(field => ({ path: `${path}.${field}`, text: (record[field] as Function).toString() }));
+        }
     }
     if (Array.isArray(value)) {
         return value.flatMap((item, index) => collectFunctionText(item, `${path}[${index}]`, seen));
@@ -924,7 +949,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
 
     return {
         version: 2,
-        frameworkVersion: "1",
+        frameworkVersion: MIGRATION_MANIFEST_GENERATOR_VERSION,
         modelHash: hash(model),
         records,
         relations,
@@ -943,81 +968,19 @@ export function getChangedComputations(oldManifest: MigrationManifest, newManife
     });
 }
 
-function normalizeComputationOwnershipProof(computation: ComputationManifest, ownerComputationId: string): ComputationManifest["ownershipProof"] {
-    if (!computation.ownershipProof) return undefined;
-    return {
-        ...computation.ownershipProof,
-        ownerComputationId,
-    };
-}
-
-function hasSameSemanticComputationShape(oldComputation: ComputationManifest, nextComputation: ComputationManifest) {
-    const oldFunctionHash = oldComputation.functionSignature?.hash;
-    const nextFunctionHash = nextComputation.functionSignature?.hash;
-    const hasStableUuid = oldComputation.identity.uuid !== undefined &&
-        oldComputation.identity.uuid === nextComputation.identity.uuid;
-    const hasMatchingFunctionHash = oldFunctionHash !== undefined && oldFunctionHash === nextFunctionHash;
-    if (!hasStableUuid && !hasMatchingFunctionHash) return false;
-    if (oldFunctionHash !== nextFunctionHash) return false;
-    return oldComputation.dataContext === nextComputation.dataContext &&
-        oldComputation.outputRecord === nextComputation.outputRecord &&
-        oldComputation.outputProperty === nextComputation.outputProperty &&
-        oldComputation.asyncReturn === nextComputation.asyncReturn &&
-        oldComputation.owner === nextComputation.owner &&
-        oldComputation.allocationSignature === nextComputation.allocationSignature &&
-        isEqualValue(stripUndefinedDeep(oldComputation.deps), stripUndefinedDeep(nextComputation.deps)) &&
-        isEqualValue(stripUndefinedDeep(oldComputation.eventDeps), stripUndefinedDeep(nextComputation.eventDeps)) &&
-        isEqualValue(stripUndefinedDeep(oldComputation.stateKeys), stripUndefinedDeep(nextComputation.stateKeys)) &&
-        isEqualValue(stripUndefinedDeep(oldComputation.boundStates), stripUndefinedDeep(nextComputation.boundStates)) &&
-        oldComputation.functionSignature?.hasFunction === nextComputation.functionSignature?.hasFunction &&
-        isEqualValue(oldComputation.functionSignature?.callbackPaths || [], nextComputation.functionSignature?.callbackPaths || []);
-}
-
-function normalizeLegacyComputationManifest(oldComputation: ComputationManifest, nextComputation: ComputationManifest): ComputationManifest {
-    const stateSignature = oldComputation.stateSignature;
-    const structuralSignature = nextComputation.structuralSignature;
-    return {
-        ...oldComputation,
-        id: nextComputation.id,
-        identity: {
-            ...oldComputation.identity,
-            key: nextComputation.id,
-            namePath: nextComputation.id,
-        },
-        type: nextComputation.type,
-        outputSignature: nextComputation.outputSignature,
-        stateSignature,
-        structuralSignature,
-        allocation: nextComputation.allocation,
-        allocationSignature: nextComputation.allocationSignature,
-        scopeSignature: nextComputation.scopeSignature,
-        signature: hash({ structuralSignature, stateSignature, functionHash: oldComputation.functionSignature?.hash, allocationSignature: nextComputation.allocationSignature }),
-        ownershipProof: normalizeComputationOwnershipProof(oldComputation, nextComputation.id),
-    };
-}
-
-export function normalizePreviousComputationManifest(previousManifest: MigrationManifest, nextManifest: MigrationManifest): MigrationManifest {
-    const nextById = new Map(nextManifest.computations.map(item => [item.id, item]));
-    const usedNextIds = new Set<string>();
-    const normalizedComputations = previousManifest.computations.map(oldComputation => {
-        const sameId = nextById.get(oldComputation.id);
-        if (sameId) {
-            usedNextIds.add(sameId.id);
-            return oldComputation;
-        }
-        const semanticMatch = nextManifest.computations.find(nextComputation =>
-            !usedNextIds.has(nextComputation.id) &&
-            hasSameSemanticComputationShape(oldComputation, nextComputation)
+// No backward compatibility: manifests written by a different generator version
+// are rejected outright. Signature collection semantics differ between
+// generators, so silently comparing or adopting them would hide real changes.
+// The explicit recovery path is controller.createMigrationBaseline() after
+// verifying that the current definitions match the existing schema.
+export function assertManifestGeneratorCurrent(manifest: MigrationManifest) {
+    if (manifest.frameworkVersion !== MIGRATION_MANIFEST_GENERATOR_VERSION) {
+        throw new MigrationBaselineError(
+            `Migration manifest was written by an incompatible interaqt manifest generator (found '${manifest.frameworkVersion}', expected '${MIGRATION_MANIFEST_GENERATOR_VERSION}'). ` +
+            `Verify that the current definitions match the existing schema, then re-baseline with controller.createMigrationBaseline().`,
+            { foundGeneratorVersion: manifest.frameworkVersion, expectedGeneratorVersion: MIGRATION_MANIFEST_GENERATOR_VERSION },
         );
-        if (!semanticMatch) return oldComputation;
-        usedNextIds.add(semanticMatch.id);
-        return normalizeLegacyComputationManifest(oldComputation, semanticMatch);
-    });
-    return {
-        ...previousManifest,
-        computations: normalizedComputations,
-        sequences: previousManifest.sequences || createScopedSequenceDeclarationManifests(normalizedComputations),
-    };
+    }
 }
 
 function requirementKey(requirement: MigrationDecisionRequirement) {
@@ -1118,7 +1081,7 @@ function takeoverTargetType(dataContext: string): "property" | "entity" | "relat
     return "relation";
 }
 
-type MigrationReadHandle = Pick<EntityQueryHandle, "find">;
+type MigrationReadHandle = Pick<EntityQueryHandle, "find" | "findOne">;
 
 function dbQuery(controller: Controller) {
     return (controller.system.storage as unknown as { db?: { query?: Function } }).db ||
@@ -1688,20 +1651,10 @@ export function buildMigrationDiff(
                 requiredDecisions.push(seedRequirement);
             }
         }
-        if (detected.needsEventRebuildHandler) {
-            requiredDecisions.push({
-                kind: "event-rebuild-handler",
-                dataContext: computation.dataContext,
-                reason: "event-based computation needs an external migration rebuild handler",
-            });
-        }
-        if (detected.needsAsyncCompletionHandler) {
-            requiredDecisions.push({
-                kind: "async-completion-handler",
-                dataContext: computation.dataContext,
-                reason: "async computation needs an external migration completion handler",
-            });
-        }
+        // Handler requirements (event rebuild / async completion) are added later
+        // from the provisional rebuild plan: only computations whose output will
+        // actually be rebuilt need migration handlers. Requiring handlers for
+        // untouched computations only breeds dangerous placeholder handlers.
     }
 
     for (const operation of schemaPlan.preRecomputeDDL) {
@@ -1753,20 +1706,38 @@ export function buildMigrationDiff(
     };
 }
 
+// Handler requirements are derived from the rebuild plan so that only
+// computations whose output is actually rebuilt demand migration handlers.
+// The predicates must mirror getRecomputeBlockingChanges, which gates
+// execution on the same conditions.
 export function addMissingRebuildHandlerRequirements(diff: MigrationDiffFile, controller: Controller, rebuildPlan: ComputationRebuildItem[]) {
     const handles = computationById(controller);
     const requirements = new Map(diff.requiredDecisions.map(requirement => [requirementKey(requirement), requirement]));
     for (const item of rebuildPlan) {
         if (!item.rebuildOutput) continue;
         const computation = handles.get(item.computationId);
-        if ((computation?.args as { _type?: string } | undefined)?._type === "ScopedSequence") continue;
-        if (!computation || typeof (computation as DataBasedComputation).compute === "function") continue;
-        const requirement: MigrationDecisionRequirement = {
-            kind: "event-rebuild-handler",
-            dataContext: item.dataContext,
-            reason: "computation without full compute support needs an external migration rebuild handler",
-        };
-        requirements.set(requirementKey(requirement), requirement);
+        if (!computation) continue;
+        if ((computation.args as { _type?: string } | undefined)?._type === "ScopedSequence") continue;
+        const eventBased = typeof (computation as EventBasedComputation).eventDeps === "object";
+        const lacksCompute = typeof (computation as DataBasedComputation).compute !== "function";
+        if (eventBased || lacksCompute) {
+            const requirement: MigrationDecisionRequirement = {
+                kind: "event-rebuild-handler",
+                dataContext: item.dataContext,
+                reason: eventBased
+                    ? "event-based computation needs an external migration rebuild handler"
+                    : "computation without full compute support needs an external migration rebuild handler",
+            };
+            requirements.set(requirementKey(requirement), requirement);
+        }
+        if (typeof (computation as DataBasedComputation).asyncReturn === "function") {
+            const requirement: MigrationDecisionRequirement = {
+                kind: "async-completion-handler",
+                dataContext: item.dataContext,
+                reason: "async computation needs an external migration completion handler",
+            };
+            requirements.set(requirementKey(requirement), requirement);
+        }
     }
     diff.requiredDecisions = Array.from(requirements.values());
     diff.summary = {
@@ -2052,6 +2023,48 @@ function relationForAttribute(manifest: MigrationManifest, hostName: string, att
     );
 }
 
+function recordOutputNode(manifest: MigrationManifest, recordName: string): string {
+    const storageRecord = manifest.storage.records.find(item => item.recordName === recordName);
+    const isRelation = storageRecord
+        ? storageRecord.isRelation
+        : manifest.relations.some(relation => relation.name === recordName);
+    return `${isRelation ? "relation" : "entity"}:${recordName}`;
+}
+
+// A dependency on a filtered record is fed by its base record's output, so the
+// dependency must be registered on the whole resolved base chain as well.
+function recordChainNames(manifest: MigrationManifest, recordName: string): string[] {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    let current: string | undefined = recordName;
+    while (current && !seen.has(current)) {
+        seen.add(current);
+        names.push(current);
+        const storageRecord = manifest.storage.records.find(item => item.recordName === current);
+        current = storageRecord?.isFiltered ? storageRecord.resolvedBaseRecordName : undefined;
+    }
+    return names;
+}
+
+function recordDepNodes(manifest: MigrationManifest, recordName: string): string[] {
+    return recordChainNames(manifest, recordName).map(name => recordOutputNode(manifest, name));
+}
+
+// A records dependency reads the queried properties too, so it must also be
+// registered on their (possibly computed) property nodes and on relation
+// nodes reachable through the attribute query.
+function recordAttributeDepNodes(manifest: MigrationManifest, recordName: string, attributes: unknown[]): string[] {
+    return recordChainNames(manifest, recordName).flatMap(name => {
+        const record = manifest.records.find(item => item.name === name);
+        const propertyNodes = attributes.includes("*")
+            ? (record?.properties || []).map(property => `property:${name}.${property.name}`)
+            : attributes
+                .filter((item): item is string => typeof item === "string" && item !== "*" && item !== "id")
+                .map(attribute => `property:${name}.${attribute}`);
+        return [...propertyNodes, ...relationDepNodes(manifest, name, attributes)];
+    });
+}
+
 function relationDepNodes(manifest: MigrationManifest, hostName: string, attributes: unknown[]): string[] {
     return attributes.flatMap(attribute => {
         if (!Array.isArray(attribute) || typeof attribute[0] !== "string") return [];
@@ -2078,7 +2091,13 @@ function relationDepNodes(manifest: MigrationManifest, hostName: string, attribu
 
 function depNodes(dep: { type: string; source?: string; attributeQuery?: unknown }, computation: ComputationManifest, manifest: MigrationManifest) {
     if (dep.type === "global" && dep.source) return [`global:${dep.source}`];
-    if (dep.type === "records" && dep.source) return [`entity:${dep.source}`];
+    if (dep.type === "records" && dep.source) {
+        const attributes = Array.isArray(dep.attributeQuery) ? dep.attributeQuery : [];
+        return [
+            ...recordDepNodes(manifest, dep.source),
+            ...recordAttributeDepNodes(manifest, dep.source, attributes),
+        ];
+    }
     if (dep.type === "property") {
         const match = computation.dataContext.match(/^property:([^.]*)\./);
         if (!match) return [];
@@ -2089,13 +2108,13 @@ function depNodes(dep: { type: string; source?: string; attributeQuery?: unknown
             .filter((item): item is string => typeof item === "string" && item !== "*")
             .map(attribute => `property:${hostName}.${attribute}`);
         const nodes = [...propertyNodes, ...relationNodes];
-        return nodes.length ? nodes : [`entity:${hostName}`];
+        return nodes.length ? nodes : recordDepNodes(manifest, hostName);
     }
     return [];
 }
 
 function eventDepNodes(eventDep: { recordName: string; type: string }, manifest: MigrationManifest) {
-    const nodes = [`entity:${eventDep.recordName}`];
+    const nodes = recordDepNodes(manifest, eventDep.recordName);
     if (eventDep.type === "update") {
         const record = manifest.records.find(item => item.name === eventDep.recordName);
         nodes.push(...(record?.properties || []).map(property => `property:${eventDep.recordName}.${property.name}`));
@@ -2129,13 +2148,34 @@ export function buildAffectedRebuildPlan(
         }
     }
 
+    // A hard-deletion property computation deletes its host records, so its
+    // output also mutates the host record node itself.
+    const hardDeletionHostNodes = (node: string) => {
+        const match = node.match(/^property:([^.]*)\._isDeleted_$/);
+        return match ? recordDepNodes(newManifest, match[1]) : [];
+    };
+    const hardDeletionByRecordNode = new Map<string, ComputationManifest>();
+    for (const computation of newManifest.computations) {
+        for (const node of hardDeletionHostNodes(computation.dataContext)) {
+            hardDeletionByRecordNode.set(node, computation);
+        }
+    }
+    const upstreamComputationsForNode = (node: string): ComputationManifest[] => {
+        const upstream: ComputationManifest[] = [];
+        const direct = byOutput.get(node);
+        if (direct) upstream.push(direct);
+        const hardDeletion = hardDeletionByRecordNode.get(node);
+        if (hardDeletion && hardDeletion !== direct) upstream.push(hardDeletion);
+        return upstream;
+    };
+
     const affected = new Set(changedComputations.map(item => item.id));
     const outputChangedNodes = changedComputations
         .filter(item => {
             const old = oldById.get(item.id);
             return options.outputChangedIds?.has(item.id) || !old || old.outputSignature !== item.outputSignature;
         })
-        .map(item => outputNode(item));
+        .flatMap(item => [outputNode(item), ...hardDeletionHostNodes(outputNode(item))]);
     const queue = [...outputChangedNodes, ...changedDataContexts];
     while (queue.length) {
         const node = queue.shift()!;
@@ -2160,15 +2200,17 @@ export function buildAffectedRebuildPlan(
         if (computation) {
             for (const dep of computation.deps) {
                 for (const upstream of depNodes(dep, computation, newManifest)) {
-                    const upstreamComputation = byOutput.get(upstream);
-                    if (upstreamComputation && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    for (const upstreamComputation of upstreamComputationsForNode(upstream)) {
+                        if (upstreamComputation.id !== id && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    }
                 }
             }
             for (const eventDep of computation.eventDeps) {
                 for (const upstream of eventDepNodes(eventDep, newManifest)) {
                     if (upstream === computation.dataContext) continue;
-                    const upstreamComputation = byOutput.get(upstream);
-                    if (upstreamComputation && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    for (const upstreamComputation of upstreamComputationsForNode(upstream)) {
+                        if (upstreamComputation.id !== id && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    }
                 }
             }
         }
@@ -2227,7 +2269,7 @@ export function getStorageBlockingChanges(oldManifest: MigrationManifest, newMan
     for (const newRecord of newManifest.storage.records) {
         const oldRecord = oldRecords.get(newRecord.recordName);
         if (!oldRecord) continue;
-        if (oldRecord.tableName !== newRecord.tableName && !newRecord.attributes.some(attr => attr.startsWith("_"))) {
+        if (oldRecord.tableName !== newRecord.tableName) {
             blocking.push({
                 kind: "physical-path-move",
                 logicalPath: newRecord.recordName,
@@ -2309,10 +2351,13 @@ function hasApprovedComputationTakeover(options: MigrationOptions, oldManifest: 
 
 export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan: ComputationRebuildItem[], options: MigrationOptions = {}, oldManifest?: MigrationManifest) {
     const blockingChanges: StorageBlockingChange[] = [];
-    const rebuildIds = new Set(rebuildPlan.map(item => item.computationId));
+    // State-only rebuilds reset bound state defaults without touching output,
+    // so output-related gates (handlers, compute contracts) only apply to
+    // plan items that actually rebuild output.
+    const outputRebuildIds = new Set(rebuildPlan.filter(item => item.rebuildOutput).map(item => item.computationId));
     for (const computation of controller.scheduler.computationsHandles.values()) {
         const computationId = computationManifestId(computation as DataBasedComputation);
-        if (!rebuildIds.has(computationId)) continue;
+        if (!outputRebuildIds.has(computationId)) continue;
 
         const dataContext = dataContextPath(computation.dataContext);
         if ((computation.args as { _type?: string; initializeFrom?: unknown })._type === "ScopedSequence") {
@@ -2623,7 +2668,81 @@ export async function seedScopedSequenceInitializers(controller: Controller, app
     }
 }
 
-export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest) {
+// New plain fact properties are created as NULL columns by additive DDL, but
+// their declared defaultValue is the framework's create-time semantics. Existing
+// rows must be backfilled so reads and post-recompute non-null constraint
+// verification see the declared default instead of NULL.
+export function getNewFactPropertyBackfills(controller: Controller, previousManifest: MigrationManifest, nextManifest: MigrationManifest): FactPropertyBackfill[] {
+    const previousRecords = new Map(previousManifest.records.map(record => [record.id, record]));
+    const filteredRecordNames = new Set(nextManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
+    const backfills: FactPropertyBackfill[] = [];
+    for (const record of nextManifest.records) {
+        if (filteredRecordNames.has(record.name)) continue;
+        const previousProperties = new Set((previousRecords.get(record.id)?.properties || []).map(property => property.id));
+        for (const property of record.properties) {
+            if (previousProperties.has(property.id) || property.computed) continue;
+            const definition = findFactPropertyDefinition(controller, record.name, property.name);
+            if (typeof definition?.defaultValue !== "function") continue;
+            backfills.push({ recordName: record.name, propertyName: property.name });
+        }
+    }
+    return backfills;
+}
+
+function findFactPropertyDefinition(controller: Controller, recordName: string, propertyName: string) {
+    const host = controller.entities.find(entity => entity.name === recordName) ||
+        controller.relations.find(relation => relation.name === recordName);
+    return host?.properties?.find(property => property.name === propertyName);
+}
+
+export async function backfillNewFactPropertyDefaults(controller: Controller, backfills: FactPropertyBackfill[]) {
+    for (const backfill of backfills) {
+        const definition = findFactPropertyDefinition(controller, backfill.recordName, backfill.propertyName);
+        if (typeof definition?.defaultValue !== "function") {
+            throw new MigrationError(`Cannot backfill ${backfill.recordName}.${backfill.propertyName}: property has no defaultValue`);
+        }
+        const records = await controller.system.storage.find(backfill.recordName, undefined, undefined, ["*"]);
+        for (const record of records) {
+            if (record[backfill.propertyName] !== undefined && record[backfill.propertyName] !== null) continue;
+            const value = definition.defaultValue(record, backfill.recordName);
+            if (value === undefined) continue;
+            await controller.system.storage.update(
+                backfill.recordName,
+                MatchExp.atom({ key: "id", value: ["=", record.id] }),
+                { [backfill.propertyName]: value },
+            );
+        }
+    }
+}
+
+// Resolve a computation's data deps before the runtime storage query handle
+// exists (diff generation / dry-run time), using the migration read handle.
+async function resolveDataDepsForMigration(controller: Controller, computation: DataBasedComputation, record?: Record<string, unknown>, readHandle?: MigrationReadHandle) {
+    const hasQueryHandle = Boolean((controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle);
+    if (hasQueryHandle || !readHandle) {
+        return controller.scheduler.resolveDataDeps(computation, record);
+    }
+    const entries = await Promise.all(Object.entries(computation.dataDeps || {}).map(async ([name, dep]) => {
+        if (dep.type === "records") {
+            return [name, await readHandle.find(dep.source.name!, dep.match, dep.modifier ?? {}, dep.attributeQuery)];
+        }
+        if (dep.type === "property") {
+            if (record?.id === undefined) {
+                throw new MigrationError(`Record ID is required to resolve property data dependency '${name}' for ${dataContextPath(computation.dataContext)}`);
+            }
+            const hostName = (computation.dataContext as { host: { name?: string } }).host.name!;
+            return [name, await readHandle.findOne(hostName, MatchExp.atom({ key: "id", value: ["=", record.id] }), {}, dep.attributeQuery)];
+        }
+        if (dep.type === "global") {
+            const stored = await readHandle.findOne(DICTIONARY_RECORD, MatchExp.atom({ key: "key", value: ["=", dep.source.name!] }), undefined, ["value"]);
+            return [name, (stored?.value as { raw?: unknown } | undefined)?.raw];
+        }
+        throw new MigrationError(`Unknown data dependency type '${(dep as { type?: string }).type}' for ${dataContextPath(computation.dataContext)}`);
+    }));
+    return Object.fromEntries(entries);
+}
+
+export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest, readHandle?: MigrationReadHandle) {
     const handles = computationById(controller);
     const scope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }> = [];
     const readExistingRecords = async (recordName: string) => {
@@ -2654,7 +2773,7 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
             if (records && typeof (computation as DataBasedComputation).compute === "function") {
                 for (const record of records) {
                     const result = await (computation as DataBasedComputation).compute!(
-                        await controller.scheduler.resolveDataDeps(computation as DataBasedComputation, record),
+                        await resolveDataDepsForMigration(controller, computation as DataBasedComputation, record, readHandle),
                         record,
                     );
                     if (result === true) ids.push(String(record.id));
@@ -2753,7 +2872,7 @@ export function getNewFilteredDataContexts(oldManifest: MigrationManifest, newMa
     const oldFiltered = new Set(oldManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
     return newManifest.storage.records
         .filter(record => record.isFiltered && !oldFiltered.has(record.recordName))
-        .map(record => `entity:${record.recordName}`);
+        .map(record => `${record.isRelation ? "relation" : "entity"}:${record.recordName}`);
 }
 
 export function createPlanBlockingMessages(changes: StorageBlockingChange[]) {
@@ -2885,6 +3004,15 @@ function createMutationEventForOutput(dataContext: DataContext, result: unknown,
         };
     }
     if (dataContext.type === "property" && record) {
+        // A truthy hard-deletion output physically deletes the host record, so
+        // downstream computations must see a delete event, not a property update.
+        if (dataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
+            return {
+                recordName: dataContext.host.name!,
+                type: "delete",
+                record: record as any,
+            };
+        }
         return {
             recordName: dataContext.host.name!,
             type: "update",

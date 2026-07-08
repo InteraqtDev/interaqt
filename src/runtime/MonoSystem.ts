@@ -47,6 +47,13 @@ function JSONStringify(value: unknown) {
     return encodeURI(JSON.stringify(value))
 }
 
+// Migration bookkeeping statements must be parameterized: values such as the
+// serialized manifest or error messages can contain quotes and backslashes,
+// and string interpolation corrupts them under MySQL's backslash escaping.
+function migrationSQLPlaceholders(dialectName: string, count: number): string[] {
+    return Array.from({ length: count }, (_, index) => dialectName === 'postgres' ? `$${index + 1}` : '?')
+}
+
 function JSONParse(value: string) {
     return value === undefined ? undefined : JSON.parse(decodeURI(value))
 }
@@ -377,10 +384,9 @@ class MonoStorage implements Storage{
     async isMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
         if (!migrationId) return false
         const dialect = getSchemaDialect(this.db).name
+        const [p1, p2] = migrationSQLPlaceholders(dialect, 2)
         const rows = await this.db.query<{ status: string }>(
-            dialect === 'mysql'
-                ? `SELECT "status" FROM "__interaqt_migration_operation_log" WHERE "migrationId" = ? AND "operationKey" = ? LIMIT 1`
-                : `SELECT "status" FROM "__interaqt_migration_operation_log" WHERE "migrationId" = $1 AND "operationKey" = $2 LIMIT 1`,
+            `SELECT "status" FROM "__interaqt_migration_operation_log" WHERE "migrationId" = ${p1} AND "operationKey" = ${p2} LIMIT 1`,
             [migrationId, operationKey],
             'read migration operation log'
         )
@@ -389,17 +395,15 @@ class MonoStorage implements Storage{
 
     async markMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
         if (!migrationId) return
-        const escapedMigrationId = migrationId.replace(/'/g, "''")
-        const escapedOperationKey = operationKey.replace(/'/g, "''")
-        if (getSchemaDialect(this.db).name === 'mysql') {
-            await this.db.scheme(
-                `INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES ('${escapedMigrationId}', '${escapedOperationKey}', 'succeeded') ON DUPLICATE KEY UPDATE "status" = VALUES("status")`,
-                'write migration operation log'
-            )
-            return
-        }
-        await this.db.scheme(
-            `INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES ('${escapedMigrationId}', '${escapedOperationKey}', 'succeeded') ON CONFLICT ("migrationId", "operationKey") DO UPDATE SET "status" = EXCLUDED."status"`,
+        const dialect = getSchemaDialect(this.db).name
+        const [p1, p2] = migrationSQLPlaceholders(dialect, 2)
+        const conflictClause = dialect === 'mysql'
+            ? `ON DUPLICATE KEY UPDATE "status" = VALUES("status")`
+            : `ON CONFLICT ("migrationId", "operationKey") DO UPDATE SET "status" = EXCLUDED."status"`
+        await this.db.update(
+            `INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES (${p1}, ${p2}, 'succeeded') ${conflictClause}`,
+            [migrationId, operationKey],
+            undefined,
             'write migration operation log'
         )
     }
@@ -1305,10 +1309,9 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         const tables = await (this.storage as MonoStorage).getExistingTables()
         if (!tables.has('__interaqt_migration_manifest')) return undefined
         const dialect = getSchemaDialect(this.db).name
+        const [p1] = migrationSQLPlaceholders(dialect, 1)
         const rows = await this.db.query<{ value: string }>(
-            dialect === 'mysql'
-                ? `SELECT "value" FROM "__interaqt_migration_manifest" WHERE "key" = ? LIMIT 1`
-                : `SELECT "value" FROM "__interaqt_migration_manifest" WHERE "key" = $1 LIMIT 1`,
+            `SELECT "value" FROM "__interaqt_migration_manifest" WHERE "key" = ${p1} LIMIT 1`,
             ['current'],
             'read migration manifest'
         )
@@ -1319,15 +1322,14 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         await this.ensureMigrationManifestTable()
         const value = JSON.stringify(manifest)
         const dialect = getSchemaDialect(this.db).name
-        if (dialect === 'mysql') {
-            await this.db.scheme(
-                `INSERT INTO "__interaqt_migration_manifest" ("key", "value") VALUES ('current', '${value.replace(/'/g, "''")}') ON DUPLICATE KEY UPDATE "value" = VALUES("value")`,
-                'write migration manifest'
-            )
-            return
-        }
-        await this.db.scheme(
-            `INSERT INTO "__interaqt_migration_manifest" ("key", "value") VALUES ('current', '${value.replace(/'/g, "''")}') ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`,
+        const [p1, p2] = migrationSQLPlaceholders(dialect, 2)
+        const conflictClause = dialect === 'mysql'
+            ? `ON DUPLICATE KEY UPDATE "value" = VALUES("value")`
+            : `ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`
+        await this.db.update(
+            `INSERT INTO "__interaqt_migration_manifest" ("key", "value") VALUES (${p1}, ${p2}) ${conflictClause}`,
+            ['current', value],
+            undefined,
             'write migration manifest'
         )
     }
@@ -1335,7 +1337,7 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     async hasExistingData(): Promise<boolean> {
         const storage = this.storage as MonoStorage
         const tables = await storage.getExistingTables()
-        const ignored = new Set(['_IDS_', '__interaqt_migration_manifest', '__interaqt_migration_log', '__interaqt_migration_lock'])
+        const ignored = new Set(['_IDS_', '__interaqt_migration_manifest', '__interaqt_migration_log', '__interaqt_migration_lock', '__interaqt_migration_operation_log'])
         for (const tableName of tables) {
             if (ignored.has(tableName)) continue
             const escaped = tableName.replace(/"/g, '""')
@@ -1349,43 +1351,48 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         return false
     }
 
+    private async acquireMigrationLock(migrationId: string) {
+        const dialect = getSchemaDialect(this.db).name
+        const [p1] = migrationSQLPlaceholders(dialect, 1)
+        await this.db.update(
+            `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', ${p1})`,
+            [migrationId],
+            undefined,
+            'acquire migration lock'
+        )
+    }
+
     async beginMigration(modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount = 0): Promise<MigrationRunState> {
         await this.ensureMigrationManifestTable()
         const dialect = getSchemaDialect(this.db).name
+        const [lockPlaceholder] = migrationSQLPlaceholders(dialect, 1)
         const existing = await this.db.query<{ migrationId: string }>(
-            dialect === 'mysql'
-                ? `SELECT "migrationId" FROM "__interaqt_migration_lock" WHERE "key" = ? LIMIT 1`
-                : `SELECT "migrationId" FROM "__interaqt_migration_lock" WHERE "key" = $1 LIMIT 1`,
+            `SELECT "migrationId" FROM "__interaqt_migration_lock" WHERE "key" = ${lockPlaceholder} LIMIT 1`,
             ['current'],
             'read migration lock'
         )
         if (existing[0]) {
-            throw new Error(`Migration is already running: ${existing[0].migrationId}`)
+            throw new Error(`Migration is already running: ${existing[0].migrationId}. If that process crashed, call controller.forceReleaseMigrationLock() after confirming no migration is actually running, then retry.`)
         }
+        const [resumableP1, resumableP2] = migrationSQLPlaceholders(dialect, 2)
         const resumable = await this.db.query<{ id: string, phase: MigrationPhase, status: string }>(
-            dialect === 'mysql'
-                ? `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = ? AND COALESCE("approvedDiffHash", '') = ? AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`
-                : `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = $1 AND COALESCE("approvedDiffHash", '') = $2 AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`,
+            `SELECT "id", "phase", "status" FROM "__interaqt_migration_log" WHERE "modelHash" = ${resumableP1} AND COALESCE("approvedDiffHash", '') = ${resumableP2} AND "status" IN ('pending', 'failed') AND "phase" IN ('pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written') ORDER BY "updatedAt" DESC LIMIT 1`,
             [modelHash, approvedDiffHash || ''],
             'read resumable migration'
         )
         if (resumable[0]) {
-            await this.db.scheme(
-                `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', '${resumable[0].id}')`,
-                'acquire migration lock'
-            )
+            await this.acquireMigrationLock(resumable[0].id)
             return { id: resumable[0].id, phase: resumable[0].phase }
         }
         const migrationId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
         const now = new Date().toISOString()
-        const summary = approvedDiffSummary === undefined ? null : JSON.stringify(approvedDiffSummary).replace(/'/g, "''")
-        const escapedDiffHash = (approvedDiffHash || '').replace(/'/g, "''")
-        await this.db.scheme(
-            `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', '${migrationId}')`,
-            'acquire migration lock'
-        )
-        await this.db.scheme(
-            `INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "approvedDiffSummary", "decisionCount", "reviewedAt", "phase", "status", "createdAt", "updatedAt") VALUES ('${migrationId}', '${modelHash}', '${escapedDiffHash}', ${summary === null ? 'NULL' : `'${summary}'`}, ${decisionCount}, '${now}', 'pending', 'pending', '${now}', '${now}')`,
+        const summary = approvedDiffSummary === undefined ? null : JSON.stringify(approvedDiffSummary)
+        await this.acquireMigrationLock(migrationId)
+        const logPlaceholders = migrationSQLPlaceholders(dialect, 8)
+        await this.db.update(
+            `INSERT INTO "__interaqt_migration_log" ("id", "modelHash", "approvedDiffHash", "approvedDiffSummary", "decisionCount", "reviewedAt", "phase", "status", "createdAt", "updatedAt") VALUES (${logPlaceholders[0]}, ${logPlaceholders[1]}, ${logPlaceholders[2]}, ${logPlaceholders[3]}, ${logPlaceholders[4]}, ${logPlaceholders[5]}, 'pending', 'pending', ${logPlaceholders[6]}, ${logPlaceholders[7]})`,
+            [migrationId, modelHash, approvedDiffHash || '', summary, decisionCount, now, now, now],
+            undefined,
             'write migration log pending'
         )
         return { id: migrationId, phase: 'pending' }
@@ -1394,8 +1401,11 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     async updateMigrationPhase(migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>): Promise<void> {
         await this.ensureMigrationManifestTable()
         const now = new Date().toISOString()
-        await this.db.scheme(
-            `UPDATE "__interaqt_migration_log" SET "phase" = '${phase}', "status" = 'pending', "updatedAt" = '${now}' WHERE "id" = '${migrationId}'`,
+        const [p1, p2, p3] = migrationSQLPlaceholders(getSchemaDialect(this.db).name, 3)
+        await this.db.update(
+            `UPDATE "__interaqt_migration_log" SET "phase" = ${p1}, "status" = 'pending', "updatedAt" = ${p2} WHERE "id" = ${p3}`,
+            [phase, now, migrationId],
+            undefined,
             `migration log ${phase}`
         )
     }
@@ -1403,14 +1413,31 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     async finishMigration(migrationId: string, status: 'succeeded' | 'failed', error?: unknown): Promise<void> {
         await this.ensureMigrationManifestTable()
         const now = new Date().toISOString()
-        const errorMessage = error === undefined ? null : String(error instanceof Error ? error.message : error).replace(/'/g, "''")
-        await this.db.scheme(
-            `UPDATE "__interaqt_migration_log" SET "status" = '${status}', "error" = ${errorMessage === null ? 'NULL' : `'${errorMessage}'`}, "updatedAt" = '${now}' WHERE "id" = '${migrationId}'`,
+        const errorMessage = error === undefined ? null : String(error instanceof Error ? error.message : error)
+        const dialect = getSchemaDialect(this.db).name
+        const [p1, p2, p3, p4] = migrationSQLPlaceholders(dialect, 4)
+        await this.db.update(
+            `UPDATE "__interaqt_migration_log" SET "status" = ${p1}, "error" = ${p2}, "updatedAt" = ${p3} WHERE "id" = ${p4}`,
+            [status, errorMessage, now, migrationId],
+            undefined,
             'finish migration log'
         )
-        await this.db.scheme(
-            `DELETE FROM "__interaqt_migration_lock" WHERE "key" = 'current' AND "migrationId" = '${migrationId}'`,
+        const [deleteP1] = migrationSQLPlaceholders(dialect, 1)
+        await this.db.update(
+            `DELETE FROM "__interaqt_migration_lock" WHERE "key" = 'current' AND "migrationId" = ${deleteP1}`,
+            [migrationId],
+            undefined,
             'release migration lock'
+        )
+    }
+
+    async releaseMigrationLock(): Promise<void> {
+        await this.ensureMigrationManifestTable()
+        await this.db.update(
+            `DELETE FROM "__interaqt_migration_lock" WHERE "key" = 'current'`,
+            [],
+            undefined,
+            'force release migration lock'
         )
     }
 

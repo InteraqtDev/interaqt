@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, createMigrationManifest, hashMigrationDiff, readMigrationManifest, validateApprovedDiff, writeMigrationManifest } from "interaqt";
+import { Average, Any, Controller, ComputationResult, Count, Custom, Dictionary, Entity, Every, Expression, GlobalBoundState, KlassByName, MatchExp, MonoSystem, NonNullConstraint, Property, RealTime, RecordMutationSideEffect, Relation, StateMachine, StateNode, StateTransfer, Summation, Transform, UniqueConstraint, WeightedSummation, computationManifestId, createMigrationManifest, hashMigrationDiff, readMigrationManifest, validateApprovedDiff, writeMigrationManifest } from "interaqt";
 import { PGLiteDB } from "@drivers";
 
 async function approveGeneratedMigrationDiff(controller: Controller, options: {
@@ -621,6 +621,53 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("hard deletion recompute emits delete events and recomputes downstream counts", async () => {
+        const db = new PGLiteDB();
+        const build = (withDeletion: boolean) => {
+            const User = new Entity({
+                name: "MigrationHardDeleteDownstreamUser",
+                properties: [
+                    new Property({ name: "name", type: "string" }, { uuid: "migration-hd-downstream-name" }),
+                    ...(withDeletion ? [new Property({
+                        name: "_isDeleted_",
+                        type: "boolean",
+                        computation: new Custom({
+                            name: "MigrationHardDeleteDownstreamFlag",
+                            dataDeps: { current: { type: "property", attributeQuery: ["name"] } },
+                            compute: async (_deps: any, record: any) => record.name === "gone",
+                        }, { uuid: "migration-hd-downstream-flag-computation" }),
+                    }, { uuid: "migration-hd-downstream-flag" })] : []),
+                ],
+            }, { uuid: "migration-hd-downstream-user" });
+            const userCount = new Dictionary({
+                name: "migrationHardDeleteDownstreamCount",
+                type: "number",
+                collection: false,
+                computation: new Count({ record: User }, { uuid: "migration-hd-downstream-count-computation" }),
+            }, { uuid: "migration-hd-downstream-count" });
+            return { entities: [User], dict: [userCount] };
+        };
+        const v1 = build(false);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: [], dict: v1.dict }).setup(true);
+        await systemV1.storage.create("MigrationHardDeleteDownstreamUser", { name: "keep" });
+        await systemV1.storage.create("MigrationHardDeleteDownstreamUser", { name: "gone" });
+        expect(await systemV1.storage.dict.get("migrationHardDeleteDownstreamCount")).toBe(2);
+
+        const v2 = build(true);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: [], dict: v2.dict });
+        const plan = await migrateWithApproval(controllerV2);
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationHardDeleteDownstreamCount");
+        const remaining = await systemV2.storage.find("MigrationHardDeleteDownstreamUser", undefined, undefined, ["name"]);
+        expect(remaining.map(user => user.name)).toEqual(["keep"]);
+        expect(await systemV2.storage.dict.get("migrationHardDeleteDownstreamCount")).toBe(1);
+        await db.close();
+    });
+
     test("migrate rebuilds added Transform entity output from existing source records", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({
@@ -728,6 +775,188 @@ describe("Data migration phase 1", () => {
 
         expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationTransformChangeSum");
         expect(await systemV2.storage.dict.get("migrationTransformChangeSum")).toBe(60);
+        await db.close();
+    });
+
+    test("changed Transform-derived relation recomputes downstream aggregations over the relation", async () => {
+        const db = new PGLiteDB();
+        const build = (factor: number) => {
+            const User = new Entity({
+                name: "MigrationRelationDownstreamUser",
+                properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-relation-downstream-user-name" })],
+            }, { uuid: "migration-relation-downstream-user" });
+            const Item = new Entity({
+                name: "MigrationRelationDownstreamItem",
+                properties: [new Property({ name: "price", type: "number" }, { uuid: "migration-relation-downstream-item-price" })],
+            }, { uuid: "migration-relation-downstream-item" });
+            const creatorRel = new Relation({
+                source: Item,
+                sourceProperty: "creator",
+                target: User,
+                targetProperty: "created",
+                name: "MigrationRelationDownstreamCreator",
+                type: "n:1",
+            }, { uuid: "migration-relation-downstream-creator" });
+            const derivedRel = new Relation({
+                source: User,
+                sourceProperty: "items",
+                target: Item,
+                targetProperty: "owner",
+                name: "MigrationRelationDownstreamOwn",
+                type: "n:n",
+                properties: [new Property({ name: "weight", type: "number" }, { uuid: "migration-relation-downstream-own-weight" })],
+                computation: new Transform({
+                    record: Item,
+                    attributeQuery: ["id", "price", ["creator", { attributeQuery: ["id"] }]],
+                    callback: function (item: any) {
+                        return item.creator ? { source: item.creator, target: item, weight: item.price * factor } : null;
+                    },
+                }, { uuid: "migration-relation-downstream-own-transform" }),
+            }, { uuid: "migration-relation-downstream-own" });
+            const weightSum = new Dictionary({
+                name: "migrationRelationDownstreamWeightSum",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: derivedRel,
+                    attributeQuery: ["weight"],
+                }, { uuid: "migration-relation-downstream-weight-sum-computation" }),
+            }, { uuid: "migration-relation-downstream-weight-sum" });
+            return { entities: [User, Item], relations: [derivedRel, creatorRel], dict: [weightSum] };
+        };
+        const v1 = build(1);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: v1.relations, dict: v1.dict }).setup(true);
+        const user = await systemV1.storage.create("MigrationRelationDownstreamUser", { name: "u" });
+        await systemV1.storage.create("MigrationRelationDownstreamItem", { price: 10, creator: { id: user.id } });
+        await systemV1.storage.create("MigrationRelationDownstreamItem", { price: 20, creator: { id: user.id } });
+        expect(await systemV1.storage.dict.get("migrationRelationDownstreamWeightSum")).toBe(30);
+
+        const v2 = build(2);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: v2.relations, dict: v2.dict });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                "computation:relation:MigrationRelationDownstreamOwn:Transform": "changed",
+            },
+        });
+        const plan = await controllerV2.migrate({ approvedDiff });
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationRelationDownstreamWeightSum");
+        expect(await systemV2.storage.dict.get("migrationRelationDownstreamWeightSum")).toBe(60);
+        await db.close();
+    });
+
+    test("changed property computation recomputes aggregations whose records dep queries the property", async () => {
+        const db = new PGLiteDB();
+        const build = (factor: number) => {
+            const Product = new Entity({
+                name: "MigrationRecordsDepProduct",
+                properties: [
+                    new Property({ name: "price", type: "number" }, { uuid: "migration-records-dep-price" }),
+                    new Property({
+                        name: "adjusted",
+                        type: "number",
+                        computation: new Custom({
+                            name: "MigrationRecordsDepAdjusted",
+                            dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                            compute: factor === 1
+                                ? (async (_deps: any, record: any) => record.price * 1)
+                                : (async (_deps: any, record: any) => record.price * 2),
+                        }, { uuid: "migration-records-dep-adjusted-computation" }),
+                    }, { uuid: "migration-records-dep-adjusted" }),
+                ],
+            }, { uuid: "migration-records-dep-product" });
+            const total = new Dictionary({
+                name: "migrationRecordsDepTotal",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: Product,
+                    attributeQuery: ["adjusted"],
+                }, { uuid: "migration-records-dep-total-computation" }),
+            }, { uuid: "migration-records-dep-total" });
+            return { entities: [Product], dict: [total] };
+        };
+        const v1 = build(1);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: [], dict: v1.dict }).setup(true);
+        await systemV1.storage.create("MigrationRecordsDepProduct", { price: 10 });
+        await systemV1.storage.create("MigrationRecordsDepProduct", { price: 20 });
+        expect(await systemV1.storage.dict.get("migrationRecordsDepTotal")).toBe(30);
+
+        const v2 = build(2);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: [], dict: v2.dict });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                "computation:property:MigrationRecordsDepProduct.adjusted:Custom": "changed",
+            },
+        });
+        const plan = await controllerV2.migrate({ approvedDiff });
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationRecordsDepTotal");
+        expect(await systemV2.storage.dict.get("migrationRecordsDepTotal")).toBe(60);
+        await db.close();
+    });
+
+    test("changed Transform output recomputes downstream aggregations over an existing filtered entity", async () => {
+        const db = new PGLiteDB();
+        const build = (factor: number) => {
+            const Product = new Entity({
+                name: "MigrationFilteredDownstreamProduct",
+                properties: [new Property({ name: "price", type: "number" }, { uuid: "migration-filtered-downstream-price" })],
+            }, { uuid: "migration-filtered-downstream-product" });
+            const Discount = new Entity({
+                name: "MigrationFilteredDownstreamDiscount",
+                properties: [new Property({ name: "value", type: "number" }, { uuid: "migration-filtered-downstream-value" })],
+                computation: new Transform({
+                    record: Product,
+                    attributeQuery: ["id", "price"],
+                    callback: (item: any) => ({ value: item.price * factor }),
+                }, { uuid: "migration-filtered-downstream-transform" }),
+            }, { uuid: "migration-filtered-downstream-discount" });
+            const BigDiscount = new Entity({
+                name: "MigrationFilteredDownstreamBigDiscount",
+                baseEntity: Discount,
+                matchExpression: MatchExp.atom({ key: "value", value: [">", 15] }),
+            }, { uuid: "migration-filtered-downstream-big-discount" });
+            const bigSum = new Dictionary({
+                name: "migrationFilteredDownstreamBigSum",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: BigDiscount,
+                    attributeQuery: ["value"],
+                }, { uuid: "migration-filtered-downstream-big-sum-computation" }),
+            }, { uuid: "migration-filtered-downstream-big-sum" });
+            return { entities: [Product, Discount, BigDiscount], dict: [bigSum] };
+        };
+        const v1 = build(1);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: [], dict: v1.dict }).setup(true);
+        await systemV1.storage.create("MigrationFilteredDownstreamProduct", { price: 10 });
+        await systemV1.storage.create("MigrationFilteredDownstreamProduct", { price: 20 });
+        expect(await systemV1.storage.dict.get("migrationFilteredDownstreamBigSum")).toBe(20);
+
+        const v2 = build(2);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: [], dict: v2.dict });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+            computationDecisions: {
+                "computation:entity:MigrationFilteredDownstreamDiscount:Transform": "changed",
+            },
+        });
+        const plan = await controllerV2.migrate({ approvedDiff });
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationFilteredDownstreamBigSum");
+        expect(await systemV2.storage.dict.get("migrationFilteredDownstreamBigSum")).toBe(60);
         await db.close();
     });
 
@@ -1425,6 +1654,57 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("dry-run blocks record table moves even when the record hosts computation state attributes", async () => {
+        const db = new PGLiteDB();
+        const build = () => {
+            const User = new Entity({
+                name: "MigrationStateMoveUser",
+                properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-state-move-user-name" })],
+            }, { uuid: "migration-state-move-user" });
+            const Post = new Entity({
+                name: "MigrationStateMovePost",
+                properties: [new Property({ name: "title", type: "string" }, { uuid: "migration-state-move-post-title" })],
+            }, { uuid: "migration-state-move-post" });
+            const rel = new Relation({
+                source: User,
+                sourceProperty: "posts",
+                target: Post,
+                targetProperty: "author",
+                name: "MigrationStateMoveAuthored",
+                type: "1:n",
+            }, { uuid: "migration-state-move-authored" });
+            // property Count injects record-bound state (underscore attributes) onto User
+            User.properties.push(new Property({
+                name: "postCount",
+                type: "number",
+                computation: new Count({ property: "posts" }, { uuid: "migration-state-move-count-computation" }),
+            }, { uuid: "migration-state-move-post-count" }));
+            return { entities: [User, Post], relations: [rel] };
+        };
+        const v1 = build();
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: v1.entities, relations: v1.relations });
+        await controllerV1.setup(true);
+
+        const manifest = await readMigrationManifest(controllerV1);
+        const tampered = structuredClone(manifest!);
+        const userRecord = tampered.storage.records.find(record => record.recordName === "MigrationStateMoveUser")!;
+        expect(userRecord.attributes.some(attribute => attribute.startsWith("_"))).toBe(true);
+        userRecord.tableName = "OldUserTableThatMoved";
+        tampered.modelHash = "migration-state-move-tampered-hash";
+        await writeMigrationManifest(controllerV1, tampered);
+
+        const v2 = build();
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: v2.relations });
+        const plan = await dryRunWithApproval(controllerV2);
+        expect(plan.blockingChanges.join("\n")).toMatch(/physical-path-move/);
+        expect(plan.blockingChanges.join("\n")).toMatch(/MigrationStateMoveUser/);
+        await db.close();
+    });
+
     test("dry-run reports relation source target physical field moves", async () => {
         const db = new PGLiteDB();
         const User = new Entity({
@@ -1542,80 +1822,22 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
-    test("legacy minified computation ids are normalized to stable semantic ids", async () => {
-        const db = new PGLiteDB();
-        const Product = new Entity({
-            name: "MigrationLegacyComputationProduct",
-            properties: [
-                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-computation-price" }),
-                new Property({
-                    name: "doublePrice",
-                    type: "number",
-                    computation: new Custom({
-                        name: "MigrationLegacyComputationDouble",
-                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
-                        compute: async (_deps: any, record: any) => record.price * 2,
-                    }, { uuid: "migration-legacy-computation-double" }),
-                }, { uuid: "migration-legacy-computation-double-price" }),
-            ],
-        }, { uuid: "migration-legacy-computation-product" });
-        const systemV1 = new MonoSystem(db);
-        systemV1.conceptClass = KlassByName;
-        const controllerV1 = new Controller({ system: systemV1, entities: [Product], relations: [] });
-        await controllerV1.setup(true);
-
-        const manifest = await readMigrationManifest(controllerV1);
-        const tampered = structuredClone(manifest!);
-        const computation = tampered.computations.find(item => item.dataContext === "property:MigrationLegacyComputationProduct.doublePrice")!;
-        computation.id = "computation:property:MigrationLegacyComputationProduct.doublePrice:Gr";
-        computation.identity = {
-            ...computation.identity,
-            key: computation.id,
-            namePath: computation.id,
+    test("computation identity requires an explicitly declared type name", () => {
+        const MinifiedArgs = class {
+            uuid = "minified-computation-uuid";
         };
-        computation.type = "Gr";
-        tampered.modelHash = "legacy-minified-computation-model-hash";
-        await writeMigrationManifest(controllerV1, tampered);
-
-        const ProductAgain = new Entity({
-            name: "MigrationLegacyComputationProduct",
-            properties: [
-                new Property({ name: "price", type: "number" }, { uuid: "migration-legacy-computation-price" }),
-                new Property({
-                    name: "doublePrice",
-                    type: "number",
-                    computation: new Custom({
-                        name: "MigrationLegacyComputationDouble",
-                        dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
-                        compute: async (_deps: any, record: any) => record.price * 2,
-                    }, { uuid: "migration-legacy-computation-double" }),
-                }, { uuid: "migration-legacy-computation-double-price" }),
-            ],
-        }, { uuid: "migration-legacy-computation-product" });
-        const systemV2 = new MonoSystem(db);
-        systemV2.conceptClass = KlassByName;
-        const controllerV2 = new Controller({ system: systemV2, entities: [ProductAgain], relations: [] });
-        const diff = await controllerV2.generateMigrationDiff();
-
-        expect(diff.changes.filter(change => change.kind === "computation")).toHaveLength(1);
-        expect(diff.changes.find(change => change.kind === "computation")).toMatchObject({
-            kind: "computation",
-            changeType: "unchanged",
-            recommendation: "needs-review",
-        });
-        expect(diff.requiredDecisions.filter(item => item.kind === "computation")).toHaveLength(1);
-        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
-            computationDecisions: {
-                [diff.requiredDecisions.find(item => item.kind === "computation")!.id]: "unchanged",
-            },
-        });
-        const plan = await controllerV2.migrate({ dryRun: true, approvedDiff });
-        expect(plan.changedComputations).toHaveLength(0);
-        expect(plan.rebuildPlan).toHaveLength(0);
-        await db.close();
+        const computation = {
+            constructor: class {},
+            args: new MinifiedArgs(),
+            dataContext: { type: "property", host: { name: "MinifiedHost" }, id: { name: "value" } },
+        };
+        // Class names are rewritten by minifiers, so they must never become
+        // migration identity. The manifest generator fails fast instead.
+        expect(() => computationManifestId(computation as any)).toThrow(/stable migration identity.*displayName/s);
+        expect(() => computationManifestId(computation as any)).toThrow(/property:MinifiedHost\.value/);
     });
 
-    test("legacy computation ids are not normalized when function hash changed", async () => {
+    test("changed computation type ids appear as removed plus added", async () => {
         const db = new PGLiteDB();
         const Product = new Entity({
             name: "MigrationLegacyChangedFunctionProduct",
@@ -3689,6 +3911,51 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("unchanged StateMachine does not demand event rebuild handlers for unrelated migrations", async () => {
+        const db = new PGLiteDB();
+        const build = (withNote: boolean) => {
+            const open = new StateNode({ name: "open" }, { uuid: "migration-sm-untouched-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-untouched-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationSmUntouchedTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                    }, { uuid: "migration-sm-untouched-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-sm-untouched-lifecycle" });
+            return new Entity({
+                name: "MigrationSmUntouchedTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-sm-untouched-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-sm-untouched-status" }),
+                    ...(withNote ? [new Property({ name: "note", type: "string" }, { uuid: "migration-sm-untouched-note" })] : []),
+                ],
+            }, { uuid: "migration-sm-untouched-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [build(false)], relations: [] }).setup(true);
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.requiredDecisions.some(requirement =>
+            requirement.kind === "event-rebuild-handler" &&
+            requirement.dataContext === "property:MigrationSmUntouchedTicket.status"
+        )).toBe(false);
+
+        // Adding an unrelated plain property must not demand runtime handlers
+        // for the untouched StateMachine.
+        const plan = await migrateWithApproval(controllerV2);
+        expect(plan.rebuildPlan.map(item => item.dataContext)).not.toContain("property:MigrationSmUntouchedTicket.status");
+        await db.close();
+    });
+
     test("StateMachine without transfers generates and accepts an event rebuild handler decision", async () => {
         const db = new PGLiteDB();
         const ProbeV1 = new Entity({
@@ -3805,6 +4072,220 @@ describe("Data migration phase 1", () => {
             { eventRebuild: { probeLifecycleHandler: async () => "open" } },
             expectedDiffMissingEventRequirement,
         )).not.toThrow();
+        await db.close();
+    });
+
+    test("new plain property defaultValue is backfilled for existing rows", async () => {
+        const db = new PGLiteDB();
+        const build = (withStatus: boolean) => new Entity({
+            name: "MigrationDefaultBackfillDoc",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-default-backfill-title" }),
+                ...(withStatus ? [new Property({ name: "status", type: "string", defaultValue: () => "draft" }, { uuid: "migration-default-backfill-status" })] : []),
+            ],
+        }, { uuid: "migration-default-backfill-doc" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [build(false)], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationDefaultBackfillDoc", { title: "old" });
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        const plan = await migrateWithApproval(controllerV2);
+        expect(plan.factPropertyBackfills).toEqual([{ recordName: "MigrationDefaultBackfillDoc", propertyName: "status" }]);
+
+        const docs = await systemV2.storage.find("MigrationDefaultBackfillDoc", undefined, undefined, ["title", "status"]);
+        expect(docs.find(doc => doc.title === "old")?.status).toBe("draft");
+        await db.close();
+    });
+
+    test("defaultValue backfill does not trigger StateMachine transitions on the same record", async () => {
+        const db = new PGLiteDB();
+        const build = (withNote: boolean) => {
+            const open = new StateNode({ name: "open" }, { uuid: "migration-backfill-sm-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-backfill-sm-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationBackfillSmTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                        computeTarget: (event: any) => ({ id: event.record.id }),
+                    }, { uuid: "migration-backfill-sm-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-backfill-sm-lifecycle" });
+            return new Entity({
+                name: "MigrationBackfillSmTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-backfill-sm-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-backfill-sm-status" }),
+                    ...(withNote ? [new Property({ name: "note", type: "string", defaultValue: () => "n/a" }, { uuid: "migration-backfill-sm-note" })] : []),
+                ],
+            }, { uuid: "migration-backfill-sm-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [build(false)], relations: [] });
+        await controllerV1.setup(true);
+        await systemV1.storage.create("MigrationBackfillSmTicket", { title: "t" });
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const statusBefore = (await systemV1.storage.find("MigrationBackfillSmTicket", undefined, undefined, ["status"]))[0].status;
+        const plan = await controllerV2.migrate({ approvedDiff });
+        expect(plan.rebuildPlan).toEqual([]);
+        expect(plan.factPropertyBackfills).toEqual([{ recordName: "MigrationBackfillSmTicket", propertyName: "note" }]);
+
+        const tickets = await systemV2.storage.find("MigrationBackfillSmTicket", undefined, undefined, ["title", "status", "note"]);
+        expect(tickets).toHaveLength(1);
+        expect(tickets[0].note).toBe("n/a");
+        // The backfill update must not fire the update-triggered transition:
+        // status stays exactly what it was before migration.
+        expect(tickets[0].status).toBe(statusBefore);
+        await db.close();
+    });
+
+    test("new non-null property with defaultValue passes constraint verification through backfill", async () => {
+        const db = new PGLiteDB();
+        const build = (withStatus: boolean) => new Entity({
+            name: "MigrationDefaultNonNullDoc",
+            properties: [
+                new Property({ name: "title", type: "string" }, { uuid: "migration-default-non-null-title" }),
+                ...(withStatus ? [new Property({ name: "status", type: "string", defaultValue: () => "draft" }, { uuid: "migration-default-non-null-status" })] : []),
+            ],
+            constraints: withStatus ? [
+                new NonNullConstraint({ name: "default_non_null_status_required", property: "status" }, { uuid: "migration-default-non-null-constraint" }),
+            ] : [],
+        }, { uuid: "migration-default-non-null-doc" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [build(false)], relations: [] }).setup(true);
+        await systemV1.storage.create("MigrationDefaultNonNullDoc", { title: "old" });
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        await migrateWithApproval(controllerV2);
+
+        const docs = await systemV2.storage.find("MigrationDefaultNonNullDoc", undefined, undefined, ["title", "status"]);
+        expect(docs.find(doc => doc.title === "old")?.status).toBe("draft");
+        await db.close();
+    });
+
+    test("StateNode.computeValue changes are visible in the manifest and migration diff", async () => {
+        const db = new PGLiteDB();
+        const build = (computeValue: () => string) => {
+            const open = new StateNode({
+                name: "open",
+                computeValue,
+            }, { uuid: "migration-sm-function-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-function-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationSmFunctionTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                    }, { uuid: "migration-sm-function-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-sm-function-lifecycle" });
+            return new Entity({
+                name: "MigrationSmFunctionTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-sm-function-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-sm-function-status" }),
+                ],
+            }, { uuid: "migration-sm-function-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [build(() => "open-v1")], relations: [] });
+        await controllerV1.setup(true);
+        const manifestV1 = createMigrationManifest(controllerV1);
+        const computationV1 = manifestV1.computations.find(item => item.dataContext === "property:MigrationSmFunctionTicket.status")!;
+        expect(computationV1.functionSignature?.hasFunction).toBe(true);
+        expect(computationV1.functionSignature?.callbackPaths).toContain("args.initialState.computeValue");
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(() => "open-v2-changed")], relations: [] });
+        const computationV2 = createMigrationManifest(controllerV2).computations.find(item => item.dataContext === "property:MigrationSmFunctionTicket.status")!;
+        expect(computationV2.signature).not.toBe(computationV1.signature);
+
+        await expect(controllerV2.setup(false)).rejects.toThrow(/Model manifest mismatch/);
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.changes.find(change => change.kind === "computation" && change.dataContext === "property:MigrationSmFunctionTicket.status")).toMatchObject({
+            changeType: "possibly-changed",
+            recommendation: "needs-review",
+        });
+        await db.close();
+    });
+
+    test("manifests from an incompatible generator version are rejected and recovered via baseline", async () => {
+        const db = new PGLiteDB();
+        const build = () => {
+            const open = new StateNode({
+                name: "open",
+                computeValue: () => "open",
+            }, { uuid: "migration-sm-legacy-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-legacy-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationSmLegacyTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                    }, { uuid: "migration-sm-legacy-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-sm-legacy-lifecycle" });
+            return new Entity({
+                name: "MigrationSmLegacyTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-sm-legacy-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-sm-legacy-status" }),
+                ],
+            }, { uuid: "migration-sm-legacy-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const controllerV1 = new Controller({ system: systemV1, entities: [build()], relations: [] });
+        await controllerV1.setup(true);
+
+        // Simulate a manifest written by generator "1", which could not see
+        // StateNode.computeValue / StateTransfer.computeTarget.
+        const manifest = await readMigrationManifest(controllerV1);
+        const legacy = structuredClone(manifest!);
+        legacy.frameworkVersion = "1";
+        legacy.modelHash = "legacy-generator-model-hash";
+        const legacyComputation = legacy.computations.find(item => item.dataContext === "property:MigrationSmLegacyTicket.status")!;
+        legacyComputation.functionSignature = undefined;
+        await writeMigrationManifest(controllerV1, legacy);
+
+        // No backward compatibility: both startup validation and diff
+        // generation refuse the old-generator manifest explicitly.
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build()], relations: [] });
+        await expect(controllerV2.setup(false)).rejects.toThrow(/incompatible interaqt manifest generator.*createMigrationBaseline/s);
+        await expect(controllerV2.generateMigrationDiff()).rejects.toThrow(/incompatible interaqt manifest generator/);
+        await expect(controllerV2.migrate({})).rejects.toThrow(/incompatible interaqt manifest generator/);
+
+        // Explicit recovery: re-baseline (definitions match the schema), then
+        // normal startup works again.
+        await controllerV2.createMigrationBaseline();
+        const systemV3 = new MonoSystem(db);
+        systemV3.conceptClass = KlassByName;
+        const controllerV3 = new Controller({ system: systemV3, entities: [build()], relations: [] });
+        await controllerV3.setup(false);
         await db.close();
     });
 
@@ -4031,6 +4512,94 @@ describe("Data migration phase 1", () => {
         await migrateWithApproval(controllerV2);
 
         expect(sideEffectCalls).toBe(0);
+        await db.close();
+    });
+
+    test("migration bookkeeping statements are parameterized instead of interpolated", async () => {
+        const calls: Array<{ kind: string; sql: string; params: unknown[] }> = [];
+        const stubDb = {
+            logger: { info() {}, error() {}, child() { return this; } },
+            schemaDialect: { name: "mysql" as const },
+            async open() {},
+            async scheme(sql: string) { calls.push({ kind: "scheme", sql, params: [] }); return undefined; },
+            async query(sql: string, params: unknown[] = []) { calls.push({ kind: "query", sql, params }); return []; },
+            async update(sql: string, params: unknown[] = []) { calls.push({ kind: "update", sql, params }); return []; },
+            async insert() { return { id: "" }; },
+            async delete() { return []; },
+            async close() {},
+        };
+        const system = new MonoSystem(stubDb as any);
+        // Backslash sequences corrupt interpolated literals under MySQL escaping.
+        const hostile = `back\\slash 'quote' "double" \\' end\\`;
+
+        await system.writeMigrationManifest({ hostileField: hostile } as any);
+        await system.beginMigration("model-hash", "diff-hash", { reason: hostile }, 1);
+        await system.updateMigrationPhase("migration-id", "schema-applied");
+        await system.finishMigration("migration-id", "failed", new Error(hostile));
+
+        const statements = calls.filter(call => call.kind !== "scheme");
+        expect(statements.length).toBeGreaterThan(0);
+        for (const call of statements) {
+            expect(call.sql).not.toContain("back\\slash");
+            expect(call.sql).not.toContain(hostile);
+        }
+        const manifestWrite = calls.find(call => call.kind === "update" && call.sql.includes("__interaqt_migration_manifest"))!;
+        expect(String(manifestWrite.params[1])).toContain("back\\\\slash");
+        const logWrite = calls.find(call => call.kind === "update" && call.sql.includes("INSERT INTO \"__interaqt_migration_log\""))!;
+        expect(String(logWrite.params[3])).toContain("back\\\\slash");
+        const finishWrite = calls.find(call => call.kind === "update" && call.sql.includes("SET \"status\""))!;
+        expect(String(finishWrite.params[1])).toContain("back\\slash");
+    });
+
+    test("migration manifest with quotes and backslashes round-trips through storage", async () => {
+        const db = new PGLiteDB();
+        const Product = new Entity({
+            name: "MigrationHostileManifestProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-hostile-manifest-name" })],
+        }, { uuid: "migration-hostile-manifest-product" });
+        const system = new MonoSystem(db);
+        system.conceptClass = KlassByName;
+        const controller = new Controller({ system, entities: [Product], relations: [] });
+        await controller.setup(true);
+
+        const manifest = await readMigrationManifest(controller);
+        const hostile = structuredClone(manifest!);
+        (hostile as any).hostileField = `back\\slash 'quote' "double" \\' end\\`;
+        await writeMigrationManifest(controller, hostile);
+        const restored = await readMigrationManifest(controller);
+        expect(restored).toEqual(hostile);
+        await db.close();
+    });
+
+    test("crashed migration lock can be force released and migration retried", async () => {
+        const db = new PGLiteDB();
+        const ProductV1 = new Entity({
+            name: "MigrationLockRecoveryProduct",
+            properties: [new Property({ name: "name", type: "string" }, { uuid: "migration-lock-recovery-name" })],
+        }, { uuid: "migration-lock-recovery-product" });
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [ProductV1], relations: [] }).setup(true);
+
+        // Simulate a migration process that died while holding the lock.
+        await db.scheme(`INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', 'crashed-migration')`);
+
+        const ProductV2 = new Entity({
+            name: "MigrationLockRecoveryProduct",
+            properties: [
+                new Property({ name: "name", type: "string" }, { uuid: "migration-lock-recovery-name" }),
+                new Property({ name: "tag", type: "string" }, { uuid: "migration-lock-recovery-tag" }),
+            ],
+        }, { uuid: "migration-lock-recovery-product" });
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2], relations: [] });
+        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/Migration is already running: crashed-migration.*forceReleaseMigrationLock/s);
+
+        await controllerV2.forceReleaseMigrationLock();
+        await migrateWithApproval(controllerV2);
+        const record = await systemV2.storage.create("MigrationLockRecoveryProduct", { name: "n", tag: "t" });
+        expect(record.id).toBeDefined();
         await db.close();
     });
 
