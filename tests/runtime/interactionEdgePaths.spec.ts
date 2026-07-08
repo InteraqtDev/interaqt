@@ -154,9 +154,11 @@ describe('checkPayload with concept validation', () => {
     });
 
     test('checkPayload rejects non-ref item in isRef collection', async () => {
+        const RefCollEntity = Entity.create({ name: 'RefCollEntity' });
         const payloadItem = PayloadItem.create({
             name: 'refs',
             type: 'object',
+            base: RefCollEntity,
             isRef: true,
             isCollection: true,
         });
@@ -177,9 +179,11 @@ describe('checkPayload with concept validation', () => {
     });
 
     test('checkPayload rejects non-ref single item when isRef', async () => {
+        const RefSingleEntity = Entity.create({ name: 'RefSingleEntity' });
         const payloadItem = PayloadItem.create({
             name: 'ref',
             type: 'object',
+            base: RefSingleEntity,
             isRef: true,
         });
         const payload = Payload.create({ items: [payloadItem] });

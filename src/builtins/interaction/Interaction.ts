@@ -328,8 +328,13 @@ export async function checkAttributive(controller: GuardController, attributive:
   let result;
   try {
     result = await attributive.content.call(controller, target, eventArgs);
-  } catch (_e) {
-    result = false;
+  } catch (e) {
+    // CAUTION 与 Condition 一致：异常作为错误信息透出（fail-closed），而不是吞成 false。
+    //  吞成 false 会让运维无法区分权限误配与真实拒绝；更严重的是在 not(attributive)
+    //  组合下 false 会被取反成 true，异常反而变成放行（fail-open）。
+    //  错误字符串在 BoolExp.evaluateAsync 中无论是否处于 not 之下都判为失败。
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    return `Attributive '${attributive.name ?? '(unnamed)'}' threw exception: ${errorMessage}`;
   }
   if (result === undefined) {
     return `Attributive '${attributive.name ?? '(unnamed)'}' returned undefined; guard callbacks must explicitly return a boolean (did you forget a return statement?)`;
