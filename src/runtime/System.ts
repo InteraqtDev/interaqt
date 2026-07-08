@@ -162,6 +162,12 @@ export type Storage = {
     findOne: (entityName: string, ...arg: any[]) => Promise<EntityIdRef>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     update: (entityName: string, ...arg: any[]) => Promise<EntityIdRef>
+    // Internal write path (record-level counterpart of dict.setInternal): the updated record's own
+    // update events are not dispatched to mutation listeners (the write is not a business mutation,
+    // e.g. computed initial-value backfill on create). Derived events (filtered-entity membership
+    // changes, etc.) are still dispatched. All events are pushed into the caller-provided array.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updateInternal: (entityName: string, ...arg: any[]) => Promise<EntityIdRef>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     find: (entityName: string, ...arg: any[]) => Promise<EntityIdRef[]>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

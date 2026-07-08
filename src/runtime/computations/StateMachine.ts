@@ -77,6 +77,12 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         // 因为可能有多个 transfer 都是同样的 trigger。
         // 使用的系统的 eventDeps 会执行完一个再执行另一个，这时有可能刚好记录转换成下一个状态，结果又被匹配中了。进行下一次转换。
         for(const transfer of this.args.transfers) {
+            // fail fast：属性 StateMachine 靠 computeTarget 定位要转移的宿主记录，
+            // 缺失时如果等到运行期第一次触发才报 undefined.call 会非常难排查。
+            assert(
+                typeof transfer.computeTarget === 'function',
+                `StateMachine computation of property "${this.dataContext.host.name}.${this.dataContext.id.name}": transfer "${transfer.current.name}" -> "${transfer.next.name}" (trigger: ${transfer.trigger.recordName} ${transfer.trigger.type}) must define computeTarget. computeTarget maps a matched mutation event to the record(s) whose "${this.dataContext.id.name}" should transition, e.g. computeTarget: (event) => ({ id: event.record.id })`
+            )
             const eventDepName = `${transfer.trigger.recordName}_${transfer.trigger.type}`
             this.eventDeps[eventDepName] = {
                 recordName: transfer.trigger.recordName,

@@ -1075,6 +1075,20 @@ RETURNING "lastValue" AS value`,
     update(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
         return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [entity, matchExpressionData, rawData], events) as Promise<EntityIdRef>
     }
+    // 内部写路径（对应 dict.setInternal）：写入本身不是业务变更（例如属性 computation 的初始值回写），
+    // 被更新记录自身的 update 事件不进入 dispatch，也不进入 effects；
+    // 但由这次写入派生出来的事件（如 filtered entity 成员资格的 create/delete）仍然正常派发。
+    // 所有事件（含被抑制的 update 事件）依旧会推入调用方提供的 events 数组，供调用方读取写入结果。
+    updateInternal(entity: string, matchExpressionData: MatchExpressionData, rawData: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
+        const recordInfo = this.queryHandle!.map.getRecordInfo(entity)
+        const baseRecordName = recordInfo.resolvedBaseRecordName || entity
+        return this.callWithEvents(
+            this.queryHandle!.update.bind(this.queryHandle),
+            [entity, matchExpressionData, rawData],
+            events,
+            (event) => !(event.type === 'update' && event.recordName === baseRecordName)
+        ) as Promise<EntityIdRef>
+    }
     delete(entityName: string, matchExpressionData: MatchExpressionData, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
         return this.callWithEvents(this.queryHandle!.delete.bind(this.queryHandle), [entityName, matchExpressionData], events) as Promise<EntityIdRef>
     }
@@ -1113,9 +1127,9 @@ RETURNING "lastValue" AS value`,
             }
         )
     }
-    async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = []): Promise<unknown> {
+    async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = [], shouldDispatch?: (event: RecordMutationEvent) => boolean): Promise<unknown> {
         if (!this.isInTransaction()) {
-            return this.withAtomicTransaction('storage mutation with events', async () => this.callWithEvents(method, args, events))
+            return this.withAtomicTransaction('storage mutation with events', async () => this.callWithEvents(method, args, events, shouldDispatch))
         }
         try {
             const methodEvents:RecordMutationEvent[] = []
@@ -1124,14 +1138,17 @@ RETURNING "lastValue" AS value`,
             // nextJob(() => {
             //     this.dispatch(events)
             // })
+            // 被 shouldDispatch 过滤掉的事件不进入 dispatch，也不进入 effects（内部写路径，见 updateInternal），
+            // 但仍然会推入调用方提供的 events 数组。
+            const dispatchableEvents = shouldDispatch ? methodEvents.filter(shouldDispatch) : methodEvents
             // CAUTION 特别注意这里会空充 events
-            const  newEvents = await this.dispatch(methodEvents)
+            const  newEvents = await this.dispatch(dispatchableEvents)
             events.push(...methodEvents, ...newEvents)
             
             // Also add to async context if available
             const contextEffects = getCurrentEffects()
-            if (contextEffects && methodEvents.length > 0) {
-                addToCurrentEffects(methodEvents)
+            if (contextEffects && dispatchableEvents.length > 0) {
+                addToCurrentEffects(dispatchableEvents)
             }
             if (contextEffects && newEvents.length > 0) {
                 addToCurrentEffects(newEvents)
