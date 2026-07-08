@@ -2625,6 +2625,12 @@ const GetPostsPaginated = Interaction.create({
 })
 ```
 
+> **⚠️ SECURITY: always declare `dataPolicy.match` for row-level access control.**
+> The caller-supplied `query.match` is merged with `dataPolicy.match` using AND — it can only *narrow* the
+> policy-defined scope. But if an interaction has **no** `dataPolicy.match`, the caller fully controls the filter
+> and can read **any** rows of the entity (userAttributives only decide *whether* the interaction may run,
+> not *which rows* are visible). Every `GetAction` interaction on non-public data MUST declare `dataPolicy.match`.
+
 **Usage Examples for Get Data Interactions**
 
 ```typescript

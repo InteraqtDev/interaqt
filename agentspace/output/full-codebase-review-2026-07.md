@@ -1,5 +1,15 @@
 # 全代码库深度 Review 报告（2026-07）
 
+> **维护说明（2026-07-08 更新）**：本报告发现的问题已在同分支（`cursor/deep-code-review-0a77`）修复：
+>
+> - **致命 F-1 ~ F-5 全部修复**，回归测试见 `tests/runtime/review-fixes-2026-07.spec.ts`（13 个用例，覆盖附录中的全部复现场景 + 边界）。
+> - **重要 R-1 ~ R-9 全部修复**（R-4 以文档强制约定的方式处置：`agent/agentspace/knowledge/generator/api-reference.md` 增加 dataPolicy.match 安全警告）。SQLite/PGLite 并发 dispatch 事务交错问题也已通过 MonoStorage 顶层事务串行化队列修复。
+> - **已完成的改进项**：I-4（Custom 重复赋值 / Average 死代码）、I-6（`RecordQueryTree.addRecord` 合并）、I-8 部分（`JSON.parse` 带上下文报错、`LIMIT 0`）、I-13（Attributive 异常透出——顺带修复了 `not(attributive)` 下异常被反转为放行的 fail-open）、I-14（删除 `Controller.callbacks`/`addEventListener`、`ExternalSynchronizer.ts`、`runtime/boolExpression.ts`、`buildDeleteByWhereSQL`、`findPath` 的 `limitLength` 死参数）、I-15（FrameworkError 消息）、I-16（两个 Logger 的 `child()` 携带 fixed 元数据）。
+> - **经核实为既定语义、不改动**：I-3 中 Average 对 null 计 0 且计入分母——`tests/runtime/average.spec.ts` L422 明确断言该行为（"null is considered as 0"），保持现状；property 路径缺失的 NaN/Infinity 守卫已补齐（与 global 对齐）。
+> - **明确遗留（建议独立 PR）**：I-1（六个聚合 handle 的 property 增量模板抽取）、I-2（global create 路径与 update 对齐全量 findOne）、I-5（查询结果保留 SQL NULL 标量，属 API 行为变更）、I-7（orderBy 关联字段 + 扇出的代表行语义）、I-9（性能项）、I-10（序列化往返 / registerKlass 补全）、I-11（clone 注册语义统一）、I-12（'program' ActivityGroup 实现或移除）、4.4 节既有报告遗留项 S1–S4、S8。
+>
+> 下文正文保留 review 时的原始判定，作为问题背景与复现依据。
+
 - 日期：2026-07-08
 - 基线：`main` @ `af49f80a`（v1.7.0-alpha.0，即 `2b0dc63f` 之后的 release commit）
 - 范围：`src/core`、`src/runtime`（含 computations）、`src/storage`、`src/builtins`、`src/drivers` 全量
