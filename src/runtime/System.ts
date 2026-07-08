@@ -189,6 +189,7 @@ export type Storage = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getEntityName: (...arg: any[]) => string
     listen: (callback: RecordMutationCallback) => void
+    unlisten: (callback: RecordMutationCallback) => void
     destroy: () => Promise<void>
 }
 

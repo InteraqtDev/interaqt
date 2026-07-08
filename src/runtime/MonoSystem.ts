@@ -157,20 +157,35 @@ class MonoStorage implements Storage{
 
         const context: StorageTransactionContext = { depth: 1, isolation }
         const run = async () => this.transactionContext.run(context, fn)
-        if (this.db.runInTransaction) {
-            return this.db.runInTransaction({ name: options.name, isolation }, run)
+        const startTransaction = async (): Promise<T> => {
+            if (this.db.runInTransaction) {
+                return this.db.runInTransaction({ name: options.name, isolation }, run)
+            }
+
+            await this.db.scheme('BEGIN', options.name)
+            try {
+                const result = await run()
+                await this.db.scheme('COMMIT', options.name)
+                return result
+            } catch (error) {
+                await this.db.scheme('ROLLBACK', options.name)
+                throw error
+            }
         }
 
-        await this.db.scheme('BEGIN', options.name)
-        try {
-            const result = await run()
-            await this.db.scheme('COMMIT', options.name)
-            return result
-        } catch (error) {
-            await this.db.scheme('ROLLBACK', options.name)
-            throw error
+        // CAUTION 单连接驱动（SQLite/PGLite 声明 concurrentTransactions: 'unsupported'）上，
+        //  并发的顶层事务会在同一连接上交错 BEGIN/COMMIT，导致提交/回滚彼此的工作。
+        //  这里按声明串行化顶层事务；嵌套事务在上面的 existing 分支已经复用，不会进入队列（无死锁）。
+        if (capability.concurrentTransactions === 'unsupported') {
+            // transactionQueue 永远是已"消化"过错误的 promise，直接串接即可。
+            const task = this.transactionQueue.then(() => startTransaction())
+            this.transactionQueue = task.then(() => undefined, () => undefined)
+            return task
         }
+        return startTransaction()
     }
+    // 串行化 concurrentTransactions: 'unsupported' 驱动上的顶层事务。
+    private transactionQueue: Promise<unknown> = Promise.resolve()
     private isInTransaction() {
         return (this.getActiveTransactionContext()?.depth ?? 0) > 0
     }
@@ -1183,6 +1198,9 @@ RETURNING "lastValue" AS value`,
     listen(callback: RecordMutationCallback) {
         this.callbacks.add(callback)
     }
+    unlisten(callback: RecordMutationCallback) {
+        this.callbacks.delete(callback)
+    }
     async dispatch(events: RecordMutationEvent[]) {
         const newEvents: RecordMutationEvent[] = []
         for(let callback of this.callbacks) {
@@ -1208,20 +1226,20 @@ export enum DBLogLevel {
 }
 
 export class DBConsoleLogger implements DatabaseLogger{
-    constructor(private level: DBLogLevel = DBLogLevel.ERROR) {}
+    constructor(private level: DBLogLevel = DBLogLevel.ERROR, private fixed: object = {}) {}
     
     info({type, name, sql, params}: Parameters<DatabaseLogger["info"]>[0]) {
         if (this.level >= DBLogLevel.INFO) {
-            console.log({type, name, sql, params})
+            console.log({...this.fixed, type, name, sql, params})
         }
     }
     error({type, name, sql, params, error}: Parameters<DatabaseLogger["error"]>[0]) {
         if (this.level >= DBLogLevel.ERROR) {
-            console.error({type, name, sql, params, error})
+            console.error({...this.fixed, type, name, sql, params, error})
         }
     }
-    child() {
-        return new DBConsoleLogger(this.level)
+    child(fixed: object = {}) {
+        return new DBConsoleLogger(this.level, {...this.fixed, ...fixed})
     }
 }
 
@@ -1234,25 +1252,25 @@ export enum SystemLogLevel {
 }
 
 export class SystemConsoleLogger implements SystemLogger{
-    constructor(private level: SystemLogLevel = SystemLogLevel.ERROR) {}
+    constructor(private level: SystemLogLevel = SystemLogLevel.ERROR, private fixed: object = {}) {}
     
     error({label, message, ...rest}: SystemLogType) {
         if (this.level >= SystemLogLevel.ERROR) {
-            console.error(`[ERROR] ${label}: ${message}`, rest)
+            console.error(`[ERROR] ${label}: ${message}`, {...this.fixed, ...rest})
         }
     }
     info({label, message, ...rest}: SystemLogType) {
         if (this.level >= SystemLogLevel.INFO) {
-            console.info(`[INFO] ${label}: ${message}`, rest)
+            console.info(`[INFO] ${label}: ${message}`, {...this.fixed, ...rest})
         }
     }
     debug({label, message, ...rest}: SystemLogType) {
         if (this.level >= SystemLogLevel.DEBUG) {
-            console.debug(`[DEBUG] ${label}: ${message}`, rest)
+            console.debug(`[DEBUG] ${label}: ${message}`, {...this.fixed, ...rest})
         }
     }
     child(fixed: object) {
-        return new SystemConsoleLogger(this.level)
+        return new SystemConsoleLogger(this.level, {...this.fixed, ...fixed})
     }
 }
 export const dbConsoleLogger = new DBConsoleLogger()
@@ -1371,12 +1389,21 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     private async acquireMigrationLock(migrationId: string) {
         const dialect = getSchemaDialect(this.db).name
         const [p1] = migrationSQLPlaceholders(dialect, 1)
-        await this.db.update(
-            `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', ${p1})`,
-            [migrationId],
-            undefined,
-            'acquire migration lock'
-        )
+        try {
+            await this.db.update(
+                `INSERT INTO "__interaqt_migration_lock" ("key", "migrationId") VALUES ('current', ${p1})`,
+                [migrationId],
+                undefined,
+                'acquire migration lock'
+            )
+        } catch (error) {
+            // CAUTION 锁的取得必须以主键冲突为准（原子），SELECT-then-INSERT 存在并发窗口。
+            //  两个进程同时 migrate 时，后到者在这里得到清晰的"已在迁移中"错误，而不是裸的约束冲突。
+            if (normalizeDatabaseError(error, this.db).isUniqueViolation) {
+                throw new Error(`Migration is already running (lock held by another process). If that process crashed, call controller.forceReleaseMigrationLock() after confirming no migration is actually running, then retry.`)
+            }
+            throw error
+        }
     }
 
     async beginMigration(modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount = 0): Promise<MigrationRunState> {
