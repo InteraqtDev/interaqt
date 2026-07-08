@@ -56,6 +56,9 @@ export class GlobalEveryHandle implements DataBasedComputation {
         
         await this.state.aggregate.setInternal({ matchCount, totalCount })
 
+        // CAUTION 空集合不能返回 0 === 0 的空真（vacuous truth），必须与 getInitialValue/增量路径
+        //  保持一致地返回 defaultValue，否则 notEmpty: true 的语义在 full recompute 时会被反转。
+        if (totalCount === 0) return this.defaultValue
         return matchCount === totalCount
     }
     planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
@@ -181,6 +184,8 @@ export class PropertyEveryHandle implements DataBasedComputation {
         }
         await this.state.matchCount.setInternal(_current, matchCount)
 
+        // 与 getInitialValue/增量路径一致：空集合返回 defaultValue，不产生空真。
+        if (totalCount === 0) return !this.args.notEmpty
         return matchCount === totalCount
     }
     planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
@@ -238,6 +243,9 @@ export class PropertyEveryHandle implements DataBasedComputation {
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
             matchDelta = oldItemMatch ? -1 : 0
             totalDelta = -1
+            // CAUTION delete 事件可能只是 filtered relation 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则关系再次进入时 replace 读到陈旧值导致增量错误（与 global 路径保持一致）。
+            await this.state!.isItemMatch.setInternal(relationRecord, false)
         } else if (relatedMutationEvent.type === 'update'&&(relatedMutationEvent.recordName === this.relation.name!||relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!

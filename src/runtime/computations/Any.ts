@@ -213,6 +213,9 @@ export class PropertyAnyHandle implements DataBasedComputation {
             const relationRecord = relatedMutationEvent.record!
             const oldItemMatch = !!await this.state!.isItemMatch.get(relationRecord)
             delta = oldItemMatch ? -1 : 0
+            // CAUTION delete 事件可能只是 filtered relation 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则关系再次进入时 replace 读到陈旧值导致增量错误（与 global 路径保持一致）。
+            await this.state!.isItemMatch.setInternal(relationRecord, false)
         } else if (relatedMutationEvent.type === 'update'&&(relatedMutationEvent.recordName === this.relation.name!||relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 关联实体或者关联关系上的字段的更新
             const currentRecord = mutationEvent.oldRecord!

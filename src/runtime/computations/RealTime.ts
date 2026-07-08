@@ -4,6 +4,35 @@ import { ComputationResultPatch, ComputationResult, DataBasedComputation, DataDe
 import { RealTimeInstance, PropertyInstance } from "@core";
 import { DataContext } from "./Computation.js";
 import { Equation, Expression, Inequality } from "./MathResolver";
+import { ComputationError } from "../errors/ComputationErrors.js";
+
+// core 层的 nextRecomputeTime 是可选参数，但 callback 返回 Expression 时运行期必需
+// （Inequality/Equation 可以用 solve() 推出下次重算时间，Expression 推不出来）。
+// 这里统一做显式校验，避免运行到 `this.nextRecomputeTime!(...)` 时抛出难以定位的 TypeError。
+// Inequality/Equation 不可解（solve() 返回 null/NaN）是合法状态：优先回退到用户声明的
+// nextRecomputeTime，两者都没有时存 null（表示不再按时间重新调度）。
+function resolveNextRecomputeTime(
+    result: Expression | Inequality | Equation,
+    now: number,
+    dataDeps: Record<string, unknown>,
+    nextRecomputeTime: ((now: number, dataDeps: Record<string, unknown>) => number) | undefined,
+    contextName: string,
+): number | null {
+    if (result instanceof Expression) {
+        if (!nextRecomputeTime) {
+            throw new ComputationError(
+                `RealTime computation "${contextName}" returned an Expression but has no nextRecomputeTime. Declare nextRecomputeTime when the callback returns an Expression.`,
+                { computationName: 'RealTime' }
+            )
+        }
+        return now + nextRecomputeTime(now, dataDeps)
+    }
+    const solved = result.solve()
+    if (solved === undefined || solved === null || Number.isNaN(solved)) {
+        return nextRecomputeTime ? now + nextRecomputeTime(now, dataDeps) : null
+    }
+    return solved
+}
 
 export class GlobalRealTimeComputation implements DataBasedComputation {
     static computationType = RealTime
@@ -28,8 +57,8 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
     }
     createState() {
         return {
-            lastRecomputeTime: new GlobalBoundState<number>(null),
-            nextRecomputeTime: new GlobalBoundState<number>(null)
+            lastRecomputeTime: new GlobalBoundState<number | null>(null),
+            nextRecomputeTime: new GlobalBoundState<number | null>(null)
         }
     }
     
@@ -41,18 +70,12 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
     async compute(dataDeps: {[key: string]: unknown}) : Promise<number|boolean>{
         const result = await this.args.callback(Expression.variable('now'), dataDeps) as Expression|Inequality|Equation
         const now = Date.now()
-        let resultValue: number|boolean
-        let nextRecomputeTime: number
 
-        if (result instanceof Expression) {
-            resultValue = result.evaluate({now});
-            nextRecomputeTime = now + this.nextRecomputeTime!(now, dataDeps);
-        } else if (result instanceof Inequality || result instanceof Equation) {
-            resultValue = result.evaluate({now});
-            nextRecomputeTime = result.solve()!;
-        } else {
+        if (!(result instanceof Expression) && !(result instanceof Inequality) && !(result instanceof Equation)) {
             throw new Error('Invalid result type');
         }
+        const resultValue = result.evaluate({now});
+        const nextRecomputeTime = resolveNextRecomputeTime(result, now, dataDeps, this.nextRecomputeTime, `global:${(this.dataContext.id as {name?:string})?.name ?? String(this.dataContext.id)}`)
 
         await this.state.lastRecomputeTime.setInternal(now);
         await this.state.nextRecomputeTime.setInternal(nextRecomputeTime);
@@ -91,8 +114,8 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     }
     createState() {
         return {
-            lastRecomputeTime: new RecordBoundState<number>(null),
-            nextRecomputeTime: new RecordBoundState<number>(null)
+            lastRecomputeTime: new RecordBoundState<number | null>(null),
+            nextRecomputeTime: new RecordBoundState<number | null>(null)
         }
     }
     
@@ -104,18 +127,12 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     async compute(dataDeps: {[key: string]: unknown}, record: any) : Promise<number|boolean>{
         const result = await this.args.callback(Expression.variable('now'), dataDeps) as Expression|Inequality|Equation
         const now = Date.now()
-        let resultValue: number|boolean
-        let nextRecomputeTime: number
 
-        if (result instanceof Expression) {
-            resultValue = result.evaluate({now});
-            nextRecomputeTime = now + this.nextRecomputeTime!(now, dataDeps);
-        } else if (result instanceof Inequality || result instanceof Equation) {
-            resultValue = result.evaluate({now});
-            nextRecomputeTime = result.solve()!;
-        } else {
+        if (!(result instanceof Expression) && !(result instanceof Inequality) && !(result instanceof Equation)) {
             throw new Error('Invalid result type');
         }
+        const resultValue = result.evaluate({now});
+        const nextRecomputeTime = resolveNextRecomputeTime(result, now, dataDeps, this.nextRecomputeTime, `property:${(this.dataContext as {host?:{name?:string}}).host?.name ?? ''}.${(this.dataContext.id as {name?:string})?.name ?? String(this.dataContext.id)}`)
 
         await this.state.lastRecomputeTime.setInternal(record, now);
         await this.state.nextRecomputeTime.setInternal(record, nextRecomputeTime);

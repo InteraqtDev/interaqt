@@ -8,6 +8,14 @@ import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp, LINK_SYMBOL, RecordQueryData } from "@storage";
 import { assert } from "../util.js";
 
+// CAUTION 与 Summation.resolveSumField 的语义对齐：null/undefined/NaN/Infinity 一律按 0 计。
+//  否则一条脏记录产生的 NaN 会通过 increment 永久污染总和，且无法通过后续增量恢复。
+function resolveWeightedResult(weightAndValue: { weight: number; value: number } | null | undefined): number {
+    if (!weightAndValue) return 0
+    const result = Number(weightAndValue.weight) * Number(weightAndValue.value)
+    return Number.isFinite(result) ? result : 0
+}
+
 export class GlobalWeightedSummationHandle implements DataBasedComputation {
     static computationType = WeightedSummation
     static contextType = 'global' as const
@@ -49,7 +57,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
         
         for (const record of records) {
             const weightAndValue = this.matchRecordToWeight.call(this.controller, record, dataDeps);
-            summation += await this.state.itemResult.setInternal(record, weightAndValue.weight * weightAndValue.value);
+            summation += await this.state.itemResult.setInternal(record, resolveWeightedResult(weightAndValue));
         }
         await this.state.total.setInternal(summation)
         return summation;
@@ -68,7 +76,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
         if (mutationEvent.type === 'create') {
             const newItem = mutationEvent.record;
             const weightAndValue = this.matchRecordToWeight.call(this.controller, newItem, dataDeps);
-            const newResult = weightAndValue.weight * weightAndValue.value;
+            const newResult = resolveWeightedResult(weightAndValue);
             const { oldValue } = await this.state.itemResult.replace(newItem, newResult);
             delta = newResult - (oldValue ?? 0);
         } else if (mutationEvent.type === 'delete') {
@@ -83,7 +91,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
                 value: ['=', mutationEvent.record!.id]
             }), undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery);
             const newWeightAndValue = this.matchRecordToWeight.call(this.controller, newRecord, dataDeps);
-            const newResult = newWeightAndValue.weight * newWeightAndValue.value;
+            const newResult = resolveWeightedResult(newWeightAndValue);
             const { oldValue } = await this.state.itemResult.replace(newRecord, newResult);
             delta = newResult - (oldValue ?? 0);
         }
@@ -157,7 +165,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
         for (const relatedItem of relations) {
             const relationStateRecord = relatedItem[LINK_SYMBOL] || relatedItem['&'] || relatedItem
             const valueAndWeight = this.matchRecordToWeight.call(this.controller, relatedItem, dataDeps);
-            const result = valueAndWeight.weight * valueAndWeight.value;
+            const result = resolveWeightedResult(valueAndWeight);
             await this.state.itemResult.setInternal(relationStateRecord, result);
             summation += result;
         }
@@ -198,14 +206,16 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const valueAndWeight = this.matchRecordToWeight.call(this.controller, relatedRecord, dataDeps);
-            const result = valueAndWeight.weight * valueAndWeight.value;
+            const result = resolveWeightedResult(valueAndWeight);
             const { oldValue } = await this.state!.itemResult.replace(newRelationWithEntity, result);
             delta = result - (oldValue ?? 0);
         } else if (relatedMutationEvent.type === 'delete' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的删除
             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
             delta = -(oldResult ?? 0);
-
+            // CAUTION delete 事件可能只是 filtered relation 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则关系再次进入时 replace 读到陈旧值导致增量错误。物理删除场景 setInternal 会安全忽略。
+            await this.state!.itemResult.setInternal(relatedMutationEvent.record, 0);
         } else if (relatedMutationEvent.type === 'update') {
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。
@@ -221,7 +231,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const newValueAndWeight = this.matchRecordToWeight.call(this.controller, relatedRecord, dataDeps);
-            const newResult = newValueAndWeight.weight * newValueAndWeight.value;
+            const newResult = resolveWeightedResult(newValueAndWeight);
             const { oldValue } = await this.state!.itemResult.replace(newRelationWithEntity, newResult);
             delta = newResult - (oldValue ?? 0);
         }

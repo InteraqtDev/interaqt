@@ -137,15 +137,6 @@ export class GlobalAverageHandle implements DataBasedComputation {
 }
 
 
-function setByPath(record: any, path: string[], value: any) {
-    let base:any = record
-    for(let attr of path.slice(0, -1)) {
-        base = base[attr]
-    }
-    base[path.at(-1)!] = value
-}
-
-
 export class PropertyAverageHandle implements DataBasedComputation {
     static computationType = Average
     static contextType = 'property' as const
@@ -215,7 +206,8 @@ export class PropertyAverageHandle implements DataBasedComputation {
             base = base[attr]
             if (base === undefined || base === null) return null
         }
-        return base
+        // 与 GlobalAverageHandle 保持一致：NaN/Infinity 归为 null，避免污染 sum。
+        return (Number.isNaN(base)||!Number.isFinite(base)) ? null : base
     }
 
     async compute({_current}: {_current: any}): Promise<number> {
@@ -283,6 +275,9 @@ export class PropertyAverageHandle implements DataBasedComputation {
             const oldResult = await this.state!.itemResult.get(relatedMutationEvent.record);
             sumDelta = -(oldResult ?? 0);
             countDelta = -1;
+            // CAUTION delete 事件可能只是 filtered relation 的成员资格退出（行仍存在），必须复位绑定状态，
+            //  否则关系再次进入时 replace 读到陈旧值导致增量错误（与 global 路径保持一致）。
+            await this.state!.itemResult.setInternal(relatedMutationEvent.record, 0);
         } else if (relatedMutationEvent.type === 'update') {
             // 可能是关系更新也可能是关联实体更新
             // relatedAttribute 是从当前 dataContext 出发，要转换成从关联关系出发的 match key。
