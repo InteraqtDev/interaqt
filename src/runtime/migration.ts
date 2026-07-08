@@ -1775,20 +1775,10 @@ export function buildMigrationDiff(
                 requiredDecisions.push(seedRequirement);
             }
         }
-        if (detected.needsEventRebuildHandler) {
-            requiredDecisions.push({
-                kind: "event-rebuild-handler",
-                dataContext: computation.dataContext,
-                reason: "event-based computation needs an external migration rebuild handler",
-            });
-        }
-        if (detected.needsAsyncCompletionHandler) {
-            requiredDecisions.push({
-                kind: "async-completion-handler",
-                dataContext: computation.dataContext,
-                reason: "async computation needs an external migration completion handler",
-            });
-        }
+        // Handler requirements (event rebuild / async completion) are added later
+        // from the provisional rebuild plan: only computations whose output will
+        // actually be rebuilt need migration handlers. Requiring handlers for
+        // untouched computations only breeds dangerous placeholder handlers.
     }
 
     for (const operation of schemaPlan.preRecomputeDDL) {
@@ -1840,20 +1830,38 @@ export function buildMigrationDiff(
     };
 }
 
+// Handler requirements are derived from the rebuild plan so that only
+// computations whose output is actually rebuilt demand migration handlers.
+// The predicates must mirror getRecomputeBlockingChanges, which gates
+// execution on the same conditions.
 export function addMissingRebuildHandlerRequirements(diff: MigrationDiffFile, controller: Controller, rebuildPlan: ComputationRebuildItem[]) {
     const handles = computationById(controller);
     const requirements = new Map(diff.requiredDecisions.map(requirement => [requirementKey(requirement), requirement]));
     for (const item of rebuildPlan) {
         if (!item.rebuildOutput) continue;
         const computation = handles.get(item.computationId);
-        if ((computation?.args as { _type?: string } | undefined)?._type === "ScopedSequence") continue;
-        if (!computation || typeof (computation as DataBasedComputation).compute === "function") continue;
-        const requirement: MigrationDecisionRequirement = {
-            kind: "event-rebuild-handler",
-            dataContext: item.dataContext,
-            reason: "computation without full compute support needs an external migration rebuild handler",
-        };
-        requirements.set(requirementKey(requirement), requirement);
+        if (!computation) continue;
+        if ((computation.args as { _type?: string } | undefined)?._type === "ScopedSequence") continue;
+        const eventBased = typeof (computation as EventBasedComputation).eventDeps === "object";
+        const lacksCompute = typeof (computation as DataBasedComputation).compute !== "function";
+        if (eventBased || lacksCompute) {
+            const requirement: MigrationDecisionRequirement = {
+                kind: "event-rebuild-handler",
+                dataContext: item.dataContext,
+                reason: eventBased
+                    ? "event-based computation needs an external migration rebuild handler"
+                    : "computation without full compute support needs an external migration rebuild handler",
+            };
+            requirements.set(requirementKey(requirement), requirement);
+        }
+        if (typeof (computation as DataBasedComputation).asyncReturn === "function") {
+            const requirement: MigrationDecisionRequirement = {
+                kind: "async-completion-handler",
+                dataContext: item.dataContext,
+                reason: "async computation needs an external migration completion handler",
+            };
+            requirements.set(requirementKey(requirement), requirement);
+        }
     }
     diff.requiredDecisions = Array.from(requirements.values());
     diff.summary = {
@@ -2419,10 +2427,13 @@ function hasApprovedComputationTakeover(options: MigrationOptions, oldManifest: 
 
 export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan: ComputationRebuildItem[], options: MigrationOptions = {}, oldManifest?: MigrationManifest) {
     const blockingChanges: StorageBlockingChange[] = [];
-    const rebuildIds = new Set(rebuildPlan.map(item => item.computationId));
+    // State-only rebuilds reset bound state defaults without touching output,
+    // so output-related gates (handlers, compute contracts) only apply to
+    // plan items that actually rebuild output.
+    const outputRebuildIds = new Set(rebuildPlan.filter(item => item.rebuildOutput).map(item => item.computationId));
     for (const computation of controller.scheduler.computationsHandles.values()) {
         const computationId = computationManifestId(computation as DataBasedComputation);
-        if (!rebuildIds.has(computationId)) continue;
+        if (!outputRebuildIds.has(computationId)) continue;
 
         const dataContext = dataContextPath(computation.dataContext);
         if ((computation.args as { _type?: string; initializeFrom?: unknown })._type === "ScopedSequence") {

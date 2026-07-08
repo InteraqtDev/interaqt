@@ -3816,6 +3816,51 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("unchanged StateMachine does not demand event rebuild handlers for unrelated migrations", async () => {
+        const db = new PGLiteDB();
+        const build = (withNote: boolean) => {
+            const open = new StateNode({ name: "open" }, { uuid: "migration-sm-untouched-open" });
+            const closed = new StateNode({ name: "closed" }, { uuid: "migration-sm-untouched-closed" });
+            const lifecycle = new StateMachine({
+                states: [open, closed],
+                transfers: [
+                    new StateTransfer({
+                        trigger: { recordName: "MigrationSmUntouchedTicket", type: "update" },
+                        current: open,
+                        next: closed,
+                    }, { uuid: "migration-sm-untouched-transfer" }),
+                ],
+                initialState: open,
+            }, { uuid: "migration-sm-untouched-lifecycle" });
+            return new Entity({
+                name: "MigrationSmUntouchedTicket",
+                properties: [
+                    new Property({ name: "title", type: "string" }, { uuid: "migration-sm-untouched-title" }),
+                    new Property({ name: "status", type: "string", computation: lifecycle }, { uuid: "migration-sm-untouched-status" }),
+                    ...(withNote ? [new Property({ name: "note", type: "string" }, { uuid: "migration-sm-untouched-note" })] : []),
+                ],
+            }, { uuid: "migration-sm-untouched-ticket" });
+        };
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: [build(false)], relations: [] }).setup(true);
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: [build(true)], relations: [] });
+        const diff = await controllerV2.generateMigrationDiff();
+        expect(diff.requiredDecisions.some(requirement =>
+            requirement.kind === "event-rebuild-handler" &&
+            requirement.dataContext === "property:MigrationSmUntouchedTicket.status"
+        )).toBe(false);
+
+        // Adding an unrelated plain property must not demand runtime handlers
+        // for the untouched StateMachine.
+        const plan = await migrateWithApproval(controllerV2);
+        expect(plan.rebuildPlan.map(item => item.dataContext)).not.toContain("property:MigrationSmUntouchedTicket.status");
+        await db.close();
+    });
+
     test("StateMachine without transfers generates and accepts an event rebuild handler decision", async () => {
         const db = new PGLiteDB();
         const ProbeV1 = new Entity({
