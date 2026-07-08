@@ -1,4 +1,33 @@
+# Changelog
 
+## [1.7.0-alpha.0](https://github.com/interaqtdev/interaqt/compare/v1.6.0...v1.7.0-alpha.0) (2026-07-08)
+
+### ⚠ BREAKING CHANGES
+
+* **runtime:** remove legacy computation-id normalization; require explicit computation type names
+* **runtime:** reject old-generator manifests instead of adopting them
+
+### Bug Fixes
+
+* **ci:** make PostgreSQL Concurrency workflow actually pass, fixing real bugs it uncovered ([c1617c8](https://github.com/interaqtdev/interaqt/commit/c1617c879458631693fb62732355601795304149))
+* resolve fatal issues F1-F7 from core/runtime/builtins review ([db2ee82](https://github.com/interaqtdev/interaqt/commit/db2ee82ac82f33aebd36cb1effe8fd8e235d88d7))
+* resolve significant core/builtins issues S9-S17,S19-S23,M-1 from review ([0139685](https://github.com/interaqtdev/interaqt/commit/0139685d546841832a1422676a50477a7c1912b9))
+* **runtime:** backfill new fact property defaults, close remaining rebuild-graph gaps, remove physical-move exemption ([1fc4574](https://github.com/interaqtdev/interaqt/commit/1fc457439948597629418ad4684f7b183630a7b5))
+* **runtime:** collect StateNode.computeValue / StateTransfer.computeTarget into migration function signatures ([5b1adc2](https://github.com/interaqtdev/interaqt/commit/5b1adc26bb958e59bcac7b87e4379ce9fa1f0597))
+* **runtime:** fail fast on missing computeTarget; make initial-value backfill an internal write ([73c79ba](https://github.com/interaqtdev/interaqt/commit/73c79baf90d23eefd18cf85ff827e4369a71b2c4))
+* **runtime:** hard-deletion recompute propagates delete events to downstream computations ([2a924e0](https://github.com/interaqtdev/interaqt/commit/2a924e0dcc0ab3d53352f65a46a2ce91e9e70ec0))
+* **runtime:** migration rebuild graph misses downstream of relation and filtered-entity outputs ([1f61161](https://github.com/interaqtdev/interaqt/commit/1f61161ae905f4b52b2d511bf2a823a59a3f4066))
+* **runtime:** only demand migration handlers for computations whose output is rebuilt ([80a7195](https://github.com/interaqtdev/interaqt/commit/80a71954471c7da1cb0b09a03efb71ba72ec8e31))
+* **runtime:** parameterize migration bookkeeping SQL and add migration lock recovery ([f65ac34](https://github.com/interaqtdev/interaqt/commit/f65ac34383ce4df4201ba4746e31e05800b88ef5))
+* **runtime:** reset record-bound aggregate state on membership delete events; add regression tests and docs ([dd5feef](https://github.com/interaqtdev/interaqt/commit/dd5feefcceb8c9bfc5abccf520b3a0c81de1ab4d))
+* **storage:** add missing MatchExpressionData type import in MergedItemProcessor ([f5654ed](https://github.com/interaqtdev/interaqt/commit/f5654ed3a5f7aa540e7fce1c787b78882e8f991a))
+* **storage:** address robustness, performance and code-quality issues from deep analysis ([5906049](https://github.com/interaqtdev/interaqt/commit/59060492701b5b2c0fb6567d88b29f5301243df2))
+* **storage:** resolve fatal bugs F1-F8 in erstorage ([4053d13](https://github.com/interaqtdev/interaqt/commit/4053d138582d3168fca59828fea7c0d951de55df))
+
+### Code Refactoring
+
+* **runtime:** reject old-generator manifests instead of adopting them ([3ee7aec](https://github.com/interaqtdev/interaqt/commit/3ee7aecb510d794f81a4cf44204cde4b5074b3f8))
+* **runtime:** remove legacy computation-id normalization; require explicit computation type names ([5aa8c46](https://github.com/interaqtdev/interaqt/commit/5aa8c46d905f86d68aa573fc69e41833ab911c8c))
 
 ## [1.6.0](https://github.com/InteraqtDev/interaqt/compare/v1.5.9...v1.6.0) (2026-05-29)
 
