@@ -621,6 +621,53 @@ describe("Data migration phase 1", () => {
         await db.close();
     });
 
+    test("hard deletion recompute emits delete events and recomputes downstream counts", async () => {
+        const db = new PGLiteDB();
+        const build = (withDeletion: boolean) => {
+            const User = new Entity({
+                name: "MigrationHardDeleteDownstreamUser",
+                properties: [
+                    new Property({ name: "name", type: "string" }, { uuid: "migration-hd-downstream-name" }),
+                    ...(withDeletion ? [new Property({
+                        name: "_isDeleted_",
+                        type: "boolean",
+                        computation: new Custom({
+                            name: "MigrationHardDeleteDownstreamFlag",
+                            dataDeps: { current: { type: "property", attributeQuery: ["name"] } },
+                            compute: async (_deps: any, record: any) => record.name === "gone",
+                        }, { uuid: "migration-hd-downstream-flag-computation" }),
+                    }, { uuid: "migration-hd-downstream-flag" })] : []),
+                ],
+            }, { uuid: "migration-hd-downstream-user" });
+            const userCount = new Dictionary({
+                name: "migrationHardDeleteDownstreamCount",
+                type: "number",
+                collection: false,
+                computation: new Count({ record: User }, { uuid: "migration-hd-downstream-count-computation" }),
+            }, { uuid: "migration-hd-downstream-count" });
+            return { entities: [User], dict: [userCount] };
+        };
+        const v1 = build(false);
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        await new Controller({ system: systemV1, entities: v1.entities, relations: [], dict: v1.dict }).setup(true);
+        await systemV1.storage.create("MigrationHardDeleteDownstreamUser", { name: "keep" });
+        await systemV1.storage.create("MigrationHardDeleteDownstreamUser", { name: "gone" });
+        expect(await systemV1.storage.dict.get("migrationHardDeleteDownstreamCount")).toBe(2);
+
+        const v2 = build(true);
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const controllerV2 = new Controller({ system: systemV2, entities: v2.entities, relations: [], dict: v2.dict });
+        const plan = await migrateWithApproval(controllerV2);
+
+        expect(plan.rebuildPlan.map(item => item.dataContext)).toContain("global:migrationHardDeleteDownstreamCount");
+        const remaining = await systemV2.storage.find("MigrationHardDeleteDownstreamUser", undefined, undefined, ["name"]);
+        expect(remaining.map(user => user.name)).toEqual(["keep"]);
+        expect(await systemV2.storage.dict.get("migrationHardDeleteDownstreamCount")).toBe(1);
+        await db.close();
+    });
+
     test("migrate rebuilds added Transform entity output from existing source records", async () => {
         const db = new PGLiteDB();
         const ProductV1 = new Entity({

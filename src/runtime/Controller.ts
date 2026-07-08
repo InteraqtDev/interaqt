@@ -335,8 +335,9 @@ export class Controller {
             { outputChangedIds: new Set(provisionalChangedComputations.map(item => item.id)) },
         )
         const storageBlockingChanges = getStorageBlockingChanges(previousManifest, nextManifest)
+        const readHandle = createMigrationReadHandle(this, schemaPlan)
         const destructiveScopes = options.includeDestructiveScope === true
-            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest)
+            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest, readHandle)
             : []
         const safety = {
             blockingChanges: [
@@ -345,7 +346,6 @@ export class Controller {
             ],
             destructiveScopes,
         }
-        const readHandle = createMigrationReadHandle(this, schemaPlan)
         const takeoverDiff = await addComputationTakeoverReview(this, buildMigrationDiff(planningPreviousManifest, nextManifest, schemaPlan, safety), planningPreviousManifest, nextManifest, readHandle)
         const cleanupDiff = await addEmptyFactRecordRemovalReview(this, takeoverDiff, planningPreviousManifest, nextManifest)
         const scopedSequenceDiff = await addScopedSequenceNoSeedReview(this, cleanupDiff, planningPreviousManifest, nextManifest, readHandle)
@@ -412,9 +412,9 @@ export class Controller {
             ...recomputeBlockingChanges,
         ]
         const blockingChanges = createPlanBlockingMessages(allBlockingChanges)
-        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, planningPreviousManifest)
-        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
+        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, planningPreviousManifest, readHandle)
+        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
         await assertComputationTakeoverAllowed(this, migrationOptions, planningPreviousManifest, readHandle)
         await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, planningPreviousManifest, readHandle)
         const factPropertyBackfills = getNewFactPropertyBackfills(this, planningPreviousManifest, nextManifest)

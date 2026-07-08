@@ -1211,7 +1211,7 @@ function takeoverTargetType(dataContext: string): "property" | "entity" | "relat
     return "relation";
 }
 
-type MigrationReadHandle = Pick<EntityQueryHandle, "find">;
+type MigrationReadHandle = Pick<EntityQueryHandle, "find" | "findOne">;
 
 function dbQuery(controller: Controller) {
     return (controller.system.storage as unknown as { db?: { query?: Function } }).db ||
@@ -2278,13 +2278,34 @@ export function buildAffectedRebuildPlan(
         }
     }
 
+    // A hard-deletion property computation deletes its host records, so its
+    // output also mutates the host record node itself.
+    const hardDeletionHostNodes = (node: string) => {
+        const match = node.match(/^property:([^.]*)\._isDeleted_$/);
+        return match ? recordDepNodes(newManifest, match[1]) : [];
+    };
+    const hardDeletionByRecordNode = new Map<string, ComputationManifest>();
+    for (const computation of newManifest.computations) {
+        for (const node of hardDeletionHostNodes(computation.dataContext)) {
+            hardDeletionByRecordNode.set(node, computation);
+        }
+    }
+    const upstreamComputationsForNode = (node: string): ComputationManifest[] => {
+        const upstream: ComputationManifest[] = [];
+        const direct = byOutput.get(node);
+        if (direct) upstream.push(direct);
+        const hardDeletion = hardDeletionByRecordNode.get(node);
+        if (hardDeletion && hardDeletion !== direct) upstream.push(hardDeletion);
+        return upstream;
+    };
+
     const affected = new Set(changedComputations.map(item => item.id));
     const outputChangedNodes = changedComputations
         .filter(item => {
             const old = oldById.get(item.id);
             return options.outputChangedIds?.has(item.id) || !old || old.outputSignature !== item.outputSignature;
         })
-        .map(item => outputNode(item));
+        .flatMap(item => [outputNode(item), ...hardDeletionHostNodes(outputNode(item))]);
     const queue = [...outputChangedNodes, ...changedDataContexts];
     while (queue.length) {
         const node = queue.shift()!;
@@ -2309,15 +2330,17 @@ export function buildAffectedRebuildPlan(
         if (computation) {
             for (const dep of computation.deps) {
                 for (const upstream of depNodes(dep, computation, newManifest)) {
-                    const upstreamComputation = byOutput.get(upstream);
-                    if (upstreamComputation && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    for (const upstreamComputation of upstreamComputationsForNode(upstream)) {
+                        if (upstreamComputation.id !== id && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    }
                 }
             }
             for (const eventDep of computation.eventDeps) {
                 for (const upstream of eventDepNodes(eventDep, newManifest)) {
                     if (upstream === computation.dataContext) continue;
-                    const upstreamComputation = byOutput.get(upstream);
-                    if (upstreamComputation && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    for (const upstreamComputation of upstreamComputationsForNode(upstream)) {
+                        if (upstreamComputation.id !== id && affected.has(upstreamComputation.id)) visit(upstreamComputation.id);
+                    }
                 }
             }
         }
@@ -2822,7 +2845,34 @@ export async function backfillNewFactPropertyDefaults(controller: Controller, ba
     }
 }
 
-export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest) {
+// Resolve a computation's data deps before the runtime storage query handle
+// exists (diff generation / dry-run time), using the migration read handle.
+async function resolveDataDepsForMigration(controller: Controller, computation: DataBasedComputation, record?: Record<string, unknown>, readHandle?: MigrationReadHandle) {
+    const hasQueryHandle = Boolean((controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle);
+    if (hasQueryHandle || !readHandle) {
+        return controller.scheduler.resolveDataDeps(computation, record);
+    }
+    const entries = await Promise.all(Object.entries(computation.dataDeps || {}).map(async ([name, dep]) => {
+        if (dep.type === "records") {
+            return [name, await readHandle.find(dep.source.name!, dep.match, dep.modifier ?? {}, dep.attributeQuery)];
+        }
+        if (dep.type === "property") {
+            if (record?.id === undefined) {
+                throw new MigrationError(`Record ID is required to resolve property data dependency '${name}' for ${dataContextPath(computation.dataContext)}`);
+            }
+            const hostName = (computation.dataContext as { host: { name?: string } }).host.name!;
+            return [name, await readHandle.findOne(hostName, MatchExp.atom({ key: "id", value: ["=", record.id] }), {}, dep.attributeQuery)];
+        }
+        if (dep.type === "global") {
+            const stored = await readHandle.findOne(DICTIONARY_RECORD, MatchExp.atom({ key: "key", value: ["=", dep.source.name!] }), undefined, ["value"]);
+            return [name, (stored?.value as { raw?: unknown } | undefined)?.raw];
+        }
+        throw new MigrationError(`Unknown data dependency type '${(dep as { type?: string }).type}' for ${dataContextPath(computation.dataContext)}`);
+    }));
+    return Object.fromEntries(entries);
+}
+
+export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest, readHandle?: MigrationReadHandle) {
     const handles = computationById(controller);
     const scope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }> = [];
     const readExistingRecords = async (recordName: string) => {
@@ -2853,7 +2903,7 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
             if (records && typeof (computation as DataBasedComputation).compute === "function") {
                 for (const record of records) {
                     const result = await (computation as DataBasedComputation).compute!(
-                        await controller.scheduler.resolveDataDeps(computation as DataBasedComputation, record),
+                        await resolveDataDepsForMigration(controller, computation as DataBasedComputation, record, readHandle),
                         record,
                     );
                     if (result === true) ids.push(String(record.id));
@@ -3084,6 +3134,15 @@ function createMutationEventForOutput(dataContext: DataContext, result: unknown,
         };
     }
     if (dataContext.type === "property" && record) {
+        // A truthy hard-deletion output physically deletes the host record, so
+        // downstream computations must see a delete event, not a property update.
+        if (dataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
+            return {
+                recordName: dataContext.host.name!,
+                type: "delete",
+                record: record as any,
+            };
+        }
         return {
             recordName: dataContext.host.name!,
             type: "update",
