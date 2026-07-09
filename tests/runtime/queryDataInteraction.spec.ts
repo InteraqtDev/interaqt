@@ -925,14 +925,61 @@ describe('Get Data Interaction', () => {
             const data = result.data as any[]
             // Should be limited to 5 by fixed modifier
             expect(data.length).toBeLessThanOrEqual(5)
-            // All should be published (from fixed match) AND have views >= 500 (from user match)
-            expect(data.every((a: any) => a.status === 'published' && a.views >= 500)).toBe(true)
+            // All should have views >= 500 (from user match; fixed match filtered to published)
+            expect(data.every((a: any) => a.views >= 500)).toBe(true)
+            // dataPolicy.attributeQuery is a fixed projection: the caller-requested extra
+            // field `status` must NOT be exposed (policy wins, callers cannot widen).
+            expect(data.every((a: any) => !('status' in a))).toBe(true)
+            expect(data.every((a: any) => 'title' in a && 'author' in a && 'views' in a)).toBe(true)
             // Should be ordered by views desc (from fixed modifier)
             if (data.length > 1) {
                 for (let i = 1; i < data.length; i++) {
                     expect(data[i-1].views).toBeGreaterThanOrEqual(data[i].views)
                 }
             }
+        })
+
+        test('dataPolicy.attributeQuery caps caller projection (cannot widen to hidden fields)', async () => {
+            const Secret = Entity.create({
+                name: 'PolicySecret',
+                properties: [
+                    Property.create({ name: 'title', type: 'string' }),
+                    Property.create({ name: 'ssn', type: 'string' })
+                ]
+            })
+            const GetSecrets = Interaction.create({
+                name: 'getPolicySecrets',
+                action: GetAction,
+                data: Secret,
+                dataPolicy: DataPolicy.create({
+                    attributeQuery: ['id', 'title'] as any
+                })
+            })
+            controller = new Controller({
+                system,
+                entities: [Secret],
+                eventSources: [GetSecrets]
+            })
+            await controller.setup(true)
+            await system.storage.create('PolicySecret', { title: 't', ssn: '123-45-6789' })
+
+            // caller tries to widen the projection to the hidden field
+            const widened = await controller.dispatch(GetSecrets, {
+                user: { id: 'u1' },
+                query: { attributeQuery: ['id', 'title', 'ssn'] }
+            })
+            expect(widened.error).toBeUndefined()
+            const rows = widened.data as any[]
+            expect(rows.length).toBe(1)
+            expect(rows[0].title).toBe('t')
+            expect('ssn' in rows[0]).toBe(false)
+
+            // caller passing no attributeQuery still gets the policy projection
+            const bare = await controller.dispatch(GetSecrets, { user: { id: 'u1' }, query: {} })
+            expect(bare.error).toBeUndefined()
+            const bareRows = bare.data as any[]
+            expect(bareRows[0].title).toBe('t')
+            expect('ssn' in bareRows[0]).toBe(false)
         })
 
         test('should work with complex fixed match expressions', async () => {

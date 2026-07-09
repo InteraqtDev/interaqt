@@ -150,6 +150,34 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     result[combinedRecordIdRef.info?.attributeName!] = {
                         ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
                     }
+
+                    // CAUTION 当正在创建的是 merged link record（如 1:n 关系合并进 n 端的行）而被抢夺的
+                    //  端点记录上已有【同一业务关系】的旧 link 时，旧 link 的列不能随行迁移：
+                    //  新 link 自己会写这些列（同名列重复导致 INSERT 崩溃），语义上旧 link 也已被替换。
+                    //  这里剔除旧 link 数据并补发业务 link 的 delete 事件（所有权转移的另一半事实）。
+                    const newRecordInfo = this.map.getRecordInfo(newEntityData.recordName)
+                    if (newRecordInfo.isRelation && this.map.data.links[newEntityData.recordName]) {
+                        const stolenData = result[combinedRecordIdRef.info?.attributeName!]
+                        const stolenRecordInfo = this.map.getRecordInfo(combinedRecordIdRef.recordName)
+                        for (const mergedAttrInfo of stolenRecordInfo.mergedRecordAttributes) {
+                            if (mergedAttrInfo.linkName !== newEntityData.recordName) continue
+                            const oldRelated = stolenData[mergedAttrInfo.attributeName]
+                            if (oldRelated?.id === undefined) continue
+                            const oldLink = oldRelated[LINK_SYMBOL]
+                            const stolenIsSource = !this.map.getLinkInfoByName(newEntityData.recordName)
+                                .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
+                            events?.push({
+                                type: 'delete',
+                                recordName: newEntityData.recordName,
+                                record: {
+                                    ...(oldLink || {}),
+                                    source: stolenIsSource ? { id: stolenData.id } : { id: oldRelated.id },
+                                    target: stolenIsSource ? { id: oldRelated.id } : { id: stolenData.id },
+                                }
+                            })
+                            delete stolenData[mergedAttrInfo.attributeName]
+                        }
+                    }
                     // 相当于新建了关系。如果不是虚拟link 就要记录。
                     // TODO 要给出一个明确的 虚拟 link  record 的差异
                     if (!combinedRecordIdRef.info!.isLinkSourceRelation()) {
