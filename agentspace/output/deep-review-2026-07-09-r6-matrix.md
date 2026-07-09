@@ -1,5 +1,15 @@
 # 组合空间矩阵化探索报告（2026-07-09 第六轮）
 
+> **维护说明（2026-07-09 更新）**：本报告发现的全部 35 个破损格子已在同分支（`cursor/deep-code-review-r5-06e2`）修复清零，`aggregationConsistencyMatrix.spec.ts` 的 `KNOWN_BROKEN_CELLS` 已清空、转为纯回归守卫：
+>
+> - **家族 1（25 格）**：filtered 源 update 监听注册到物理 base 名 + Scheduler 成员资格守卫与事件名改写（r5 F-1 修复，详见 r5 报告维护说明）。
+> - **家族 2**：`handleUpdateReliance` 透传 `linkRecordData`（r5 F-3）。
+> - **家族 3（r6-F1）**：`createRecordDependency` 不再把端点 ref 对象别名进 link 数据（打破 `deps[attr]['&'].target === deps[attr]` 的环引用）；`NewRecordData` 剔除与 linkField 同列的 link 端点字段。1:1 `&` 载荷 create/update 双路可用。
+> - **家族 4（r6-F2）**：`handleCreationReliance` 把 `&` 数据挂到反向 attribute 值上而非实体记录顶层，1:n source 侧 `ref+&` create 可用。
+> - **家族 4（r6-F3）**：`flashOutCombinedRecordsAndMergedLinks` 抢夺端点行时剔除被替换的旧同名 link 列并补发旧 link 的 delete 事件，1:n 所有权转移可用且事件完整。
+>
+> 修复后全量测试 1733 passed / 26 skipped；`npm run check` 通过。下文正文保留探索时的原始判定。
+
 - 日期：2026-07-09
 - 基线：`cursor/deep-code-review-r5-06e2`（r5 报告之后，代码与 `main` @ `1f848596` 一致）
 - 方法：**不变式预言机（oracle）驱动的组合矩阵**——不再逐例人工写期望值，而是用两条自校验不变式让每个格子的断言零成本：

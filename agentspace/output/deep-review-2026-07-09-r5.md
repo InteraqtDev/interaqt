@@ -1,5 +1,15 @@
 # 全代码库深度 Review 报告（2026-07-09 第五轮）
 
+> **维护说明（2026-07-09 更新）**：本报告的致命项已在同分支（`cursor/deep-code-review-r5-06e2`）修复：
+>
+> - **F-1**：`ComputationSourceMap` 把 filtered 源的 update 监听注册到物理 base 记录名（携带 `filteredRecordName`）；`Scheduler.resolveFilteredUpdateEvent` 做同批次成员资格事件去重 + 当前成员资格查询守卫，并把事件名改写回 filtered 名。回归网：`tests/runtime/aggregationConsistencyMatrix.spec.ts`（25 个原破损格子全部转绿）。
+> - **F-2**：`retrieveData` 中 `dataPolicy.attributeQuery` 声明即生效（policy wins，调用方不可拓宽投影），与 modifier 的合并方向一致；`queryDataInteraction.spec.ts` 新增「调用方无法越权取隐藏字段」回归用例，并修正了原先断言越权行为的既有用例。
+> - **F-3**：`UpdateExecutor.handleUpdateReliance` 把 `linkRecordData` 透传给 `addLinkFromRecord`，update 替换关系不再丢 `&` 属性（矩阵 parity 格子转绿）。
+> - **F-4**：`NewRecordData.getSameRowFieldAndValue` 用 Proxy 把「computed 只能引用同行 value 字段」变成可执行契约——computed 访问关系属性立即抛出明确错误，不再静默腐蚀；回归测试 `tests/storage/computedRelationGuard.spec.ts`。
+> - 重要项（R-1~R-8）与改进项为**明确遗留**，建议独立 PR 处理。
+>
+> 修复后全量测试 1733 passed / 26 skipped；`npm run check` 通过。下文正文保留 review 时的原始判定，作为问题背景与复现依据。
+
 - 日期：2026-07-09
 - 基线：`main` @ `1f848596`（PR #22 合入之后，前四轮 review 修复全部落地）
 - 范围：`src/core`、`src/runtime`（Controller/Scheduler/ComputationSourceMap/computations/transaction）、`src/storage`（mutation executors / SQL 构造 / filtered entity）、`src/builtins`（dispatch 守卫链 / data API）、`src/drivers`、`agent/agentspace/knowledge/`（知识库与代码事实的一致性）

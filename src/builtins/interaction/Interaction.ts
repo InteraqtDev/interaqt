@@ -550,7 +550,10 @@ async function retrieveData(controller: Controller, interaction: InteractionInst
     const fixedModifier = interaction.dataPolicy?.modifier;
 
     const modifier = { ...(eventArgs.query?.modifier || {}), ...(fixedModifier || {}) };
-    const attributeQuery = eventArgs.query?.attributeQuery || [];
+    // CAUTION dataPolicy.attributeQuery 是交互作者声明的固定投影，声明了就必须生效（policy wins）。
+    //  与 modifier 的合并方向一致：调用方不能越权拓宽可见字段——否则 policy 形同虚设，
+    //  任何调用方都可以请求任意字段（含 '*'），这是数据暴露级缺陷（r5 F-2）。
+    const attributeQuery = interaction.dataPolicy?.attributeQuery ?? (eventArgs.query?.attributeQuery || []);
 
     const matchValue = typeof fixedMatch === 'function'
       ? await fixedMatch.call(controller, eventArgs)

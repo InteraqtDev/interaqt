@@ -168,13 +168,33 @@ export class NewRecordData {
         
         // 获取记录的所有 value 属性定义，不仅仅是提供的属性
         const recordInfo = this.map.getRecordInfo(this.recordName)
+        // CAUTION computed 的契约是【只能引用同行 value 字段】。关系数据不在同行、
+        //  update 的前置查询也不会加载它——嵌套 create 时 payload 恰好携带关系数据会让
+        //  这种写法"表面可用"，然后在任意一次无关 update 时静默算错并持久化（r5 F-4）。
+        //  用 Proxy 把契约变成可执行的：computed 一旦访问关系属性立即抛出明确错误。
+        const recordAttributeNames = new Set(
+            Object.keys(recordInfo.data.attributes).filter(key => (recordInfo.data.attributes[key] as { isRecord?: boolean }).isRecord)
+        )
+        const guardComputedInput = (record: { [k: string]: unknown }, computedName: string) => new Proxy(record, {
+            get: (target, prop) => {
+                if (typeof prop === 'string' && recordAttributeNames.has(prop)) {
+                    throw new Error(
+                        `computed property "${computedName}" on "${this.recordName}" accessed relation property "${prop}". ` +
+                        `"computed" only receives the record's own same-row value fields; relation data is not loaded here ` +
+                        `and would be silently stale. Use a reactive computation (Count/Summation/Custom/StateMachine, etc.) ` +
+                        `for derivations that depend on related records.`
+                    )
+                }
+                return target[prop as keyof typeof target]
+            }
+        })
         const allValueAttributes = new Set<string>()
         
         // 先处理提供的属性
         this.valueAttributes.forEach((info) => {
             allValueAttributes.add(info.attributeName)
             // 处理默认值：如果字段值为 undefined 且有默认值函数，则调用默认值函数
-            let value = info.isComputed ? info.computed!(newRecord) : this.rawData[info.attributeName]
+            let value = info.isComputed ? info.computed!(guardComputedInput(newRecord, info.attributeName)) : this.rawData[info.attributeName]
             
             // 如果值为 undefined 且有默认值函数，使用默认值
             // 注意：null 是明确的值，不应该被默认值替换
@@ -217,7 +237,7 @@ export class NewRecordData {
         // CAUTION 只有更新自己的字段和递归更新三表合一的字段是需要岛上 oldRecord 的。因为我们只允许递归更新三表合一的 record。
         recordInfo.valueAttributes.forEach(info => {
             if (info.isComputed && !updatedComputedFields.has(info.attributeName)) {
-                const newValue = info.computed!(newRecord)
+                const newValue = info.computed!(guardComputedInput(newRecord, info.attributeName))
                 if (newValue !== oldRecord[info.attributeName]) {
                     result.push({
                         name: info.attributeName,
