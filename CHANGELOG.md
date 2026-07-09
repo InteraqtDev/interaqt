@@ -1,5 +1,7 @@
 # Changelog
 
+## [2.0.0](https://github.com/interaqtdev/interaqt/compare/v2.0.0-alpha.0...v2.0.0) (2026-07-09)
+
 ## [2.0.0-alpha.0](https://github.com/interaqtdev/interaqt/compare/v1.7.0-alpha.0...v2.0.0-alpha.0) (2026-07-09)
 
 ### Bug Fixes
