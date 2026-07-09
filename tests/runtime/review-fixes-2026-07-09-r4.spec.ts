@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { Entity, Property, Relation, Interaction, GetAction, DataPolicy } from 'interaqt';
+import { Entity, Property, Relation, Interaction, GetAction, DataPolicy, EventSource } from 'interaqt';
 import { PGLiteDB } from '@drivers';
 import {
   Controller, KlassByName,
@@ -340,6 +340,55 @@ describe('r4 R-4: PropertyCount / PropertyWeightedSummation guard drift', () => 
       );
       expect(result?.type ?? result?.constructor?.name).toMatch(/fullRecompute|ComputationResultFullRecompute/i);
     }
+  });
+});
+
+describe('r4 R-5: transaction retry re-runs with pristine dispatch args', () => {
+  test('in-place payload mutation from resolve does not leak into the retry attempt', async () => {
+    const EventRecord = Entity.create({
+      name: 'RetryArgsEvent',
+      properties: [Property.create({ name: 'kind', type: 'string' })]
+    });
+    const Result = Entity.create({
+      name: 'RetryArgsResult',
+      properties: [Property.create({ name: 'tags', type: 'string', collection: true })]
+    });
+
+    let attempts = 0;
+    const source = EventSource.create({
+      name: 'retryArgsSource',
+      entity: EventRecord,
+      mapEventData: () => ({ kind: 'retry-args' }),
+      resolve: async function(this: Controller, args: any) {
+        attempts++;
+        // legal-looking in-place normalization of the payload
+        args.payload.tags.push('normalized');
+        if (attempts === 1) {
+          const error = new Error('deadlock');
+          Object.assign(error, { code: '40P01' }); // retryable SQLSTATE
+          throw error;
+        }
+        await this.system.storage.create('RetryArgsResult', { tags: [...args.payload.tags] });
+      },
+    });
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Result], relations: [], eventSources: [source] });
+    await controller.setup(true);
+
+    const originalPayload = { tags: ['user-supplied'] };
+    const res = await controller.dispatch(source, { user: { id: 'u1' }, payload: originalPayload });
+    expect(res.error).toBeUndefined();
+    expect(attempts).toBe(2);
+
+    // the retry attempt must have seen the pristine payload: exactly one 'normalized'
+    const rows = await system.storage.find('RetryArgsResult', undefined, undefined, ['*']);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].tags).toEqual(['user-supplied', 'normalized']);
+
+    // the caller's original args object is never mutated
+    expect(originalPayload.tags).toEqual(['user-supplied']);
   });
 });
 

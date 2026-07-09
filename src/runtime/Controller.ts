@@ -613,16 +613,35 @@ export class Controller {
             }
         }
     }
+    /**
+     * 每次事务 attempt 用独立克隆的 args 执行。
+     * CAUTION 必须深拷贝纯数据（嵌套对象/数组）：guard/mapEventData/resolve 就地修改
+     *  args（如 payload.items.push(...)）后，serialization retry 会以被污染的 args 重放，
+     *  重试对用户代码不再幂等。类实例（MatchExp/BoolExp/Date 等）与函数按引用保留——
+     *  它们不是纯数据，浅层共享风险由「不得就地修改」的契约约束。
+     */
     private cloneDispatchArgs<TArgs>(args: TArgs): TArgs {
-        if (!args || typeof args !== 'object') return args
-        const cloned = { ...(args as Record<string, unknown>) }
-        if (cloned.payload && typeof cloned.payload === 'object') {
-            cloned.payload = { ...(cloned.payload as Record<string, unknown>) }
+        return Controller.deepClonePlainData(args)
+    }
+
+    private static deepClonePlainData<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+        if (!value || typeof value !== 'object') return value
+        if (seen.has(value as object)) return seen.get(value as object) as T
+        if (Array.isArray(value)) {
+            const cloned: unknown[] = []
+            seen.set(value as object, cloned)
+            for (const item of value) cloned.push(Controller.deepClonePlainData(item, seen))
+            return cloned as unknown as T
         }
-        if (cloned.user && typeof cloned.user === 'object') {
-            cloned.user = { ...(cloned.user as Record<string, unknown>) }
+        const proto = Object.getPrototypeOf(value)
+        // 类实例（非 plain object）按引用保留，避免破坏其原型方法。
+        if (proto !== Object.prototype && proto !== null) return value
+        const cloned: Record<string, unknown> = {}
+        seen.set(value as object, cloned)
+        for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+            cloned[key] = Controller.deepClonePlainData(item, seen)
         }
-        return cloned as TArgs
+        return cloned as T
     }
 
     /**
