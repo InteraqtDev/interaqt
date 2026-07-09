@@ -6,6 +6,7 @@ import type { ComputationInstance } from './types.js';
 import type { ConstraintInstance } from './Constraint.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
+const VALID_RELATION_TYPES = ['1:1', '1:n', 'n:1', 'n:n'];
 
 export interface RelationInstance extends IInstance {
   name?: string;
@@ -127,6 +128,11 @@ export class Relation implements RelationInstance {
       // Filtered relation must have sourceProperty and targetProperty
       if (!args.sourceProperty || !args.targetProperty) {
         throw new Error('Filtered relation must have sourceProperty and targetProperty');
+      }
+      // filtered relation 是 base 上的谓词视图：没有 matchExpression 的"视图"没有任何语义
+      // （查询重写拿不到谓词，运行期在深处抛裸 TypeError），必须在声明期 fail-fast。
+      if (!args.matchExpression) {
+        throw new Error(`Filtered relation${args.name ? ` "${args.name}"` : ''} declares baseRelation but no matchExpression. A filtered relation is a predicate view over its base — declare matchExpression, or use the base relation directly.`);
       }
       
       this.baseRelation = args.baseRelation;
@@ -290,7 +296,12 @@ export class Relation implements RelationInstance {
     if (args.targetProperty !== undefined && !validNameFormatExp.test(args.targetProperty)) {
       throw new Error(`Relation targetProperty "${args.targetProperty}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
     }
-
+    // type 直接决定存储布局（relType.split(':')）与基数语义，畸形值不会在任何后续阶段被检查，
+    // 会静默产出不可预测的表结构/查询行为，必须在声明期 fail-fast。
+    // filtered/merged relation 的 type 继承自 baseRelation/inputRelations，不允许显式传入矛盾值之外的校验负担。
+    if (args.type !== undefined && !VALID_RELATION_TYPES.includes(args.type)) {
+      throw new Error(`Relation type "${args.type}" is invalid. Valid types: ${VALID_RELATION_TYPES.map(t => `'${t}'`).join(', ')}.`);
+    }
     const instance = new Relation(args, options);
     
     // 检查 uuid 是否重复

@@ -40,13 +40,14 @@ describe('map interaction', () => {
         sendRequestInteraction = interactions.find(i => i.name === 'sendRequest')!
         approveRequestInteraction = interactions.find(i => i.name === 'approve')!
 
-        const userARef = await system.storage.create('User', {name: 'A', age: 10})
+        // leaveRequest 的 User 只声明了 name（age 此前被静默丢弃，写入口现在 fail-fast）。
+        const userARef = await system.storage.create('User', {name: 'A'})
         userAId = userARef.id
 
-        const userBRef = await system.storage.create('User', {name: 'B', age: 12})
+        const userBRef = await system.storage.create('User', {name: 'B'})
         userBId = userBRef.id
 
-        const userCRef = await system.storage.create('User', {name: 'C', age: 14})
+        const userCRef = await system.storage.create('User', {name: 'C'})
         userCId = userCRef.id
     })
 

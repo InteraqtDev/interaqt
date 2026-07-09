@@ -336,7 +336,7 @@ export class Scheduler {
                     const propertyDataContext = computation.dataContext as PropertyDataContext
 
                     // assertion: 有 computation 的 property 就不能有原本的 defaultValue 了，因为会被 computation 的 getInitialValue 覆盖。
-                    assert(!propertyDataContext.id.defaultValue, `${propertyDataContext.host.name}.${propertyDataContext.id.name} property shuold not has a defaultValue, because it will be overridden by computation`)
+                    assert(!propertyDataContext.id.defaultValue, `${propertyDataContext.host.name}.${propertyDataContext.id.name} property should not have a defaultValue, because it will be overridden by computation`)
 
                     // TODO 未来合成一个 listener ?
                     listeners.push(async (mutationEvents) => {

@@ -71,6 +71,10 @@ export type RecordMapItem = {
     // 该 record 是 merged item 编译出的物理 base，持有框架管理的 __type 判别列。
     // 判别列的值只能由"创建时使用的名字"决定，公共写入口必须拒绝显式写入。
     hasMergedDiscriminator?: boolean
+    // merged input 视图名下可写的 value 属性名集合（该 input 声明面 + base 链）。
+    // merged 编译把全部 input 的属性合并进同一物理表，attributes 表因此是共享命名空间——
+    // 没有这个集合，以 input A 的名义写 input B 的特有属性会静默落库（跨视图列污染）。
+    writablePropertyNames?: string[]
 }
 
 type RecordMap = {
@@ -204,6 +208,13 @@ export class EntityToTableMap {
                 attributeData = undefined
             } else {
                 const data = this.data.records[currentEntity]
+                // fail-fast：上一段是值属性时 currentEntity 为 ''（值属性没有可继续深入的记录），
+                //  继续解析会在这里对 undefined 取 attributes 抛与用户写法无关的裸 TypeError。
+                if (!data) {
+                    throw new Error(
+                        `invalid attribute path "${namePath.join('.')}": "${lastAttribute}" is a value attribute and cannot be traversed further (unexpected segment "${currentAttribute}")`
+                    )
+                }
                 // Filtered entity/relation 的 attributes 已经在 Setup 阶段复制过了，直接使用即可
                 attributeData = data!.attributes[currentAttribute!] as RecordAttribute
                 assert(!!attributeData, `attribute ${currentAttribute} not found in ${currentEntity}. namePath: ${namePath.join('.')}`)

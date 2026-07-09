@@ -228,6 +228,13 @@ export class ActivityCall {
                 const supported = Array.from(InteractionState.GroupStateNodeType.keys()).map(t => `'${t}'`).join(', ')
                 throw new Error(`ActivityGroup type "${group.type}" in activity "${activity.name}" is not supported. Supported types: ${supported}.`)
             }
+            // fail-fast: a group with no child activities can never complete (group state
+            // only advances via child-branch onChange callbacks, and an empty group has no
+            // branches to trigger them), so any transfer out of the group is permanently
+            // unreachable — the activity deadlocks silently at runtime.
+            if (!group.activities?.length) {
+                throw new Error(`ActivityGroup (type '${group.type}') in activity "${activity.name}" has no child activities. An empty group can never complete, so the activity would deadlock — declare at least one child activity or remove the group.`)
+            }
             const node: ActivityGroupNode = {
                 uuid: group.uuid,
                 content: group,
@@ -249,6 +256,12 @@ export class ActivityCall {
 
             assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstance).name!}`)
             assert(!!targetNode, `cannot find target ${(transfer.target as InteractionInstance).name!}`)
+            // fail-fast: each node holds a single `next` pointer, so a second transfer from
+            // the same source would silently overwrite the first one — the built graph would
+            // no longer match the declaration. Branching must be modeled with ActivityGroup.
+            if (sourceNode.next) {
+                throw new Error(`Activity "${activity.name}" declares multiple transfers from the same source "${(transfer.source as InteractionInstance).name}". Each node can have only one outgoing transfer; model branching with ActivityGroup (type 'any'/'every'/'race') instead.`)
+            }
             sourceNode.next = targetNode
             targetNode.prev = sourceNode
 

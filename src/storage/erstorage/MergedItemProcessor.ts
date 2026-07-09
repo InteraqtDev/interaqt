@@ -30,6 +30,13 @@ export interface ProcessMergedItemsResult {
      * 判别列由框架管理（记录创建时按使用的名字写入），公共写入口据此拒绝显式覆写。
      */
     discriminatorHostNames: Set<string>;
+    /**
+     * 各 input 视图名（含 filtered input 的 root base 名）→ 该名字下可写的 value 属性名集合。
+     * merged 编译把所有 input 的属性合并进同一张物理表，属性命名空间因此被共享——
+     * 以 input A 的名义写入 input B 的特有属性会静默落库（跨视图列污染）。
+     * 公共写入口据此拒绝写入不属于该 input 声明面的属性（explicit control）。
+     */
+    inputWritablePropertyNames: Map<string, string[]>;
 }
 
 function isEntity(item: MergedItem): item is EntityInstance {
@@ -126,6 +133,7 @@ export function processMergedItems(
     const refContainer = new RefContainer(entities, relations);
     const abstractNames = new Set<string>();
     const discriminatorHostNames = new Set<string>();
+    const inputWritablePropertyNames = new Map<string, string[]>();
 
     // 1. 基于原始（克隆前的）图计算每个名字的具体类型值：
     //    typeValue(name) = 沿 base 链走到根的名字；根是 merged item 时该名字是抽象的（不可创建）。
@@ -151,14 +159,14 @@ export function processMergedItems(
     const relationTree = buildItemTree(relations);
 
     for (const mergedEntity of mergedEntities) {
-        processSingleMergedItem(mergedEntity, refContainer, 'entity', entityTree, typeValueByName, compiledByName, abstractNames, discriminatorHostNames);
+        processSingleMergedItem(mergedEntity, refContainer, 'entity', entityTree, typeValueByName, compiledByName, abstractNames, discriminatorHostNames, inputWritablePropertyNames);
     }
     for (const mergedRelation of mergedRelations) {
-        processSingleMergedItem(mergedRelation, refContainer, 'relation', relationTree, typeValueByName, compiledByName, abstractNames, discriminatorHostNames);
+        processSingleMergedItem(mergedRelation, refContainer, 'relation', relationTree, typeValueByName, compiledByName, abstractNames, discriminatorHostNames, inputWritablePropertyNames);
     }
 
     const result = refContainer.getAll();
-    return { ...result, abstractNames, discriminatorHostNames };
+    return { ...result, abstractNames, discriminatorHostNames, inputWritablePropertyNames };
 }
 
 /**
@@ -245,6 +253,7 @@ function processSingleMergedItem<T extends MergedItem>(
     compiledByName: Map<string, CompiledMergedInfo>,
     abstractNames: Set<string>,
     discriminatorHostNames: Set<string>,
+    inputWritablePropertyNames: Map<string, string[]>,
 ): void {
     const isEntityType = itemType === 'entity';
     const itemName = getItemName(mergedItem);
@@ -324,8 +333,14 @@ function processSingleMergedItem<T extends MergedItem>(
     // 4. 把每个 input 替换成物理 base 上的 filtered item
     //    rootBaseName -> 该 root base 承载的类型集合，用于保持 root base 的可查询性（IS-A 语义）。
     const rootsToRebase = new Map<string, MergedItem>();
-    for (const { inputItem, memberCondition: inputCondition, rootToRebase } of inputMemberships) {
-        rebaseAsFilteredItem(getItemName(inputItem), registeredBaseItem, inputCondition, refContainer, isEntityType);
+    for (const { inputItem, memberCondition: inputCondition } of inputMemberships) {
+        const inputName = getItemName(inputItem);
+        // rebase 之前记录该 input 名下可写的属性集合：pre-rebase 的 base 链上全部声明属性
+        //（plain input = 自身；filtered input = 自身 + root base；嵌套 merged input = 其合并后的全集）。
+        inputWritablePropertyNames.set(inputName, collectWritablePropertyNames(inputName, refContainer, isEntityType));
+        rebaseAsFilteredItem(inputName, registeredBaseItem, inputCondition, refContainer, isEntityType);
+    }
+    for (const { rootToRebase } of inputMemberships) {
         if (rootToRebase && getItemName(rootToRebase) !== getItemName(registeredBaseItem)) {
             rootsToRebase.set(getItemName(rootToRebase), rootToRebase);
         }
@@ -335,8 +350,27 @@ function processSingleMergedItem<T extends MergedItem>(
     //    rebase 为物理 base 上的 filtered item，成员条件就是自己的类型判别（IS-A：包含所有子 input 的记录）。
     for (const [rootName] of rootsToRebase) {
         const rootCondition = MatchExp.atom({ key: MERGED_TYPE_ATTR, value: ['=', rootName] });
+        inputWritablePropertyNames.set(rootName, collectWritablePropertyNames(rootName, refContainer, isEntityType));
         rebaseAsFilteredItem(rootName, registeredBaseItem, rootCondition, refContainer, isEntityType);
     }
+}
+
+/**
+ * 收集 name（pre-rebase）的可写属性名：沿 base 链向上取全部声明属性的并集。
+ * - plain input：自身属性（含 commonProperties 的同名再声明、bound-state 注入列）。
+ * - filtered input：自身（通常为空）∪ root base 的属性。
+ * - 嵌套 merged input：其 transform 后的属性全集（自身或虚拟 base 上的 mergedProperties）。
+ */
+function collectWritablePropertyNames(name: string, refContainer: RefContainer, isEntityType: boolean): string[] {
+    let current: MergedItem | undefined = isEntityType ? refContainer.getEntityByName(name) : refContainer.getRelationByName(name);
+    const names = new Set<string>();
+    while (current) {
+        for (const property of current.properties || []) {
+            names.add(property.name);
+        }
+        current = getBaseItem(current);
+    }
+    return [...names];
 }
 
 /**

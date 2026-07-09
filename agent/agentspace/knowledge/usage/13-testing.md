@@ -26,7 +26,8 @@ storage.create('Entity', data)                       // ✅ Create record
 
 ```typescript
 import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, KlassByName, PGLiteDB, MatchExp } from 'interaqt'
+import { Controller, MonoSystem, KlassByName, MatchExp } from 'interaqt'
+import { PGLiteDB } from 'interaqt/drivers'
 import { entities, relations, interactions, activities } from '../backend'
 // If you need UUID, install and import it:
 // npm install uuid @types/uuid
@@ -675,7 +676,8 @@ Permission testing is an important component of interaqt application testing, re
 
 ```typescript
 import { describe, test, expect, beforeEach } from 'vitest';
-import { Controller, MonoSystem, KlassByName, PGLiteDB } from 'interaqt';
+import { Controller, MonoSystem, KlassByName } from 'interaqt';
+import { PGLiteDB } from 'interaqt/drivers';
 
 describe('Permission Testing', () => {
   let system: MonoSystem;

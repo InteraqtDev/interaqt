@@ -209,6 +209,15 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
                     fieldParams: [value[1]]
                 }
             }
+            // json 类型没有 = / != 操作符（"operator does not exist: json = unknown"），
+            // 转成 jsonb 做语义相等比较（对键序不敏感）。NULL 行不参与匹配，与标量列的 =/!= 语义一致。
+            if (value[0] === '=' || value[0] === '!=') {
+                const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
+                return {
+                    fieldValue: `IS NOT NULL AND ${fieldNameWithQuotes}::jsonb ${value[0]} ${p()}::jsonb`,
+                    fieldParams: [JSON.stringify(value[1])]
+                }
+            }
         }
     }
 

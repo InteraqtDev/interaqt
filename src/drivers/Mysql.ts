@@ -201,6 +201,15 @@ export class MysqlDB implements Database{
                     fieldParams: [JSON.stringify(value[1])]
                 }
             }
+            // JSON 列与字符串参数直接比较会按类型序比较（恒不等）。CAST 成 JSON 做语义相等比较。
+            // NULL 行不参与匹配，与标量列的 =/!= 语义一致。
+            if (value[0] === '=' || value[0] === '!=') {
+                const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
+                return {
+                    fieldValue: `IS NOT NULL AND ${fieldNameWithQuotes} ${value[0]} CAST(${p()} AS JSON)`,
+                    fieldParams: [JSON.stringify(value[1])]
+                }
+            }
         }
     }
 

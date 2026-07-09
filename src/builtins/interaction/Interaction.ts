@@ -147,6 +147,16 @@ export class Interaction implements InteractionInstance {
   };
   
   static create(args: InteractionCreateArgs, options?: { uuid?: string }): InteractionInstance {
+    // fail-fast：挂在守卫链上的容器必须可执行。content 为空的 Conditions/Attributives
+    //  会在每次 dispatch 时深入到 BoolExp 构造器才抛出与用户写法无关的内部错误
+    //  （"BoolExp raw data cannot be undefined"），必须在声明期给出业务级错误。
+    if (Conditions.is(args.conditions) && !args.conditions.content) {
+      throw new Error(`Interaction "${args.name}" declares conditions with a Conditions instance that has no content. Provide content (a Condition BoolExp), or omit the conditions field.`);
+    }
+    if (Attributives.is(args.userAttributives) && !args.userAttributives.content) {
+      throw new Error(`Interaction "${args.name}" declares userAttributives with an Attributives instance that has no content. Provide content (an Attributive BoolExp), or omit the userAttributives field.`);
+    }
+
     const instance = new Interaction(args, options);
     
     const existing = this.instances.find(i => i.uuid === instance.uuid);
@@ -482,6 +492,11 @@ export async function checkPayload(controller: GuardController, interaction: Int
 // attached to a concept against a payload item.
 async function checkConceptAttributive(controller: GuardController, attributive: unknown, eventArgs: InteractionEventArgs, target: unknown): Promise<boolean | string> {
   if (Attributives.is(attributive)) {
+    // fail-closed：content 为空的 Attributives 无法求值。给出业务级错误，
+    //  而不是让 BoolExp 构造器抛出与声明处无关的内部错误。
+    if (!(attributive as AttributivesInstance).content) {
+      return `Attributives instance has no content to evaluate — declare content (an Attributive BoolExp) or remove the attributives declaration`;
+    }
     const combined = BoolExp.fromValue<AttributiveInstance>((attributive as AttributivesInstance).content! as ExpressionData<AttributiveInstance>);
     const result = await combined.evaluateAsync((atom: AttributiveInstance) => checkAttributive(controller, atom, eventArgs, target));
     return result === true ? true : 'attributives check failed';

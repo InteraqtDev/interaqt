@@ -51,8 +51,10 @@ describe("activity state", () => {
         rejectES = controller.findEventSourceByName(`${activityName}:reject`)!
         cancelES = controller.findEventSourceByName(`${activityName}:cancel`)!
 
-        userA = await controller.system.storage.create('User', { roles: ['user']})
-        userB = await controller.system.storage.create('User', { roles: ['user']})
+        // roles 不是 User entity 声明的属性（storage 写入口现在 fail-fast），
+        // 但 guard 的 role attributive 检查的是 dispatch 传入的内存 user 对象——在内存上补齐。
+        userA = { ...await controller.system.storage.create('User', { name: 'A' }), roles: ['user'] }
+        userB = { ...await controller.system.storage.create('User', { name: 'B' }), roles: ['user'] }
     })
 
     test("call friend request activity with approve response via dispatch", async () => {

@@ -43,6 +43,7 @@ describe('S9: Relation.isTargetReliance inheritance', () => {
             baseRelation: base,
             sourceProperty: 'p',
             targetProperty: 'o',
+            matchExpression: { key: 'active', value: ['=', true] },
             isTargetReliance: false,
         });
         expect(filtered.isTargetReliance).toBe(false);
