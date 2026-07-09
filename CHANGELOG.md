@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.2](https://github.com/interaqtdev/interaqt/compare/v2.0.1...v2.0.2) (2026-07-09)
+
+### Bug Fixes
+
+* **core+storage+runtime+builtins:** fail-fast for silent-failure paths found in r10 review ([fe67519](https://github.com/interaqtdev/interaqt/commit/fe67519f442e5cebf9b26f427f1ca5f8310425d5))
+
 ## [2.0.1](https://github.com/interaqtdev/interaqt/compare/v2.0.0...v2.0.1) (2026-07-09)
 
 ### Bug Fixes
