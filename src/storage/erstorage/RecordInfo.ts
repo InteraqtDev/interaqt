@@ -107,15 +107,17 @@ export class RecordInfo {
         })
     }
 
+    // CAUTION 不能用 table 相等判断"同行"：自引用（source === target）的 reliance 表相同但不合行。
+    //  语义上这两个 getter 表达的是"随本记录同一行存储的 reliance"（三表合一），必须用 isMergedWithParent 判断。
     get differentTableReliance(): AttributeInfo[] {
         return this.reliance.filter(info => {
-            return info.table !== this.table
+            return !info.isMergedWithParent()
         })
     }
 
     get sameTableReliance(): AttributeInfo[] {
         return this.reliance.filter(info => {
-            return info.table === this.table
+            return info.isMergedWithParent()
         })
     }
 
