@@ -4,6 +4,7 @@ import { ComputationResultAsync, ComputationResultFullRecompute, ComputationResu
 import type { AtomicSequenceScope, RecordMutationEvent, ScopedSequenceDeclarationManifest, StorageSchemaMetadata, System } from "./System.js";
 import { DICTIONARY_RECORD } from "./System.js";
 import { EntityQueryHandle, EntityToTableMap, getSchemaDialect, LINK_SYMBOL, MatchExp, quoteIdentifier } from "@storage";
+import { BoolExp } from "@core";
 import { createHash } from "node:crypto";
 import { ComputationSourceMapManager, type DataBasedEntityEventsSourceMap, type EntityEventSourceMap, type EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
 import { canonicalizeScopedSequenceScopeFromValues, readScopedSequencePath } from "./scopedSequenceScope.js";
@@ -721,12 +722,18 @@ function serializeEventDeps(computation: Partial<EventBasedComputation>) {
 function serializeState(computation: Computation): BoundStateManifest[] {
     return Object.values(computation.state || {}).map(state => {
         const isRecordState = "record" in state;
+        const defaultValue = (state as RecordBoundState<unknown> | GlobalBoundState<unknown>).defaultValue;
+        // CAUTION 函数型 defaultValue 不能折叠成常量 "[Function]"：那样任何函数变更都不会进入
+        //  stateSignature/modelHash，state-only 迁移会带着错误初始状态静默放行。用函数文本哈希区分。
+        const defaultSignature = typeof defaultValue === "function"
+            ? `[Function:${hash(String(defaultValue))}]`
+            : stableStringify(defaultValue);
         return {
             key: state.key,
             scope: isRecordState ? "record" : "global",
             hostRecord: isRecordState ? (state as RecordBoundState<unknown>).record : undefined,
-            defaultSignature: stableStringify((state as RecordBoundState<unknown> | GlobalBoundState<unknown>).defaultValue),
-            valueType: typeof (state as RecordBoundState<unknown> | GlobalBoundState<unknown>).defaultValue,
+            defaultSignature,
+            valueType: typeof defaultValue,
         };
     });
 }
@@ -1655,6 +1662,19 @@ export function buildMigrationDiff(
         // from the provisional rebuild plan: only computations whose output will
         // actually be rebuilt need migration handlers. Requiring handlers for
         // untouched computations only breeds dangerous placeholder handlers.
+    }
+
+    // filtered entity/relation 的谓词变更必须在审阅文件里可见：
+    //  查询侧立即生效，但成员资格 diff 与下游 rebuild 都取决于这次迁移，审阅者需要看到语义变化。
+    for (const filteredChange of getFilteredRecordChanges(previousManifest, nextManifest)) {
+        if (filteredChange.changeType !== "predicate-changed") continue;
+        changes.push({
+            kind: "storage",
+            id: `filtered-predicate:${filteredChange.recordName}`,
+            changeType: "changed",
+            dataContext: `${filteredChange.isRelation ? "relation" : "entity"}:${filteredChange.recordName}`,
+            reason: `filtered-predicate-changed: matchExpression of filtered ${filteredChange.isRelation ? "relation" : "entity"} "${filteredChange.recordName}" changed from ${stableStringify(filteredChange.oldRecord?.resolvedMatchExpression ?? null)} to ${stableStringify(filteredChange.newRecord.resolvedMatchExpression ?? null)}; existing memberships will be re-evaluated and downstream computations rebuilt`,
+        });
     }
 
     for (const operation of schemaPlan.preRecomputeDDL) {
@@ -2868,11 +2888,43 @@ export async function assertComputationTakeoverAllowed(controller: Controller, o
     }
 }
 
+type FilteredRecordChange = {
+    recordName: string;
+    isRelation?: boolean;
+    oldRecord?: MigrationManifest["storage"]["records"][number];
+    newRecord: MigrationManifest["storage"]["records"][number];
+    changeType: "added" | "predicate-changed";
+};
+
+/**
+ * 找出 filtered entity/relation 的成员资格语义变更：
+ * - added：新增的 filtered 记录（存量成员需要合成 create 事件）；
+ * - predicate-changed：已有 filtered 记录的 resolvedMatchExpression / resolvedBaseRecordName 变了
+ *   （查询侧是无状态谓词、立即生效，但依赖它的增量计算必须拿到成员进入/退出的 diff 事件并 rebuild，
+ *   否则会永久停留在旧基数上——静默脏数据）。
+ */
+export function getFilteredRecordChanges(oldManifest: MigrationManifest, newManifest: MigrationManifest): FilteredRecordChange[] {
+    const oldFiltered = new Map(oldManifest.storage.records.filter(record => record.isFiltered).map(record => [record.recordName, record]));
+    const changes: FilteredRecordChange[] = [];
+    for (const record of newManifest.storage.records) {
+        if (!record.isFiltered) continue;
+        const oldRecord = oldFiltered.get(record.recordName);
+        if (!oldRecord) {
+            changes.push({ recordName: record.recordName, isRelation: record.isRelation, newRecord: record, changeType: "added" });
+        } else if (
+            stableStringify(oldRecord.resolvedMatchExpression ?? null) !== stableStringify(record.resolvedMatchExpression ?? null) ||
+            oldRecord.resolvedBaseRecordName !== record.resolvedBaseRecordName
+        ) {
+            changes.push({ recordName: record.recordName, isRelation: record.isRelation, oldRecord, newRecord: record, changeType: "predicate-changed" });
+        }
+    }
+    return changes;
+}
+
 export function getNewFilteredDataContexts(oldManifest: MigrationManifest, newManifest: MigrationManifest) {
-    const oldFiltered = new Set(oldManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
-    return newManifest.storage.records
-        .filter(record => record.isFiltered && !oldFiltered.has(record.recordName))
-        .map(record => `${record.isRelation ? "relation" : "entity"}:${record.recordName}`);
+    // 新增和谓词变更都必须作为 rebuild 图的种子节点：两者都改变了 filtered 集合的成员资格。
+    return getFilteredRecordChanges(oldManifest, newManifest)
+        .map(change => `${change.isRelation ? "relation" : "entity"}:${change.recordName}`);
 }
 
 export function createPlanBlockingMessages(changes: StorageBlockingChange[]) {
@@ -3288,21 +3340,56 @@ class MigrationScheduler {
 
 export async function recomputeFilteredMemberships(controller: Controller, oldManifest: MigrationManifest, newManifest: MigrationManifest) {
     // CAUTION filtered entity 的成员资格没有持久化标记（storage 侧为无状态设计，成员资格 = 谓词实时求值）。
-    //  迁移时新增的 filtered entity 不需要"回填"任何状态，只需要为已有的存量成员合成 create 事件，
-    //  让依赖它的计算得到增量输入。存量非成员从未属于该（新建的）filtered entity，不产生 delete 事件。
-    const oldFiltered = new Set(oldManifest.storage.records.filter(record => record.isFiltered).map(record => record.recordName));
-    const affectedFilteredRecords = newManifest.storage.records.filter(record => record.isFiltered && !oldFiltered.has(record.recordName));
+    //  - 新增的 filtered entity：为已有的存量成员合成 create 事件（存量非成员从未属于它，不产生 delete）。
+    //  - 谓词变更的 filtered entity：按旧/新谓词对基表求值并做成员资格 diff，
+    //    进入者合成 create、退出者合成 delete，让依赖它的计算拿到完整的增量输入。
     const events: RecordMutationEvent[] = [];
-    for (const filteredRecord of affectedFilteredRecords) {
+    // 旧 manifest 从存储读出后 resolvedMatchExpression 是 JSON 反序列化的 raw ExpressionData，
+    //  必须归一化成 BoolExp 实例才能传给 storage.find。
+    const normalizeMatch = (expression: unknown) => expression ? BoolExp.fromValue(expression as any) : undefined;
+    for (const change of getFilteredRecordChanges(oldManifest, newManifest)) {
+        const filteredRecord = change.newRecord;
         const baseRecordName = filteredRecord.resolvedBaseRecordName;
         if (!baseRecordName || !filteredRecord.resolvedMatchExpression) continue;
-        const matchedRecords = await controller.system.storage.find(baseRecordName, filteredRecord.resolvedMatchExpression, undefined, ["*"]);
+        const matchedRecords = await controller.system.storage.find(baseRecordName, normalizeMatch(filteredRecord.resolvedMatchExpression), undefined, ["*"]);
+
+        if (change.changeType === "added") {
+            for (const matchedRecord of matchedRecords) {
+                events.push({
+                    recordName: filteredRecord.recordName,
+                    type: "create",
+                    record: matchedRecord as any,
+                });
+            }
+            continue;
+        }
+
+        // predicate-changed：旧成员集合来自旧谓词（旧谓词引用的属性可能已被删除——
+        // 那类破坏性变更会先被 storage blocking check 拦截，这里可以直接用旧谓词查询新库）。
+        const oldMatchExpression = normalizeMatch(change.oldRecord?.resolvedMatchExpression);
+        const oldMatchedRecords = oldMatchExpression
+            ? await controller.system.storage.find(baseRecordName, oldMatchExpression, undefined, ["*"])
+            : [];
+        const oldIds = new Set(oldMatchedRecords.map(record => String((record as { id: unknown }).id)));
+        const newIds = new Set(matchedRecords.map(record => String((record as { id: unknown }).id)));
         for (const matchedRecord of matchedRecords) {
-            events.push({
-                recordName: filteredRecord.recordName,
-                type: "create",
-                record: matchedRecord as any,
-            });
+            if (!oldIds.has(String((matchedRecord as { id: unknown }).id))) {
+                events.push({
+                    recordName: filteredRecord.recordName,
+                    type: "create",
+                    record: matchedRecord as any,
+                });
+            }
+        }
+        for (const oldRecord of oldMatchedRecords) {
+            if (!newIds.has(String((oldRecord as { id: unknown }).id))) {
+                events.push({
+                    recordName: filteredRecord.recordName,
+                    type: "delete",
+                    record: oldRecord as any,
+                    oldRecord: oldRecord as any,
+                });
+            }
         }
     }
     return events;

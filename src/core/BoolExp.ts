@@ -239,7 +239,7 @@ export class BoolExp<T> {
       return undefined
     }
     const [first, ...rest] = atomValueWithoutEmpty
-    return rest.reduce((acc, cur) => acc.or(cur), first instanceof BoolExp ? first : BoolExp.atom(first))
+    return rest.reduce((acc, cur) => acc.or(cur), first instanceof BoolExp ? first : new BoolExp<U>(BoolExp.standardizeData<U>(first)))
   }
   
   constructor(public raw: ExpressionData<T>) {
@@ -327,11 +327,13 @@ export class BoolExp<T> {
   }
   
   or(atomValueOrExp: unknown) {
+    // CAUTION 与 and() 保持一致：raw ExpressionData 必须保留为子表达式，
+    //  而不是整棵包成一个 atom（否则组合条件被静默当作单个原子求值）。
     return new BoolExp<T>({
       type: 'expression',
       operator: 'or',
       left: this.raw,
-      right: (atomValueOrExp instanceof BoolExp) ? atomValueOrExp.raw : { type: 'atom', data: atomValueOrExp as T}
+      right: BoolExp.standardizeData<T>(atomValueOrExp)
     })
   }
   
@@ -399,14 +401,14 @@ export class BoolExp<T> {
     if (this.isOr()) {
       const leftResult = this.left.evaluate(atomHandle, currentStack)
       if (leftResult === true) return true
-      return this.right!.evaluate(atomHandle, currentStack)
+      return this.requireRight('or').evaluate(atomHandle, currentStack)
     }
 
     if (this.isAnd()) {
       const leftResult = this.left.evaluate(atomHandle, currentStack)
       if (leftResult !== true) return leftResult
 
-      return this.right!.evaluate(atomHandle, currentStack)
+      return this.requireRight('and').evaluate(atomHandle, currentStack)
     }
 
     if (this.isNot()) {
@@ -414,6 +416,15 @@ export class BoolExp<T> {
     }
 
     throw new Error(`invalid bool expression type: ${JSON.stringify(this.raw)}`)
+  }
+
+  // fail fast：畸形的 and/or 表达式（缺 right 操作数）如果直接解引用会抛出难以定位的 TypeError。
+  private requireRight(operator: 'and' | 'or'): BoolExp<T> {
+    const right = this.right
+    if (!right) {
+      throw new Error(`invalid bool expression: "${operator}" expression is missing the right operand: ${JSON.stringify(this.raw)}`)
+    }
+    return right
   }
   
   async evaluateAsync(atomHandle: AtomHandle<T>, stack :ExpressionData<T>[] = [], inverse: boolean = false): Promise<true|EvaluateError<T>> {
@@ -436,14 +447,14 @@ export class BoolExp<T> {
     if (this.isOr()) {
       const leftResult = await this.left.evaluateAsync(atomHandle, currentStack)
       if (leftResult === true) return true
-      return this.right!.evaluateAsync(atomHandle, currentStack)
+      return this.requireRight('or').evaluateAsync(atomHandle, currentStack)
     }
 
     if (this.isAnd()) {
       const leftResult = await this.left.evaluateAsync(atomHandle, currentStack)
       if (leftResult !== true) return leftResult
 
-      return this.right!.evaluateAsync(atomHandle, currentStack)
+      return this.requireRight('and').evaluateAsync(atomHandle, currentStack)
     }
 
     if (this.isNot()) {

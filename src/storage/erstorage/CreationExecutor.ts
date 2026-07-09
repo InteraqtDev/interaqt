@@ -189,14 +189,19 @@ export class CreationExecutor {
                 const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
                 const valueAttributeNames = new Set(recordInfo.valueAttributes.map(attr => attr.attributeName))
                 const updateRecord = { ...newEntityData.getData() } as Record
+                const updatedKeys: string[] = []
                 updatedFieldValues.forEach(field => {
                     if (valueAttributeNames.has(field.name)) {
                         updateRecord[field.name] = field.value
+                        updatedKeys.push(field.name)
                     }
                 })
                 events?.push({
                     type: 'update',
                     recordName: newEntityData.recordName,
+                    // keys 是本次实际写入的属性名（含被联动重算的 computed 属性）。
+                    //  StateTransfer.trigger.keys 等字段级匹配依赖它。
+                    keys: updatedKeys,
                     record: { ...updateRecord, id: oldRecord!.id },
                     oldRecord: oldRecord
                 })

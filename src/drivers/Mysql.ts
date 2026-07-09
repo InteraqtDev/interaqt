@@ -50,26 +50,30 @@ export class MysqlDB implements Database{
         this.logger = this.options?.logger || dbConsoleLogger
     }
     async open(forceDrop = false) {
-        const options = {...this.options}
-        delete options.logger
-        this.db = await mysql.createConnection({
+        // 第一条连接不带默认库，仅用于检查/创建目标库；用完必须关闭（否则每次 open 泄漏一条连接）。
+        const bootstrapConnection = await mysql.createConnection({
             ...this.options,
         })
-        await this.db.connect()
-        const [rows] = await this.db.query(`SHOW DATABASES LIKE '${this.database}'`)
-        if ((rows as RowDataPacket[]).length === 0) {
-            await this.db.query(`CREATE DATABASE ${this.database}`)
-        } else {
-            if (forceDrop) {
-                await this.db.query(`DROP DATABASE ${this.database}`)
-                await this.db.query(`CREATE DATABASE ${this.database}`)
+        await bootstrapConnection.connect()
+        try {
+            const [rows] = await bootstrapConnection.query(`SHOW DATABASES LIKE '${this.database}'`)
+            if ((rows as RowDataPacket[]).length === 0) {
+                await bootstrapConnection.query(`CREATE DATABASE ${this.database}`)
+            } else if (forceDrop) {
+                await bootstrapConnection.query(`DROP DATABASE ${this.database}`)
+                await bootstrapConnection.query(`CREATE DATABASE ${this.database}`)
             }
-            this.db = await mysql.createConnection({
-                ...this.options,
-                database: this.database
-            })
-            await this.db.connect()
+        } finally {
+            await bootstrapConnection.end()
         }
+
+        // CAUTION 无论目标库是已有还是刚创建，工作连接都必须显式带上 database，
+        //  否则后续 scheme/query 跑在没有默认库的连接上，首次建库启动即失败。
+        this.db = await mysql.createConnection({
+            ...this.options,
+            database: this.database
+        })
+        await this.db.connect()
         await this.db.query(`SET sql_mode='ANSI_QUOTES'`)
 
         await this.idSystem.setup()

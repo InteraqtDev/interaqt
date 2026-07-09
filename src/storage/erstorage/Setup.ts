@@ -830,6 +830,17 @@ export class DBSetup {
         Object.values(oneToOneRelianceLinks).forEach(linkData => {
             if(linkData.isFilteredRelation) return
             const { sourceRecord, targetRecord, recordName: linkRecord} = linkData
+            // CAUTION 自引用（source === target）的 1:1 reliance 无法三表合一：
+            //  同一实体不能与自身合表（joinTables 会 assert 崩溃）。退化为只合并关系表（下面的 fallback 分支）。
+            if (sourceRecord === targetRecord) {
+                const linkToRecordLinkName = (this.map.records[linkRecord!].attributes.source! as RecordAttribute).linkName
+                const linkConflicts = this.joinTables(sourceRecord, linkRecord!, linkToRecordLinkName!)
+                if (!linkConflicts) {
+                    linkData.mergedTo = 'source'
+                    mergedLinks.push(linkData)
+                }
+                return
+            }
             // 只是尝试。有冲突就不会处理
             const conflicts = this.combineRecordTable(sourceRecord, targetRecord, linkRecord!)
             if (!conflicts) {

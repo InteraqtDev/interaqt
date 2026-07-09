@@ -228,7 +228,10 @@ export class PropertyCountHandle implements DataBasedComputation {
                     undefined, 
                     this.relationAttributeQuery
                 );
-                
+                // 关系记录在事件与增量计算之间可能已被删除（级联/竞态），退回全量重算而不是裸解引用崩溃。
+                if (!newRelationWithEntity) {
+                    return ComputationResult.fullRecompute(`relation record ${relationRecord.id} not found for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+                }
                 const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source']
                 relatedRecord['&'] = relationRecord
                 
@@ -266,7 +269,9 @@ export class PropertyCountHandle implements DataBasedComputation {
                     undefined, 
                     this.relationAttributeQuery
                 );
-                
+                if (!newRelationWithEntity) {
+                    return ComputationResult.fullRecompute(`relation record not found by ${relationMatchKey} for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+                }
                 const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source']
                 relatedRecord['&'] = newRelationWithEntity
                 

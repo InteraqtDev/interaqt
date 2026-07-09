@@ -1,63 +1,22 @@
 /**
- * COUNT CALLBACK BUGS - Framework Bug Verification Tests
- * 
- * This test file demonstrates THREE bugs in Count computation with callback.
- * 
- * NOTE: BUG 4 (HardDeletionProperty on Relation) has been moved to a separate file:
- *       count-hard-deletion.spec.ts
- * 
- * =============================================================================
- * BUG 1: Count callback does not respond to computed property changes
- * =============================================================================
- * 
- * DESCRIPTION:
- * When Count.create() uses a callback that filters by a COMPUTED PROPERTY
- * (a property with .computed function), the Count does NOT re-evaluate when
- * the underlying source property changes.
- * 
- * EXAMPLE:
- * - Child._status: StateMachine property ('active' | 'inactive')
- * - Child.isActive: computed = (_status === 'active')
- * - Parent.activeChildCount = Count({ callback: c => c.isActive })
- * 
- * EXPECTED: When _status changes 'active' -> 'inactive', count decreases
- * ACTUAL: Count stays the same
- * 
- * =============================================================================
- * BUG 2: Count callback double-counts when using StateMachine property
- * =============================================================================
- * 
- * DESCRIPTION:
- * When Count.create() uses a callback that filters by a STATEMACHINE PROPERTY
- * (a property with .computation = StateMachine), each record is counted TWICE.
- * 
- * EXAMPLE:
- * - Child._status: StateMachine property ('active' | 'inactive')
- * - Parent.activeChildCount = Count({ callback: c => c._status === 'active' })
- * 
- * EXPECTED: 1 child = count 1
- * ACTUAL: 1 child = count 2
- * 
- * =============================================================================
- * BUG 3: Count callback with StateMachine (entity-level, status change)
- * =============================================================================
- * 
- * DESCRIPTION:
- * This tests the interaction between Count callback and StateMachine property
- * when the status changes (not hard deletion). In some cases, this may work
- * correctly depending on the specific configuration.
- * 
- * =============================================================================
- * IMPACT ON REAL-WORLD SCENARIOS
- * =============================================================================
- * 
- * These bugs affect common patterns like Content.commentCount with soft deletion:
- * - Comment._softDeletion: StateMachine property ('deleted' | null)
- * - Comment.isDeleted: computed = (_softDeletion === 'deleted')
- * - Content.commentCount = Count({ callback: c => c.status === 'approved' && !c.isDeleted })
- * 
- * Using isDeleted (computed) -> Bug 1: count doesn't decrease on delete
- * Using _softDeletion (StateMachine) -> Bug 2: each comment counted twice
+ * COUNT CALLBACK - regression tests
+ *
+ * These scenarios were originally reported as framework bugs (count not
+ * responding to computed-property changes; double counting with StateMachine
+ * properties). The bugs have since been FIXED — every test below asserts the
+ * CORRECT values and passes. The scenarios are kept as regressions:
+ *
+ * 1. Count callback filtering by a COMPUTED property (isActive derived from
+ *    a StateMachine-controlled _status) must re-evaluate when the underlying
+ *    property changes.
+ * 2. Count callback filtering by a StateMachine property directly must count
+ *    each record exactly once.
+ * 3. Count must decrease when a child stops matching the callback.
+ *
+ * Related file: count-hard-deletion.spec.ts (HardDeletionProperty on Relation).
+ *
+ * Real-world pattern covered: Content.commentCount with soft deletion
+ * (Comment._softDeletion StateMachine + Comment.isDeleted computed).
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -228,9 +187,9 @@ const interactions = [CreateParent, CreateChild, DeactivateChild]
 describe('Count Callback Bug Verification', () => {
   
   // ---------------------------------------------------------------------------
-  // BUG 1: Computed property doesn't trigger Count recount
+  // Scenario 1: computed property changes trigger Count recount (fixed regression)
   // ---------------------------------------------------------------------------
-  describe('BUG 1: Computed property does not trigger Count recount', () => {
+  describe('Count recount on computed property change', () => {
     let controller: Controller
 
     beforeEach(async () => {
@@ -256,7 +215,7 @@ describe('Count Callback Bug Verification', () => {
       await controller.setup(true)
     })
 
-    it('Count does NOT decrease when computed property changes (BUG)', async () => {
+    it('Count decreases when the computed property stops matching', async () => {
       // Create parent
       await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
@@ -303,7 +262,7 @@ describe('Count Callback Bug Verification', () => {
       expect(deactivatedChild._status).toBe('inactive')
       expect(deactivatedChild.isActive).toBe(false)
 
-      // BUG: Count should be 0, but it's still 1
+      // count must drop to 0 once the child stops matching
       updatedParent = await controller.system.storage.findOne(
         Parent.name,
         MatchExp.atom({ key: 'id', value: ['=', parent.id] }),
@@ -311,17 +270,14 @@ describe('Count Callback Bug Verification', () => {
         ['id', 'activeChildCount']
       )
 
-      // This assertion FAILS due to BUG 1
-      // Expected: 0 (child is no longer active)
-      // Actual: 1 (count didn't update)
       expect(updatedParent.activeChildCount).toBe(0)
     })
   })
 
   // ---------------------------------------------------------------------------
-  // BUG 2: StateMachine property causes double-counting
+  // Scenario 2: StateMachine property counts each record exactly once (fixed regression)
   // ---------------------------------------------------------------------------
-  describe('BUG 2: StateMachine property causes double-counting', () => {
+  describe('Count with StateMachine property counts once per record', () => {
     let controller: Controller
 
     beforeEach(async () => {
@@ -347,7 +303,7 @@ describe('Count Callback Bug Verification', () => {
       await controller.setup(true)
     })
 
-    it('Each child is counted TWICE when using StateMachine property (BUG)', async () => {
+    it('one child with a StateMachine property is counted once', async () => {
       // Create parent
       await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
@@ -364,7 +320,6 @@ describe('Count Callback Bug Verification', () => {
         payload: { parentId: parent.id, name: 'Child 1' }
       })
 
-      // BUG: Count should be 1, but it's 2
       let updatedParent = await controller.system.storage.findOne(
         Parent.name,
         MatchExp.atom({ key: 'id', value: ['=', parent.id] }),
@@ -372,13 +327,10 @@ describe('Count Callback Bug Verification', () => {
         ['id', 'activeChildCount']
       )
 
-      // This assertion FAILS due to BUG 2
-      // Expected: 1 (one child)
-      // Actual: 2 (child counted twice)
       expect(updatedParent.activeChildCount).toBe(1)
     })
 
-    it('Multiple children are all double-counted (BUG)', async () => {
+    it('multiple children are each counted once', async () => {
       // Create parent
       await controller.dispatch(CreateParent, {
         user: { id: 'test-user' },
@@ -402,7 +354,6 @@ describe('Count Callback Bug Verification', () => {
         payload: { parentId: parent.id, name: 'Child 3' }
       })
 
-      // BUG: Count should be 3, but it's 6
       const updatedParent = await controller.system.storage.findOne(
         Parent.name,
         MatchExp.atom({ key: 'id', value: ['=', parent.id] }),
@@ -410,17 +361,14 @@ describe('Count Callback Bug Verification', () => {
         ['id', 'activeChildCount']
       )
 
-      // This assertion FAILS due to BUG 2
-      // Expected: 3 (three children)
-      // Actual: 6 (each child counted twice)
       expect(updatedParent.activeChildCount).toBe(3)
     })
   })
 
   // ---------------------------------------------------------------------------
-  // BUG 3: HardDeletionProperty interaction with Count callback
+  // Scenario 3: status change decreases the count (fixed regression)
   // ---------------------------------------------------------------------------
-  describe('BUG 3: HardDeletionProperty does not properly update Count with callback', () => {
+  describe('Count decreases when a child stops matching the callback', () => {
     let controller: Controller
 
     beforeEach(async () => {
@@ -446,7 +394,7 @@ describe('Count Callback Bug Verification', () => {
       await controller.setup(true)
     })
 
-    it('Count should decrease when child is hard deleted via HardDeletionProperty (BUG)', async () => {
+    it('Count decreases after deactivation', async () => {
       // This test verifies the interaction between HardDeletionProperty and Count callback.
       // When a relation or entity with HardDeletionProperty is physically deleted,
       // the Count computation should properly decrease.
@@ -467,8 +415,7 @@ describe('Count Callback Bug Verification', () => {
         payload: { parentId: parent.id, name: 'Child 1' }
       })
 
-      // Note: Due to BUG 2, the count might be 2 instead of 1 after creation
-      // This test focuses on whether deletion properly decreases the count
+      // This test focuses on whether deactivation properly decreases the count
       let updatedParent = await controller.system.storage.findOne(
         Parent.name,
         MatchExp.atom({ key: 'id', value: ['=', parent.id] }),
@@ -476,7 +423,7 @@ describe('Count Callback Bug Verification', () => {
         ['id', 'activeChildCount']
       )
       const countAfterCreate = updatedParent.activeChildCount
-      console.log(`Count after create: ${countAfterCreate}`) // May be 2 due to BUG 2
+      console.log(`Count after create: ${countAfterCreate}`)
 
       // Get child
       const children = await controller.system.storage.find(Child.name, undefined, undefined, ['id', '_status'])

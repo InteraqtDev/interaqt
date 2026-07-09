@@ -27,7 +27,20 @@ function resolveNextRecomputeTime(
         }
         return now + nextRecomputeTime(now, dataDeps)
     }
-    const solved = result.solve()
+    // solve() 对多变量/不支持的表达式形态会直接 throw（而不是返回 null）；
+    //  与"无解"同样处理：回退到用户声明的 nextRecomputeTime，两者都没有时给出明确错误。
+    let solved: number | null | undefined
+    try {
+        solved = result.solve()
+    } catch (error) {
+        if (!nextRecomputeTime) {
+            throw new ComputationError(
+                `RealTime computation "${contextName}" returned an expression whose next boundary cannot be solved automatically (${error instanceof Error ? error.message : String(error)}). Declare nextRecomputeTime to schedule recomputation explicitly.`,
+                { computationName: 'RealTime', causedBy: error instanceof Error ? error : undefined }
+            )
+        }
+        return now + nextRecomputeTime(now, dataDeps)
+    }
     if (solved === undefined || solved === null || Number.isNaN(solved)) {
         return nextRecomputeTime ? now + nextRecomputeTime(now, dataDeps) : null
     }
@@ -96,11 +109,15 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
     nextRecomputeTime?: (now: number, dataDeps: Record<string, unknown>) => number
     isResultNumber: boolean
     constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
+        // _current 只有在用户声明了 attributeQuery 时才有意义：没有它无法注册任何监听
+        //  （纯时间驱动的 RealTime property 计算靠 create + nextRecomputeTime 调度触发）。
         this.dataDeps = {
-            _current: {
-                type: 'property',
-                attributeQuery: this.args.attributeQuery
-            },
+            ...(this.args.attributeQuery && this.args.attributeQuery.length > 0 ? {
+                _current: {
+                    type: 'property' as const,
+                    attributeQuery: this.args.attributeQuery
+                }
+            } : {}),
             ...(this.args.dataDeps || {})
         }
         this.isResultNumber = (this.dataContext.id as PropertyInstance).type === 'number'

@@ -328,10 +328,20 @@ export class ComputationSourceMapManager {
             // 只能监听 update eventType。
             const dataContext = computation.dataContext as PropertyDataContext
 
-            if (dataDep.attributeQuery) {
-                // 注意这里的 recordName 应该是当前数据 entity 的 name，因为依赖的是 property 所在的自身 entity
-                ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name!, dataDep.attributeQuery, [], computation, true))
+            // CAUTION fail fast：property 依赖没有 attributeQuery 时无法编译出任何监听，
+            //  计算将永远不会被触发（连初次 compute 都没有），这是静默错误结果，必须在 setup 阶段拒绝。
+            if (!dataDep.attributeQuery || dataDep.attributeQuery.length === 0) {
+                throw new ComputationProtocolError(
+                    `Property dataDep "${dataDepName}" of computation on "${dataContext.host.name}.${dataContext.id.name}" must declare a non-empty attributeQuery. Without it no mutation listener can be registered and the computation would never run. Declare the fields it depends on, e.g. { type: 'property', attributeQuery: ['fieldA'] }`,
+                    {
+                        handleName: computation.constructor.name,
+                        dataContext: computation.dataContext,
+                        computationPhase: 'source-map-initialization'
+                    }
+                )
             }
+            // 注意这里的 recordName 应该是当前数据 entity 的 name，因为依赖的是 property 所在的自身 entity
+            ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name!, dataDep.attributeQuery, [], computation, true))
         } else if (dataDep.type ==='global') {
             // 依赖的是全局的一个 Dict 值。注意这里理论上只有 create 和 update，初始化的时候会得到创建的事件。全局的值是不会删除的。
             // Global 数据存储在 _System_ 表中，监听 state 类型的记录更新
