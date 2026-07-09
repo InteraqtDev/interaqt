@@ -277,6 +277,9 @@ export type Database = {
     parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => { fieldValue: string, fieldParams: unknown[] } | undefined
     getPlaceholder?: () => (name?:string) => string,
     supportsSelectForUpdate?: boolean,
+    // 单条 SQL 允许的最大绑定参数数量（如 SQLite 的 SQLITE_MAX_VARIABLE_NUMBER、PG wire protocol 的 Int16 上限）。
+    // 声明后，MatchExp 会在编译期对超限的 IN/NOT IN 列表抛出带指引的受控错误，而不是留给驱动抛裸错误。
+    maxQueryParams?: number,
     setupInternalComputationState?: () => Promise<void>,
     setupScopedSequenceState?: () => Promise<void>,
     atomicSequenceCapability?: AtomicSequenceCapability,

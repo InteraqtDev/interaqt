@@ -58,7 +58,7 @@ export class NewRecordData {
         const [valueAttributesInfo, entityAttributesInfo, entityIdAttributes] = this.map.groupAttributes(this.recordName, rawData ? Object.keys(rawData) : [])
         this.relatedEntitiesData = flatten(entityAttributesInfo.map(info =>
             Array.isArray(rawData[info.attributeName]) ?
-                rawData[info.attributeName].map((i: RawEntityData) => new NewRecordData(this.map, info.recordName, i, info)):
+                NewRecordData.dedupeRefItems(rawData[info.attributeName], info.attributeName, this.recordName).map((i: RawEntityData) => new NewRecordData(this.map, info.recordName, i, info)):
                 new NewRecordData(this.map, info.recordName, rawData[info.attributeName], info)
         ))
 
@@ -147,6 +147,37 @@ export class NewRecordData {
         return {id: this.rawData.id}
     }
 
+
+    // CAUTION xToMany 关系数组里的重复引用（同一个 {id} 出现两次）在声明式语义下表达的是同一个终态，
+    //  必须幂等去重：否则 create/update 都会崩在 addLink 的「link already exist」内部断言上，
+    //  错误信息与用户写法完全脱节（r5 R-2）。同一 id 携带互相矛盾的 `&` link 数据则是矛盾声明，fail-fast。
+    private static dedupeRefItems(items: RawEntityData[], attributeName: string, hostRecordName: string): RawEntityData[] {
+        const seenById = new Map<string, RawEntityData>()
+        const result: RawEntityData[] = []
+        for (const item of items) {
+            const id = item?.id
+            if (id === undefined) {
+                result.push(item)
+                continue
+            }
+            const prev = seenById.get(String(id))
+            if (!prev) {
+                seenById.set(String(id), item)
+                result.push(item)
+                continue
+            }
+            const prevLink = JSON.stringify(prev[LINK_SYMBOL] ?? null)
+            const currLink = JSON.stringify(item[LINK_SYMBOL] ?? null)
+            if (prevLink !== currLink) {
+                throw new Error(
+                    `duplicate reference to id "${id}" in "${hostRecordName}.${attributeName}" carries conflicting '&' link data. ` +
+                    `A target may appear at most once, or its duplicates must declare identical link attributes.`
+                )
+            }
+            // 完全相同的重复引用：幂等，静默去重。
+        }
+        return result
+    }
 
     isRef() {
         return this.rawData?.id !== undefined

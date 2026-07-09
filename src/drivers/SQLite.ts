@@ -28,6 +28,8 @@ export class SQLiteDB implements Database{
     idSystem!: IDSystem
     logger: DatabaseLogger
     supportsSelectForUpdate = false
+    // SQLite 的 SQLITE_MAX_VARIABLE_NUMBER 自 3.32 起默认 32766；留出安全余量。
+    maxQueryParams = 32000
     transactionCapability: TransactionCapability = {
         transactions: true,
         isolationLevels: ['READ COMMITTED', 'SERIALIZABLE'],

@@ -19,6 +19,8 @@ export class PGLiteDB implements Database{
     logger: DatabaseLogger
     db: InstanceType<typeof PGlite>
     supportsSelectForUpdate = true
+    // PostgreSQL wire protocol 的绑定参数数量是 Int16（65535）；留出安全余量。
+    maxQueryParams = 65000
     transactionCapability: TransactionCapability = {
         transactions: true,
         isolationLevels: ['READ COMMITTED', 'SERIALIZABLE'],
