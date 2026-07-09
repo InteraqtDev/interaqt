@@ -1064,7 +1064,8 @@ RETURNING "lastValue" AS value`,
             lockRows: async (recordName: string, match: MatchExpressionData, attributeQuery = ['*']) => {
                 this.requireTransaction(`atomic lockRows ${recordName}`)
                 const rows = await this.queryHandle!.find(recordName, match, undefined, ['id'])
-                const ids = rows.map(row => row.id)
+                // 按 id 排序保证并发事务以一致顺序取行锁，避免互相持有对方等待的行导致死锁。
+                const ids = rows.map(row => row.id).sort((a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)
                 if (!ids.length) return []
                 const { tableName, idField } = this.resolveRecordTable(recordName)
                 const p = this.getPlaceholder()
