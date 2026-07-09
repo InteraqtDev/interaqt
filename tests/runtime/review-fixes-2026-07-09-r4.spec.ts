@@ -179,6 +179,80 @@ describe('r4 F-2: dataPolicy.attributeQuery is enforced', () => {
   });
 });
 
+describe('r4 R-1: reserved property names are rejected at setup', () => {
+  test('user property named "id" fails fast with a clear error', async () => {
+    const Doc = Entity.create({
+      name: 'DocR1',
+      properties: [
+        Property.create({ name: 'id', type: 'string' }),
+        Property.create({ name: 'title', type: 'string' }),
+      ]
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Doc], relations: [] });
+    await expect(controller.setup(true)).rejects.toThrow(/Property name "id" is reserved on "DocR1"/);
+  });
+});
+
+describe('r4 R-2: relation type whitelist', () => {
+  test('invalid relation type is rejected at Relation.create', () => {
+    const A = Entity.create({ name: 'AR2', properties: [Property.create({ name: 'x', type: 'string' })] });
+    const B = Entity.create({ name: 'BR2', properties: [Property.create({ name: 'y', type: 'string' })] });
+    expect(() => Relation.create({
+      source: A, sourceProperty: 'bs', target: B, targetProperty: 'as', type: '2:3' as any
+    })).toThrow(/Relation type "2:3" is invalid/);
+  });
+
+  test('all four legal relation types are accepted', () => {
+    const A = Entity.create({ name: 'AR2b', properties: [Property.create({ name: 'x', type: 'string' })] });
+    const B = Entity.create({ name: 'BR2b', properties: [Property.create({ name: 'y', type: 'string' })] });
+    for (const [i, type] of (['1:1', '1:n', 'n:1', 'n:n'] as const).entries()) {
+      expect(() => Relation.create({
+        source: A, sourceProperty: `p${i}`, target: B, targetProperty: `q${i}`, type
+      })).not.toThrow();
+    }
+  });
+});
+
+describe('r4 R-3: filtered entity predicates with unknown simple keys fail at setup', () => {
+  test('misspelled single-segment key is rejected with a pointed error', async () => {
+    const Base = Entity.create({
+      name: 'BaseR3',
+      properties: [Property.create({ name: 'status', type: 'string' })]
+    });
+    const Filtered = Entity.create({
+      name: 'FilteredR3',
+      baseEntity: Base,
+      matchExpression: MatchExp.atom({ key: 'statsu', value: ['=', 'active'] }) // typo
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Base, Filtered], relations: [] });
+    await expect(controller.setup(true)).rejects.toThrow(/FilteredR3.*unknown attribute 'statsu' on base 'BaseR3'/);
+  });
+
+  test('valid single keys (own property, id) still pass', async () => {
+    const Base = Entity.create({
+      name: 'BaseR3b',
+      properties: [Property.create({ name: 'status', type: 'string' })]
+    });
+    const Filtered = Entity.create({
+      name: 'FilteredR3b',
+      baseEntity: Base,
+      matchExpression: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Base, Filtered], relations: [] });
+    await controller.setup(true);
+    await system.storage.create('BaseR3b', { status: 'active' });
+    await system.storage.create('BaseR3b', { status: 'archived' });
+    const rows = await system.storage.find('FilteredR3b', undefined, undefined, ['*']);
+    expect(rows.length).toBe(1);
+  });
+});
+
 describe('r4 F-3: computation dependency cycles fail fast instead of recursing unboundedly', () => {
   test('property dataDep including its own output property is rejected at setup', async () => {
     const Item = Entity.create({

@@ -79,6 +79,32 @@ export class MatchExp {
         return paths;
     }
 
+    /**
+     * 从 MatchExpressionData 中提取所有单段（非关联遍历）的 key。
+     * 与 extractPaths 互补：extractPaths 只收集多段路径，单段 key 由本方法收集，
+     * 供 setup 期校验其确实存在于目标记录的属性集合中（fail-fast）。
+     */
+    public static extractSingleKeys(expression: MatchExpressionData): string[] {
+        const keys: string[] = [];
+        const boolExp = expression instanceof BoolExp ? expression : BoolExp.fromValue(expression);
+
+        if (boolExp.isExpression()) {
+            if (boolExp.left) {
+                keys.push(...MatchExp.extractSingleKeys(boolExp.left.raw as MatchExpressionData));
+            }
+            if (boolExp.right) {
+                keys.push(...MatchExp.extractSingleKeys(boolExp.right.raw as MatchExpressionData));
+            }
+        } else if (boolExp.isAtom()) {
+            const matchAtom = boolExp.data as MatchAtom;
+            if (typeof matchAtom?.key === 'string' && !matchAtom.key.includes('.')) {
+                keys.push(matchAtom.key);
+            }
+        }
+
+        return keys;
+    }
+
     public xToOneQueryTree: RecordQueryTree
     public data?: MatchExpressionData
     public entityName: string
