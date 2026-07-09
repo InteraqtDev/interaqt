@@ -184,12 +184,19 @@ export class UpdateExecutor {
 
             removedLinkName.add(linkInfo.name)
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName) ? 'source' : 'target'
-            await this.agent.unlink(
-                linkInfo.name,
-                MatchExp.atom({
+            // CAUTION 对称 n:n 关系里，被替换实体的旧 link 行可能把它记录在 source 侧或 target 侧。
+            //  update 是 replace 语义，若只按单侧（updatedEntityLinkAttr）unlink，会漏删该实体在另一侧的旧关系，
+            //  导致新旧关系并存、查询出现脏数据。因此对称关系必须同时匹配 source.id 与 target.id。
+            const unlinkMatch = (relatedEntityData.info!.isManyToMany && linkInfo.isSymmetric())
+                ? MatchExp.atom({ key: 'source.id', value: ['=', matchedEntity.id] })
+                    .or({ key: 'target.id', value: ['=', matchedEntity.id] })
+                : MatchExp.atom({
                     key: `${updatedEntityLinkAttr}.id`,
                     value: ['=', matchedEntity.id],
-                }),
+                })
+            await this.agent.unlink(
+                linkInfo.name,
+                unlinkMatch,
                 !linkInfo.isRelationSource(entityName, relatedEntityData.info!.attributeName),
                 'unlink old reliance for update',
                 events,

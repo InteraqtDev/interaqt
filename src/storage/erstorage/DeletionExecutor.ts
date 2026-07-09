@@ -251,11 +251,18 @@ export class DeletionExecutor {
         const recordInfo = this.map.getRecordInfo(recordName)
         for (let info of recordInfo.differentTableRecordAttributes) {
             if (!info.isReliance) {
-                const key = info.isRecordSource() ? 'source.id' : 'target.id'
-                const newMatch = MatchExp.atom({
-                    key,
-                    value: ['in', records.map(r => r.id)]
-                })
+                const ids = records.map(r => r.id)
+                // CAUTION 对称 n:n 关系（source===target 且 sourceProperty===targetProperty）里，同一个
+                //  实体可能存在于某些 link 行的 source 侧、另一些 link 行的 target 侧。只按 isRecordSource()
+                //  取单侧（恒为 source）会漏删该实体在 target 侧的 link 行，留下孤儿关系并让对称 Count 偏高。
+                //  因此对称关系必须同时匹配 source.id 与 target.id。
+                const newMatch = info.isLinkManyToManySymmetric()
+                    ? MatchExp.atom({ key: 'source.id', value: ['in', ids] })
+                        .or({ key: 'target.id', value: ['in', ids] })
+                    : MatchExp.atom({
+                        key: info.isRecordSource() ? 'source.id' : 'target.id',
+                        value: ['in', ids]
+                    })
                 // 关系事件上全部都要增加原始 record 的引用。注意不能给所有 events 都去加，因为删除 link 时也可能有关联实体被删除事件。
                 //  只有最后哪些 events 是删除 link 的事件。
                 await this.deleteRecord(info.linkName, newMatch, events)
