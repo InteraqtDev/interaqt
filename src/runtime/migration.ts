@@ -722,12 +722,18 @@ function serializeEventDeps(computation: Partial<EventBasedComputation>) {
 function serializeState(computation: Computation): BoundStateManifest[] {
     return Object.values(computation.state || {}).map(state => {
         const isRecordState = "record" in state;
+        const defaultValue = (state as RecordBoundState<unknown> | GlobalBoundState<unknown>).defaultValue;
+        // CAUTION 函数型 defaultValue 不能折叠成常量 "[Function]"：那样任何函数变更都不会进入
+        //  stateSignature/modelHash，state-only 迁移会带着错误初始状态静默放行。用函数文本哈希区分。
+        const defaultSignature = typeof defaultValue === "function"
+            ? `[Function:${hash(String(defaultValue))}]`
+            : stableStringify(defaultValue);
         return {
             key: state.key,
             scope: isRecordState ? "record" : "global",
             hostRecord: isRecordState ? (state as RecordBoundState<unknown>).record : undefined,
-            defaultSignature: stableStringify((state as RecordBoundState<unknown> | GlobalBoundState<unknown>).defaultValue),
-            valueType: typeof (state as RecordBoundState<unknown> | GlobalBoundState<unknown>).defaultValue,
+            defaultSignature,
+            valueType: typeof defaultValue,
         };
     });
 }
