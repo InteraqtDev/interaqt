@@ -19,6 +19,7 @@ import { SideEffect } from './SideEffect.js';
 import { Dictionary } from './RealDictionary.js';
 import { ScopedSequence } from './ScopedSequence.js';
 import { BoolAtomData, BoolExpressionData } from './BoolExp.js';
+import { EventSource } from './EventSource.js';
 
 const klassesToRegister = [
   Entity,
@@ -43,6 +44,7 @@ const klassesToRegister = [
   ScopedSequence,
   BoolAtomData,
   BoolExpressionData,
+  EventSource,
 ];
 
 klassesToRegister.forEach(klass => {

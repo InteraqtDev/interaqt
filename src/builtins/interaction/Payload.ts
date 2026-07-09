@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues, stringifyInstance } from '@core';
 import { PayloadItemInstance } from './PayloadItem.js';
 
 export interface PayloadInstance extends IInstance {
@@ -48,16 +48,10 @@ export class Payload implements PayloadInstance {
     return instance;
   }
   
+  // CAUTION 必须走统一的 stringifyInstance 管线：items 编码为 uuid:: 引用，
+  //  否则 graph round-trip 后 items 变成与 PayloadItem 实例失去身份关联的裸对象。
   static stringify(instance: PayloadInstance): string {
-    const data: SerializedData<PayloadCreateArgs> = {
-      type: 'Payload',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: {
-        items: instance.items
-      }
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: PayloadInstance, deep: boolean): PayloadInstance {

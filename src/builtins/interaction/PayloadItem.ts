@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, decodeFunctionValues, EntityInstance } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues, stringifyInstance, EntityInstance } from '@core';
 import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
 
 export interface PayloadItemInstance extends IInstance {
@@ -103,23 +103,11 @@ export class PayloadItem implements PayloadItemInstance {
     return instance;
   }
   
+  // CAUTION 必须走统一的 stringifyInstance 管线（以 static public 为单一事实来源）：
+  //  base/itemRef 编码为 uuid:: 引用。此前手写字段清单漏掉了 itemRef，
+  //  round-trip 后 activity 的 ref 绑定静默丢失。
   static stringify(instance: PayloadItemInstance): string {
-    const args: PayloadItemCreateArgs = {
-      name: instance.name,
-      base: instance.base,
-      isCollection: instance.isCollection,
-      required: instance.required,
-      isRef: instance.isRef,
-      type: instance.type,
-    };
-    
-    const data: SerializedData<PayloadItemCreateArgs> = {
-      type: 'PayloadItem',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: PayloadItemInstance, deep: boolean): PayloadItemInstance {
