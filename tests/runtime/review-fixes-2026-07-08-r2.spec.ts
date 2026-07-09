@@ -11,10 +11,10 @@
  */
 import { describe, expect, test } from "vitest";
 import {
-    BoolExp, Controller, Count, Custom, Dictionary, Entity, KlassByName, MatchExp, MonoSystem,
-    Property, Relation, StateMachine, StateNode, StateTransfer,
+    BoolExp, Controller, Count, Custom, Dictionary, Entity, GlobalBoundState, KlassByName, MatchExp, MonoSystem,
+    Property, Relation, StateMachine, StateNode, StateTransfer, createMigrationManifest,
 } from "interaqt";
-import { PGLiteDB } from "@drivers";
+import { PGLiteDB, SQLiteDB } from "@drivers";
 
 async function approveGeneratedMigrationDiff(controller: Controller) {
     const diff = await controller.generateMigrationDiff({ includeFunctionText: true, includeDestructiveScope: true });
@@ -253,13 +253,56 @@ describe("review fixes 2026-07-08 r2", () => {
         const expr = BoolExp.atom({ key: "a", value: ["=", 1] }).and({ key: "b", value: ["=", 2] });
         const orWithRaw = BoolExp.atom({ key: "c", value: ["=", 3] }).or(expr.raw);
         expect((orWithRaw.raw as any).right?.type).toBe("expression");
-        const staticOr = BoolExp.or({ key: "c", value: ["=", 3] }, expr.raw)!;
+        const staticOr = BoolExp.or<unknown>({ key: "c", value: ["=", 3] }, expr.raw)!;
         expect((staticOr.raw as any).right?.type).toBe("expression");
     });
 
     test("R-7: malformed and/or expression without right operand is rejected", () => {
         const malformed = new BoolExp<any>({ type: "expression", operator: "and", left: { type: "atom", data: { key: "a", value: ["=", 1] } } } as any);
         expect(() => malformed.evaluate(() => true)).toThrow(/right/i);
+    });
+
+    // -------------------------------------------------------------------------
+    // R-5: SQLite update() returns RETURNING rows like PostgreSQL/PGLite
+    // -------------------------------------------------------------------------
+    test("R-5: SQLite driver update() returns rows when idField is given", async () => {
+        const db = new SQLiteDB(":memory:");
+        await db.open();
+        await db.scheme(`CREATE TABLE "r5_test" ("_rowId" INTEGER PRIMARY KEY, "id" INT, "v" INT)`);
+        await db.insert(`INSERT INTO "r5_test" ("id", "v") VALUES (?, ?)`, [1, 1]);
+        const rows = await db.update(`UPDATE "r5_test" SET "v" = ? WHERE "v" = ?`, [2, 1], "id");
+        expect(Array.isArray(rows)).toBe(true);
+        expect(rows.map((r: any) => r.id)).toEqual([1]);
+        await db.close();
+    });
+
+    // -------------------------------------------------------------------------
+    // R-8: function-valued bound-state defaultValue enters the state signature
+    // -------------------------------------------------------------------------
+    test("R-8: changing a function-valued state defaultValue changes the state signature", async () => {
+        const buildController = (defaultValueFn: () => number, dbInstance: PGLiteDB) => {
+            const dict = new Dictionary({
+                name: "r8SignatureDict", type: "number", collection: false,
+                computation: new Custom({
+                    name: "R8SignatureCustom",
+                    dataDeps: {},
+                    compute: async () => 0,
+                    getInitialValue: () => 0,
+                    createState: () => ({ marker: new GlobalBoundState<unknown>(defaultValueFn) }),
+                }, { uuid: "r8-signature-custom" }),
+            }, { uuid: "r8-signature-dict" });
+            const system = new MonoSystem(dbInstance);
+            system.conceptClass = KlassByName;
+            return new Controller({ system, entities: [], relations: [], dict: [dict] });
+        };
+        const db = new PGLiteDB();
+        const manifestA = createMigrationManifest(buildController(() => 1, db));
+        const manifestB = createMigrationManifest(buildController(() => 2, db));
+        const manifestA2 = createMigrationManifest(buildController(() => 1, db));
+        const signatureOf = (manifest: any) => manifest.computations.find((c: any) => c.dataContext === "global:r8SignatureDict")!.stateSignature;
+        expect(signatureOf(manifestA)).not.toBe(signatureOf(manifestB));
+        expect(signatureOf(manifestA)).toBe(signatureOf(manifestA2));
+        await db.close();
     });
 
     // -------------------------------------------------------------------------
