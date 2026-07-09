@@ -473,6 +473,18 @@ export class DBSetup {
     }
 
     /**
+     * 解析 endpoint（entity 或 relation）沿 base 链的最底层 record 名。
+     * 普通 entity/relation 返回自己的名字。
+     */
+    private resolveEndpointRootName(endpoint: EntityInstance | RelationInstance): string {
+        let current: EntityInstance | RelationInstance = endpoint
+        while ((current as EntityInstance).baseEntity || (current as RelationInstance).baseRelation) {
+            current = ((current as EntityInstance).baseEntity || (current as RelationInstance).baseRelation)!
+        }
+        return current.name!
+    }
+
+    /**
      * 验证 relations
      * 
      * 检查 filtered entity 上的关系属性名是否与其 base entity 的关系属性名冲突。
@@ -528,6 +540,40 @@ export class DBSetup {
                 }
             }
         })
+
+        // 家族级冲突检查：关系属性最终都登记到 resolved base record 上（filtered entity 与 base
+        //  共享同一张表和同一个属性命名空间），所以同一 base 家族里（base 自身 + 全部 filtered 变体）
+        //  不同 relation 不能声明相同的属性名。上面的链式检查只覆盖 filtered-vs-base-chain，
+        //  这里补齐兄弟 filtered entity 之间、以及 base 在 filtered 之后声明的同名冲突。
+        const familyProps = new Map<string, Map<string, { relations: Set<RelationInstance>, declarers: Set<string> }>>()
+        const registerFamilyProp = (endpoint: EntityInstance | RelationInstance, prop: string | undefined, relation: RelationInstance) => {
+            if (!prop) return
+            const rootName = this.resolveEndpointRootName(endpoint)
+            let props = familyProps.get(rootName)
+            if (!props) familyProps.set(rootName, props = new Map())
+            let entry = props.get(prop)
+            if (!entry) props.set(prop, entry = { relations: new Set(), declarers: new Set() })
+            entry.relations.add(relation)
+            entry.declarers.add(endpoint.name!)
+        }
+        this.relations.forEach(relation => {
+            registerFamilyProp(relation.source, relation.sourceProperty, relation)
+            registerFamilyProp(relation.target, relation.targetProperty, relation)
+        })
+        familyProps.forEach((props, rootName) => {
+            props.forEach((entry, prop) => {
+                // 同一个 relation 的对称两端共用同一属性名是合法的（symmetric relation）。
+                const hasFilteredDeclarer = Array.from(entry.declarers).some(name => name !== rootName)
+                if (entry.relations.size > 1 && hasFilteredDeclarer) {
+                    throw new Error(
+                        `Relation property name conflict: property '${prop}' is declared by multiple relations ` +
+                        `within the same base record family '${rootName}' (declared on: ${Array.from(entry.declarers).join(', ')}). ` +
+                        `Filtered entities share the base entity's attribute namespace, ` +
+                        `so each relation property name must be unique across the base entity and all its filtered entities.`
+                    )
+                }
+            })
+        })
     }
 
     /**
@@ -579,7 +625,7 @@ export class DBSetup {
             const sourceLink = isFilteredRelation ? this.map.links[relationRecord.baseRelationName!]! : undefined
             
 
-            this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = {
+            const sourceAttribute = {
                 type: 'id',
                 isRecord:true,
                 relType: relationData.relType,
@@ -596,11 +642,21 @@ export class DBSetup {
                 resolvedMatchExpression: isFilteredRelation? relationRecord.resolvedMatchExpression: undefined,
                 resolvedBaseRecordName: isFilteredRelation? relationRecord?.resolvedBaseRecordName: undefined
             } as RecordAttribute
+            this.map.records[relationData.sourceRecord].attributes[relationData.sourceProperty] = sourceAttribute
+            // CAUTION 端点是 filtered entity/relation 时，属性必须同时登记到 resolved base record 上：
+            //  查询编译（RecordQuery.create）统一按 resolvedBaseRecordName 解析属性，删除级联也遍历
+            //  base record 的属性表。copyAttributesToFilteredEntities（步骤 4.5）随后会把 base 的
+            //  完整属性表复制回全部 filtered 变体（含声明该关系的这个）。
+            //  虚拟 link（isSourceRelation，即 relation 记录自身的 source/target 属性）除外：
+            //  filtered relation 的 source/target 属性由 copy 阶段统一继承 base relation 的虚拟 link。
+            if (!relationData.isSourceRelation) {
+                this.registerAttributeOnResolvedBase(relationData.sourceRecord, relationData.sourceProperty, sourceAttribute)
+            }
 
             // CAUTION 关联查询时，不可能出现从实体来获取一个关系的情况，语义不正确。
             assert(!(relationData.isSourceRelation && relationData.targetProperty), 'virtual relation should not have targetProperty')
             if (relationData.targetProperty) {
-                this.map.records[relationData.targetRecord].attributes[relationData.targetProperty] = {
+                const targetAttribute = {
                     type: 'id',
                     isRecord:true,
                     // CAUTION 这里翻转了！在 AttributeInfo 中方便判断。不能用 Array.reverse()，因为不会返回新数组。
@@ -614,6 +670,9 @@ export class DBSetup {
                     matchExpression: isFilteredRelation?relationData.matchExpression: undefined,
                     baseRelationAttributeName: isFilteredRelation? sourceLink?.targetProperty: undefined
                 } as RecordAttribute
+                this.map.records[relationData.targetRecord].attributes[relationData.targetProperty] = targetAttribute
+                // 同 source 侧：filtered 端点的属性同步登记到 resolved base record。
+                this.registerAttributeOnResolvedBase(relationData.targetRecord, relationData.targetProperty, targetAttribute)
             }
         })
     }
@@ -629,6 +688,20 @@ export class DBSetup {
                 this.validateFilteredEntityPaths(entityWithProps.baseEntity.name, entityWithProps.matchExpression);
             }
         });
+    }
+
+    /**
+     * 把 filtered entity/relation 端点上声明的关系属性同步登记到 resolved base record。
+     * 见 populateRecordAttributes 中的 CAUTION 注释。
+     */
+    private registerAttributeOnResolvedBase(recordName: string, attributeName: string, attribute: RecordAttribute) {
+        const record = this.map.records[recordName]
+        const resolvedName = record?.resolvedBaseRecordName
+        if (resolvedName && resolvedName !== recordName) {
+            const baseRecord = this.map.records[resolvedName]
+            assert(!!baseRecord, `resolved base record ${resolvedName} not found for ${recordName}`)
+            baseRecord.attributes[attributeName] = { ...attribute }
+        }
     }
 
     /**

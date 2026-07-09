@@ -973,6 +973,7 @@ const User = Entity.create({
       computation: Count.create({
         record: UserArticleRelation,
         direction: 'target',
+        attributeQuery: [['source', { attributeQuery: ['status'] }]],  // Required when callback reads fields
         callback: (relation) => relation.source.status !== 'deleted'
       })
     })

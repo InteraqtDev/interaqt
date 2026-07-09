@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues, stringifyInstance } from '@core';
 
 // DataPolicy - defines fixed constraints for data fetching in interactions
 export interface DataPolicyInstance extends IInstance {
@@ -65,19 +65,10 @@ export class DataPolicy implements DataPolicyInstance {
     return instance;
   }
   
+  // CAUTION 必须走统一的 stringifyInstance 管线：match 常见形态是函数（GetAction 的动态过滤），
+  //  手写 JSON.stringify 会把函数静默丢成 undefined，round-trip 后 dataPolicy 失去过滤语义。
   static stringify(instance: DataPolicyInstance): string {
-    const args: DataPolicyCreateArgs = {};
-    if (instance.match !== undefined) args.match = instance.match;
-    if (instance.modifier !== undefined) args.modifier = instance.modifier;
-    if (instance.attributeQuery !== undefined) args.attributeQuery = instance.attributeQuery;
-    
-    const data: SerializedData<DataPolicyCreateArgs> = {
-      type: 'DataPolicy',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance);
   }
   
   static clone(instance: DataPolicyInstance, deep: boolean): DataPolicyInstance {

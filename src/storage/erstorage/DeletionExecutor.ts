@@ -282,18 +282,21 @@ export class DeletionExecutor {
                 key: `${info.getReverseInfo()?.attributeName!}.id`,
                 value: ['in', records.map(r => r.id)]
             })
+            // 删除关系时，要增加上当前 record 的引用。
+            // 只需要回填本次 deleteRecord 追加的事件（记录起点），避免每层 reliance 都全量扫描
+            // 共享事件数组（深级联 + 事件多的场景会退化成 O(n×m)）。
+            const eventsLengthBeforeDelete = events?.length ?? 0
             await this.deleteRecord(info.recordName, matchInIds, events)
             if (events) {
-                // 删除关系时，要增加上当前 record 的引用。
-                // TODO 这里需要更加高效的方法
-                events.forEach(event => {
+                for (let i = eventsLengthBeforeDelete; i < events.length; i++) {
+                    const event = events[i]
                     if (event.recordName === info.linkName) {
                         const record = recordsById!.get(event.record![info.isRecordSource() ? 'source' : 'target'].id)
                         if (record) {
                             event.record![info.isRecordSource() ? 'source' : 'target'] = record
                         }
                     }
-                })
+                }
             }
         }
     }

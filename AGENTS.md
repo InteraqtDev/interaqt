@@ -338,6 +338,7 @@ npm run build               # vite library build → dist/
 - PGLite does not support `GENERATED ALWAYS AS IDENTITY`
 - PGLite requires single-quoted string defaults
 - Avoid dynamic functions in `defaultValue`
+- The MySQL driver declares `transactions: false` — `Controller.dispatch` requires transactions and fails fast with `TransactionCapabilityError` on MySQL; use PostgreSQL/PGLite/SQLite for dispatch-driven applications
 
 ### Common pitfalls
 

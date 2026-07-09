@@ -1,4 +1,5 @@
 import { IInstance, generateUUID, SerializedData } from './interfaces.js';
+import { decodeFunctionValues, stringifyInstance } from './utils.js';
 import { EntityInstance } from './Entity.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `this` is bound at runtime by Controller; core layer cannot reference it
@@ -74,6 +75,46 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous collection
   static instances: EventSourceInstance<any, any>[] = [];
 
+  // CAUTION public 是 stringifyInstance 的单一事实来源：所有回调都必须列出，
+  //  否则序列化会静默丢弃 guard/resolve 等行为定义，round-trip 后得到残缺实例。
+  static public = {
+    name: {
+      type: 'string' as const,
+      required: true as const,
+      collection: false as const,
+    },
+    entity: {
+      type: 'Entity' as const,
+      required: true as const,
+      collection: false as const,
+    },
+    guard: {
+      type: 'function' as const,
+      required: false as const,
+      collection: false as const,
+    },
+    mapEventData: {
+      type: 'function' as const,
+      required: false as const,
+      collection: false as const,
+    },
+    resolve: {
+      type: 'function' as const,
+      required: false as const,
+      collection: false as const,
+    },
+    afterDispatch: {
+      type: 'function' as const,
+      required: false as const,
+      collection: false as const,
+    },
+    postCommit: {
+      type: 'function' as const,
+      required: false as const,
+      collection: false as const,
+    },
+  };
+
   static create<TArgs = unknown, TResult = void>(
     args: EventSourceCreateArgs<TArgs, TResult>,
     options?: { uuid?: string }
@@ -97,17 +138,10 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
     return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
   }
 
+  // CAUTION 必须走统一的 stringifyInstance 管线：entity 编码为 uuid:: 引用、回调编码为 func::，
+  //  否则 graph round-trip（createInstances）无法还原实例身份与行为。
   static stringify(instance: EventSourceInstance): string {
-    const data: SerializedData<EventSourceCreateArgs> = {
-      type: 'EventSource',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: {
-        name: instance.name,
-        entity: instance.entity,
-      }
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance as unknown as IInstance);
   }
 
   static clone(instance: EventSourceInstance, deep: boolean): EventSourceInstance {
@@ -122,8 +156,10 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
     });
   }
 
+  // 与其他 Klass 的 parse 契约一致：还原 func:: 编码的回调、保持 uuid 身份；
+  // uuid:: 引用（entity）需要 graph 管线（createInstances）才能解析。
   static parse(json: string): EventSourceInstance {
     const data: SerializedData<EventSourceCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }

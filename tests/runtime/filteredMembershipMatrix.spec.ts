@@ -75,7 +75,7 @@ describe("filtered membership combination matrix", () => {
             system, entities: [Task, ActiveTask], relations: [],
             dict: [Dictionary.create({
                 name: "mxPlainCount", type: "number", collection: false,
-                computation: Count.create({ record: ActiveTask, callback: () => true }),
+                computation: Count.create({ record: ActiveTask }),
             })],
         });
         await controller.setup(true);
@@ -121,7 +121,7 @@ describe("filtered membership combination matrix", () => {
             system, entities: [Task, ActiveTask], relations: [],
             dict: [Dictionary.create({
                 name: "mxComputedCount", type: "number", collection: false,
-                computation: Count.create({ record: ActiveTask, callback: () => true }),
+                computation: Count.create({ record: ActiveTask }),
             })],
         });
         await controller.setup(true);
@@ -168,7 +168,7 @@ describe("filtered membership combination matrix", () => {
             system, entities: [User, Team, TechUser], relations: [UserTeam],
             dict: [Dictionary.create({
                 name: "mxTechUserCount", type: "number", collection: false,
-                computation: Count.create({ record: TechUser, callback: () => true }),
+                computation: Count.create({ record: TechUser }),
             })],
         });
         await controller.setup(true);
@@ -221,7 +221,7 @@ describe("filtered membership combination matrix", () => {
             system, entities: [User, Post], relations: [UserPost, PinnedPosts],
             dict: [Dictionary.create({
                 name: "mxPinnedCount", type: "number", collection: false,
-                computation: Count.create({ record: PinnedPosts, callback: () => true }),
+                computation: Count.create({ record: PinnedPosts }),
             })],
         });
         await controller.setup(true);
@@ -274,7 +274,7 @@ describe("filtered membership combination matrix", () => {
             system, entities: [User, Post], relations: [UserPost, BigDeals],
             dict: [Dictionary.create({
                 name: "mxBigDealCount", type: "number", collection: false,
-                computation: Count.create({ record: BigDeals, callback: () => true }),
+                computation: Count.create({ record: BigDeals }),
             })],
         });
         await controller.setup(true);
@@ -330,11 +330,11 @@ describe("filtered membership combination matrix", () => {
             dict: [
                 Dictionary.create({
                     name: "mxHighCount", type: "number", collection: false,
-                    computation: Count.create({ record: HighTask, callback: () => true }),
+                    computation: Count.create({ record: HighTask }),
                 }),
                 Dictionary.create({
                     name: "mxHighActiveCount", type: "number", collection: false,
-                    computation: Count.create({ record: HighActiveTask, callback: () => true }),
+                    computation: Count.create({ record: HighActiveTask }),
                 }),
             ],
         });

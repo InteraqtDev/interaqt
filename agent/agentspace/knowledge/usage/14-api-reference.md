@@ -299,6 +299,7 @@ const userTotalScore = Property.create({
     defaultValue: () => 0,  // Must provide default value
     computation: WeightedSummation.create({
         record: UserScoreRelation,
+        attributeQuery: ['multiplier', 'points'],  // Required when callback reads fields
         callback: function(scoreRecord) {
             return {
                 weight: scoreRecord.multiplier || 1,
@@ -311,6 +312,7 @@ const userTotalScore = Property.create({
 // Global weighted summation
 const globalWeightedScore = WeightedSummation.create({
     record: ScoreRecord,
+    attributeQuery: ['difficulty', 'score'],  // Required when callback reads fields
     callback: function(record) {
         return {
             weight: record.difficulty,
@@ -460,6 +462,7 @@ const completedAllRequired = Property.create({
     defaultValue: () => false,  // Must provide default value
     computation: Every.create({
         record: UserCourseRelation,
+        attributeQuery: ['status'],  // Required when callback reads fields
         callback: function(courseRelation) {
             return courseRelation.status === 'completed'
         },
@@ -491,6 +494,7 @@ const hasPendingTasks = Property.create({
     defaultValue: () => false,  // Must provide default value
     computation: Any.create({
         record: UserTaskRelation,
+        attributeQuery: ['status'],  // Required when callback reads fields
         callback: function(taskRelation) {
             return taskRelation.status === 'pending'
         }

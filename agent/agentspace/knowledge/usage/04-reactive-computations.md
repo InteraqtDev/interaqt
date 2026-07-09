@@ -495,6 +495,7 @@ const Student = Entity.create({
       defaultValue: () => 0,
       computation: WeightedSummation.create({
         record: StudentGrades,
+        attributeQuery: [['target', { attributeQuery: ['credit', 'score'] }]],  // Required when callback reads fields
         callback: (relation) => ({
           weight: relation.target.credit,
           value: relation.target.score
@@ -508,6 +509,7 @@ const Student = Entity.create({
       defaultValue: () => 0,
       computation: WeightedSummation.create({
         record: StudentGrades,
+        attributeQuery: [['target', { attributeQuery: ['credit'] }]],  // Required when callback reads fields
         callback: (relation) => ({
           weight: 1,
           value: relation.target.credit
@@ -534,6 +536,7 @@ const Student = Entity.create({
       defaultValue: () => 0,
       computation: WeightedSummation.create({
         record: StudentGrades,
+        attributeQuery: [['target', { attributeQuery: ['score', 'credit'] }]],  // Required when callback reads fields
         callback: (relation) => {
           // Only count subjects with score >= 60
           if (relation.target.score >= 60) {
@@ -573,6 +576,7 @@ const Project = Entity.create({
       defaultValue: () => false,
       computation: Every.create({
         record: ProjectTasks,
+        attributeQuery: [['target', { attributeQuery: ['status'] }]],  // Required when callback reads fields
         callback: (relation) => relation.target.status === 'completed'
       })
     })
@@ -610,6 +614,7 @@ const Project = Entity.create({
       defaultValue: () => false,
       computation: Any.create({
         record: ProjectMember,
+        attributeQuery: ['role'],  // Required when callback reads fields
         callback: (relation) => relation.role === 'admin'
       })
     })
@@ -644,6 +649,7 @@ const Order = Entity.create({
       defaultValue: () => false,
       computation: Every.create({
         record: OrderItems,
+        attributeQuery: [['target', { attributeQuery: ['quantity', 'stockQuantity'] }]],  // Required when callback reads fields
         callback: (relation) => {
           const item = relation.target;
           return item.quantity > 0 && item.stockQuantity >= item.quantity;
@@ -657,6 +663,7 @@ const Order = Entity.create({
       defaultValue: () => false,
       computation: Any.create({
         record: OrderItems,
+        attributeQuery: [['target', { attributeQuery: ['quantity', 'price'] }]],  // Required when callback reads fields
         callback: (relation) => {
           const item = relation.target;
           return (item.quantity * item.price) > 1000;
@@ -1905,6 +1912,7 @@ const Post = Entity.create({
       defaultValue: () => 0,
       computation: WeightedSummation.create({
         record: PostInteractions,
+        attributeQuery: [['target', { attributeQuery: ['type'] }]],  // Required when callback reads fields
         callback: (relation) => {
           const interaction = relation.target;
           switch (interaction.type) {
@@ -1936,6 +1944,7 @@ const Post = Entity.create({
       defaultValue: () => false,
       computation: Every.create({
         record: PostComments,
+        attributeQuery: [['target', { attributeQuery: ['status'] }]],  // Required when callback reads fields
         callback: (relation) => relation.target.status === 'approved'
       })
     })
@@ -1980,6 +1989,7 @@ Property.create({
   defaultValue: () => 0,
   computation: Count.create({
     record: User,
+    attributeQuery: ['status'],  // Required when callback reads fields
     callback: (user) => user.status === 'active'
   })
 });

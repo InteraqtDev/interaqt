@@ -15,7 +15,7 @@ import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
 import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
-import { SideEffectError } from "./errors/index.js";
+import { SchedulerError, SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
@@ -268,7 +268,21 @@ export class Controller {
         }
         await this.system.setup(this.entities, this.relations, states, { install, internalRequirements })
         const nextManifest = createMigrationManifest(this)
-        await this.scheduler.setup(install)
+        try {
+            await this.scheduler.setup(install)
+        } catch (error) {
+            // CAUTION install 半途失败恢复路径：此时表已创建、manifest 尚未写入，
+            //  直接重试 setup(false) 会撞上误导性的 MigrationBaselineError（有数据无 manifest）。
+            //  用明确的错误告诉调用方正确的恢复动作是修复后重跑 setup(true)（install 会重建表）。
+            throw new SchedulerError(
+                'Initial install failed after database tables were created but before the migration manifest was written. ' +
+                'Fix the underlying error and re-run setup(true) (install recreates tables from scratch); do NOT call setup(false) — it will fail with a misleading MigrationBaselineError.',
+                {
+                    schedulingPhase: 'install-scheduler-setup',
+                    causedBy: error instanceof Error ? error : new Error(String(error))
+                }
+            )
+        }
         if (install) {
             await writeMigrationManifest(this, nextManifest)
         }
@@ -495,7 +509,21 @@ export class Controller {
             if (migrationRun) await migrationSystem.finishMigration?.(migrationRun.id, 'failed', error)
             throw error
         }
-        await this.scheduler.setup(false)
+        try {
+            await this.scheduler.setup(false)
+        } catch (error) {
+            // CAUTION 数据库已完成迁移（manifest 已提交、migration log 已记 succeeded），
+            //  失败的只是本进程的计算监听层。必须用明确的错误告诉调用方恢复路径，
+            //  否则调用方会误判为「迁移失败」而重跑迁移或回滚，与实际数据库状态矛盾。
+            throw new SchedulerError(
+                'Migration completed successfully (database schema, data and manifest are all migrated), but scheduler setup failed afterwards: ' +
+                'the reactive computation layer is NOT active in this process. Fix the underlying error and call controller.setup() (without install) to register computation listeners; do NOT retry the migration.',
+                {
+                    schedulingPhase: 'post-migration-scheduler-setup',
+                    causedBy: error instanceof Error ? error : new Error(String(error))
+                }
+            )
+        }
         return plan
     }
     

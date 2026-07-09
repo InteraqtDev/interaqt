@@ -326,7 +326,8 @@ export class Scheduler {
         }
         this.registeredMutationListeners = []
     }
-    addMutationPropertyComputationDefaultValueListeners() {
+    private buildPropertyDefaultValueListeners(): RecordMutationCallback[] {
+        const listeners: RecordMutationCallback[] = []
         for(const computation of this.computationsHandles.values()) {
             if(computation.getInitialValue) {
                 if (computation.dataContext.type==='property') {
@@ -338,7 +339,7 @@ export class Scheduler {
                     assert(!propertyDataContext.id.defaultValue, `${propertyDataContext.host.name}.${propertyDataContext.id.name} property shuold not has a defaultValue, because it will be overridden by computation`)
 
                     // TODO 未来合成一个 listener ?
-                    this.registerMutationListener(async (mutationEvents) => {
+                    listeners.push(async (mutationEvents) => {
                         for(let mutationEvent of mutationEvents){
                             if (mutationEvent.type === 'create' && mutationEvent.recordName === propertyDataContext.host.name) {
                                 const defaultValue = await computation.getInitialValue?.(mutationEvent.record)
@@ -353,6 +354,7 @@ export class Scheduler {
                 }
             }
         }
+        return listeners
     }
     async setupGlobalComputationDefaultValue() {
         for(const computation of this.computationsHandles.values()) {
@@ -382,11 +384,11 @@ export class Scheduler {
     }
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
-    addMutationComputationListeners() {
+    private buildComputationMutationListener(): RecordMutationCallback {
         this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
-        this.registerMutationListener(async (mutationEvents) => {
+        return (async (mutationEvents) => {
             for(let mutationEvent of mutationEvents){
                 const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                 if (sources.length > 0) {
@@ -424,8 +426,11 @@ export class Scheduler {
      *
      * 带 targetPath 的（property/关联路径）监听不需要此守卫：computeDirtyDataDepRecords
      * 与各 handle 的增量分支都通过 filtered 路径查询定位记录，成员资格由查询本身保证。
+     *
+     * CAUTION 非 private：MigrationScheduler（migration.ts）的增量重算路径必须复用同一守卫，
+     *  否则迁移期的链式 rebuild 对 filtered 源会出现「成员资格事件 + 字段 update」双计或错误路由。
      */
-    private async resolveFilteredUpdateEvent(
+    async resolveFilteredUpdateEvent(
         source: EntityEventSourceMap,
         mutationEvent: RecordMutationEvent,
         batchEvents: RecordMutationEvent[]
@@ -509,13 +514,6 @@ export class Scheduler {
 
         return dirtyDataDepRecords
     }
-    computeOldRecord(newRecord: any, sourceMap: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
-        // FIXME 理论上我们现在不需要 computeOldRecord 了。
-        if(!sourceMap.targetPath?.length) {
-            return mutationEvent.oldRecord
-        }
-        return {...newRecord}
-    }
     async computeDataBasedDirtyRecordsAndEvents(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
@@ -531,7 +529,9 @@ export class Scheduler {
                     type: 'update',
                     recordName: propertyContext.host.name!,
                     record: record,
-                    oldRecord: record,
+                    // 变化发生在 global dict 上，宿主记录自身没有变：old/new 快照内容相同是语义事实，
+                    // 但必须是独立副本，避免消费方原地修改 record 时污染 oldRecord。
+                    oldRecord: {...record},
                     relatedMutationEvent: mutationEvent
                 }])
             } else if (source.computation.dataContext.type === 'global') {
@@ -555,7 +555,12 @@ export class Scheduler {
                 type: 'update',
                 recordName: source.sourceRecordName,
                 record: record,
-                oldRecord: this.computeOldRecord(record, source, mutationEvent),
+                // CAUTION 关联路径的合成宿主 update 事件拿不到宿主的"变更前"快照（变化发生在关联记录上，
+                //  宿主行自身没有旧值）。这里如实置 undefined，而不是像旧实现那样用当前记录副本冒充
+                //  oldRecord——假的 oldRecord 会让依赖 old/new diff 的自定义增量计算把成员资格变化误判
+                //  为 none。真正的变更前后快照在 relatedMutationEvent 上；框架内消费方
+                //  （buildMatchEventContext）对带 relatedAttribute 的事件一律走 full recompute。
+                oldRecord: undefined,
                 relatedAttribute: source.targetPath,
                 relatedMutationEvent: mutationEvent
             }])
@@ -1292,10 +1297,18 @@ export class Scheduler {
     
     async setup(createDefaultDictValue: boolean = false) {
         try {
-            // 幂等：重复 setup（或 migrate 后的重建）先注销上一次注册的 listener。
+            // CAUTION 原子切换：先完整构建新 listener（含 sourceMapManager.initialize 等可抛出的路径），
+            //  全部构建成功后才注销旧的、注册新的。如果先注销再构建，构建中途抛出会留下一个
+            //  「零监听」的静默系统——事实写入照常、所有增量计算冻结、无任何后续报错。
+            const listeners = [
+                ...this.buildPropertyDefaultValueListeners(),
+                this.buildComputationMutationListener()
+            ]
+            // 幂等：重复 setup（或 migrate 后的重建）注销上一次注册的 listener，否则同一 mutation 会触发多次计算。
             this.removeRegisteredMutationListeners()
-            this.addMutationPropertyComputationDefaultValueListeners()
-            this.addMutationComputationListeners()
+            for (const listener of listeners) {
+                this.registerMutationListener(listener)
+            }
             if (createDefaultDictValue) {   
                 // 一定要先把 bound state default value 设置后，因为后面开始设置 dict default value 时，可能触发 computation。可能要读 state。
                 await this.setupGlobalBoundStateDefaultValues()
