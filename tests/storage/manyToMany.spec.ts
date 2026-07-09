@@ -663,21 +663,29 @@ describe('many to many', () => {
         // Delete user1 which is involved in both relations
         await handle.delete('User', MatchExp.atom({ key: 'id', value: ['=', user1.id]}), events)
 
-        // Check that delete events for relations have both source and target
+        // Check that delete events for relations have both source and target.
+        // user1 is source of relation1 and TARGET of relation2 — symmetric cascade
+        // deletion must remove both directions (r4 F-1 regression).
         const relationDeleteEvents = events.filter(e => e.type === 'delete' && e.recordName === 'User_friends_friends_User')
-        
-        expect(relationDeleteEvents.length).toBe(1)
-        
-        const event = relationDeleteEvents[0]
-        expect(event.record).toHaveProperty('source')
-        expect(event.record).toHaveProperty('target')
-        expect(event.record!.source).toHaveProperty('id')
-        expect(event.record!.target).toHaveProperty('id')
-        
-        // Verify that user1 is involved in each relation
-        const isUser1Source = event.record!.source.id === user1.id
-        const isUser1Target = event.record!.target.id === user1.id
-        expect(isUser1Source || isUser1Target).toBe(true)
+
+        expect(relationDeleteEvents.length).toBe(2)
+
+        for (const event of relationDeleteEvents) {
+            expect(event.record).toHaveProperty('source')
+            expect(event.record).toHaveProperty('target')
+            expect(event.record!.source).toHaveProperty('id')
+            expect(event.record!.target).toHaveProperty('id')
+
+            // Verify that user1 is involved in each relation
+            const isUser1Source = event.record!.source.id === user1.id
+            const isUser1Target = event.record!.target.id === user1.id
+            expect(isUser1Source || isUser1Target).toBe(true)
+        }
+        expect(new Set(relationDeleteEvents.map(e => e.record!.id))).toEqual(new Set([relation1.id, relation2.id]))
+
+        // No orphan link rows may remain in the database
+        const remainingLinks = await handle.find('User_friends_friends_User', undefined, undefined, ['*'])
+        expect(remainingLinks.length).toBe(0)
     })
 })
 

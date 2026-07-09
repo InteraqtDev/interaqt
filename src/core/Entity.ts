@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyInstance, decodeFunctionValues } from './utils.js';
+import { stringifyInstance, decodeFunctionValues, enforceDeclaredConstraints } from './utils.js';
 import { PropertyInstance } from './Property.js';
 import type { ComputationInstance } from './types.js';
 import type { RelationInstance } from './Relation.js';
@@ -137,7 +137,11 @@ export class Entity implements EntityInstance {
     }
 
     const instance = new Entity(args, options);
-    
+
+    // 执行 public 里声明的约束（eachNameUnique / mergedEntityNoProperties 等）：
+    // 约束是行为承诺，静默不执行会让重名属性在 setup 时以误导性的错误暴露。
+    enforceDeclaredConstraints(this, instance);
+
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {

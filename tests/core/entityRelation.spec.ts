@@ -399,11 +399,12 @@ describe('Relation.public constraint and computed functions', () => {
         });
         expect(Relation.public.properties.constraints.eachNameUnique(relUnique)).toBe(true);
 
-        const relDup = Relation.create({
+        // declared constraints are now enforced at create (r4 I-16):
+        // duplicate property names fail fast instead of silently collapsing at setup
+        expect(() => Relation.create({
             source: s, sourceProperty: 'cys2', target: t, targetProperty: 'cx2', type: '1:n',
             properties: [p1, p3],
-        });
-        expect(Relation.public.properties.constraints.eachNameUnique(relDup)).toBe(false);
+        })).toThrow(/Relation constraint "eachNameUnique" on field "properties" failed/);
     });
 
     test('inputRelations.constraints.mergedRelationNoProperties rejects properties on merged', () => {

@@ -51,6 +51,29 @@ export function stringifyAttribute(obj: unknown): unknown {
   return obj;
 }
 
+// 通用约束执行：Klass.public 里声明的 constraints 是行为承诺，
+// 必须在 create() 时执行（fail-fast），而不是仅作为文档存在。
+// 约束函数以完整实例为参数（Entity 的约束按需解构，Relation 的约束直接使用实例）。
+export function enforceDeclaredConstraints(
+  Klass: { displayName: string, public: Record<string, unknown> },
+  instance: object
+) {
+  for (const [field, def] of Object.entries(Klass.public)) {
+    const constraints = (def as { constraints?: Record<string, (instance: never) => boolean> })?.constraints
+    if (!constraints) continue
+    for (const [constraintName, check] of Object.entries(constraints)) {
+      if (!check(instance as never)) {
+        const instanceName = (instance as { name?: unknown }).name
+        throw new Error(
+          `${Klass.displayName} constraint "${constraintName}" on field "${field}" failed` +
+          (typeof instanceName === 'string' ? ` for "${instanceName}"` : '') +
+          `.`
+        )
+      }
+    }
+  }
+}
+
 // 通用实例序列化：以 Klass.public 声明的字段为单一事实来源，
 // 保证 stringify 不因手写字段清单而与 CreateArgs 漂移。
 export function stringifyInstance(

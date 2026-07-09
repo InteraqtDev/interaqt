@@ -29,7 +29,13 @@ export class AttributeQuery {
         const recordAttributesByName = recordAttributes.reduce((acc, item) => {
             const [attributeName, subQueryData] = item
             if(acc[attributeName]) {
-                acc[attributeName] = { attributeQuery: AttributeQuery.mergeAttributeQueryData(acc[attributeName].attributeQuery!, subQueryData.attributeQuery!) }
+                // CAUTION 深度合并 attributeQuery 的同时必须保留 matchExpression/modifier/label 等
+                //  查询选项（先出现者优先），否则同一关系出现两次时嵌套过滤/限流会被静默丢弃。
+                acc[attributeName] = {
+                    ...subQueryData,
+                    ...acc[attributeName],
+                    attributeQuery: AttributeQuery.mergeAttributeQueryData(acc[attributeName].attributeQuery || [], subQueryData.attributeQuery || [])
+                }
             } else {
                 acc[attributeName] = subQueryData
             }

@@ -165,6 +165,24 @@ export class DBSetup {
         for (const path of paths) {
             this.validateSinglePath(entityName, path);
         }
+
+        // 单段 key（非关联遍历）必须存在于 base 记录的属性集合中。
+        // 否则（例如谓词 key 拼写错误）setup 静默通过，首次写入 base 实体时
+        // 才在成员资格求值处抛出与用户声明无关的内部路径解析错误。
+        const entityData = this.map.records[entityName];
+        if (!entityData) {
+            throw new Error(`Entity ${entityName} not found in map`);
+        }
+        for (const key of MatchExp.extractSingleKeys(matchExpression)) {
+            // 对称关系的 key 可以带 :source/:target 后缀，校验属性名部分
+            const attrName = key.split(':')[0];
+            if (!entityData.attributes[attrName]) {
+                throw new Error(
+                    `Filtered entity '${this.currentFilteredEntityName}' matchExpression references unknown attribute '${attrName}' ` +
+                    `on base '${entityName}'. Available attributes: ${Object.keys(entityData.attributes).join(', ')}`
+                );
+            }
+        }
     }
     
     /**
@@ -254,6 +272,12 @@ export class DBSetup {
 
         if (isRelation) {
             assert(!attributes.source && !attributes.target, 'source and target is reserved name for relation attributes')
+        }
+
+        // CAUTION fail fast：`id` 是框架自动注入的主键属性，用户同名 Property 会被静默覆盖，
+        //  随后写入用户自定义 id 值时在数据库层报出与声明无关的错误（如 uuid 语法错误）。
+        if (attributes[ID_ATTR]) {
+            throw new Error(`Property name "${ID_ATTR}" is reserved on "${entity.name}": the framework injects the primary key attribute automatically. Rename the property.`)
         }
 
         // 自动补充
@@ -699,12 +723,43 @@ export class DBSetup {
             if (relation.targetProperty !== undefined && !DBSetup.VALID_NAME_FORMAT.test(relation.targetProperty)) {
                 throw new Error(`Relation targetProperty "${relation.targetProperty}" is invalid. Property names must match ${DBSetup.VALID_NAME_FORMAT} (letters, numbers and underscore only).`)
             }
+            // 与 Relation.create 相同的白名单（实例可能绕过 Klass 工厂直接构造，storage 入口再校验一次）。
+            // 非法基数字符串会被 `relation.type.split(':')` 静默消费，查询返回空关联数据。
+            if (!DBSetup.VALID_RELATION_TYPES.includes(relation.type as typeof DBSetup.VALID_RELATION_TYPES[number])) {
+                throw new Error(`Relation type "${relation.type}" on "${this.getItemEffectiveName(relation)}" is invalid. Relation type must be one of ${DBSetup.VALID_RELATION_TYPES.map(t => `'${t}'`).join(', ')}.`)
+            }
         })
+    }
+    private static readonly VALID_RELATION_TYPES = ['1:1', '1:n', 'n:1', 'n:n'] as const
+
+    /**
+     * 校验 baseEntity/baseRelation 链无环。
+     * CAUTION 解析链的代码（resolveRootBaseRecordNameAndMatchExpression / getBaseEntityChain /
+     *  collectAllFilteredEntities）都是无守卫的 while/递归：循环链会同步死循环直至 OOM 进程崩溃，
+     *  必须在一切处理之前 fail-fast。
+     */
+    private validateBaseChains() {
+        for (const item of [...this.entities, ...this.relations]) {
+            const path: string[] = [this.getItemEffectiveName(item)]
+            const visited = new Set<unknown>([item])
+            let current = (item as any).baseEntity || (item as any).baseRelation
+            while (current) {
+                path.push(this.getItemEffectiveName(current))
+                if (visited.has(current)) {
+                    throw new Error(`Circular baseEntity/baseRelation chain detected: ${path.join(' -> ')}. Filtered entity/relation base chains must be acyclic.`)
+                }
+                visited.add(current)
+                current = current.baseEntity || current.baseRelation
+            }
+        }
     }
 
     buildMap() {
         // -1. 校验所有 entity/relation 的 name（name 会直接进入 SQL，必须先于一切处理）
         this.validateRecordNames();
+
+        // -0.5. 校验 baseEntity/baseRelation 链无环（循环链会让后续解析死循环直至 OOM）
+        this.validateBaseChains();
 
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();

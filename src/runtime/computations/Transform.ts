@@ -79,6 +79,12 @@ export class RecordsTransformHandle implements DataBasedComputation {
         }
     }
     planIncremental(_event: EtityMutationEvent, _record: unknown, context: DataDepEventContext): IncrementalPlan {
+        // CAUTION context.skip 是一等契约（与内置聚合的 defaultDataBasedIncrementalPlan 对齐）：
+        //  Transform 当前的 dataDep 不带 match，skip 实际不会出现，但未来扩展 match 支持时
+        //  漏掉它意味着为不属于依赖集合的记录静默产出派生行。
+        if (context.skip) {
+            return { type: 'skip', reason: context.reason || 'data dependency event does not affect Transform' }
+        }
         if (context.requiresFullRecompute) {
             return { type: 'fullRecompute', reason: context.reason || 'Transform source requires full recompute' }
         }

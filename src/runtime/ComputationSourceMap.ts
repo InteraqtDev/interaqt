@@ -339,6 +339,24 @@ export class ComputationSourceMapManager {
                     }
                 )
             }
+            // CAUTION fail fast：property 依赖的 attributeQuery 显式包含计算自身的输出属性时，
+            //  每次写出都会触发自身重算（写→事件→重算→写），不收敛的计算将无界递归。
+            //  「依赖上一轮自身值」应使用 useLastValue / bound state，而不是读自身输出列。
+            const outputPropertyName = dataContext.id.name
+            const referencesOwnOutput = dataDep.attributeQuery.some(item =>
+                (typeof item === 'string' && item === outputPropertyName) ||
+                (Array.isArray(item) && item[0] === outputPropertyName)
+            )
+            if (referencesOwnOutput) {
+                throw new ComputationProtocolError(
+                    `Property dataDep "${dataDepName}" of computation on "${dataContext.host.name}.${outputPropertyName}" must not include the computation's own output property "${outputPropertyName}" in its attributeQuery. Every write of the output would re-trigger the computation (unbounded recursion for non-converging compute). Use useLastValue or a bound state to read the previous value instead.`,
+                    {
+                        handleName: computation.constructor.name,
+                        dataContext: computation.dataContext,
+                        computationPhase: 'source-map-initialization'
+                    }
+                )
+            }
             // 注意这里的 recordName 应该是当前数据 entity 的 name，因为依赖的是 property 所在的自身 entity
             ERMutationEventsSource.push(...this.convertAttrsToERMutationEventsSourceMap(dataDep, dataContext.host.name!, dataDep.attributeQuery, [], computation, true))
         } else if (dataDep.type ==='global') {

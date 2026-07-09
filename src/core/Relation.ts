@@ -1,11 +1,13 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyInstance, decodeFunctionValues } from './utils.js';
+import { stringifyInstance, decodeFunctionValues, enforceDeclaredConstraints } from './utils.js';
 import { PropertyInstance, Property } from './Property.js';
 import { EntityInstance } from './Entity.js';
 import type { ComputationInstance } from './types.js';
 import type { ConstraintInstance } from './Constraint.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
+
+export const RELATION_TYPES = ['1:1', '1:n', 'n:1', 'n:n'] as const;
 
 export interface RelationInstance extends IInstance {
   name?: string;
@@ -290,9 +292,17 @@ export class Relation implements RelationInstance {
     if (args.targetProperty !== undefined && !validNameFormatExp.test(args.targetProperty)) {
       throw new Error(`Relation targetProperty "${args.targetProperty}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
     }
+    // 强制执行 type 白名单：基数字符串直接决定表结构与合并策略，
+    // 非法值（如 '2:3'）不会报错但查询会静默返回空关联数据。
+    if (args.type !== undefined && !RELATION_TYPES.includes(args.type as typeof RELATION_TYPES[number])) {
+      throw new Error(`Relation type "${args.type}" is invalid. Relation type must be one of ${RELATION_TYPES.map(t => `'${t}'`).join(', ')}.`);
+    }
 
     const instance = new Relation(args, options);
-    
+
+    // 执行 public 里声明的约束（eachNameUnique / mergedRelationNoProperties 等）。
+    enforceDeclaredConstraints(this, instance);
+
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {

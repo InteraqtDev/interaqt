@@ -194,7 +194,11 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
 
 
         let delta = 0;
-        const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
+        const relatedMutationEvent = mutationEvent.relatedMutationEvent;
+        // 与 Summation/Average 保持一致：缺失 related 事件时退回全量重算而不是裸解引用崩溃。
+        if (!relatedMutationEvent) {
+            return ComputationResult.fullRecompute(`No related mutation event for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+        }
 
         if (relatedMutationEvent.type === 'create' && relatedMutationEvent.recordName === this.relation.name!) {
             // 关联关系的新建
@@ -219,7 +223,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
             // CAUTION delete 事件可能只是 filtered relation 的成员资格退出（行仍存在），必须复位绑定状态，
             //  否则关系再次进入时 replace 读到陈旧值导致增量错误。物理删除场景 setInternal 会安全忽略。
             await this.state!.itemResult.setInternal(relatedMutationEvent.record, 0);
-        } else if (relatedMutationEvent.type === 'update') {
+        } else if (relatedMutationEvent.type === 'update' && (relatedMutationEvent.recordName === this.relation.name! || relatedMutationEvent.recordName === this.relatedRecordName)) {
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。
             const relationMatchKey = buildRelationSideMatchKey(mutationEvent.relatedAttribute, this.isSource ? 'target' : 'source')
