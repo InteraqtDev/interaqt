@@ -6,7 +6,7 @@
 - 方法：与 r1–r10 报告**逐条去重** → 对每个致命/重要候选**编写最小复现测试实际运行**（PGLiteDB/SQLiteDB）。只有「已运行复现确认」的问题列为致命/重要；证伪或重新归类的候选明确记录（见第五节）。
 - 基线健康度：`npm run check` 通过；`npm test` 全量 1795 passed / 26 skipped。
 
-> **维护说明（2026-07-09）**：本报告的致命项与重要项已在同分支（`cursor/deep-code-review-r11-5327`）全部修复。回归测试：`tests/runtime/review-fixes-2026-07-09-r11.spec.ts`（10 用例）+ `tests/runtime/review-fixes-2026-07-09-r11-serialization.spec.ts`（1 用例）+ `tests/storage/review-fixes-2026-07-09-r11.spec.ts`（6 用例）。顺带修正 2 处被新 fail-fast 暴露的既有测试（`queryDataInteraction.spec.ts` 的 data-on-non-get 用例改为断言声明期错误；`review-fixes-2026-07.spec.ts` 的 RealTime 守卫用例补占位 dataDep）。
+> **维护说明（2026-07-09）**：本报告的致命项与重要项已在同分支（`cursor/deep-code-review-r11-5327`）全部修复。回归测试：`tests/runtime/review-fixes-2026-07-09-r11.spec.ts`（10 用例）+ `tests/runtime/review-fixes-2026-07-09-r11-serialization.spec.ts`（1 用例）+ `tests/storage/review-fixes-2026-07-09-r11.spec.ts`（6 用例）。修复后 `npm run check` 通过；`npm test` 全量 **1812 passed / 26 skipped**。顺带修正 4 处被新 fail-fast 暴露的既有测试反模式（`queryDataInteraction.spec.ts` / `core-domain-refactored.spec.ts` / `ignorePermission.spec.ts` / `computationEdgeCases.spec.ts` 均在非 get action 上声明 data——此前静默失效，现改为 get action 或删除死配置并断言声明期错误）。另按 I-1 在知识库 `generator/api-reference.md` 补充 `storage.listen` 事务语义（事务内、pre-commit）与 `RecordMutationSideEffect`（post-commit）的契约分工。
 
 ---
 
@@ -90,12 +90,12 @@ stringifyAllInstances → clearAllInstances → createInstances
 - 复现：两个同名 Interaction（不同守卫链）注册进同一 Controller → `findEventSourceByName` 只命中最后注册者，先注册者的 guard/权限链从此不可达，零告警。Activity 名重复（`ActivityManager` L79）与 entity/relation 名重复（`Setup.ts`）早有 fail-fast，eventSource 是最后一个无守卫的注册表。
 - 修复：构造期对「不同实例、相同名字」抛错；同一实例重复注册保持合法。Activity 内的 interaction 以 `activity:interaction` 作用域名注册，不受影响。
 
-### R-2 零触发的 RealTime 计算：声明合法、callback 永不执行、property 形态静默持久化 0
+### R-2 零触发的 property RealTime：声明合法、callback 永不执行、每次 create 静默持久化 0
 
-- 位置：`src/runtime/computations/RealTime.ts`——property 形态无 `attributeQuery` 且无 `dataDeps` 时 `dataDeps={}`，注册不出任何监听；`getInitialValue()` 返回 0 被宿主 create 监听持久化。global 形态同理（值永远停在 null）。
+- 位置：`src/runtime/computations/RealTime.ts`——property 形态无 `attributeQuery` 且无 `dataDeps` 时 `dataDeps={}`，注册不出任何监听；`getInitialValue()` 返回 0 被宿主 create 监听持久化。
 - 复现：纯时间驱动的 property RealTime（只有 `nextRecomputeTime` + `callback`）→ 实测 `callbackRuns === 0`、`liveSeconds === 0` 永不变化。
-- 背景：时间驱动的重算调度器尚未实现（r3 R-5 遗留，`nextRecomputeTime` 只被记录、无消费方）——纯时间驱动形态是「声明合法、永不可用」的死配置，且 property 形态还主动写入误导性的 0。
-- 修复：两个 handle 构造期 fail-fast，错误信息明确说明「时间调度未实现，需声明 attributeQuery/dataDeps」。调度器落地后此校验应放宽。
+- 背景：时间驱动的重算调度器尚未实现（r3 R-5 遗留，`nextRecomputeTime` 只被记录、无消费方）——纯时间驱动的 property 形态是「声明合法、永不可用」的死配置，且每个新记录都被主动写入误导性的 0。
+- 修复：property handle 构造期 fail-fast，错误信息明确说明「时间调度未实现，需声明 attributeQuery/dataDeps」。**global 形态保持合法**：migration rebuild 是 global computation 的合法触发路径（`migration.spec.ts` 的 RealTime 迁移用例依赖零 dataDeps 的 global RealTime 在迁移期全量重算），且 global 形态不会写入误导性初值（保持 null）。调度器落地后 property 校验应放宽。
 
 ### R-3 操作符大小写：`['LIKE', ...]` 落入内部 assert
 
@@ -156,5 +156,5 @@ stringifyAllInstances → clearAllInstances → createInstances
 - F-2：collection 属性 `['in', [['alpha','beta']]]` → PGLite/SQLite 均应正确命中快照；`not in` 排除且 NULL 行不参与；空数组恒 false/true。
 - F-3：`Action.create({name:'get'})` + data → dispatch 应返回数据；data 挂非 get action → 声明期错误；round-trip 后 `resolve` 应存在。
 - R-1：两个同名 eventSource → Controller 构造期抛 `Duplicate eventSource name`。
-- R-2：无 attributeQuery/dataDeps 的 RealTime（property/global）→ 构造期错误。
+- R-2：无 attributeQuery/dataDeps 的 property RealTime → 构造期错误；同形态 global RealTime 保持合法。
 - R-3/R-4：`['LIKE','%x%']` 应正常命中；`['between', 25]` 应抛 two-element array 错误。
