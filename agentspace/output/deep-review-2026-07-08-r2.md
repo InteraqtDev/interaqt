@@ -1,5 +1,25 @@
 # 全代码库深度 Review 报告（2026-07-08 第二轮）
 
+> **维护说明（2026-07-09 更新）**：本报告发现的问题已在同分支（`cursor/deep-code-review-r2-d1f4`）修复：
+>
+> - **致命 F-1 ~ F-4 全部修复**，回归测试见 `tests/runtime/review-fixes-2026-07-08-r2.spec.ts`（12 个用例，覆盖附录中的全部复现场景）。
+>   - F-1：`getFilteredRecordChanges` 统一识别「新增 + 谓词变更」的 filtered 记录；`recomputeFilteredMemberships` 按新旧谓词做成员资格 diff（进入 create / 退出 delete）；变更的 filtered 上下文进入 rebuild 种子；diff 中新增 `filtered-predicate-changed` review item（含新旧谓词摘要）。
+>   - F-2：source-map 编译对无 `attributeQuery` 的 property dataDep 在 setup 阶段抛 `ComputationProtocolError`；`PropertyRealTimeComputation` 仅在声明了 attributeQuery 时注入 `_current` 依赖（纯时间驱动场景不受影响）。
+>   - F-3：storage 的 update 事件携带 `keys`（本次实际写入的属性名，含联动重算的 computed 属性）；`TransitionFinder` 对 `trigger.keys` 采用子集匹配语义。
+>   - F-4：`mergeRecords` 对自引用（source === target）的 1:1 reliance 跳过三表合一、退化为只合并关系表；`RecordInfo.sameTableReliance/differentTableReliance` 改用 `isMergedWithParent()`（合行）判断而非表名相等。
+> - **重要 R-1 ~ R-5、R-7、R-8 已修复**：
+>   - R-1：`completeInteractionState` 改用 `storage.atomic.compareAndSet`（单条条件 UPDATE，锁等待后重评估 WHERE）推进 `stateVersion`，`saveUserRefs` 处于同一事务、随败者一起回滚。
+>   - R-2：`handleAsyncReturn` 在 isLatest 判定前对同 `freshnessKey` 的全部 task 行取行锁（`lockRows` 改为按 id 有序取锁避免死锁），消除 check-then-apply 窗口。
+>   - R-3：MySQL `open()` 用独立 bootstrap 连接建库并关闭，工作连接始终显式带 `database`。
+>   - R-4：同一 current 状态多条 transfer 命中同一事件且指向不同 next 时抛出明确的歧义错误。
+>   - R-5：SQLite `update()` 带 idField 时用 `.all()` 返回 RETURNING 行，对齐 PG/PGLite 契约。
+>   - R-7：`BoolExp.or`（实例方法与静态方法）统一走 `standardizeData`；and/or 缺 right 操作数时抛出明确错误而非 TypeError。
+>   - R-8：函数型 bound-state `defaultValue` 以函数文本哈希进入 `stateSignature`。
+> - **已完成的改进项**：I-1/I-2（Summation/Average/WeightedSummation/Count property 分支补 fullRecompute 兜底与 findOne null 守卫）、I-3（增量-only 计算触发 planned full recompute 时的错误消息说明成因与出路）、I-4（RealTime `solve()` 抛错时回退 nextRecomputeTime 或给出明确错误）、I-18（清理两个 count spec 的过期 BUG 注释）。
+> - **明确遗留（建议独立 PR）**：R-6/I-15（四驱动类型映射统一 + Property.type 白名单，属行为变更需单独评审）、I-5（级联深度上限）、I-6（async task 清理）、I-7~I-11（合表事件完整性，依赖 mergeLinks 去留决策）、I-12/I-13（migration dry-run read handle 与锁租约）、I-14/I-16/I-17。
+>
+> 修复后全量测试 1693 passed / 26 skipped；`npm run check` 与 `check:all` 通过。下文正文保留 review 时的原始判定，作为问题背景与复现依据。
+
 - 日期：2026-07-08
 - 基线：`main` @ `3ff3ccd2`（PR #17 合入之后，v1.7.0-alpha.0 + 前两轮 review 修复）
 - 范围：`src/core`、`src/runtime`（含 computations、migration）、`src/storage`、`src/builtins`、`src/drivers` 全量
