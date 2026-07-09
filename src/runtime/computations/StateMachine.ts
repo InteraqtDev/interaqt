@@ -1,4 +1,4 @@
-import { StateMachine, StateMachineInstance, StateNode, StateNodeInstance } from "@core";
+import { BoolExp, StateMachine, StateMachineInstance, StateNode, StateNodeInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { DataContext, PropertyDataContext } from "./Computation.js";
@@ -74,6 +74,56 @@ type SourceTargetPair = [EntityIdRef, EntityIdRef][]
 type ComputeRelationTargetResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef} | undefined
 type EntityTargetResult = EntityIdRef|EntityIdRef[]|undefined
 type ComputeSourceResult = ComputeRelationTargetResult| EntityTargetResult
+
+/**
+ * 归一化 computeTarget 的返回值为 `{id}[]`。
+ * 支持的形态：`{id}`、`{id}[]`、`undefined/null`（skip）；
+ * 宿主为 relation 时额外支持按端点定位：`{source, target}`（source/target 为 `{id}` 或 `{id}[]`，取笛卡尔积）
+ * 与 `[[source, target], ...]` 数组对形式——这两种形态会查询 relation 记录并解析为 `{id}[]`。
+ * 其他无法识别的形态一律 fail-fast：静默 skip 会让转移无声失效，极难排查。
+ */
+async function normalizeComputeTargetResult(
+    controller: Controller,
+    result: ComputeSourceResult,
+    dataContext: PropertyDataContext,
+    describeTransfer: () => string
+): Promise<EntityIdRef[]> {
+    if (result === undefined || result === null) return []
+    const items = Array.isArray(result) ? result : [result]
+    const hostIsRelation = controller.relations.some(r => r.name === dataContext.host.name)
+    const normalized: EntityIdRef[] = []
+    for (const item of items) {
+        if (item === undefined || item === null) continue
+        if (Array.isArray(item) || (typeof item === 'object' && 'source' in item && 'target' in item && !('id' in item))) {
+            // 端点形态：[source, target] 数组对，或 {source, target} 对象
+            if (!hostIsRelation) {
+                throw new ComputationProtocolError(
+                    `StateMachine computation of property "${dataContext.host.name}.${dataContext.id.name}" ${describeTransfer()}: computeTarget returned a {source, target} endpoint form, but the host is not a relation. Return {id} (or an array of {id}) identifying the ${dataContext.host.name} record(s) to transition.`,
+                    { handleName: 'StateMachine', computationPhase: 'compute-dirty-records' }
+                )
+            }
+            const sources = Array.isArray(item) ? [item[0]].flat() : [item.source].flat()
+            const targets = Array.isArray(item) ? [item[1]].flat() : [item.target].flat()
+            for (const source of sources) {
+                for (const target of targets) {
+                    if (!source?.id || !target?.id) continue
+                    const match = BoolExp.atom({ key: 'source.id', value: ['=', source.id] })
+                        .and({ key: 'target.id', value: ['=', target.id] })
+                    const relationRecords = await controller.system.storage.find(dataContext.host.name!, match, undefined, ['id'])
+                    normalized.push(...relationRecords)
+                }
+            }
+        } else if (typeof item === 'object' && (item as EntityIdRef).id !== undefined) {
+            normalized.push(item as EntityIdRef)
+        } else {
+            throw new ComputationProtocolError(
+                `StateMachine computation of property "${dataContext.host.name}.${dataContext.id.name}" ${describeTransfer()}: computeTarget returned an unrecognized value ${JSON.stringify(item)}. Supported forms: {id}, {id}[], undefined${hostIsRelation ? ', {source, target}, [[source, target], ...]' : ''}.`,
+                { handleName: 'StateMachine', computationPhase: 'compute-dirty-records' }
+            )
+        }
+    }
+    return normalized
+}
 
 export class GlobalStateMachineHandle implements EventBasedComputation {
     static computationType = StateMachine
@@ -179,10 +229,16 @@ Or if you want to use state name as value, you should not set ${this.dataContext
     async computeDirtyRecords(mutationEvent: RecordMutationEvent) {
         // Now directly use mutationEvent for matching
         const transfers = this.transitionFinder.findTransfers(mutationEvent)
-        // CAUTION 不能返回有 null 的节点，所以加上 filter。
-        const allRecords = (await Promise.all(transfers.map(transfer => {
-            return transfer.computeTarget!.call(this.controller, mutationEvent)
-        }))).flat().filter(Boolean)
+        // CAUTION computeTarget 的返回形态必须归一化为 {id}[]：
+        //  {source, target} / [[source, target]] 端点形态（relation 宿主）需要解析成 relation 记录，
+        //  直接 .flat() 会把整个对象保留下来（record.id === undefined），lock 失败后静默 skip——转移无声失效。
+        const allRecords = (await Promise.all(transfers.map(async transfer => {
+            const raw = await transfer.computeTarget!.call(this.controller, mutationEvent) as ComputeSourceResult
+            return normalizeComputeTargetResult(
+                this.controller, raw, this.dataContext,
+                () => `(transfer "${transfer.current.name}" -> "${transfer.next.name}", trigger: ${transfer.trigger.recordName} ${transfer.trigger.type})`
+            )
+        }))).flat()
         
         // 按 id 去重，确保每个 record 在同一个事件周期内只被处理一次。
         // 这是为了防止当多个 transfers 有相同的 trigger 但不同的 current state 时，
