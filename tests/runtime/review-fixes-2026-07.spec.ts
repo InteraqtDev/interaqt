@@ -125,6 +125,8 @@ describe('R-1: RealTime guards', () => {
         const realTimeArgs = RealTime.create({
             callback: (async (now: Expression) => now.add(1)) as any,
             // 故意不声明 nextRecomputeTime
+            // r11: 零 dataDeps 的 RealTime 现在在构造期 fail-fast，这里给一个占位依赖
+            dataDeps: { trigger: { type: 'global', source: { name: 'r1RealTimeTrigger' } } } as any,
         })
         const handle = new GlobalRealTimeComputation(
             {} as any,

@@ -21,6 +21,7 @@ import {
     EntityCreateEventsSourceMap
 } from "./ComputationSourceMap.js";
 import { createScopedSequenceSignatures, scopedSequenceComputationId } from "./scopedSequenceManifest.js";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export { EtityMutationEvent };
 
@@ -384,32 +385,57 @@ export class Scheduler {
     }
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
+    // CAUTION 计算传播的重入守卫。计算的写回（applyResult/applyResultPatch）会在同一事务内
+    //  立即重入 mutation listener，触发下游计算——这是反应式语义的主干。但循环依赖的声明
+    //  （互相派生的 Transform、dataDeps 引用自身输出的 dict 等）会让这条链永不收敛：
+    //  Transform 环每一跳都创建新记录（无限增长），dict 环每一跳都改写值（无限重算），
+    //  表现为 dispatch/setup 无任何报错地挂起或栈溢出。这里用 AsyncLocalStorage 记录
+    //  传播深度（并发事务互不串扰），超限时抛出带传播轨迹的受控错误。
+    //  上限对合法的深计算链（实践中通常 < 10 跳）留了充足余量。
+    static MAX_COMPUTATION_PROPAGATION_DEPTH = 100
+    private propagationContext = new AsyncLocalStorage<{ depth: number, trail: string[] }>()
     private buildComputationMutationListener(): RecordMutationCallback {
         this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
         return (async (mutationEvents) => {
-            for(let mutationEvent of mutationEvents){
-                const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
-                if (sources.length > 0) {
-                    for(const source of sources) {
-                        if(!this.sourceMapManager.shouldTriggerUpdateComputation(source, mutationEvent)) {
-                            continue
+            const parent = this.propagationContext.getStore()
+            const depth = (parent?.depth ?? 0) + 1
+            if (depth > Scheduler.MAX_COMPUTATION_PROPAGATION_DEPTH) {
+                const trailTail = (parent?.trail ?? []).slice(-10).join(' -> ')
+                throw new SchedulerError(
+                    `Computation propagation exceeded the maximum depth of ${Scheduler.MAX_COMPUTATION_PROPAGATION_DEPTH}. ` +
+                    `This almost always means circular computation dependencies (e.g. two Transforms deriving records from each other, ` +
+                    `or a computation whose dataDeps include its own output). Recent propagation trail: ${trailTail}`,
+                    { schedulingPhase: 'computation-propagation-depth-guard' }
+                )
+            }
+            const trail = parent?.trail ?? []
+            await this.propagationContext.run({ depth, trail }, async () => {
+                for(let mutationEvent of mutationEvents){
+                    const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
+                    if (sources.length > 0) {
+                        for(const source of sources) {
+                            if(!this.sourceMapManager.shouldTriggerUpdateComputation(source, mutationEvent)) {
+                                continue
+                            }
+                            // 对于 EventBasedComputation，进行深度匹配检查
+                            if (!('dataDep' in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
+                                continue
+                            }
+                            // filtered 源的 update 监听挂在物理 base 名上（见 ComputationSourceMap），
+                            // 路由前做成员资格守卫并把事件名改写回 filtered 名。
+                            const routedEvent = await this.resolveFilteredUpdateEvent(source, mutationEvent, mutationEvents)
+                            if (!routedEvent) {
+                                continue
+                            }
+                            trail.push(this.getComputationName(source.computation))
+                            if (trail.length > 32) trail.splice(0, trail.length - 32)
+                            await this.runDirtyRecordsComputation(source, routedEvent)
                         }
-                        // 对于 EventBasedComputation，进行深度匹配检查
-                        if (!('dataDep' in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
-                            continue
-                        }
-                        // filtered 源的 update 监听挂在物理 base 名上（见 ComputationSourceMap），
-                        // 路由前做成员资格守卫并把事件名改写回 filtered 名。
-                        const routedEvent = await this.resolveFilteredUpdateEvent(source, mutationEvent, mutationEvents)
-                        if (!routedEvent) {
-                            continue
-                        }
-                        await this.runDirtyRecordsComputation(source, routedEvent)
                     }
                 }
-            }
+            })
         })
     }
     /**

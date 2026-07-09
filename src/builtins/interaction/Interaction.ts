@@ -156,6 +156,16 @@ export class Interaction implements InteractionInstance {
     if (Attributives.is(args.userAttributives) && !args.userAttributives.content) {
       throw new Error(`Interaction "${args.name}" declares userAttributives with an Attributives instance that has no content. Provide content (an Attributive BoolExp), or omit the userAttributives field.`);
     }
+    // CAUTION 查询语义按 action 的 name（'get'）识别，不能按 GetAction 单例的引用同一性识别：
+    //  序列化 round-trip（createInstances 会重建 uuid 相同但对象不同的 Action 实例）和用户自建的
+    //  Action.create({ name: 'get' }) 都会让 `===` 判定失败——声明看起来是查询交互，
+    //  dispatch 却静默返回 data: undefined。
+    const isGetAction = args.action?.name === GetAction.name;
+    // fail-fast：data/dataPolicy 只在 get 语义下被消费。挂在非 get action 上是合法声明、
+    //  永不生效的死配置（dispatch 成功但永远不返回数据），必须在声明期拒绝。
+    if (!isGetAction && (args.data !== undefined || args.dataPolicy !== undefined)) {
+      throw new Error(`Interaction "${args.name}" declares data/dataPolicy but its action "${args.action?.name}" is not the query action. Only interactions with GetAction (action name "get") retrieve data; remove data/dataPolicy or use GetAction.`);
+    }
 
     const instance = new Interaction(args, options);
     
@@ -169,7 +179,7 @@ export class Interaction implements InteractionInstance {
     instance.guard = buildInteractionGuard(instance);
     instance.mapEventData = buildInteractionMapEventData(instance);
 
-    if (args.action === GetAction) {
+    if (isGetAction) {
       instance.resolve = buildInteractionResolve(instance);
     }
     

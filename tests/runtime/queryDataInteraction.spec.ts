@@ -600,7 +600,7 @@ describe('Get Data Interaction', () => {
             ).rejects.toThrow()
         })
 
-        test('should return error when action is not GetAction', async () => {
+        test('should fail fast when data is declared on a non-get action', async () => {
             const User = Entity.create({
                 name: 'User',
                 properties: [
@@ -608,31 +608,13 @@ describe('Get Data Interaction', () => {
                 ]
             })
 
-            // Create interaction with wrong action type
-            const CreateUser = Interaction.create({
+            // r11: data/dataPolicy on a non-get action used to be silently ignored
+            // (dispatch succeeded but never returned data). It is now a declaration error.
+            expect(() => Interaction.create({
                 name: 'createUser',
                 action: Action.create({ name: 'create' }),  // Not GetAction
                 data: User
-            })
-
-            controller = new Controller({
-                system,
-                entities: [User],
-                eventSources: [CreateUser]
-            })
-            await controller.setup(true)
-
-            await system.storage.create('User', { name: 'Alice' })
-
-            const result = await controller.dispatch(CreateUser, {
-                user: { id: 'test-user' },
-                query: {
-                    attributeQuery: ['id', 'name']
-                }
-            })
-
-            // Should not return data since it's not a GetAction
-            expect(result.data).toBeUndefined()
+            })).toThrow(/declares data\/dataPolicy but its action "create" is not the query action/)
         })
     })
 

@@ -149,6 +149,22 @@ export class ComputationSourceMapManager {
 
                 const computationSources: EntityEventSourceMap[][] = [[], [], []]
                 Object.entries(computation.dataDeps).forEach(([dataDepName, dataDep]) => {
+                    // CAUTION fail fast：global 计算把自己的输出 dict 声明为 global dataDep 是无终止的
+                    //  反馈环——每次写回都触发自身重算，setup/dispatch 无任何报错地挂起。
+                    //  「依赖上一次的计算结果」应使用 useLastValue / state（GlobalBoundState），不是 dataDep。
+                    if (dataDep.type === 'global' && computation.dataContext.type === 'global' && dataDep.source === computation.dataContext.id) {
+                        throw new ComputationProtocolError(
+                            `Global dataDep "${dataDepName}" of the computation on dictionary "${(computation.dataContext.id as { name?: string }).name}" references the computation's own output. ` +
+                            `This creates an unterminated feedback loop (every write re-triggers the computation). ` +
+                            `To use the previous result, rely on lastValue (useLastValue) or a GlobalBoundState instead of a dataDep.`,
+                            {
+                                handleName: computation.constructor.name,
+                                computationName: computation.args.constructor.displayName,
+                                dataContext: computation.dataContext,
+                                computationPhase: 'source-map-initialization'
+                            }
+                        )
+                    }
                     const sources = this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)
                     computationSources[dataDep.phase || PHASE_NORMAL].push(...sources)
                 })

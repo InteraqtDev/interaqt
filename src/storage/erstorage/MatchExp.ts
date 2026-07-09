@@ -226,7 +226,9 @@ export class MatchExp {
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
         const lowerOp = typeof value[0] === 'string' ? value[0].toLowerCase() : value[0]
 
-        if (simpleOp.includes(value[0])) {
+        // CAUTION 操作符按小写归一识别（'LIKE' 与 'like' 等价，与 in/not in/between 的处理一致）。
+        //  否则大写写法落入末尾的 unknown-expression assert，抛出与用户写法脱节的内部错误。
+        if (simpleOp.includes(lowerOp)) {
             if (isReferenceValue) {
                 // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL，不使用占位符
                 const referenceField = this.getReferenceFieldValue(value[1])
@@ -283,8 +285,23 @@ export class MatchExp {
                 // 空数组的 IN 语义上恒为 false（任何值都不在空集合中）。
                 // `IN ()` 是非法 SQL，这里生成跨数据库合法且恒为 false 的表达式：
                 // `x IN (NULL)` 求值为 NULL，`NULL AND (1=0)` 为 false，且在外层 NOT 下取反后正确为 true。
-                fieldValue = `IN (NULL) AND 1=0`
+                // json 列不能参与 `= NULL` 比较（PG 系报 "operator does not exist"），
+                // 改用等价且不比较列值的恒 false 表达式。
+                fieldValue = fieldType?.toLowerCase() === 'json' ? `IS NOT NULL AND 1=0` : `IN (NULL) AND 1=0`
                 fieldParams = []
+            } else if (fieldType?.toLowerCase() === 'json') {
+                // CAUTION 与 =/!= 同理（见上）：json 列的写入路径统一 JSON.stringify，
+                //  IN/NOT IN 的元素参数不做同样的序列化会导致 PG 系裸报 "operator does not exist"、
+                //  SQLite 把数组元素展开成多余绑定参数直接崩溃。优先给驱动方言机会（PG 系 ::jsonb），
+                //  否则退化为与写入路径一致的序列化文本比较。
+                const dialectResult = db?.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this), p)
+                if (dialectResult) {
+                    fieldValue = dialectResult.fieldValue
+                    fieldParams = dialectResult.fieldParams || []
+                } else {
+                    fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
+                    fieldParams = value[1].map((item: unknown) => JSON.stringify(item))
+                }
             } else {
                 fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
                 fieldParams = value[1]
@@ -298,13 +315,26 @@ export class MatchExp {
             if (value[1].length === 0) {
                 // 空集合的 NOT IN 语义上恒为 true（任何值都不在空集合中）。
                 // 依赖 buildWhereClause 对原子加括号，保证 OR 不会泄漏到外层表达式。
-                fieldValue = `NOT IN (NULL) OR 1=1`
+                // json 列同上，避免 `NOT IN (NULL)` 触发 json 比较操作符。
+                fieldValue = fieldType?.toLowerCase() === 'json' ? `IS NULL OR 1=1` : `NOT IN (NULL) OR 1=1`
                 fieldParams = []
+            } else if (fieldType?.toLowerCase() === 'json') {
+                const dialectResult = db?.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this), p)
+                if (dialectResult) {
+                    fieldValue = dialectResult.fieldValue
+                    fieldParams = dialectResult.fieldParams || []
+                } else {
+                    fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`
+                    fieldParams = value[1].map((item: unknown) => JSON.stringify(item))
+                }
             } else {
                 fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`
                 fieldParams = value[1]
             }
         } else if (value[0].toLowerCase() === 'between') {
+            if (!Array.isArray(value[1]) || value[1].length !== 2) {
+                throw new Error(`match operator 'between' requires a two-element array value [min, max], got: ${JSON.stringify(value[1])} for key "${key}"`)
+            }
             if (isReferenceValue) {
                 // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL
                 const ref1 = this.getReferenceFieldValue(value[1][0])
