@@ -104,24 +104,33 @@ export class ComputationSourceMapManager {
                     })
                 }
 
+                const computationSources: EntityEventSourceMap[][] = [[], [], []]
                 Object.entries(computation.dataDeps).forEach(([dataDepName, dataDep]) => {
                     const sources = this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)
-                    sortedERMutationEventSources[dataDep.phase || PHASE_NORMAL].push(...sources)
+                    computationSources[dataDep.phase || PHASE_NORMAL].push(...sources)
                 })
 
-                // ERMutationEventSources.push(
-                //     ...Object.entries(computation.dataDeps).map(([dataDepName, dataDep]) => this.convertDataDepToERMutationEventsSourceMap(dataDepName, dataDep, computation)).flat()
-                // )
-
                 // 2. 监听自身 record 的 create 事件，可能一开始创建就要执行一遍 computation. 如果依赖了已有的 global dict。
+                // CAUTION 必须与业务 dataDeps 已注册的宿主 create 监听去重：
+                //  property dataDep 本身就会注册宿主 create（convertAttrsToERMutationEventsSourceMap includeCreate），
+                //  再叠加 _self 会让同一个 create 事件触发同一计算两次（昂贵计算/async 计算实打实双跑）。
                 if (computation.dataContext.type === 'property' && Object.values(computation.dataDeps).some(dataDep => dataDep.type === 'global')) {
-                    const selfDataDep: RecordsDataDep = {
-                        type: 'records',
-                        source: computation.dataContext.host,
+                    const hostName = computation.dataContext.host.name
+                    const alreadyListensHostCreate = computationSources.some(sources =>
+                        sources.some(source => source.type === 'create' && source.recordName === hostName)
+                    )
+                    if (!alreadyListensHostCreate) {
+                        const selfDataDep: RecordsDataDep = {
+                            type: 'records',
+                            source: computation.dataContext.host,
+                        }
+                        computationSources[PHASE_NORMAL].push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
                     }
-                    sortedERMutationEventSources[PHASE_NORMAL].push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
-                    // ERMutationEventSources.push(...this.convertDataDepToERMutationEventsSourceMap('_self', selfDataDep, computation, 'create'))
                 }
+
+                computationSources.forEach((sources, phase) => {
+                    sortedERMutationEventSources[phase].push(...sources)
+                })
             } else {
                 // const recordDataDep: RecordsDataDep = {
                 //     type: 'records',
