@@ -474,6 +474,21 @@ export async function checkPayload(controller: GuardController, interaction: Int
       }
     }
 
+    // 非 isRef 的实体/关系 payload 是「嵌入的新建数据」，不允许携带顶层 id：
+    // 带 id 会绕过 isRef 的存在性校验，让伪造的 { id: 真实id, ...假字段 } 作为事件事实持久化，
+    // 下游读取 event.payload.x.id 时会信任它。引用既有记录必须显式声明 isRef: true。
+    if (!payloadDef.isRef && baseRecordName) {
+      const items = (payloadDef.isCollection ? payloadItem : [payloadItem]) as Record<string, unknown>[];
+      for (const item of items) {
+        if (item && typeof item === 'object' && 'id' in item) {
+          throw new InteractionGuardError(
+            `Payload validation failed for field '${payloadDef.name}': embedded ${baseRecordName} data must not carry an 'id'. Declare the payload item with isRef: true to reference an existing record.`,
+            { type: `${payloadDef.name} embedded data must not carry id`, checkType: 'payload' }
+          );
+        }
+      }
+    }
+
     if (payloadDef.base) {
       const items = payloadDef.isCollection ? (payloadItem as unknown[]) : [payloadItem];
       for (const item of items) {

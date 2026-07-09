@@ -392,6 +392,62 @@ describe('r4 R-5: transaction retry re-runs with pristine dispatch args', () => 
   });
 });
 
+describe('r4 R-6: non-isRef entity payloads must not carry an id', () => {
+  async function setupPayloadInteraction() {
+    const Post = Entity.create({
+      name: 'PostR6',
+      properties: [Property.create({ name: 'title', type: 'string' })]
+    });
+    const { Action, Payload, PayloadItem } = await import('interaqt');
+    const CreatePost = Interaction.create({
+      name: 'CreatePostR6',
+      action: Action.create({ name: 'createPostR6' }),
+      payload: Payload.create({
+        items: [PayloadItem.create({ name: 'post', base: Post })]
+      })
+    });
+    const RefPost = Interaction.create({
+      name: 'RefPostR6',
+      action: Action.create({ name: 'refPostR6' }),
+      payload: Payload.create({
+        items: [PayloadItem.create({ name: 'post', base: Post, isRef: true })]
+      })
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Post], relations: [], eventSources: [CreatePost, RefPost] });
+    await controller.setup(true);
+    return { controller, system, CreatePost, RefPost };
+  }
+
+  test('embedded creation data with a spoofed id is rejected at guard', async () => {
+    const { controller, system, CreatePost } = await setupPayloadInteraction();
+    const real = await system.storage.create('PostR6', { title: 'real' });
+    const res: any = await controller.dispatch(CreatePost, {
+      user: { id: 'u1' },
+      payload: { post: { id: real.id, title: 'spoofed' } }
+    });
+    expect(res.error).toBeDefined();
+    expect(String((res.error as Error).message)).toContain("must not carry an 'id'");
+  });
+
+  test('embedded creation data without id passes; isRef references keep working', async () => {
+    const { controller, system, CreatePost, RefPost } = await setupPayloadInteraction();
+    const ok: any = await controller.dispatch(CreatePost, {
+      user: { id: 'u1' },
+      payload: { post: { title: 'fresh' } }
+    });
+    expect(ok.error).toBeUndefined();
+
+    const real = await system.storage.create('PostR6', { title: 'real' });
+    const refOk: any = await controller.dispatch(RefPost, {
+      user: { id: 'u1' },
+      payload: { post: { id: real.id } }
+    });
+    expect(refOk.error).toBeUndefined();
+  });
+});
+
 describe('r4 F-3: computation dependency cycles fail fast instead of recursing unboundedly', () => {
   test('property dataDep including its own output property is rejected at setup', async () => {
     const Item = Entity.create({
