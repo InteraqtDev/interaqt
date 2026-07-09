@@ -179,6 +179,111 @@ describe('r4 F-2: dataPolicy.attributeQuery is enforced', () => {
   });
 });
 
+describe('r4 F-3: computation dependency cycles fail fast instead of recursing unboundedly', () => {
+  test('property dataDep including its own output property is rejected at setup', async () => {
+    const Item = Entity.create({
+      name: 'ItemF3a',
+      properties: [
+        Property.create({ name: 'price', type: 'number' }),
+        Property.create({
+          name: 'score', type: 'number',
+          computation: Custom.create({
+            name: 'scoreCalcF3a',
+            dataDeps: { _current: { type: 'property', attributeQuery: ['price', 'score'] } },
+            compute: async function(deps: any) { return (deps._current?.score ?? 0) + 1; },
+            getDefaultValue: () => 0,
+          })
+        }),
+      ]
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Item], relations: [] });
+    await expect(controller.setup(true)).rejects.toThrow(/must not include the computation's own output property "score"/);
+  });
+
+  test('cross-property computation cycle is stopped by the cascade depth circuit breaker', async () => {
+    let calls = 0;
+    const Item = Entity.create({
+      name: 'ItemF3b',
+      properties: [
+        Property.create({ name: 'seed', type: 'number' }),
+        Property.create({
+          name: 'a', type: 'number',
+          computation: Custom.create({
+            name: 'aCalcF3b',
+            dataDeps: { _current: { type: 'property', attributeQuery: ['b'] } },
+            compute: async function(deps: any) { calls++; return (deps._current?.b ?? 0) + 1; },
+            getDefaultValue: () => 0,
+          })
+        }),
+        Property.create({
+          name: 'b', type: 'number',
+          computation: Custom.create({
+            name: 'bCalcF3b',
+            dataDeps: { _current: { type: 'property', attributeQuery: ['a'] } },
+            compute: async function(deps: any) { calls++; return (deps._current?.a ?? 0) + 1; },
+            getDefaultValue: () => 0,
+          })
+        }),
+      ]
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Item], relations: [] });
+    await controller.setup(true);
+
+    let error: any;
+    try {
+      await system.storage.create('ItemF3b', { seed: 1 });
+    } catch (e) { error = e; }
+    expect(error).toBeDefined();
+    expect(String(error.message)).toContain('Mutation cascade exceeded the maximum depth');
+    // bounded: the breaker fired instead of unbounded recursion
+    expect(calls).toBeLessThan(300);
+  }, 30000);
+
+  test('legal converging property computation chains still work', async () => {
+    const Item = Entity.create({
+      name: 'ItemF3c',
+      properties: [
+        Property.create({ name: 'price', type: 'number' }),
+        Property.create({
+          name: 'double', type: 'number',
+          computation: Custom.create({
+            name: 'doubleCalcF3c',
+            dataDeps: { _current: { type: 'property', attributeQuery: ['price'] } },
+            compute: async function(deps: any) { return (deps._current?.price ?? 0) * 2; },
+            getDefaultValue: () => 0,
+          })
+        }),
+        Property.create({
+          name: 'quadruple', type: 'number',
+          computation: Custom.create({
+            name: 'quadCalcF3c',
+            dataDeps: { _current: { type: 'property', attributeQuery: ['double'] } },
+            compute: async function(deps: any) { return (deps._current?.double ?? 0) * 2; },
+            getDefaultValue: () => 0,
+          })
+        }),
+      ]
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Item], relations: [] });
+    await controller.setup(true);
+    const r = await system.storage.create('ItemF3c', { price: 10 });
+    const row = await system.storage.findOne('ItemF3c', MatchExp.atom({ key: 'id', value: ['=', r.id] }), undefined, ['*']);
+    expect(row.double).toBe(20);
+    expect(row.quadruple).toBe(40);
+
+    await system.storage.update('ItemF3c', MatchExp.atom({ key: 'id', value: ['=', r.id] }), { price: 5 });
+    const updated = await system.storage.findOne('ItemF3c', MatchExp.atom({ key: 'id', value: ['=', r.id] }), undefined, ['*']);
+    expect(updated.double).toBe(10);
+    expect(updated.quadruple).toBe(20);
+  });
+});
+
 describe('r4 F-4: circular baseEntity chains are rejected at setup', () => {
   test('two filtered entities forming a base cycle fail fast with a clear error', async () => {
     const Base = Entity.create({

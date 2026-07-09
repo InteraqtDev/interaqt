@@ -61,7 +61,13 @@ function JSONParse(value: string) {
 type StorageTransactionContext = {
     depth: number
     isolation: TransactionIsolation
+    // mutation → 事件 → 计算 → mutation 的级联嵌套深度（见 callWithEvents 的熔断）。
+    mutationCascadeDepth?: number
 }
+
+// mutation 级联深度熔断：计算依赖图存在环（例如两个 property 计算互相依赖）时，
+// 事件级联会无界递归直至栈溢出/OOM。合法业务的派生链远达不到该深度。
+export const MAX_MUTATION_CASCADE_DEPTH = 100
 
 class MonoStorage implements Storage{
     public map!: DBSetup["map"]
@@ -1158,7 +1164,25 @@ RETURNING "lastValue" AS value`,
             // 但仍然会推入调用方提供的 events 数组。
             const dispatchableEvents = shouldDispatch ? methodEvents.filter(shouldDispatch) : methodEvents
             // CAUTION 特别注意这里会空充 events
-            const  newEvents = await this.dispatch(dispatchableEvents)
+            // 级联深度熔断：listener（计算）在处理事件时写数据会递归进入 callWithEvents。
+            // 依赖图存在环（例如计算读自身输出、两个计算互相依赖）时递归无界，
+            // 必须以明确错误熔断，而不是栈溢出/事务超时。
+            const transactionContext = this.getActiveTransactionContext()
+            let newEvents: RecordMutationEvent[]
+            if (transactionContext && dispatchableEvents.length > 0) {
+                const cascadeDepth = (transactionContext.mutationCascadeDepth ?? 0) + 1
+                if (cascadeDepth > MAX_MUTATION_CASCADE_DEPTH) {
+                    throw new Error(`Mutation cascade exceeded the maximum depth of ${MAX_MUTATION_CASCADE_DEPTH}. This almost always means the reactive computation graph contains a cycle (e.g. a computation whose dataDeps include its own output, or two computations depending on each other). Triggering events: ${dispatchableEvents.map(e => `${e.type} ${e.recordName}`).join(', ')}`)
+                }
+                transactionContext.mutationCascadeDepth = cascadeDepth
+                try {
+                    newEvents = await this.dispatch(dispatchableEvents)
+                } finally {
+                    transactionContext.mutationCascadeDepth = cascadeDepth - 1
+                }
+            } else {
+                newEvents = await this.dispatch(dispatchableEvents)
+            }
             events.push(...methodEvents, ...newEvents)
             
             // Also add to async context if available
