@@ -3,19 +3,40 @@ import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mys
 
 class IDSystem {
     constructor(public db: Database) {}
-    setup() {
-        return this.db.scheme(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
-    }
-    async getAutoId(recordName: string) {
-        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM "_IDS_" WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
-        const newId = (lastId || 0) +1
-        const name =`set last id for ${recordName}: ${newId}`
-        if (lastId === undefined) {
-            await this.db.scheme(`INSERT INTO "_IDS_" (name, last) VALUES ('${recordName}', ${newId})`, name)
-        } else {
-            await this.db.update(`UPDATE "_IDS_" SET last = ? WHERE name = ?`, [newId, recordName], undefined, name)
+    async setup() {
+        // name 必须有唯一约束（原子 UPSERT 依赖它）；MySQL 的 TEXT 不能做主键，用定长 VARCHAR。
+        await this.db.scheme(`CREATE Table IF NOT EXISTS "_IDS_" (last INTEGER, name VARCHAR(191), PRIMARY KEY (name))`)
+        // 兼容旧版建出的无约束 _IDS_ 表：检测到缺主键时补齐。
+        const primaryKey = await this.db.query<{ cnt: number }>(
+            `SELECT COUNT(1) AS cnt FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '_IDS_' AND index_name = 'PRIMARY'`,
+            [],
+            'check _IDS_ primary key'
+        )
+        if (!primaryKey[0]?.cnt) {
+            await this.db.scheme(`ALTER TABLE "_IDS_" MODIFY name VARCHAR(191), ADD PRIMARY KEY (name)`)
         }
-        return newId as unknown as string
+    }
+    // CAUTION LAST_INSERT_ID() 是会话级的，而「UPSERT + SELECT」是两条语句：同一连接上并发的
+    //  getAutoId 交错执行会让两次 SELECT 读到同一个值（实测复现）。用本地分配链把两条语句
+    //  串成不可交错的对；跨连接/跨进程由 UPSERT 的原子性 + 会话隔离保证。
+    private allocating: Promise<unknown> = Promise.resolve()
+    async getAutoId(recordName: string) {
+        const allocation = this.allocating.then(async () => {
+            // 原子 UPSERT：此前的「SELECT 再 INSERT/UPDATE」读-改-写在并发下会分配重复 id；
+            //  recordName 一律走参数绑定。LAST_INSERT_ID(expr) 是 MySQL 的会话级取值惯用法：
+            //  插入分支把会话值置为 1，冲突分支置为 last+1。
+            await this.db.update(
+                `INSERT INTO "_IDS_" (name, last) VALUES (?, LAST_INSERT_ID(1))
+ON DUPLICATE KEY UPDATE last = LAST_INSERT_ID(last + 1)`,
+                [recordName],
+                undefined,
+                `allocate next id for ${recordName}`
+            )
+            const rows = await this.db.query<{ id: number }>(`SELECT LAST_INSERT_ID() AS id`, [], `read allocated id for ${recordName}`)
+            return rows[0].id as unknown as string
+        })
+        this.allocating = allocation.catch(() => {})
+        return allocation
     }
 }
 
@@ -57,12 +78,15 @@ export class MysqlDB implements Database{
         })
         await bootstrapConnection.connect()
         try {
-            const [rows] = await bootstrapConnection.query(`SHOW DATABASES LIKE '${this.database}'`)
+            // CAUTION 库名不能字符串拼接进 SQL：LIKE 走参数绑定，标识符用反引号转义
+            //  （bootstrap 连接尚未 SET ANSI_QUOTES，双引号不可用）。
+            const quotedDatabase = `\`${this.database.replace(/`/g, '``')}\``
+            const [rows] = await bootstrapConnection.query(`SHOW DATABASES LIKE ?`, [this.database])
             if ((rows as RowDataPacket[]).length === 0) {
-                await bootstrapConnection.query(`CREATE DATABASE ${this.database}`)
+                await bootstrapConnection.query(`CREATE DATABASE ${quotedDatabase}`)
             } else if (forceDrop) {
-                await bootstrapConnection.query(`DROP DATABASE ${this.database}`)
-                await bootstrapConnection.query(`CREATE DATABASE ${this.database}`)
+                await bootstrapConnection.query(`DROP DATABASE ${quotedDatabase}`)
+                await bootstrapConnection.query(`CREATE DATABASE ${quotedDatabase}`)
             }
         } finally {
             await bootstrapConnection.end()

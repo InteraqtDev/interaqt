@@ -5,19 +5,22 @@ import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionCont
 
 class IDSystem {
     constructor(public db: Database) {}
-    setup() {
-        return this.db.scheme(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
+    async setup() {
+        await this.db.scheme(`CREATE Table IF NOT EXISTS _IDS_ (last INTEGER, name TEXT)`)
+        // 原子 UPSERT 依赖 name 上的唯一索引；IF NOT EXISTS 同时兼容旧版建出的无约束 _IDS_ 表。
+        await this.db.scheme(`CREATE UNIQUE INDEX IF NOT EXISTS "_IDS__name_unique" ON _IDS_ (name)`)
     }
     async getAutoId(recordName: string) {
-        const lastId =  (await this.db.query<{last: number}>( `SELECT last FROM _IDS_ WHERE name = '${recordName}'`, [], `finding last id of ${recordName}` ))[0]?.last
-        const newId = (lastId || 0) +1
-        const name =`set last id for ${recordName}: ${newId}`
-        if (lastId === undefined) {
-            await this.db.scheme(`INSERT INTO _IDS_ (name, last) VALUES ('${recordName}', ${newId})`, name)
-        } else {
-            await this.db.update(`UPDATE _IDS_ SET last = ? WHERE name = ?`, [newId, recordName], undefined, name)
-        }
-        return newId as unknown as string
+        // CAUTION 原子 UPSERT：此前的「SELECT 再 INSERT/UPDATE」读-改-写在并发下会分配重复 id；
+        //  recordName 一律走参数绑定（与 PostgreSQL 驱动的参数化路径一致）。
+        const rows = await this.db.query<{ last: number }>(
+            `INSERT INTO _IDS_ (name, last) VALUES (?, 1)
+ON CONFLICT(name) DO UPDATE SET last = last + 1
+RETURNING last`,
+            [recordName],
+            `allocate next id for ${recordName}`
+        )
+        return rows[0].last as unknown as string
     }
 }
 
@@ -191,6 +194,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         } else if (type === 'boolean') {
             return 'INT(2)'
         } else if(type === 'number'){
+            // CAUTION SQLite 是动态类型（type affinity）：INT 亲和的列写入 2.5 仍原样存为 REAL，
+            //  不会像 PG/MySQL 的 INT 那样报错或截断，所以 number 在 SQLite 上没有精度问题。
+            //  保持 INT 声明是为了既有部署的 schema/manifest 兼容（改声明会触发迁移 diff）。
             return "INT"
         }else if(type === 'timestamp'){
             return "INT"
