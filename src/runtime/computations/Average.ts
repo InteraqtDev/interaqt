@@ -264,7 +264,10 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 undefined, 
                 this.relationAttributeQuery
             );
-
+            // 关系记录在事件与增量计算之间可能已被删除（级联/竞态），退回全量重算而不是裸解引用崩溃。
+            if (!newRelationWithEntity) {
+                return ComputationResult.fullRecompute(`relation record ${relationRecord.id} not found for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+            }
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const value = this.resolveAvgField(relatedRecord) || 0;
@@ -288,13 +291,18 @@ export class PropertyAverageHandle implements DataBasedComputation {
                 undefined, 
                 this.relationAttributeQuery
             );
-
+            if (!newRelationWithEntity) {
+                return ComputationResult.fullRecompute(`relation record not found by ${relationMatchKey} for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+            }
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source'];
             relatedRecord['&'] = newRelationWithEntity;
             const newValue = this.resolveAvgField(relatedRecord) || 0;
 
             const { oldValue } = await this.state.itemResult.replace(newRelationWithEntity, newValue);
             sumDelta = newValue - (oldValue ?? 0);
+        } else {
+            // 与 Count/Any/Every 保持一致：未知的 related 事件形态必须退回全量重算。
+            return ComputationResult.fullRecompute(`unknown related mutation event for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
         }
 
         const sum = await this.state.sum.increment(mutationEvent.record, sumDelta);
