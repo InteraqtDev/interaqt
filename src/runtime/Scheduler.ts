@@ -15,6 +15,7 @@ import { DICTIONARY_RECORD, type InternalSchemaRequirement, RecordMutationCallba
 import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
 import {
     EntityEventSourceMap,
+    EntityUpdateEventsSourceMap,
     DataSourceMapTree,
     ComputationSourceMapManager,
     EntityCreateEventsSourceMap
@@ -397,11 +398,65 @@ export class Scheduler {
                         if (!('dataDep' in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
                             continue
                         }
-                        await this.runDirtyRecordsComputation(source, mutationEvent)
+                        // filtered 源的 update 监听挂在物理 base 名上（见 ComputationSourceMap），
+                        // 路由前做成员资格守卫并把事件名改写回 filtered 名。
+                        const routedEvent = await this.resolveFilteredUpdateEvent(source, mutationEvent, mutationEvents)
+                        if (!routedEvent) {
+                            continue
+                        }
+                        await this.runDirtyRecordsComputation(source, routedEvent)
                     }
                 }
             }
         })
+    }
+    /**
+     * filtered entity/relation 源上的 update 事件路由守卫。
+     *
+     * 背景：storage 的字段 update 事件只以物理 base 记录名发出；filtered 名下只有
+     * 成员资格 create/delete 事件。为了让「成员留在集合内的字段更新」也能触发聚合，
+     * source map 把 filtered 源的 update 监听注册到物理名上（携带 filteredRecordName）。
+     * 这里补上语义守卫，保证与成员资格事件不重复计算：
+     *  1. 同一事件批次里已有该记录在该 filtered 源上的成员资格 create/delete
+     *     （enter/exit 场景）→ 跳过，由成员资格事件驱动计算；
+     *  2. 否则查询当前成员资格：仍是成员 → 以 filtered 名改写事件后放行（stay-in 更新）；
+     *     不是成员 → 跳过（无关记录的字段更新）。
+     *
+     * 带 targetPath 的（property/关联路径）监听不需要此守卫：computeDirtyDataDepRecords
+     * 与各 handle 的增量分支都通过 filtered 路径查询定位记录，成员资格由查询本身保证。
+     */
+    private async resolveFilteredUpdateEvent(
+        source: EntityEventSourceMap,
+        mutationEvent: RecordMutationEvent,
+        batchEvents: RecordMutationEvent[]
+    ): Promise<RecordMutationEvent | null> {
+        if (!('dataDep' in source) || source.type !== 'update') return mutationEvent
+        const filteredRecordName = (source as EntityUpdateEventsSourceMap).filteredRecordName
+        if (!filteredRecordName) return mutationEvent
+        if (source.targetPath?.length) return mutationEvent
+
+        const recordId = mutationEvent.record?.id ?? mutationEvent.oldRecord?.id
+        if (recordId === undefined) return null
+
+        // 1. enter/exit 由同批次的成员资格事件驱动，避免双计。
+        const hasMembershipEventInBatch = batchEvents.some(event =>
+            event !== mutationEvent &&
+            event.recordName === filteredRecordName &&
+            (event.type === 'create' || event.type === 'delete') &&
+            (event.record?.id ?? event.oldRecord?.id) === recordId
+        )
+        if (hasMembershipEventInBatch) return null
+
+        // 2. stay-in / stay-out 判定：按 filtered 名查询当前成员资格。
+        const member = await this.controller.system.storage.findOne(
+            filteredRecordName,
+            MatchExp.atom({ key: 'id', value: ['=', recordId] }),
+            undefined,
+            ['id']
+        )
+        if (!member) return null
+
+        return { ...mutationEvent, recordName: filteredRecordName }
     }
     async computeDirtyDataDepRecords(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent): Promise<any[]> {
         // 1. 就是自身的变化

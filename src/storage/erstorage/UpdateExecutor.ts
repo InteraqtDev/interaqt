@@ -216,7 +216,10 @@ export class UpdateExecutor {
             }
 
             // FIXME 这里没有在更新的时候一次性写入，而是又通过 addLinkFromRecord 建立的关系。需要优化
-            const linkRecord = await this.agent.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, matchedEntity.id, finalRelatedEntityRef.id, undefined, events)
+            // CAUTION `&` 关系属性必须透传给 addLinkFromRecord。create 路径（handleCreationReliance）
+            //  使用 linkRecordData 写入 link 属性，update 路径若传 undefined 会把关系属性静默丢弃——
+            //  替换关系后 link 行存在但属性全部为空（r5 F-3）。
+            const linkRecord = await this.agent.addLinkFromRecord(entityName, newRelatedEntityData.info?.attributeName!, matchedEntity.id, finalRelatedEntityRef.id, newRelatedEntityData.linkRecordData?.getData(), events)
 
             if (newRelatedEntityData.info!.isXToMany) {
                 if (!result[newRelatedEntityData.info!.attributeName!]) {

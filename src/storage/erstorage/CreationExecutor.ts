@@ -56,8 +56,12 @@ export class CreationExecutor {
 
             if (mergedLinkTargetRecord.linkRecordData) {
                 // 为 link 也要把 dependency 准备好。
+                // CAUTION link 的端点必须是全新的 {id} 对象，不能复用 newDepIdRef：
+                //  下面 deps[attr][LINK_SYMBOL] 会把 link 数据挂回 newDepIdRef 自身，
+                //  复用会形成 deps[attr]['&'].target === deps[attr] 的环引用——
+                //  任何对 rawData 的 JSON.stringify（日志、事件序列化）都会当场崩溃。
                 const newLinkRecordData = mergedLinkTargetRecord.linkRecordData.merge({
-                    [mergedLinkTargetRecord.info!.isRecordSource() ? 'target' : 'source']: newDepIdRef
+                    [mergedLinkTargetRecord.info!.isRecordSource() ? 'target' : 'source']: { id: newDepIdRef.id }
                 })
                 // 所有 Link dep 也准备好了
                 const newLinkRecordDataWithDep = await this.createRecordDependency(newLinkRecordData)
@@ -308,9 +312,15 @@ export class CreationExecutor {
                 key: 'id',
                 value: ['=', record.getRef().id]
             })
+            // CAUTION `&` 关系属性必须挂在反向 attribute 的值上（NewRecordData 会把它解析成
+            //  该 attribute 的 linkRecordData 并写入合并进关联记录行的 link 列）。
+            //  挂在实体记录的顶层会让 NewRecordData 试图以 info?.linkName === undefined
+            //  解析 link 数据，直接崩溃（"entity undefined not found"）。
+            const linkData = record.getData()[LINK_SYMBOL]
             const newData = {
-                [reverseInfo!.attributeName]: currentIdRef,
-                [LINK_SYMBOL]: record.getData()[LINK_SYMBOL]
+                [reverseInfo!.attributeName]: linkData === undefined
+                    ? currentIdRef
+                    : { ...currentIdRef, [LINK_SYMBOL]: linkData }
             }
             const [updatedRecord] = await this.agent.updateRecord(reverseInfo.parentEntityName, idMatch, new NewRecordData(this.map, reverseInfo.parentEntityName, newData), events)
             if (record.info!.isXToMany) {

@@ -480,29 +480,15 @@ describe('combinatorial matrix exploration', () => {
   // FINAL: compare the whole matrix against the known defect inventory
   // =========================================================================
   test('ZZ matrix result matches known defect inventory', () => {
-    // Known broken cells as of r6 (2026-07-09). Every entry is a real, reproduced
-    // defect documented in agentspace/output/deep-review-2026-07-09-r6-matrix.md.
+    // Known broken cells inventory. Every entry must be a real, reproduced defect
+    // documented in agentspace/output/ review reports.
     // DO NOT add entries to hide regressions; REMOVE entries when the defect is fixed.
-    const KNOWN_BROKEN_CELLS = [
-      // r5 F-1 family: aggregations over filtered sources are blind to in-member
-      // field updates (listener registered on filtered name, events fire on base name).
-      'filtered/countCb', 'filtered/sum', 'filtered/avg', 'filtered/weighted', 'filtered/every', 'filtered/any',
-      'filteredComputed/countCb', 'filteredComputed/sum', 'filteredComputed/avg', 'filteredComputed/weighted', 'filteredComputed/every', 'filteredComputed/any',
-      'nestedFiltered/countCb', 'nestedFiltered/sum', 'nestedFiltered/avg', 'nestedFiltered/weighted', 'nestedFiltered/every', 'nestedFiltered/any',
-      'filteredRelation/countCb', 'filteredRelation/sum', 'filteredRelation/avg', 'filteredRelation/weighted', 'filteredRelation/every', 'filteredRelation/any',
-      // same family, property host over a filtered relation reading link fields
-      'prop/sumLinkF',
-      // r5 F-3 family: update drops '&' link attributes on relation replace
-      'parity/n:n/ref+&', 'parity/n:n/nested+&', 'parity/1:n/nested+&',
-      // r6 new: 1:1 '&' payload crashes at create AND update (circular structure in log serialization path)
-      'parity/1:1/ref+&/create', 'parity/1:1/ref+&/update',
-      'parity/1:1/nested+&/create', 'parity/1:1/nested+&/update',
-      // r6 new: 1:n ref+'&' from the source side crashes create ("entity undefined not found")
-      'parity/1:n/ref+&/create',
-      // r6 new: 1:n update stealing an already-linked target crashes
-      // ("column ... specified more than once"); ref+& update hits the same path
-      'parity/1:n/ref/update', 'parity/1:n/ref+&/update',
-    ].sort();
+    //
+    // History: the r6 exploration (deep-review-2026-07-09-r6-matrix.md) found 35 broken
+    // cells (filtered-source aggregation blindness ×25, '&' link-data loss/crashes ×10).
+    // All were fixed in the same branch — the inventory is now empty and this suite
+    // acts as a pure regression guard over the whole combination space.
+    const KNOWN_BROKEN_CELLS: string[] = [].sort();
 
     const byCell = new Map<string, Mismatch[]>();
     for (const m of allMismatches) {

@@ -247,7 +247,11 @@ export class NewRecordData {
             })
 
             if (recordData.linkRecordData) {
-                result.push(...recordData.linkRecordData.getSameRowFieldAndValue())
+                // CAUTION link 数据（`&`）里可能带有端点 ref（createRecordDependency 会补 source/target），
+                //  其 entityId 字段与上面刚写入的 linkField 是同一列——必须剔除，
+                //  否则 INSERT/UPDATE 出现重复列名直接崩溃。
+                result.push(...recordData.linkRecordData.getSameRowFieldAndValue()
+                    .filter(fieldAndValue => fieldAndValue.field !== recordData.info?.linkField))
             }
         })
 

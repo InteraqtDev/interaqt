@@ -41,7 +41,13 @@ export type EntityUpdateEventsSourceMap = {
     sourceRecordName: string,
     targetPath?: string[],
     computation: Computation,
-    isRelation?: boolean
+    isRelation?: boolean,
+    // 当监听对象是 filtered entity/relation 时，update 事件只会以【物理 base 记录名】发出
+    // （filtered 名下只有成员资格 create/delete 事件）。此字段记录原 filtered 名：
+    //  - recordName 注册为物理 base 名（否则监听永远不触发——成员字段更新静默丢失）；
+    //  - Scheduler 路由时按此名做成员资格检查并把事件改写回 filtered 名，
+    //    使 computation 的增量分支看到的事件与成员资格事件同名（enter/exit 由后者负责）。
+    filteredRecordName?: string
 }
 
 export type DataBasedEntityEventsSourceMap = EntityCreateEventsSourceMap 
@@ -78,9 +84,45 @@ export type ComputationPhase = typeof PHASE_BEFORE_ALL|typeof PHASE_NORMAL|typeo
 export class ComputationSourceMapManager {
     private sourceMaps: EntityEventSourceMap[] = []
     private sourceMapTree: DataSourceMapTree = {}
+    // filtered entity/relation 名 -> 物理 base 记录名（穿透嵌套 filtered 链）
+    private filteredToPhysicalName: Map<string, string> = new Map()
 
     constructor(public controller: Controller, public scheduler: Scheduler) {
         
+    }
+
+    private buildFilteredToPhysicalNameMap(): void {
+        this.filteredToPhysicalName = new Map()
+        const all: any[] = [...this.controller.entities, ...this.controller.relations]
+        for (const item of all) {
+            if (!item?.name) continue
+            let cur: any = item
+            while (cur.baseEntity || cur.baseRelation) {
+                cur = cur.baseEntity || cur.baseRelation
+            }
+            if (cur !== item && cur?.name) {
+                this.filteredToPhysicalName.set(item.name, cur.name)
+            }
+        }
+    }
+
+    /**
+     * CAUTION filtered entity/relation 名下只有成员资格 create/delete 事件；
+     *  字段 update 事件永远以物理 base 记录名发出。注册在 filtered 名上的 update
+     *  监听是死监听——成员字段更新会静默丢失（聚合值永久陈旧）。
+     *  这里把 update 监听改挂到物理名上，并记录原 filtered 名，Scheduler 路由时
+     *  按 filteredRecordName 做成员资格守卫并把事件名改写回 filtered 名。
+     */
+    private normalizeFilteredUpdateSourceMap(source: EntityEventSourceMap): EntityEventSourceMap {
+        if (source.type !== 'update' || !('dataDep' in source)) return source
+        const updateSource = source as EntityUpdateEventsSourceMap
+        const physicalName = this.filteredToPhysicalName.get(updateSource.recordName)
+        if (!physicalName) return source
+        return {
+            ...updateSource,
+            recordName: physicalName,
+            filteredRecordName: updateSource.recordName,
+        }
     }
 
     /**
@@ -88,6 +130,7 @@ export class ComputationSourceMapManager {
      * @param sourceMaps EntityEventSourceMap 数组
      */
     initialize(computations: Set<Computation>): void {
+        this.buildFilteredToPhysicalNameMap()
         const sortedERMutationEventSources: EntityEventSourceMap[][] = [[], [], []]
 
         
@@ -160,7 +203,7 @@ export class ComputationSourceMapManager {
 
         // const ERMutationEventSources: EntityEventSourceMap[]= sortedERMutationEventSources.flat()
 
-        this.sourceMaps =  sortedERMutationEventSources.flat()
+        this.sourceMaps = sortedERMutationEventSources.flat().map(source => this.normalizeFilteredUpdateSourceMap(source))
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
     }
     /**
