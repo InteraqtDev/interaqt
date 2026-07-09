@@ -99,6 +99,7 @@ import {
   Payload, PayloadItem, Controller, MonoSystem,
   Count, Transform, InteractionEventEntity
 } from 'interaqt'
+import { PGLiteDB } from 'interaqt/drivers'
 
 // --- Define your data model ---
 

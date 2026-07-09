@@ -1,8 +1,7 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, RequireSerializableRetry, TransactionCapability, TransactionOptions} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, RequireSerializableRetry, TransactionCapability, TransactionOptions, defaultEncodeLiteral} from "interaqt";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import pg, { type ClientConfig, type PoolClient} from 'pg'
-import { defaultEncodeLiteral } from "@storage";
 
 const { Client, Pool } = pg
 

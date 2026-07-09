@@ -11,9 +11,13 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      // drivers 是独立子入口（interaqt/drivers）：驱动依赖（better-sqlite3/pg/mysql2/pglite）
+      // 不应成为主入口的解析负担，消费者按需引入。
+      entry: {
+        index: resolve(__dirname, 'src/index.ts'),
+        drivers: resolve(__dirname, 'src/drivers/index.ts')
+      },
       name: 'interaqt',
-      fileName: 'index',
       formats: ['es']
     },
     target: 'esnext',
@@ -21,6 +25,9 @@ export default defineConfig({
     rollupOptions: {
       // 确保外部依赖不被打包
       external: [
+        // drivers 子入口通过包自引用导入主入口（共享 asyncInteractionContext 等单例），
+        // 必须保持 external，否则会打进第二份运行时副本。
+        'interaqt',
         // Node.js 内置模块
         'async_hooks',
         'fs',
