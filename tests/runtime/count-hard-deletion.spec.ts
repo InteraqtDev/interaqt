@@ -1,39 +1,14 @@
 /**
- * COUNT WITH HARDDELETIONPROPERTY ON RELATION - Bug Verification Test
- * 
- * =============================================================================
- * BUG: HardDeletionProperty on Relation causes RecordBoundState error
- * =============================================================================
- * 
- * DESCRIPTION:
- * When a Relation has HardDeletionProperty and is deleted via StateMachine
- * transition, AND there's a Count computation with callback that depends on
- * this relation, the framework throws a TypeError.
- * 
- * EXAMPLE:
- * - ChildParentRelation has HardDeletionProperty
- * - Parent.childCount = Count({ property: 'children', callback: c => c.isActive })
- * - DeleteRelation interaction triggers HardDeletionProperty state change
- * 
- * EXPECTED: Count decreases properly when relation is deleted
- * ACTUAL: Framework throws TypeError: Cannot read properties of undefined 
- *         (reading '_ParentEntity_childCount_bound_isItemMatchCount')
- * 
- * ROOT CAUSE (Count.ts:233):
- *   if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.oldRecord)))
- * 
- * The RecordBoundState table is not properly initialized or accessed when
- * processing a delete event triggered by HardDeletionProperty.
- * 
- * =============================================================================
- * IMPACT ON REAL-WORLD SCENARIOS
- * =============================================================================
- * 
- * This bug affects patterns like Topic.usageCount with relation hard deletion:
- * - ContentTopicRelation has HardDeletionProperty
- * - Topic.usageCount = Count({ property: 'contents', callback: c => !c._softDeletion })
- * 
- * When relation is hard deleted -> RecordBoundState error
+ * COUNT WITH HARDDELETIONPROPERTY ON RELATION - regression test
+ *
+ * This scenario was originally reported as a framework bug (a TypeError from
+ * RecordBoundState when a relation with HardDeletionProperty was deleted via
+ * a StateMachine transition while a Count-with-callback depended on it). The
+ * bug has since been FIXED — the test below asserts the CORRECT behavior and
+ * passes: the count decreases properly when the relation is hard deleted.
+ *
+ * Real-world pattern covered: Topic.usageCount with relation hard deletion
+ * (ContentTopicRelation has HardDeletionProperty).
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -228,20 +203,10 @@ describe('Count with HardDeletionProperty on Relation', () => {
   })
 
   it('Count should decrease when relation is hard deleted via HardDeletionProperty', async () => {
-    /**
-     * BUG: When a Relation with HardDeletionProperty is deleted via StateMachine transition,
-     * and there's a Count computation with callback that depends on this relation,
-     * the framework throws:
-     * 
-     *   TypeError: Cannot read properties of undefined 
-     *     (reading '_HardDeleteTestParent_activeChildCount_bound_isItemMatchCount')
-     * 
-     * Root cause: In PropertyCountHandle.incrementalCompute (Count.ts:233):
-     *   if((await (this.state as StateWithCallback).isItemMatchCount!.get(relatedMutationEvent.oldRecord)))
-     * 
-     * The RecordBoundState table is not properly initialized or accessed when
-     * processing a delete event triggered by HardDeletionProperty.
-     */
+    // Regression (originally a bug): deleting a relation that carries
+    // HardDeletionProperty via a StateMachine transition, while a
+    // Count-with-callback depends on it, used to throw a RecordBoundState
+    // TypeError. Fixed — the count now decreases properly.
 
     // Create parent
     await controller.dispatch(CreateTestParent, {
@@ -273,9 +238,7 @@ describe('Count with HardDeletionProperty on Relation', () => {
     expect(children.length).toBe(1)
     const child = children[0]
 
-    // Delete the relation via HardDeletionProperty
-    // Expected: Count should decrease to 0
-    // Actual: Framework throws TypeError about RecordBoundState
+    // Delete the relation via HardDeletionProperty — count must decrease to 0
     await controller.dispatch(DeleteRelation, {
       user: { id: 'test-user' },
       payload: { childId: child.id }
