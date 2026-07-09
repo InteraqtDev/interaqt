@@ -1118,25 +1118,75 @@ StateMachine is used for state transition-based computations, particularly suita
 
 ### Basic State Machine
 
-```javascript
-import { StateMachine } from 'interaqt';
+A StateMachine is declared from three parts: `StateNode` instances (the states), `StateTransfer` instances (the transitions), and an `initialState`. States are always object references, never strings.
 
+Each `StateTransfer` declares:
+- `current` / `next`: the state nodes the transfer connects
+- `trigger`: a `RecordMutationEventPattern` (`{ recordName, type, keys?, record?, oldRecord? }`) matched against record mutation events — for interaction-triggered transitions, match the creation of the interaction's event record
+- `computeTarget` (required for property-level state machines): maps the matched event to the record(s) whose property should transition
+
+```javascript
+import { StateMachine, StateNode, StateTransfer, InteractionEventEntity } from 'interaqt';
+
+// 1. Declare state nodes
+const pendingState = StateNode.create({ name: 'pending' });
+const paidState = StateNode.create({ name: 'paid' });
+const shippedState = StateNode.create({ name: 'shipped' });
+const deliveredState = StateNode.create({ name: 'delivered' });
+const cancelledState = StateNode.create({ name: 'cancelled' });
+
+// 2. Declare the interactions that drive the transitions
+const PayOrder = Interaction.create({
+  name: 'PayOrder',
+  action: Action.create({ name: 'payOrder' }),
+  payload: Payload.create({
+    items: [PayloadItem.create({ name: 'orderId', type: 'string', required: true })]
+  })
+});
+// ... ShipOrder / ConfirmDelivery / CancelOrder declared the same way
+
+// 3. Wire them together on the property
 const Order = Entity.create({
   name: 'Order',
   properties: [
     Property.create({ name: 'orderNumber', type: 'string' }),
-    Property.create({ 
-      name: 'status', 
+    Property.create({
+      name: 'status',
       type: 'string',
-      computation: new StateMachine({
-        states: ['pending', 'paid', 'shipped', 'delivered', 'cancelled'],
-        initialState: 'pending',
-        transitions: [
-          { from: 'pending', to: 'paid', condition: 'payment_received' },
-          { from: 'paid', to: 'shipped', condition: 'order_shipped' },
-          { from: 'shipped', to: 'delivered', condition: 'delivery_confirmed' },
-          { from: 'pending', to: 'cancelled', condition: 'order_cancelled' },
-          { from: 'paid', to: 'cancelled', condition: 'order_cancelled' }
+      computation: StateMachine.create({
+        states: [pendingState, paidState, shippedState, deliveredState, cancelledState],
+        initialState: pendingState,
+        transfers: [
+          StateTransfer.create({
+            current: pendingState,
+            next: paidState,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: PayOrder.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
+          }),
+          StateTransfer.create({
+            current: paidState,
+            next: shippedState,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: ShipOrder.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
+          }),
+          StateTransfer.create({
+            current: pendingState,
+            next: cancelledState,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: CancelOrder.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
+          })
         ]
       })
     })
@@ -1144,92 +1194,60 @@ const Order = Entity.create({
 });
 ```
 
-### Event-Based State Transitions
+### Data-Based State Transitions
+
+`trigger` matches **any** record mutation event, not just interaction events. This means state transitions can also be driven by data changes — for example, transition when a specific field of the host record is updated (`keys` uses subset semantics: the transfer fires when the update touched all the listed fields):
 
 ```javascript
-// Define state transition events
-const PaymentReceived = Interaction.create({
-  name: 'PaymentReceived',
-  action: Action.create({
-    name: 'recordPayment',
-    payload: Payload.create({
-      items: [
-        PayloadItem.create({ name: 'orderId', base: Order, isRef: true }),
-        PayloadItem.create({ name: 'amount' }),
-        PayloadItem.create({ name: 'paymentMethod' })
-      ]
-    })
+const draftState = StateNode.create({ name: 'draft' });
+const publishedState = StateNode.create({ name: 'published' });
+
+Property.create({
+  name: 'status',
+  type: 'string',
+  computation: StateMachine.create({
+    states: [draftState, publishedState],
+    initialState: draftState,
+    transfers: [
+      StateTransfer.create({
+        current: draftState,
+        next: publishedState,
+        // Fires when a Document update touches the `reviewed` field
+        trigger: { recordName: 'Document', type: 'update', keys: ['reviewed'] },
+        computeTarget: (event) => ({ id: event.oldRecord?.id ?? event.record?.id })
+      })
+    ]
   })
 });
-
-// State machine listens to these events and automatically transitions states
-const Order = Entity.create({
-  name: 'Order',
-  properties: [
-    Property.create({
-      name: 'status',
-      type: 'string',
-      computation: new StateMachine({
-        states: ['pending', 'paid', 'shipped', 'delivered'],
-        initialState: 'pending',
-        transitions: [
-          { 
-            from: 'pending', 
-            to: 'paid', 
-            on: 'PaymentReceived'  // Listen to interaction events
-          },
-          { 
-            from: 'paid', 
-            to: 'shipped', 
-            on: 'OrderShipped' 
-          }
-        ]
-      })
-    })
-  ]
-});
 ```
 
-### Conditional State Transitions
+Note: if several transfers share the same `current` state and their triggers match the same event but lead to different next states, the framework throws an "ambiguous transition" error — make the triggers mutually exclusive (e.g. via `record` / `keys` patterns).
+
+### Guarding Transitions
+
+There is no `condition` field on `StateTransfer`. Preconditions belong to the interaction layer (use `conditions` / `userAttributives` on the Interaction so unauthorized or invalid calls never produce an event), and fine-grained per-record filtering is expressed in `computeTarget` — return `null`/`undefined` (or an empty array) to skip the transition for records that should not transition:
 
 ```javascript
-const LeaveRequest = Entity.create({
-  name: 'LeaveRequest',
-  properties: [
-    Property.create({ name: 'employeeId', type: 'string' }),
-    Property.create({ name: 'startDate', type: 'string' }),
-    Property.create({ name: 'endDate', type: 'string' }),
-    Property.create({ name: 'reason', type: 'string' }),
-    Property.create({
-      name: 'status',
-      type: 'string',
-      computation: new StateMachine({
-        states: ['draft', 'submitted', 'approved', 'rejected', 'cancelled'],
-        initialState: 'draft',
-        transitions: [
-          {
-            from: 'draft',
-            to: 'submitted',
-            on: 'SubmitRequest',
-            condition: (record) => record.reason && record.startDate && record.endDate
-          },
-          {
-            from: 'submitted',
-            to: 'approved',
-            on: 'ApproveRequest',
-            condition: (record, context) => context.user.role === 'manager'
-          },
-          {
-            from: 'submitted',
-            to: 'rejected',
-            on: 'RejectRequest',
-            condition: (record, context) => context.user.role === 'manager'
-          }
-        ]
-      })
-    })
-  ]
-});
+StateTransfer.create({
+  current: submittedState,
+  next: approvedState,
+  trigger: {
+    recordName: InteractionEventEntity.name,
+    type: 'create',
+    record: { interactionName: ApproveRequest.name }
+  },
+  computeTarget: async function (event) {
+    // `this` is the Controller: you can query before deciding the target
+    const request = await this.system.storage.findOne(
+      'LeaveRequest',
+      MatchExp.atom({ key: 'id', value: ['=', event.record.payload.requestId] }),
+      undefined,
+      ['id', 'reason', 'startDate', 'endDate']
+    );
+    if (!request?.reason || !request?.startDate || !request?.endDate) return null;
+    return { id: request.id };
+  }
+})
 ```
 
 ### Dynamic Value Computation with StateNode
@@ -1263,8 +1281,12 @@ const EventEntity = Entity.create({
             // Self-transition: stays in the same state but triggers computeValue
             current: triggeredState,
             next: triggeredState,
-            trigger: TriggerEventInteraction,
-            computeTarget: (event) => ({ id: event.payload.eventId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: TriggerEventInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.eventId })
           })
         ],
         initialState: triggeredState
@@ -1308,14 +1330,22 @@ const CounterEntity = Entity.create({
           StateTransfer.create({
             current: idleState,
             next: incrementingState,
-            trigger: IncrementInteraction,
-            computeTarget: (event) => ({ id: event.payload.counterId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: IncrementInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.counterId })
           }),
           StateTransfer.create({
             current: incrementingState,
             next: idleState,
-            trigger: ResetInteraction,
-            computeTarget: (event) => ({ id: event.payload.counterId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: ResetInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.counterId })
           })
         ],
         initialState: idleState
@@ -1369,20 +1399,32 @@ const TaskEntity = Entity.create({
           StateTransfer.create({
             current: newState,
             next: inProgressState,
-            trigger: StartTaskInteraction,
-            computeTarget: (event) => ({ id: event.payload.taskId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: StartTaskInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.taskId })
           }),
           StateTransfer.create({
             current: inProgressState,
             next: completedState,
-            trigger: CompleteTaskInteraction,
-            computeTarget: (event) => ({ id: event.payload.taskId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: CompleteTaskInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.taskId })
           }),
           StateTransfer.create({
             current: inProgressState,
             next: cancelledState,
-            trigger: CancelTaskInteraction,
-            computeTarget: (event) => ({ id: event.payload.taskId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: CancelTaskInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.taskId })
           })
         ],
         initialState: newState

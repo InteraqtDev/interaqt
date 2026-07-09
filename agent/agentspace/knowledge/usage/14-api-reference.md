@@ -621,7 +621,11 @@ const OrderStateMachine = StateMachine.create({
         StateTransfer.create({
             current: pendingState,
             next: confirmedState,
-            trigger: ConfirmOrderInteraction
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: ConfirmOrderInteraction.name }
+            }
         })
     ],
     initialState: pendingState
@@ -927,23 +931,31 @@ StateTransfer.create(config: StateTransferConfig): KlassInstance<typeof StateTra
 ```
 
 **Parameters**
-- `config.trigger` (any, required): Trigger for the state transfer (usually an Interaction)
+- `config.trigger` (RecordMutationEventPattern, required): Pattern matched against record mutation events: `{ recordName, type, keys?, record?, oldRecord? }`. For interaction-triggered transfers use `{ recordName: InteractionEventEntity.name, type: 'create', record: { interactionName: SomeInteraction.name } }`. `keys` uses subset semantics (fires when the update touched all listed fields)
 - `config.current` (StateNode, required): Current state node
 - `config.next` (StateNode, required): Next state node
-- `config.computeTarget` (function, optional): Function to dynamically compute the target state
+- `config.computeTarget` (function, optional for global-level, **required for property-level** state machines): Maps a matched mutation event to the record(s) whose property should transition, e.g. `(event) => ({ id: event.record.payload.id })`
 
 **Examples**
 ```typescript
 // Simple state transfer
 const approveTransfer = StateTransfer.create({
-    trigger: ApproveInteraction,
+    trigger: {
+      recordName: InteractionEventEntity.name,
+      type: 'create',
+      record: { interactionName: ApproveInteraction.name }
+    },
     current: pendingState,
     next: approvedState
 });
 
 // State transfer with dynamic target computation
 const conditionalTransfer = StateTransfer.create({
-    trigger: ProcessInteraction,
+    trigger: {
+      recordName: InteractionEventEntity.name,
+      type: 'create',
+      record: { interactionName: ProcessInteraction.name }
+    },
     current: pendingState,
     next: approvedState, // Default next state
     computeTarget: (context) => {

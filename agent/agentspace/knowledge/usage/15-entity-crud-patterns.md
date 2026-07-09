@@ -363,14 +363,22 @@ const ArticleStatusStateMachine = StateMachine.create({
     StateTransfer.create({
       current: ActiveState,
       next: DeletedState,
-      trigger: DeleteArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: DeleteArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     }),
     StateTransfer.create({
       current: DeletedState,
       next: ActiveState,
-      trigger: RestoreArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: RestoreArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     })
   ]
 });
@@ -418,14 +426,22 @@ const Article = Entity.create({
             StateTransfer.create({
               current: activeState,
               next: deletedState,
-              trigger: DeleteArticle,
-              computeTarget: (event) => ({ id: event.payload.articleId })
+              trigger: {
+                recordName: InteractionEventEntity.name,
+                type: 'create',
+                record: { interactionName: DeleteArticle.name }
+              },
+              computeTarget: (event) => ({ id: event.record.payload.articleId })
             }),
             StateTransfer.create({
               current: deletedState,
               next: activeState,
-              trigger: RestoreArticle,
-              computeTarget: (event) => ({ id: event.payload.articleId })
+              trigger: {
+                recordName: InteractionEventEntity.name,
+                type: 'create',
+                record: { interactionName: RestoreArticle.name }
+              },
+              computeTarget: (event) => ({ id: event.record.payload.articleId })
             })
           ],
           initialState: activeState
@@ -476,11 +492,15 @@ deletionProperty.computation = StateMachine.create({
   initialState: NON_DELETED_STATE,
   transfers: [
     StateTransfer.create({
-      trigger: DeleteArticle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: DeleteArticle.name }
+      },
       current: NON_DELETED_STATE,
       next: DELETED_STATE,
       computeTarget: function(event) {
-        return { id: event.payload.articleId };
+        return { id: event.record.payload.articleId };
       }
     })
   ]
@@ -611,14 +631,22 @@ const ArticlePublishStateMachine = StateMachine.create({
     StateTransfer.create({
       current: DraftState,
       next: PublishedState,
-      trigger: PublishArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: PublishArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     }),
     StateTransfer.create({
       current: PublishedState,
       next: DraftState,
-      trigger: UnpublishArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: UnpublishArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     })
   ]
 });
@@ -722,8 +750,12 @@ const TimestampStateMachine = StateMachine.create({
     StateTransfer.create({
       current: TimestampState,
       next: TimestampState,
-      trigger: RecordActivity,
-      computeTarget: (event) => ({ id: event.payload.entityId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: RecordActivity.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.entityId })
     })
   ]
 });
@@ -767,7 +799,11 @@ const User = Entity.create({
           StateTransfer.create({
             current: activeState,
             next: activeState,
-            trigger: UserActivityInteraction,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: UserActivityInteraction.name }
+            },
             computeTarget: (event) => ({ id: event.user.id })
           })
         ],
@@ -801,8 +837,12 @@ const Article = Entity.create({
           StateTransfer.create({
             current: modifiedState,
             next: modifiedState,
-            trigger: UpdateArticleInteraction,
-            computeTarget: (event) => ({ id: event.payload.articleId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: UpdateArticleInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.articleId })
           })
         ],
         initialState: modifiedState
@@ -834,8 +874,12 @@ const Sensor = Entity.create({
           StateTransfer.create({
             current: triggeredState,
             next: triggeredState,
-            trigger: SensorTriggerInteraction,
-            computeTarget: (event) => ({ id: event.payload.sensorId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: SensorTriggerInteraction.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.sensorId })
           })
         ],
         initialState: triggeredState
@@ -896,7 +940,11 @@ Property.create({
       StateTransfer.create({
         current: activeState,
         next: activeState,
-        trigger: UserActivityInteraction,
+        trigger: {
+          recordName: InteractionEventEntity.name,
+          type: 'create',
+          record: { interactionName: UserActivityInteraction.name }
+        },
         computeTarget: (event) => ({ id: event.user.id })
       })
     ]
@@ -1033,20 +1081,32 @@ const ArticleLifecycleStateMachine = StateMachine.create({
     StateTransfer.create({
       current: DraftState,
       next: PublishedState,
-      trigger: PublishArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: PublishArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     }),
     StateTransfer.create({
       current: PublishedState,
       next: DeletedState,
-      trigger: DeleteArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: DeleteArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     }),
     StateTransfer.create({
       current: DraftState,
       next: DeletedState,
-      trigger: DeleteArticle,
-      computeTarget: (event) => ({ id: event.payload.articleId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: DeleteArticle.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.articleId })
     })
   ]
 });
