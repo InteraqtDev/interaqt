@@ -1,5 +1,25 @@
 # 全代码库深度 Review 报告（2026-07-09 第四轮）
 
+> **维护说明（2026-07-09 更新）**：本报告发现的问题已在同分支（`cursor/deep-code-review-r4-b7cd`）修复，回归测试见 `tests/runtime/review-fixes-2026-07-09-r4.spec.ts`（29 个用例）：
+>
+> - **致命 F-1 ~ F-4 全部修复**：
+>   - F-1：`DeletionExecutor.deleteNotReliantSeparateLinkRecords` 对对称关系（`linkInfo.isSymmetric()`）改用 `source.id IN (...) OR target.id IN (...)` 双向匹配；`manyToMany.spec.ts` 中固化了单侧删除的断言一并修正（2 条 delete 事件 + 关系表零残留），并补「非对称关系单向语义不受影响」与「下游 Count 结算为 0」的回归。
+>   - F-2：`retrieveData` 把 `dataPolicy.attributeQuery` 实施为**投影上限**——调用方未提供投影时直接采用策略投影；提供了则逐项（含嵌套关联遍历）递归校验只能收窄，`'*'`、越界字段、越界嵌套遍历一律 `InteractionGuardError` 拒绝。`queryDataInteraction.spec.ts` 中依赖旧（失效）语义的用例已对齐新语义。
+>   - F-3：两层修复——(1) setup 期：property dataDep 的 `attributeQuery` 显式包含计算自身输出属性时抛 `ComputationProtocolError`（提示改用 `useLastValue`/bound state）；(2) 运行期：`MonoStorage.callWithEvents` 以事务上下文计数 mutation 级联嵌套深度，超过 `MAX_MUTATION_CASCADE_DEPTH`（100）抛出指向「计算依赖图存在环」的明确错误——同时解决既有遗留 I-5（r1，级联深度上限），跨 property 的计算环（A↔B）由熔断兜底。
+>   - F-4：`DBSetup.validateBaseChains()` 在 `buildMap` 一切处理之前对 baseEntity/baseRelation 链做环检测，错误信息带完整环路径（`FA -> FB -> FA`）。
+> - **重要 R-1 ~ R-7 全部修复**：
+>   - R-1：`Setup.createRecord` 拒绝用户声明名为 `id` 的 Property（relation 的 source/target 已有既有 assert）。
+>   - R-2：`Relation.create` + storage 入口（`validateRecordNames`）双层校验 `type ∈ {'1:1','1:n','n:1','n:n'}`。**Property.type 白名单仍为遗留**：测试与生态中存在 `'object'`/`'json'` 等非枚举类型的既有使用，收紧属行为变更需单独评审（与 r2 R-6/I-15 结论一致）。
+>   - R-3：新增 `MatchExp.extractSingleKeys`；`validateFilteredEntityPaths` 对单段 key 校验存在于 base 记录属性集合，错误信息指向 filtered entity 名与谓词 key。
+>   - R-4：`PropertyCountHandle`/`PropertyWeightedSummationHandle` 补 `relatedMutationEvent` 空守卫；Count/Summation/Average/WeightedSummation 的 update 分支补 recordName 守卫（与 Every/Any 对齐，未知形态退 fullRecompute）。
+>   - R-5：`cloneDispatchArgs` 改为纯数据深拷贝（plain object/array 递归克隆、类实例与函数按引用保留、WeakMap 防环）——重试对就地修改 payload 的用户代码恢复幂等，且调用方原始 args 不再被污染。
+>   - R-6：非 isRef 的实体/关系 payload 携带顶层 `id` 时 guard 拒绝（伪造嵌入 `{id: 真实id, ...假字段}` 不再进入事件事实）；引用既有记录必须显式 `isRef: true`。
+>   - R-7：`getFilteredRecordChanges` 识别 `removed` 变更；`recomputeFilteredMemberships` 为被删除 filtered 记录的旧成员合成 delete 事件（base 同时被删则安全跳过）；removed 上下文不进 rebuild 种子。
+> - **改进项**：I-1（删除 `src/storage/objectstorage/` 死代码，import 已断裂且零引用）、I-4（`mergeAttributeQueryData` 合并重复关联项时保留 `matchExpression`/`modifier` 等查询选项）、I-8（Transform `planIncremental` 消费 `context.skip`，与内置聚合契约对齐）、I-16（`enforceDeclaredConstraints`：Klass `public` 声明的 constraints 在 `Entity.create`/`Relation.create` 时执行，重名属性 fail-fast 且错误信息指向模型而非迁移）。
+> - **明确遗留（建议独立 PR）**：Property.type 白名单（行为变更）、六 handle 共享模板抽取（结构性重构，四轮累计 12 处漂移证据）、I-2/I-3/I-5/I-6/I-7（storage 潜伏与文档项）、I-9~I-15、I-17~I-20（契约决策类）。
+>
+> 修复后全量测试 1745 passed / 26 skipped（基线 1716，新增 29 个用例）；`npm run check` 通过。下文正文保留 review 时的原始判定，作为问题背景与复现依据。
+
 - 日期：2026-07-09
 - 基线：`main` @ `b9ee8404`（PR #19/#20 合入之后，前三轮 review 修复全部落地）
 - 范围：`src/core`、`src/runtime`（含 computations、migration）、`src/storage`（含首次覆盖的 `objectstorage/`、DeletionExecutor 级联语义、对称关系全链路）、`src/builtins`（GetAction/dataPolicy、payload 校验、activity group）、`src/drivers`
