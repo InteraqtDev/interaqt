@@ -96,6 +96,11 @@ export class RecordQueryAgent implements RecordOperationAgent {
     /**
      * 处理合并记录和关系的闪出
      * 用于创建和更新场景中处理合并记录的数据迁移
+     *
+     * CAUTION 事件语义（tests/storage/combinedRecordEvents.spec.ts 固化）：
+     *  内部的 deleteRecordSameRowData 是**物理行搬迁**——被抢夺实体的逻辑身份（id）全程不变，
+     *  所以刻意不产生实体级 delete/create 事件（否则下游聚合会被虚假地减/加一次）。
+     *  事件流只反映关系层面的事实：旧 link delete + 新 link create（见下方 events?.push）。
      */
     async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = ''): Promise<{ [k: string]: RawEntityData }> {
         const result: { [k: string]: RawEntityData } = {}
@@ -200,6 +205,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
     /**
      * 重定位合并记录数据用于链接
      * 用于 unlink 场景中处理合并记录的数据迁移
+     *
+     * CAUTION 事件语义（tests/storage/combinedRecordEvents.spec.ts 固化）：
+     *  「删旧行 + 插新行」是**物理行搬迁**——被搬迁实体的逻辑身份（id）全程不变，
+     *  所以刻意不产生实体级 delete/create 事件；事件流只反映 link delete 这一业务事实。
+     *  注意该路径只对非 reliance 的 combined link 可达（reliance unlink 是业务级 fail-fast），
+     *  即目前只有 DBSetup 的 mergeLinks 配置能触达。
      */
     async relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, events?: RecordMutationEvent[]): Promise<Record[]> {
         const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(linkName, this.map, true, true, true, true)

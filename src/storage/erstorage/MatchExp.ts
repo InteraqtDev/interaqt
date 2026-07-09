@@ -26,11 +26,14 @@ export class MatchExp {
         assert(condition.value[1] !== undefined, `${condition.key} value cannot be undefined`)
         return BoolExp.atom<MatchAtom>(condition)
     }
-    // TODO 支持更复杂的格式
-    // object 表达批量的 and
-    public static fromObject(condition: { [key: string]: MatchAtom }) {
+    // object 表达批量的 and：每个键值对编译为 `key = value` 的相等匹配。
+    // CAUTION 值是原始比较值（不是 MatchAtom）：旧签名声明 MatchAtom 会诱导调用方传入
+    //  { key, value } 对象并被嵌成 ['=', {key,...}] 的错误 RHS。需要其他操作符时用 atom()/and() 组合。
+    public static fromObject(condition: { [key: string]: unknown }) {
+        const entries = Object.entries(condition)
+        assert(entries.length > 0, 'MatchExp.fromObject requires at least one key')
         let root: BoolExp<MatchAtom> | undefined
-        Object.entries(condition).forEach(([key, value]) => {
+        entries.forEach(([key, value]) => {
               if (!root) {
                   root = MatchExp.atom({key, value: ['=', value]})
               }  else {

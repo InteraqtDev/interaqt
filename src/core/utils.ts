@@ -75,6 +75,11 @@ export function stringifyInstance(
 
 // 递归还原 `func::` 编码的函数。单个实例的 parse 只能还原函数；
 // `uuid::` 引用需要完整的实例集合才能解析（见 createInstances）。
+//
+// SECURITY 信任边界：`func::` 的还原通过 `new Function` 执行序列化文本，等价于执行任意代码。
+//  序列化的实例图（stringifyAllInstances 的产物、migration manifest 等）必须与应用源码同信任级：
+//  只能来自你自己构建/部署的制品。绝不能把来自网络请求、用户上传、不可信存储的 JSON
+//  喂给 createInstancesFromString / Klass.parse——那等于给对方远程代码执行能力。
 export function decodeFunctionValues<T>(value: T): T {
   if (typeof value === 'string' && value.startsWith('func::')) {
     return new Function('return ' + value.substring(6))() as T;
@@ -164,6 +169,8 @@ export function createInstancesFromString(objStr: string) {
 // 依赖引用按需递归创建；循环引用（如 property.computation -> relation -> entity ->
 // property）通过延迟回填解决：先以 undefined 占位创建，被引用实例创建完成后再赋值。
 // 未注册的类型、无法解析的引用、重复 uuid 一律抛错（fail-closed，不静默丢数据）。
+//
+// SECURITY 输入必须与应用源码同信任级（`func::` 还原会执行任意代码，见 decodeFunctionValues）。
 export function createInstances(objects: SerializedInstanceInput[]) {
   const dataByUUID = new Map<string, SerializedInstanceInput>();
   for (const object of objects) {

@@ -514,13 +514,6 @@ export class Scheduler {
 
         return dirtyDataDepRecords
     }
-    computeOldRecord(newRecord: any, sourceMap: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
-        // FIXME 理论上我们现在不需要 computeOldRecord 了。
-        if(!sourceMap.targetPath?.length) {
-            return mutationEvent.oldRecord
-        }
-        return {...newRecord}
-    }
     async computeDataBasedDirtyRecordsAndEvents(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
@@ -536,7 +529,9 @@ export class Scheduler {
                     type: 'update',
                     recordName: propertyContext.host.name!,
                     record: record,
-                    oldRecord: record,
+                    // 变化发生在 global dict 上，宿主记录自身没有变：old/new 快照内容相同是语义事实，
+                    // 但必须是独立副本，避免消费方原地修改 record 时污染 oldRecord。
+                    oldRecord: {...record},
                     relatedMutationEvent: mutationEvent
                 }])
             } else if (source.computation.dataContext.type === 'global') {
@@ -560,7 +555,12 @@ export class Scheduler {
                 type: 'update',
                 recordName: source.sourceRecordName,
                 record: record,
-                oldRecord: this.computeOldRecord(record, source, mutationEvent),
+                // CAUTION 关联路径的合成宿主 update 事件拿不到宿主的"变更前"快照（变化发生在关联记录上，
+                //  宿主行自身没有旧值）。这里如实置 undefined，而不是像旧实现那样用当前记录副本冒充
+                //  oldRecord——假的 oldRecord 会让依赖 old/new diff 的自定义增量计算把成员资格变化误判
+                //  为 none。真正的变更前后快照在 relatedMutationEvent 上；框架内消费方
+                //  （buildMatchEventContext）对带 relatedAttribute 的事件一律走 full recompute。
+                oldRecord: undefined,
                 relatedAttribute: source.targetPath,
                 relatedMutationEvent: mutationEvent
             }])

@@ -81,8 +81,12 @@ describe('Scheduler setup error handling', () => {
             await controller.setup(true);
             expect.fail('should have thrown');
         } catch (e: any) {
-            expect(e).toBe(schedulerError);
-            expect(e.schedulingPhase).toBe('custom-phase');
+            // install 路径的 scheduler 失败会被包一层恢复指引（表已建、manifest 未写，
+            // 必须重跑 setup(true)），原始 SchedulerError 完整保留在 causedBy 链上。
+            expect(e instanceof SchedulerError).toBe(true);
+            expect(e.message).toContain('re-run setup(true)');
+            expect(e.causedBy).toBe(schedulerError);
+            expect(e.causedBy.schedulingPhase).toBe('custom-phase');
         } finally {
             try { await system.destroy(); } catch (_) {}
         }
