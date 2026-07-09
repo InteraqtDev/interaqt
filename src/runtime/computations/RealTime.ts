@@ -60,17 +60,10 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
         this.dataDeps = (this.args.dataDeps ?? {}) as {[key: string]: DataDep};
-        // CAUTION fail fast：时间驱动的重算调度器尚未实现（nextRecomputeTime 只被记录、无消费方）。
-        //  没有任何 dataDeps 的 global RealTime 注册不出任何监听——callback 一次都不会执行，
-        //  值永远停在 null。这是声明合法、永不可用的死配置，必须在 setup 阶段拒绝。
-        if (Object.keys(this.dataDeps).length === 0) {
-            throw new ComputationError(
-                `RealTime computation on dictionary "${(this.dataContext.id as { name?: string })?.name ?? String(this.dataContext.id)}" declares no dataDeps. ` +
-                `Time-based rescheduling is not implemented yet, so a RealTime computation without data dependencies would never run and its value would stay null forever. ` +
-                `Declare dataDeps whose mutations should trigger recomputation.`,
-                { computationName: 'RealTime' }
-            )
-        }
+        // 注意：global RealTime 允许零 dataDeps——迁移 rebuild 是合法的计算触发路径
+        //  （migration 会全量重算新增的 global computation），值保持 null 直到被触发。
+        //  property 形态则不允许（见 PropertyRealTimeComputation：getInitialValue 会
+        //  在每次 create 时持久化误导性的 0）。
         this.callback = (now: Expression, dataDeps: Record<string, unknown>) => {
             return this.args.callback.call(this.controller, now, dataDeps);
         };

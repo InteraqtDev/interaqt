@@ -207,7 +207,7 @@ describe('r11 R-2: RealTime without any trigger fails fast', () => {
             .toThrow(/neither attributeQuery nor dataDeps/)
     })
 
-    test('global RealTime without dataDeps is rejected', () => {
+    test('global RealTime without dataDeps stays legal (migration rebuild is a valid trigger path)', () => {
         const clock = Dictionary.create({
             name: 'r11r2Clock',
             type: 'number',
@@ -219,7 +219,6 @@ describe('r11 R-2: RealTime without any trigger fails fast', () => {
         })
         const system = new MonoSystem(new PGLiteDB())
         system.conceptClass = KlassByName
-        expect(() => new Controller({ system, entities: [], relations: [], dict: [clock] }))
-            .toThrow(/declares no dataDeps/)
+        expect(() => new Controller({ system, entities: [], relations: [], dict: [clock] })).not.toThrow()
     })
 })

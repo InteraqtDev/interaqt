@@ -208,11 +208,13 @@ describe("Core Domain Classes Refactored", () => {
 
     test("should create interaction with entity data", () => {
       const userEntity = Entity.create({ name: "User" });
-      const createAction = Action.create({ name: "create" });
-      
+      // r11: data is only meaningful on the query action ('get'); declaring it on
+      // other actions is now a declaration-time error.
+      const getAction = Action.create({ name: "get" });
+
       const interaction = Interaction.create({
-        name: "CreateUser",
-        action: createAction,
+        name: "GetUser",
+        action: getAction,
         data: userEntity
       });
 
