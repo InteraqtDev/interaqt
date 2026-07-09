@@ -123,6 +123,8 @@ describe("Bool and Attributive Classes Refactored", () => {
       });
       
       const stringified = Attributive.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      Attributive.instances.length = 0;
       const parsed = Attributive.parse(stringified);
 
       expect(parsed.name).toBe("TestAttr");

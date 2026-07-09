@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, stringifyAttribute, BoolAtomDataInstance, BoolExpressionDataInstance } from '@core';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, decodeFunctionValues, BoolAtomDataInstance, BoolExpressionDataInstance } from '@core';
 
 // Attributive
 export interface AttributiveInstance extends IInstance {
@@ -106,14 +106,7 @@ export class Attributive implements AttributiveInstance {
   
   static parse(json: string): AttributiveInstance {
     const data: SerializedData<AttributiveCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.content === 'string' && raw.content.startsWith('func::')) {
-      args.content = new Function('return ' + raw.content.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 
@@ -194,7 +187,7 @@ export class Attributives implements AttributivesInstance {
   
   static parse(json: string): AttributivesInstance {
     const data: SerializedData<AttributivesCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 

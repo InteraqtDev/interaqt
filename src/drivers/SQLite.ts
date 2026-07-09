@@ -1,6 +1,7 @@
 import SQLite from "better-sqlite3";
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability} from "interaqt";
-import { sqliteEncodeLiteral } from "@storage";
+// CAUTION drivers 是发布包的独立子入口（interaqt/drivers），只能从主入口 "interaqt" 导入：
+//  路径别名（@storage 等）在消费者环境不存在，且共享单例（asyncInteractionContext）必须与主包同源。
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability, sqliteEncodeLiteral} from "interaqt";
 
 class IDSystem {
     constructor(public db: Database) {}

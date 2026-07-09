@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, stringifyAttribute, BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from '@core';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, decodeFunctionValues, BoolExp, BoolAtomData, BoolExpressionData, type BoolExpressionRawData } from '@core';
 import { Conditions } from './Conditions.js';
 
 export interface ConditionInstance extends IInstance {
@@ -88,13 +88,6 @@ export class Condition implements ConditionInstance {
   
   static parse(json: string): ConditionInstance {
     const data: SerializedData<ConditionCreateArgs> = JSON.parse(json);
-    const args = data.public;
-    
-    const raw = args as unknown as Record<string, unknown>;
-    if (typeof raw.content === 'string' && raw.content.startsWith('func::')) {
-      args.content = new Function('return ' + raw.content.substring(6))();
-    }
-    
-    return this.create(args, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

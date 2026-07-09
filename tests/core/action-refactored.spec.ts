@@ -36,11 +36,13 @@ describe("Action Refactored - compatibility test", () => {
   test("should parse stringified action", () => {
     const original = Action.create({ name: "parseTest" });
     const stringified = Action.stringify(original);
+    // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+    Action.instances.length = 0;
     const parsed = Action.parse(stringified);
 
     expect(parsed.name).toBe("parseTest");
     expect(parsed._type).toBe("Action");
-    expect(parsed.uuid).toBeDefined();
+    expect(parsed.uuid).toBe(original.uuid);
   });
 
   test("should clone action", () => {

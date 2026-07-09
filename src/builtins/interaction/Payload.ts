@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
 import { PayloadItemInstance } from './PayloadItem.js';
 
 export interface PayloadInstance extends IInstance {
@@ -76,6 +76,6 @@ export class Payload implements PayloadInstance {
   
   static parse(json: string): PayloadInstance {
     const data: SerializedData<PayloadCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

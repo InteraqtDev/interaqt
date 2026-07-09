@@ -58,6 +58,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./drivers": {
+      "import": "./dist/drivers.js",
+      "types": "./dist/drivers/index.d.ts"
     }
   },
   "type": "module",

@@ -1,6 +1,5 @@
-import {Database, DatabaseLogger, EntityIdRef, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability, defaultEncodeLiteral} from "interaqt";
 import mysql, {type Connection, type ConnectionOptions, RowDataPacket} from 'mysql2/promise'
-import { defaultEncodeLiteral } from "@storage";
 
 class IDSystem {
     constructor(public db: Database) {}

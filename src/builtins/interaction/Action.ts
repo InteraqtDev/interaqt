@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
 
 // Action 实例接口
 export interface ActionInstance extends IInstance {
@@ -76,7 +76,7 @@ export class Action implements ActionInstance {
 
   static parse(json: string): ActionInstance {
     const data: SerializedData<ActionCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 

@@ -1,7 +1,6 @@
-import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability} from "interaqt";
+import {Database, DatabaseLogger, EntityIdRef, ROW_ID_ATTR, asyncInteractionContext, InteractionContext, dbConsoleLogger, TransactionCapability, defaultEncodeLiteral} from "interaqt";
 import { PGlite} from '@electric-sql/pglite'
 import { uuidv7 } from "@interaqt/uuidv7";
-import { defaultEncodeLiteral } from "@storage";
 
 class IDSystem {
     constructor(public db: Database) {}

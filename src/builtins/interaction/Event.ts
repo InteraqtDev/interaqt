@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
 
 // Event 实例接口
 export interface EventInstance extends IInstance {
@@ -76,6 +76,6 @@ export class Event implements EventInstance {
 
   static parse(json: string): EventInstance {
     const data: SerializedData<EventCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

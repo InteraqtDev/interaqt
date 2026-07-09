@@ -324,15 +324,24 @@ export class ActivityCall {
     }
 
     isActivityHead(interaction: InteractionInstance, head: InteractionLikeNodeBase = this.graph.head): boolean {
-        if (ActivityGroup.is(this.graph.head.content)) {
-            return !!(this.graph.head as ActivityGroupNode).childSeqs?.some(seq => this.isActivityHead(interaction, seq.head))
+        // CAUTION 必须使用参数 head（递归时传入的是子序列的 head），
+        //  误用 this.graph.head 会在「group 作为流程起点」时无限递归（构造期栈溢出）。
+        const headNode = head as InteractionNode | ActivityGroupNode
+        if (ActivityGroup.is(headNode.content)) {
+            return !!(headNode as ActivityGroupNode).childSeqs?.some(seq => this.isActivityHead(interaction, seq.head))
         } else {
-            return interaction === this.graph.head.content
+            return interaction === headNode.content
         }
     }
 
     async checkActivityState(storage: StorageAccess, activityId: string, interactionUuid: string) {
-        const state = new ActivityState(await this.getState(storage, activityId), this)
+        // fail-closed：activityId 是 API 边界输入，查不到记录必须给出业务级错误，
+        //  否则 new ActivityState(undefined) 会在深处抛 "Cannot read properties of undefined" 的裸 TypeError。
+        const stateData = await this.getState(storage, activityId)
+        if (!stateData) {
+            throw new Error(`activity ${activityId} not found for activity "${this.activity.name}"`)
+        }
+        const state = new ActivityState(stateData, this)
         if (!state.isInteractionAvailable(interactionUuid)) {
             throw new Error(`interaction ${interactionUuid} not available`)
         }
@@ -348,6 +357,9 @@ export class ActivityCall {
 
     async completeInteractionState(storage: StorageAccess, activityId: string, interactionUuid: string) {
         const activity = await this.getActivity(storage, activityId)
+        if (!activity) {
+            throw new Error(`activity ${activityId} not found for activity "${this.activity.name}"`)
+        }
         const state = new ActivityState(activity.state, this)
         state.completeInteraction(interactionUuid)
         const nextState = state.toJSON()

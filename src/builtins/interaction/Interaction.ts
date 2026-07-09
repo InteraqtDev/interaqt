@@ -1,7 +1,8 @@
 import {
     IInstance, SerializedData, generateUUID, Concept, ConceptAlias, ConceptInstance, DerivedConcept,
     EntityInstance, Entity, RelationInstance, Relation, Property,
-    BoolExp, ExpressionData, BoolExpressionRawData, EventSourceInstance
+    BoolExp, ExpressionData, BoolExpressionRawData, EventSourceInstance,
+    stringifyInstance, decodeFunctionValues
 } from '@core';
 import type { Controller } from '@runtime';
 import { ActionInstance, GetAction } from './Action.js';
@@ -166,26 +167,12 @@ export class Interaction implements InteractionInstance {
     return instance;
   }
   
+  // CAUTION 必须走统一的 stringifyInstance 管线：嵌套的 Klass 实例（Action/Conditions/Payload/Entity 等）
+  //  会被编码为 `uuid::` 引用、函数编码为 `func::`。此前手写的 JSON.stringify 会把嵌套实例内联成
+  //  plain object（函数直接丢失、Klass 身份丢失），graph 级 round-trip（stringifyAllInstances →
+  //  createInstancesFromString）产出损毁的 Interaction。
   static stringify(instance: InteractionInstance): string {
-    const args: InteractionCreateArgs = {
-      name: instance.name,
-      action: instance.action
-    };
-    if (instance.conditions !== undefined) args.conditions = instance.conditions;
-    if (instance.userAttributives !== undefined) args.userAttributives = instance.userAttributives;
-    if (instance.userRef !== undefined) args.userRef = instance.userRef;
-    if (instance.payload !== undefined) args.payload = instance.payload;
-
-    if (instance.data !== undefined) args.data = instance.data;
-    if (instance.dataPolicy !== undefined) args.dataPolicy = instance.dataPolicy;
-    
-    const data: SerializedData<InteractionCreateArgs> = {
-      type: 'Interaction',
-      options: instance._options,
-      uuid: instance.uuid,
-      public: args
-    };
-    return JSON.stringify(data);
+    return stringifyInstance(this, instance as unknown as IInstance);
   }
   
   static clone(instance: InteractionInstance, deep: boolean): InteractionInstance {
@@ -212,9 +199,11 @@ export class Interaction implements InteractionInstance {
     return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
   }
   
+  // 与 core（Entity.parse 等）对齐：还原 `func::` 函数并保持 uuid 身份。
+  // `uuid::` 引用需要完整实例集合才能解析——graph 级反序列化请使用 createInstancesFromString。
   static parse(json: string): InteractionInstance {
     const data: SerializedData<InteractionCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 

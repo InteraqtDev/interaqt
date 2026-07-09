@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, stringifyAttribute, BoolAtomDataInstance, BoolExpressionDataInstance, BoolExp, BoolAtomData, BoolExpressionData } from '@core';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, decodeFunctionValues, BoolAtomDataInstance, BoolExpressionDataInstance, BoolExp, BoolAtomData, BoolExpressionData } from '@core';
 
 export interface ConditionsInstance extends IInstance {
   content?: BoolExpressionDataInstance | BoolAtomDataInstance;
@@ -101,6 +101,6 @@ export class Conditions implements ConditionsInstance {
   
   static parse(json: string): ConditionsInstance {
     const data: SerializedData<ConditionsCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 
