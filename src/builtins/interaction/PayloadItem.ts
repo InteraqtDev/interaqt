@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, EntityInstance } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues, EntityInstance } from '@core';
 import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
 
 export interface PayloadItemInstance extends IInstance {
@@ -146,6 +146,6 @@ export class PayloadItem implements PayloadItemInstance {
   
   static parse(json: string): PayloadItemInstance {
     const data: SerializedData<PayloadItemCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

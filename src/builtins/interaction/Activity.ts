@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID, stringifyAttribute } from '@core';
+import { IInstance, SerializedData, generateUUID, stringifyAttribute, decodeFunctionValues } from '@core';
 import { InteractionInstance } from './Interaction.js';
 import { GatewayInstance } from './Gateway.js';
 import { EventInstance } from './Event.js';
@@ -159,9 +159,12 @@ export class Activity implements ActivityInstance {
     return data !== null && typeof data === 'object' && typeof (data as IInstance).uuid === 'string';
   }
   
+  // 与 core（Entity.parse 等）对齐：还原 `func::` 函数并保持 uuid 身份。
+  // interactions/transfers/groups 等 `uuid::` 引用需要完整实例集合才能解析——
+  // graph 级反序列化请使用 createInstancesFromString（Transfer/ActivityGroup 已注册 Klass）。
   static parse(json: string): ActivityInstance {
     const data: SerializedData<ActivityCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 
@@ -247,7 +250,7 @@ export class ActivityGroup implements ActivityGroupInstance {
   
   static parse(json: string): ActivityGroupInstance {
     const data: SerializedData<ActivityGroupCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 
@@ -335,7 +338,7 @@ export class Transfer implements TransferInstance {
   
   static parse(json: string): TransferInstance {
     const data: SerializedData<TransferCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }
 

@@ -45,6 +45,8 @@ describe("Support Classes Refactored", () => {
       });
       
       const stringified = Condition.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      Condition.instances.length = 0;
       const parsed = Condition.parse(stringified);
 
       expect(parsed.name).toBe("AlwaysTrue");
@@ -150,6 +152,8 @@ describe("Support Classes Refactored", () => {
       });
       
       const stringified = PayloadItem.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      PayloadItem.instances.length = 0;
       const parsed = PayloadItem.parse(stringified);
 
       expect(parsed.name).toBe("email");
@@ -203,6 +207,8 @@ describe("Support Classes Refactored", () => {
       });
       
       const stringified = Payload.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      Payload.instances.length = 0;
       const parsed = Payload.parse(stringified);
 
       expect(parsed.items).toHaveLength(1);

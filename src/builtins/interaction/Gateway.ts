@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
 
 // Gateway 实例接口
 export interface GatewayInstance extends IInstance {
@@ -76,6 +76,6 @@ export class Gateway implements GatewayInstance {
 
   static parse(json: string): GatewayInstance {
     const data: SerializedData<GatewayCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 } 

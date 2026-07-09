@@ -25,6 +25,8 @@ describe("Simple Objects Refactored - compatibility test", () => {
     test("should stringify and parse gateway", () => {
       const original = Gateway.create({ name: "TestGateway" });
       const stringified = Gateway.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      Gateway.instances.length = 0;
       const parsed = Gateway.parse(stringified);
 
       expect(parsed.name).toBe("TestGateway");
@@ -53,6 +55,8 @@ describe("Simple Objects Refactored - compatibility test", () => {
     test("should stringify and parse event", () => {
       const original = Event.create({ name: "TestEvent" });
       const stringified = Event.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      Event.instances.length = 0;
       const parsed = Event.parse(stringified);
 
       expect(parsed.name).toBe("TestEvent");

@@ -227,10 +227,14 @@ describe("Core Domain Classes Refactored", () => {
       });
       
       const stringified = Interaction.stringify(original);
+      // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+      Interaction.instances.length = 0;
       const parsed = Interaction.parse(stringified);
 
       expect(parsed.name).toBe("UpdateProfile");
-      expect(parsed.action).toBeDefined();
+      expect(parsed.uuid).toBe(original.uuid);
+      // 统一管线：嵌套 Klass 实例编码为 uuid:: 引用，graph 级解析见 createInstancesFromString
+      expect(parsed.action).toBe(`uuid::${action.uuid}`);
     });
   });
 

@@ -1,4 +1,4 @@
-import { IInstance, SerializedData, generateUUID } from '@core';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues } from '@core';
 
 // DataPolicy - defines fixed constraints for data fetching in interactions
 export interface DataPolicyInstance extends IInstance {
@@ -99,6 +99,6 @@ export class DataPolicy implements DataPolicyInstance {
   
   static parse(json: string): DataPolicyInstance {
     const data: SerializedData<DataPolicyCreateArgs> = JSON.parse(json);
-    return this.create(data.public, data.options);
+    return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
 }

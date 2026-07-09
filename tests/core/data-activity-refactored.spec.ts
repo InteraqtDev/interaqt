@@ -56,6 +56,8 @@ describe("Data and Activity Classes Refactored", () => {
         });
         
         const stringified = DataPolicy.stringify(original);
+        // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+        DataPolicy.instances.length = 0;
         const parsed = DataPolicy.parse(stringified);
 
         expect(parsed.match).toEqual(original.match);
@@ -207,6 +209,8 @@ describe("Data and Activity Classes Refactored", () => {
         });
         
         const stringified = Transfer.stringify(original);
+        // Clear instances before parsing: parse preserves the uuid (identity round-trip)
+        Transfer.instances.length = 0;
         const parsed = Transfer.parse(stringified);
 
         expect(parsed.name).toBe("testFlow");
