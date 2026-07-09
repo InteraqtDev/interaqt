@@ -869,6 +869,7 @@ export class DBSetup {
      */
     private mergedAbstractNames: Set<string> = new Set()
     private mergedDiscriminatorHostNames: Set<string> = new Set()
+    private mergedInputWritablePropertyNames: Map<string, string[]> = new Map()
     private processMergedItems() {
         const result = processMergedItems(
             this.entities,
@@ -879,6 +880,7 @@ export class DBSetup {
         this.relations = result.relations;
         this.mergedAbstractNames = result.abstractNames;
         this.mergedDiscriminatorHostNames = result.discriminatorHostNames;
+        this.mergedInputWritablePropertyNames = result.inputWritablePropertyNames;
     }
 
     /**
@@ -895,6 +897,13 @@ export class DBSetup {
         for (const name of this.mergedDiscriminatorHostNames) {
             if (this.map.records[name]) {
                 this.map.records[name].hasMergedDiscriminator = true
+            }
+        }
+        // input 视图共享物理 base 的属性命名空间，写入口需要知道每个 input 名下声明了哪些属性，
+        // 才能拒绝「以 input A 的名义写 input B 的特有属性」的静默跨视图污染。
+        for (const [name, propertyNames] of this.mergedInputWritablePropertyNames) {
+            if (this.map.records[name]) {
+                this.map.records[name].writablePropertyNames = propertyNames
             }
         }
     }

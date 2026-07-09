@@ -403,16 +403,21 @@ describe('Long column name tests', () => {
             'UserWithExtremelyLongEntityNameForRelationCRUDTesting',
             MatchExp.atom({ key: 'id', value: ['=', userWithTeams.id] }),
             {
+                // 关系属性必须通过 '&' 声明（内联在 ref 对象上的关系属性此前被静默丢弃，写入口现在 fail-fast）。
                 belongsToTeamsWithVeryLongPropertyNameToTestColumnShortening: [
                     {
                         id: teamAData.id,
-                        roleWithAnExtremelyLongPropertyNameInTheRelationToTestFieldShortening: 'Leader',
-                        joinDateWithAnotherVeryLongPropertyNameToEnsureProperHandling: '2024-01-01'
+                        '&': {
+                            roleWithAnExtremelyLongPropertyNameInTheRelationToTestFieldShortening: 'Leader',
+                            joinDateWithAnotherVeryLongPropertyNameToEnsureProperHandling: '2024-01-01'
+                        }
                     },
                     {
                         id: teamBData.id,
-                        roleWithAnExtremelyLongPropertyNameInTheRelationToTestFieldShortening: 'Member',
-                        joinDateWithAnotherVeryLongPropertyNameToEnsureProperHandling: '2024-01-02'
+                        '&': {
+                            roleWithAnExtremelyLongPropertyNameInTheRelationToTestFieldShortening: 'Member',
+                            joinDateWithAnotherVeryLongPropertyNameToEnsureProperHandling: '2024-01-02'
+                        }
                     }
                 ]
             }

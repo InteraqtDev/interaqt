@@ -106,7 +106,15 @@ async function normalizeComputeTargetResult(
             const targets = Array.isArray(item) ? [item[1]].flat() : [item.target].flat()
             for (const source of sources) {
                 for (const target of targets) {
-                    if (!source?.id || !target?.id) continue
+                    // fail-fast：端点形态已被显式声明（{source, target}），其中缺 id 只能是
+                    //  computeTarget 的实现错误。静默 continue 会让转移无声失效（与「整体返回
+                    //  undefined 表示 skip」不同，那是显式的跳过契约）。
+                    if (!source?.id || !target?.id) {
+                        throw new ComputationProtocolError(
+                            `StateMachine computation of property "${dataContext.host.name}.${dataContext.id.name}" ${describeTransfer()}: computeTarget returned an endpoint form whose ${!source?.id ? 'source' : 'target'} has no id (got ${JSON.stringify({ source, target })}). Every endpoint must be {id} (or an array of {id}); return undefined to skip the transfer explicitly.`,
+                            { handleName: 'StateMachine', computationPhase: 'compute-dirty-records' }
+                        )
+                    }
                     const match = BoolExp.atom({ key: 'source.id', value: ['=', source.id] })
                         .and({ key: 'target.id', value: ['=', target.id] })
                     const relationRecords = await controller.system.storage.find(dataContext.host.name!, match, undefined, ['id'])

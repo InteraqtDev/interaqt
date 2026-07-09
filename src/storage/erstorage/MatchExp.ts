@@ -243,6 +243,20 @@ export class MatchExp {
                     throw new Error(`match operator '${value[0]}' does not support null for key "${key}". Use ['=', null] (IS NULL) or ['!=', null] (IS NOT NULL)`)
                 }
                 fieldParams = []
+            } else if (fieldType?.toLowerCase() === 'json' && (value[0] === '=' || value[0] === '!=')) {
+                // CAUTION json 列的写入路径统一走 JSON.stringify（SQLBuilder.prepareFieldValue），
+                //  匹配参数若不做同样的序列化：文本型存储（SQLite/MySQL 文本比较）恒零命中，
+                //  PG/PGLite 直接抛 "operator does not exist: json = unknown" 的裸数据库错误。
+                //  优先给驱动方言机会（PG 系需要 ::jsonb 做语义相等比较），否则退化为与写入
+                //  路径一致的序列化文本相等比较。
+                const dialectResult = db?.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this), p)
+                if (dialectResult) {
+                    fieldValue = dialectResult.fieldValue
+                    fieldParams = dialectResult.fieldParams || []
+                } else {
+                    fieldValue = `${value[0]} ${p()}`
+                    fieldParams = [JSON.stringify(value[1])]
+                }
             } else {
                 fieldValue = `${value[0]} ${p()}`
                 fieldParams = [value[1]]

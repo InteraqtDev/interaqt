@@ -252,10 +252,14 @@ describe('Version Control Example with Hard Delete', () => {
           ['*']
         );
 
+        // VersionedStyle 只声明了 content/status/version/createdAt——显式拷贝声明面。
+        // （...style 展开会带上 Style 的 _isDeleted_ / bound-state 列，未声明键写入口现在 fail-fast。）
         return currentStyles.map(style => {
           return {
-            ...style,
-            id: undefined,
+            content: style.content,
+            status: style.status,
+            version: style.version,
+            createdAt: style.createdAt,
             }
           });
       }
@@ -306,9 +310,12 @@ describe('Version Control Example with Hard Delete', () => {
               ['*']
             );
 
+            // Style 的声明面是 content/status/version/createdAt——显式拷贝。
+            // （...style 展开会带上 VersionedStyle 的 bound-state 列，未声明键写入口现在 fail-fast。）
             return targetStyles.map(style => ({
-              ...style,
-              id: undefined,
+              content: style.content,
+              status: style.status,
+              createdAt: style.createdAt,
               version: versionInfo.version,
             }));
           }

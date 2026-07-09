@@ -135,6 +135,11 @@ export class Entity implements EntityInstance {
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`Entity name "${args.name}" is invalid. Entity names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
     }
+    // filtered entity 是 base 上的谓词视图：没有 matchExpression 的"视图"没有任何语义
+    // （查询重写拿不到谓词，setup/查询在深处抛裸 TypeError），必须在声明期 fail-fast。
+    if (args.baseEntity && !args.matchExpression) {
+      throw new Error(`Filtered entity "${args.name}" declares baseEntity but no matchExpression. A filtered entity is a predicate view over its base — declare matchExpression, or use the base entity directly.`);
+    }
 
     const instance = new Entity(args, options);
     

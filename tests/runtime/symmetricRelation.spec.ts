@@ -247,7 +247,8 @@ describe('Symmetric relation computation', () => {
     const user2 = await system.storage.create('User', {username: 'Bob'});
     
     // Create friendship from user1 to user2
-    await system.storage.addRelationByNameById('User_friends_friends_User', user1.id, user2.id, {level: 'bestfriend'});
+    // 该 relation 未声明 level 属性（未声明键此前被静默丢弃，写入口现在 fail-fast）。
+    await system.storage.addRelationByNameById('User_friends_friends_User', user1.id, user2.id);
     
     // Query friends of user1
     const user1WithFriends = await system.storage.findOne(

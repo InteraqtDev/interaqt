@@ -583,7 +583,9 @@ describe('Every computed handle', () => {
     await controller.setup(true)
 
     // 创建 1 个 user 和 2 个 request
-    const user = await system.storage.create('User', {everyRequestHandled: false})  
+    // 该段的 User 声明的是 everyRequestHasTwoItems（计算属性），此前误写的 everyRequestHandled
+    // 被静默丢弃；写入口 fail-fast 后必须移除。
+    const user = await system.storage.create('User', {name: 'u1'})
     const request1 = await system.storage.create('Request', {handled: false, owner: user})      
 
     const user2 = await system.storage.findOne('User', MatchExp.atom({key: 'id', value: ['=', user.id]}), undefined, ['*'])

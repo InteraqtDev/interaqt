@@ -69,16 +69,18 @@ import {
   // Special Entities
   InteractionEventEntity,  // NOT InteractionEvent
   
-  // Database Drivers
-  PGLiteDB,
-  SQLiteDB,
-  PostgreSQLDB,
-  MysqlDB,
-  
   // Class Reference
   KlassByName
   
 } from 'interaqt';
+
+// Database drivers are a separate subpath entry (NOT exported from the main package):
+import {
+  PGLiteDB,
+  SQLiteDB,
+  PostgreSQLDB,
+  MysqlDB,
+} from 'interaqt/drivers';
 ```
 
 ## What is NOT Exported
@@ -167,9 +169,9 @@ import {
 import { 
   Controller, 
   MonoSystem, 
-  PGLiteDB,
   KlassByName 
 } from 'interaqt';
+import { PGLiteDB } from 'interaqt/drivers';
 
 const system = new MonoSystem(new PGLiteDB());
 system.conceptClass = KlassByName;
@@ -202,7 +204,7 @@ const controller = new Controller({
 
 4. **Filtered Entities**: Created using `Entity.create()` with `baseEntity` and `filterCondition`, not a separate import.
 
-5. **Database Drivers**: Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. `ScopedSequence` is production-safe for cross-connection/cross-process allocation on PostgreSQL; PGLiteDB and SQLiteDB are local/test-level only for scoped sequence concurrency.
+5. **Database Drivers**: Imported from the `interaqt/drivers` subpath (not the main package). Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. `ScopedSequence` is production-safe for cross-connection/cross-process allocation on PostgreSQL; PGLiteDB and SQLiteDB are local/test-level only for scoped sequence concurrency.
 
 6. **Transaction helpers**: `runWithTransactionRetry`, `isRetryableTransactionError`, and `isRequireSerializableRetry` are exported for advanced runtime integrations and tests. Most application code should use `Controller.dispatch()` or `system.storage.runInTransaction()` instead of calling retry helpers directly.
 
