@@ -534,6 +534,7 @@ Custom callbacks may be replayed after retryable transaction failures. Do not pe
 
 **Incremental planning**
 - If `incrementalCompute` or `incrementalPatchCompute` is provided, the computation must also provide `incrementalDataDeps` or `planIncremental`.
+- Mutation event snapshot shapes differ by type: `create` events carry the written fields in `record` (`oldRecord` is `undefined`); `update` events carry **only the changed fields** (+ `id`) in `record` and the full pre-update snapshot in `oldRecord`; `delete` events carry the full deleted snapshot in `record` (`oldRecord` is `undefined`). For updates, reconstruct the full new state with `{ ...mutationEvent.oldRecord, ...mutationEvent.record }` or re-fetch the record — reading unchanged fields off `mutationEvent.record` yields `undefined`.
 - `incrementalDataDeps: string[]` lists exactly which `dataDeps` keys should be resolved for the incremental callback; use `[]` when none are needed.
 - `planIncremental(event, record, context)` is the advanced form. Return `{ type: 'incremental', dataDepKeys, needsLastValue? }`, `{ type: 'fullRecompute', reason }`, or `{ type: 'skip', reason }`.
 - Incremental callbacks receive only planned partial `dataDeps`; the runtime no longer resolves all `dataDeps` before incremental execution.
