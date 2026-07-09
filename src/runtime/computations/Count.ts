@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Count } from "@core";
 import { Controller } from "../Controller.js";
 import { CountInstance, EntityInstance, RelationInstance } from "@core";
-import { buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { assertCallbackAttributeQueryDeclared, buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
 import { assert } from "../util.js";
@@ -25,6 +25,9 @@ export class GlobalCountHandle implements DataBasedComputation {
     constructor(public controller: Controller, public args: CountInstance, public dataContext: DataContext) {
         this.record = this.args.record!
         this.callback = this.args.callback?.bind(this) || (() => true)
+        if (this.args.callback) {
+            assertCallbackAttributeQueryDeclared('Count', dataContext, this.args.attributeQuery)
+        }
         
         this.dataDeps = {
             main: {
@@ -73,8 +76,20 @@ export class GlobalCountHandle implements DataBasedComputation {
         let delta = 0
         if (mutationEvent.type === 'create') {
             // 检查新创建的记录是否符合条件
-            const itemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps)
-            const { oldValue } = await this.state.isItemMatch.replace(mutationEvent.record, itemMatch)
+            let newRecord = mutationEvent.record
+            if (this.args.callback) {
+                // CAUTION create 事件的 record 只携带写入时的字段（defaultValues + payload），callback 可能
+                //  依赖计算列或 attributeQuery 声明的关联数据，必须拉取全量 new record 再判断（与 update 路径一致）。
+                newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
+                    key: 'id',
+                    value: ['=', mutationEvent.record!.id]
+                }), undefined, this.args.attributeQuery)
+                if (!newRecord) {
+                    return ComputationResult.fullRecompute(`record ${mutationEvent.record!.id} not found on create for ${this.dataContext.type} count`)
+                }
+            }
+            const itemMatch = !!this.callback.call(this.controller, newRecord, dataDeps)
+            const { oldValue } = await this.state.isItemMatch.replace(newRecord, itemMatch)
             delta = Number(itemMatch) - Number(!!oldValue)
         } else if (mutationEvent.type === 'delete') {
             const itemMatch = await this.state.isItemMatch.get(mutationEvent.record)
@@ -126,6 +141,9 @@ export class PropertyCountHandle implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: CountInstance, public dataContext: PropertyDataContext) {
         this.callback = this.args.callback?.bind(this.controller)
+        if (this.args.callback) {
+            assertCallbackAttributeQueryDeclared('Count', dataContext, this.args.attributeQuery)
+        }
         
         // Find relation by property name or fall back to record
         if (this.args.property) {

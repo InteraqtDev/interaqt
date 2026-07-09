@@ -33,6 +33,7 @@ import { Every } from 'interaqt';
 
 const allCompleted = Every.create({
   record: UserTaskRelation,
+  attributeQuery: ['status'],  // Required when callback reads fields
   callback: (relation) => relation.status === 'completed'
 });
 ```

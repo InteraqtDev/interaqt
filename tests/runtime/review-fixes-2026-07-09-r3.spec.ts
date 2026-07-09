@@ -74,7 +74,7 @@ describe("review fixes 2026-07-09 r3", () => {
             system, entities: [Task, ActiveTask], relations: [],
             dict: [Dictionary.create({
                 name: "r3FixActiveTaskCount", type: "number", collection: false,
-                computation: Count.create({ record: ActiveTask, callback: () => true }),
+                computation: Count.create({ record: ActiveTask }),
             })],
         });
         await controller.setup(true);

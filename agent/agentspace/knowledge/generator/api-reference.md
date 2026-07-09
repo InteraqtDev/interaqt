@@ -799,6 +799,7 @@ const userTotalScore = Property.create({
     type: 'number',
     computation: WeightedSummation.create({
         property: 'scores',  // Use property name from relation
+        attributeQuery: ['multiplier', 'points'],  // Required when callback reads fields
         callback: function(scoreRecord) {
             return {
                 weight: scoreRecord.multiplier || 1,
@@ -811,6 +812,7 @@ const userTotalScore = Property.create({
 // Global weighted summation
 const globalWeightedScore = WeightedSummation.create({
     record: ScoreRecord,
+    attributeQuery: ['difficulty', 'score'],  // Required when callback reads fields
     callback: function(record) {
         return {
             weight: record.difficulty,

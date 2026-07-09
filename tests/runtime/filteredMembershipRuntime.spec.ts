@@ -60,9 +60,8 @@ describe('filtered/merged membership events drive runtime computations', () => {
                     type: 'number',
                     collection: false,
                     computation: Count.create({
-                        record: techTeamUserEntity,
-                        callback: () => true
-                    })
+                        record: techTeamUserEntity
+                        })
                 })
             ]
         });
@@ -113,7 +112,7 @@ describe('filtered/merged membership events drive runtime computations', () => {
             dict: [
                 Dictionary.create({
                     name: 'activeCount', type: 'number', collection: false,
-                    computation: Count.create({ record: activeUserEntity, callback: () => true })
+                    computation: Count.create({ record: activeUserEntity })
                 }),
                 Dictionary.create({
                     name: 'activeSalarySum', type: 'number', collection: false,
@@ -210,13 +209,13 @@ describe('filtered/merged membership events drive runtime computations', () => {
                     name: 'contactCount',
                     type: 'number',
                     collection: false,
-                    computation: Count.create({ record: contactEntity, callback: () => true })
+                    computation: Count.create({ record: contactEntity })
                 }),
                 Dictionary.create({
                     name: 'customerCount',
                     type: 'number',
                     collection: false,
-                    computation: Count.create({ record: customerEntity, callback: () => true })
+                    computation: Count.create({ record: customerEntity })
                 })
             ]
         });

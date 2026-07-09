@@ -99,8 +99,14 @@ export class LinkInfo {
     isSymmetric() {
         return this.data.sourceRecord === this.data.targetRecord && this.data.sourceProperty === this.data.targetProperty
     }
+    // CAUTION link 的端点可能是 filtered entity（如 Relation.create({ source: ActiveUser, ... })），
+    //  而调用方（删除级联/更新 unlink 等）经常拿的是 resolved base 名（'User'）。filtered 与 base
+    //  共享同一属性命名空间（Setup.validateRelations 保证家族内属性名唯一），所以按 resolved 名比较。
+    private resolveRecordName(recordName: string) {
+        return this.map.data.records[recordName]?.resolvedBaseRecordName || recordName
+    }
     isRelationSource(recordName: string, attribute: string) {
-        return this.data.sourceRecord === recordName && this.data.sourceProperty === attribute
+        return this.resolveRecordName(this.data.sourceRecord) === this.resolveRecordName(recordName) && this.data.sourceProperty === attribute
     }
 
     getAttributeName(recordName: string, attribute: string) {

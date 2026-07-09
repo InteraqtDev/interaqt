@@ -41,7 +41,7 @@ type AggKind = {
 const aggKinds: AggKind[] = [
   {
     name: 'count', dictType: 'number',
-    create: (record) => Count.create({ record, callback: () => true }),
+    create: (record) => Count.create({ record, attributeQuery: [], callback: () => true }),
     truth: (rows) => rows.length,
   },
   {
@@ -289,8 +289,8 @@ describe('combinatorial matrix exploration', () => {
       Worker.properties!.push(Property.create({ name: propName, type, computation }));
       propCells.push({ cell: `prop/${propName}`, propName, truth, useFlagged });
     };
-    addProp('cnt', 'number', Count.create({ property: 'jobs', callback: () => true }), ls => ls.length, false);
-    addProp('cntF', 'number', Count.create({ property: 'flaggedJobs', callback: () => true }), ls => ls.length, true);
+    addProp('cnt', 'number', Count.create({ property: 'jobs', attributeQuery: [], callback: () => true }), ls => ls.length, false);
+    addProp('cntF', 'number', Count.create({ property: 'flaggedJobs', attributeQuery: [], callback: () => true }), ls => ls.length, true);
     addProp('sumLink', 'number', Summation.create({ property: 'jobs', attributeQuery: [['&', { attributeQuery: ['rscore'] }]] }),
       ls => ls.reduce((a, l) => a + (l.rscore ?? 0), 0), false);
     addProp('sumLinkF', 'number', Summation.create({ property: 'flaggedJobs', attributeQuery: [['&', { attributeQuery: ['rscore'] }]] }),

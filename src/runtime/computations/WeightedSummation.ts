@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { WeightedSummation } from "@core";
 import { Controller } from "../Controller.js";
 import { WeightedSummationInstance, EntityInstance, RelationInstance } from "@core";
-import { buildRelationSideMatchKey, ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, IncrementalPlan, RecordsDataDep, RecordBoundState, GlobalBoundState } from "./Computation.js";
+import { assertCallbackAttributeQueryDeclared, buildRelationSideMatchKey, ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, IncrementalPlan, RecordsDataDep, RecordBoundState, GlobalBoundState } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
 import { AttributeQueryData, MatchExp, LINK_SYMBOL, RecordQueryData } from "@storage";
@@ -29,7 +29,7 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: DataContext) {
         this.matchRecordToWeight = this.args.callback.bind(this.controller)
         this.record = this.args.record!
-        
+        assertCallbackAttributeQueryDeclared('WeightedSummation', dataContext, this.args.attributeQuery)
         
         this.dataDeps = {
             main: {
@@ -74,7 +74,15 @@ export class GlobalWeightedSummationHandle implements DataBasedComputation {
         }
         let delta = 0
         if (mutationEvent.type === 'create') {
-            const newItem = mutationEvent.record;
+            // CAUTION create 事件的 record 只携带写入时的字段（defaultValues + payload），callback 可能
+            //  依赖计算列或 attributeQuery 声明的关联数据，必须拉取全量 new record 再判断（与 update 路径一致）。
+            const newItem = await this.controller.system.storage.findOne(this.record.name!, MatchExp.atom({
+                key: 'id',
+                value: ['=', mutationEvent.record!.id]
+            }), undefined, (this.dataDeps.main as RecordsDataDep).attributeQuery);
+            if (!newItem) {
+                return ComputationResult.fullRecompute(`record ${mutationEvent.record!.id} not found on create for global weighted summation`)
+            }
             const weightAndValue = this.matchRecordToWeight.call(this.controller, newItem, dataDeps);
             const newResult = resolveWeightedResult(weightAndValue);
             const { oldValue } = await this.state.itemResult.replace(newItem, newResult);
@@ -119,6 +127,7 @@ export class PropertyWeightedSummationHandle implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: WeightedSummationInstance, public dataContext: PropertyDataContext) {
         this.matchRecordToWeight = this.args.callback.bind(this.controller)
+        assertCallbackAttributeQueryDeclared('WeightedSummation', dataContext, this.args.attributeQuery)
 
         // Find relation by property name
         this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!

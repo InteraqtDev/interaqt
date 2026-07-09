@@ -215,6 +215,7 @@ const Product = Entity.create({
       name: 'currentStock',
       computation: WeightedSummation.create({
         record: OrderItemRelation,
+        attributeQuery: ['quantity'],  // Required when callback reads fields
         callback: (orderItem) => ({
           weight: -1,  // Reduce inventory
           value: orderItem.quantity
@@ -225,6 +226,7 @@ const Product = Entity.create({
       name: 'totalSales',
       computation: WeightedSummation.create({
         record: OrderItemRelation,
+        attributeQuery: ['quantity'],  // Required when callback reads fields
         callback: (orderItem) => ({
           weight: 1,
           value: orderItem.quantity

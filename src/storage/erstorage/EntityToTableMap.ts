@@ -395,13 +395,15 @@ export class EntityToTableMap {
             assert(!!recordAttribute?.linkName, `${entityName}.${attribute} is not a record attribute`)
             const relationName = recordAttribute.linkName
             const relationData = this.data.links[relationName]
-            if (relationData.sourceRecord === entityName && relationData.sourceProperty === attribute) {
+            // CAUTION 端点可能是 filtered entity（属性同时登记在 resolved base record 上），
+            //  此时 link 的 sourceRecord/targetRecord 是 filtered 名，与 entityName（base 名）不相等，
+            //  所以用属性自身的 isSource 判定方向，而不是端点名字符串匹配。
+            if (recordAttribute.isSource) {
+                assert(relationData.sourceProperty === attribute, `wrong relation data ${entityName}.${attribute}`)
                 return relationData.targetProperty!
-            } else if (relationData.targetRecord === entityName && relationData.targetProperty === attribute) {
-                return relationData.sourceProperty
             } else {
-                assert(false, `wrong relation data ${entityName}.${attribute}`)
-                return ''
+                assert(relationData.targetProperty === attribute, `wrong relation data ${entityName}.${attribute}`)
+                return relationData.sourceProperty
             }
         }
         

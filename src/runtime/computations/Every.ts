@@ -1,6 +1,6 @@
 import { PropertyDataContext } from "./Computation.js";
 import { Every } from "@core";
-import { buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { assertCallbackAttributeQueryDeclared, buildRelationSideMatchKey, ComputationResult, DataBasedComputation, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { EveryInstance, RelationInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { DataContext } from "./Computation.js";
@@ -20,6 +20,7 @@ export class GlobalEveryHandle implements DataBasedComputation {
     defaultValue: boolean
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: DataContext, ) {
         this.callback = this.args.callback.bind(this.controller)
+        assertCallbackAttributeQueryDeclared('Every', dataContext, this.args.attributeQuery)
         this.dataDeps = {
             main: {
                 type: 'records',
@@ -74,8 +75,17 @@ export class GlobalEveryHandle implements DataBasedComputation {
         let matchDelta = 0
         if (mutationEvent.type === 'create') {
             totalDelta = 1
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
-            const { oldValue } = await this.state!.isItemMatch.replace(mutationEvent.record, newItemMatch)
+            // CAUTION create 事件的 record 只携带写入时的字段（defaultValues + payload），callback 可能
+            //  依赖计算列或 attributeQuery 声明的关联数据，必须拉取全量 new record 再判断（与 update 路径一致）。
+            const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', mutationEvent.record!.id]
+            }), undefined, this.args.attributeQuery)
+            if (!newRecord) {
+                return ComputationResult.fullRecompute(`record ${mutationEvent.record!.id} not found on create for global every`)
+            }
+            const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps) 
+            const { oldValue } = await this.state!.isItemMatch.replace(newRecord, newItemMatch)
             matchDelta = Number(newItemMatch) - Number(!!oldValue)
         } else if (mutationEvent.type === 'delete') {
             totalDelta = -1
@@ -133,6 +143,7 @@ export class PropertyEveryHandle implements DataBasedComputation {
     relatedAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: EveryInstance,  public dataContext: PropertyDataContext ) {
         this.callback = this.args.callback.bind(this.controller)
+        assertCallbackAttributeQueryDeclared('Every', dataContext, this.args.attributeQuery)
 
         this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
         this.isSource = this.args.direction ? this.args.direction === 'source' :this.relation.source.name === dataContext.host.name

@@ -373,6 +373,7 @@ const User = Entity.create({
       defaultValue: () => 0,
       computation: WeightedSummation.create({
         record: UserPublishedPosts,
+        attributeQuery: [['target', { attributeQuery: ['viewCount'] }]],  // Required when callback reads fields
         callback: (relation) => ({
           weight: 1,
           value: relation.target.viewCount

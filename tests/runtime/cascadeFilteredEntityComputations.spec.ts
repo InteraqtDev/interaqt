@@ -105,9 +105,8 @@ describe('Cascade Filtered Entity Computations', () => {
           type: 'number',
           collection: false,
           computation: Count.create({
-            record: userEntity,
-            callback: () => true
-          })
+            record: userEntity
+            })
         }),
         // Count active users
         Dictionary.create({
@@ -115,9 +114,8 @@ describe('Cascade Filtered Entity Computations', () => {
           type: 'number',
           collection: false,
           computation: Count.create({
-            record: activeUsersEntity,
-            callback: () => true
-          })
+            record: activeUsersEntity
+            })
         }),
         // Count tech active users
         Dictionary.create({
@@ -125,9 +123,8 @@ describe('Cascade Filtered Entity Computations', () => {
           type: 'number',
           collection: false,
           computation: Count.create({
-            record: techActiveUsersEntity,
-            callback: () => true
-          })
+            record: techActiveUsersEntity
+            })
         }),
         // Count senior tech active users
         Dictionary.create({
@@ -135,9 +132,8 @@ describe('Cascade Filtered Entity Computations', () => {
           type: 'number',
           collection: false,
           computation: Count.create({
-            record: seniorTechActiveUsersEntity,
-            callback: () => true
-          })
+            record: seniorTechActiveUsersEntity
+            })
         }),
         // Count young active users
         Dictionary.create({
@@ -145,9 +141,8 @@ describe('Cascade Filtered Entity Computations', () => {
           type: 'number',
           collection: false,
           computation: Count.create({
-            record: youngActiveUsersEntity,
-            callback: () => true
-          })
+            record: youngActiveUsersEntity
+            })
         })
       ];
 

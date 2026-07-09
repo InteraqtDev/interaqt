@@ -200,6 +200,7 @@ describe('WeightedSummation computed handle', () => {
         collection: false,
         computation: WeightedSummation.create({
           record: productEntity,
+          attributeQuery: ['quantity', 'price'],
           callback: (product: any) => {
             return {
               weight: product.quantity || 0,
@@ -256,6 +257,7 @@ describe('WeightedSummation computed handle', () => {
         collection: false,
         computation: WeightedSummation.create({
           record: accountEntity,
+          attributeQuery: ['factor', 'amount'],
           callback: (account: any) => {
             return {
               weight: account.factor || 0,

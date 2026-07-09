@@ -1344,6 +1344,7 @@ const Order = Entity.create({
       computation: Every.create({
         record: OrderItemRelation,
         relationDirection: 'source',
+        attributeQuery: ['quantity', ['product', { attributeQuery: ['stock'] }]],  // Required when callback reads fields
         callback: function(orderItem) {
           // Check if each order item has sufficient product inventory
           return orderItem.product.stock >= orderItem.quantity;

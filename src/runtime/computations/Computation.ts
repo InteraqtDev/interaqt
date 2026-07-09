@@ -7,6 +7,7 @@ import { Controller } from "../Controller";
 import { AttributeQueryData, LINK_SYMBOL, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { type ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
 import type { EtityMutationEvent } from "../ComputationSourceMap.js";
+import { ComputationProtocolError } from "../errors/ComputationErrors.js";
 
 // Types from ComputationHandle.ts
 export type GlobalDataContext = {
@@ -277,6 +278,39 @@ export type DataDepEventContext = {
 export function externalDataDepKeys(dataDeps: Record<string, DataDep>, primaryKeys: string[]) {
     const primary = new Set(primaryKeys)
     return Object.keys(dataDeps).filter(key => !primary.has(key))
+}
+
+export function describeDataContext(dataContext: DataContext): string {
+    if (dataContext.type === 'property') {
+        return `${dataContext.host.name}.${dataContext.id.name}`
+    }
+    return `${dataContext.type} '${dataContext.id.name}'`
+}
+
+/**
+ * CAUTION fail fast（与 Custom 的 records dataDep 校验对齐）：声明了 callback 却没有 attributeQuery 时，
+ *  full compute 的取数是 id-only（callback 读字段静默拿到 undefined），且字段 update 不会注册任何监听——
+ *  聚合结果静默错误或永久冻结，必须在 setup 阶段拒绝。
+ *  显式声明 attributeQuery: [] 表示 "callback 只依赖 id / 关系成员资格 / dataDeps"，仍然允许。
+ */
+export function assertCallbackAttributeQueryDeclared(
+    computationName: string,
+    dataContext: DataContext,
+    attributeQuery: AttributeQueryData | undefined
+): void {
+    if (attributeQuery === undefined) {
+        throw new ComputationProtocolError(
+            `${computationName} computation of ${describeDataContext(dataContext)} declares a callback but no attributeQuery. ` +
+            `Without attributeQuery the callback receives id-only records (fields read as undefined) and field updates never re-trigger the computation. ` +
+            `Declare the fields your callback reads (e.g. attributeQuery: ['status']), ` +
+            `or explicitly pass attributeQuery: [] if the callback only depends on record membership (create/delete) or external dataDeps.`,
+            {
+                computationName,
+                dataContext,
+                computationPhase: 'callback-attribute-query-validation'
+            }
+        )
+    }
 }
 
 /**

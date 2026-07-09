@@ -2,7 +2,7 @@ import { DataContext, PropertyDataContext } from "./Computation.js";
 import { Any } from "@core";
 import { Controller } from "../Controller.js";
 import { AnyInstance, RelationInstance } from "@core";
-import { buildRelationSideMatchKey, ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
+import { assertCallbackAttributeQueryDeclared, buildRelationSideMatchKey, ComputationResult, DataDep, DataDepEventContext, defaultDataBasedIncrementalPlan, GlobalBoundState, IncrementalPlan, RecordBoundState, RecordsDataDep } from "./Computation.js";
 import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { MatchExp, AttributeQueryData, RecordQueryData, LINK_SYMBOL } from "@storage";
@@ -19,6 +19,7 @@ export class GlobalAnyHandle implements DataBasedComputation {
     primaryDataDepKeys = ['main']
     constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: DataContext, ) {
         this.callback = this.args.callback.bind(this.controller)
+        assertCallbackAttributeQueryDeclared('Any', dataContext, this.args.attributeQuery)
         this.dataDeps = {
             main: {
                 type: 'records',
@@ -68,8 +69,17 @@ export class GlobalAnyHandle implements DataBasedComputation {
 
         let delta = 0
         if (mutationEvent.type === 'create') {
-            const newItemMatch = !!this.callback.call(this.controller, mutationEvent.record, dataDeps) 
-            const { oldValue } = await this.state!.isItemMatch.replace(mutationEvent.record, newItemMatch)
+            // CAUTION create 事件的 record 只携带写入时的字段（defaultValues + payload），callback 可能
+            //  依赖计算列或 attributeQuery 声明的关联数据，必须拉取全量 new record 再判断（与 update 路径一致）。
+            const newRecord = await this.controller.system.storage.findOne(mutationEvent.recordName, MatchExp.atom({
+                key: 'id',
+                value: ['=', mutationEvent.record!.id]
+            }), undefined, this.args.attributeQuery)
+            if (!newRecord) {
+                return ComputationResult.fullRecompute(`record ${mutationEvent.record!.id} not found on create for global any`)
+            }
+            const newItemMatch = !!this.callback.call(this.controller, newRecord, dataDeps) 
+            const { oldValue } = await this.state!.isItemMatch.replace(newRecord, newItemMatch)
             delta = Number(newItemMatch) - Number(!!oldValue)
         } else if (mutationEvent.type === 'delete') {
             // Get the old match status from state instead of recalculating
@@ -114,6 +124,7 @@ export class PropertyAnyHandle implements DataBasedComputation {
     relatedAttributeQuery: AttributeQueryData
     constructor(public controller: Controller,  public args: AnyInstance,  public dataContext: PropertyDataContext ) {
         this.callback = this.args.callback.bind(this.controller)
+        assertCallbackAttributeQueryDeclared('Any', dataContext, this.args.attributeQuery)
 
         this.relation = this.controller.relations.find(r => (r.source === dataContext.host && r.sourceProperty === this.args.property) || (r.target === dataContext.host && r.targetProperty === this.args.property))!
         assert(this.relation, `cannot find relation for property ${this.args.property} in "Any" computation`)
