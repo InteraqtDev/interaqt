@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.0.0-alpha.0](https://github.com/interaqtdev/interaqt/compare/v1.7.0-alpha.0...v2.0.0-alpha.0) (2026-07-09)
+
+### Bug Fixes
+
+* **builtins,drivers:** guard hardening and driver contract fixes ([1c48084](https://github.com/interaqtdev/interaqt/commit/1c48084c582bf6adc560334f88af448e0dc17478))
+* **builtins:** activity stateVersion OCC uses the atomic CAS primitive instead of find-then-update (R-1) ([4377415](https://github.com/interaqtdev/interaqt/commit/4377415cdf40f5e00403296bff97165a16d46560))
+* **core:** BoolExp.or standardizes ExpressionData like .and; missing right operand fails fast (R-7) ([9825192](https://github.com/interaqtdev/interaqt/commit/9825192d29d7a090d2a74fd612bf62ab2e3d69e0))
+* **drivers:** MySQL open() reconnects with the target database and closes the bootstrap connection; SQLite update() returns RETURNING rows (R-3, R-5) ([8ba8c7b](https://github.com/interaqtdev/interaqt/commit/8ba8c7b8ffe6ee87af5f1ab336fc0b809cefba16))
+* **runtime,storage:** update events carry changed keys; trigger.keys subset matching; ambiguous transfers throw (F-3, R-4) ([10f8cf4](https://github.com/interaqtdev/interaqt/commit/10f8cf4ab81732612d698456da8623c2d732dc7e))
+* **runtime/computations:** empty-set Every, NaN guards, property bound-state resets, RealTime validation ([812e358](https://github.com/interaqtdev/interaqt/commit/812e3586e777ea8c5f59e975c4238ad96dfcf196))
+* **runtime/computations:** property aggregation handles fall back to fullRecompute on unknown related events and guard missing relation records (I-1, I-2) ([fa3e5d3](https://github.com/interaqtdev/interaqt/commit/fa3e5d38ea86e34f5ced983f7025be85c1c88f2f))
+* **runtime:** clearer incremental-only full-recompute error; RealTime falls back or fails clearly when solve() throws (I-3, I-4) ([7d73e52](https://github.com/interaqtdev/interaqt/commit/7d73e525c4b1a52f84112c6d44b3b77f89f4de7e))
+* **runtime:** fail fast on bare property dataDep without attributeQuery (F-2) ([1ab1711](https://github.com/interaqtdev/interaqt/commit/1ab1711bdc9c82964ecc9f1ced3227ec627a1a23))
+* **runtime:** filtered predicate changes produce membership diffs, rebuild seeds, and diff review items during migration (F-1) ([13d9ad7](https://github.com/interaqtdev/interaqt/commit/13d9ad74b3136abcc932572ce77a03fe87bfc363))
+* **runtime:** function-valued bound-state defaultValue enters the migration state signature (R-8) ([7ffd288](https://github.com/interaqtdev/interaqt/commit/7ffd2880154095e72e0d86da9d283ef4e784ca4c))
+* **runtime:** handleAsyncReturn locks the whole freshnessKey row set before the isLatest check; lockRows takes locks in id order (R-2) ([6ff6b08](https://github.com/interaqtdev/interaqt/commit/6ff6b08a93955cc9d2c876325d2ccb9da122fdf9))
+* **runtime:** idempotent scheduler setup, serialized single-connection transactions, migration bookkeeping ([2c933d4](https://github.com/interaqtdev/interaqt/commit/2c933d4198e178cde24978d256f624e384d854d4))
+* **storage:** NULL matching, fan-out pagination, boolean read normalization ([e07814e](https://github.com/interaqtdev/interaqt/commit/e07814ed6d50cb319d419e79fca878761b93e027))
+* **storage:** support self-referencing 1:1 reliance by skipping table combine (F-4) ([eb16dff](https://github.com/interaqtdev/interaqt/commit/eb16dfffb8711d38780eb8600d77297f95f69b96))
+
 ## [1.7.0-alpha.0](https://github.com/interaqtdev/interaqt/compare/v1.6.0...v1.7.0-alpha.0) (2026-07-08)
 
 ### ⚠ BREAKING CHANGES
