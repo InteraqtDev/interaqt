@@ -4,8 +4,9 @@ import { PGLiteDB } from '@drivers';
 import {
   Controller, KlassByName,
   MonoSystem, Count, WeightedSummation,
-  MatchExp, Custom,
+  MatchExp, Custom, createMigrationManifest,
 } from 'interaqt';
+import { recomputeFilteredMemberships, getNewFilteredDataContexts, getFilteredRecordChanges } from '@runtime';
 
 // Regression tests for the fourth-round deep code review findings
 // (agentspace/output/deep-review-2026-07-09-r4.md).
@@ -403,14 +404,14 @@ describe('r4 R-6: non-isRef entity payloads must not carry an id', () => {
       name: 'CreatePostR6',
       action: Action.create({ name: 'createPostR6' }),
       payload: Payload.create({
-        items: [PayloadItem.create({ name: 'post', base: Post })]
+        items: [PayloadItem.create({ name: 'post', type: 'object', base: Post })]
       })
     });
     const RefPost = Interaction.create({
       name: 'RefPostR6',
       action: Action.create({ name: 'refPostR6' }),
       payload: Payload.create({
-        items: [PayloadItem.create({ name: 'post', base: Post, isRef: true })]
+        items: [PayloadItem.create({ name: 'post', type: 'object', base: Post, isRef: true })]
       })
     });
     const system = new MonoSystem(new PGLiteDB());
@@ -448,6 +449,96 @@ describe('r4 R-6: non-isRef entity payloads must not carry an id', () => {
   });
 });
 
+describe('r4 R-7: removed filtered records produce membership exit events during migration', () => {
+  test('delete events are synthesized for old members; removed context stays out of rebuild seeds', async () => {
+    const UserV1 = new (Entity as any)({
+      name: 'R7User',
+      properties: [new (Property as any)({ name: 'active', type: 'boolean' }, { uuid: 'r7-user-active' })],
+    }, { uuid: 'r7-user' });
+    const ActiveV1 = new (Entity as any)({
+      name: 'R7ActiveUser',
+      baseEntity: UserV1,
+      matchExpression: MatchExp.atom({ key: 'active', value: ['=', true] }),
+    }, { uuid: 'r7-active' });
+
+    const db = new PGLiteDB();
+    const systemV1 = new MonoSystem(db);
+    systemV1.conceptClass = KlassByName;
+    const controllerV1 = new Controller({ system: systemV1, entities: [UserV1, ActiveV1], relations: [] });
+    await controllerV1.setup(true);
+    const u1 = await systemV1.storage.create('R7User', { active: true });
+    await systemV1.storage.create('R7User', { active: false });
+    const oldManifest = createMigrationManifest(controllerV1);
+
+    // v2: the filtered entity is removed, the base entity stays
+    const UserV2 = new (Entity as any)({
+      name: 'R7User',
+      properties: [new (Property as any)({ name: 'active', type: 'boolean' }, { uuid: 'r7-user-active' })],
+    }, { uuid: 'r7-user' });
+    const systemV2 = new MonoSystem(db);
+    systemV2.conceptClass = KlassByName;
+    const controllerV2 = new Controller({ system: systemV2, entities: [UserV2], relations: [] });
+    const statesV2 = controllerV2.scheduler.createStates();
+    const internalRequirementsV2 = controllerV2.scheduler.createInternalSchemaRequirements();
+    const schemaPlanV2 = await (systemV2 as any).prepareMigrationSchema(
+      controllerV2.entities, controllerV2.relations, statesV2, { internalRequirements: internalRequirementsV2 });
+    const newManifest = createMigrationManifest(controllerV2, schemaPlanV2.schema);
+
+    const changes = getFilteredRecordChanges(oldManifest, newManifest);
+    expect(changes).toEqual([expect.objectContaining({ recordName: 'R7ActiveUser', changeType: 'removed' })]);
+
+    // removed contexts must not seed the rebuild graph (they no longer resolve)
+    expect(getNewFilteredDataContexts(oldManifest, newManifest)).toEqual([]);
+
+    const events = await recomputeFilteredMemberships(controllerV1, oldManifest, newManifest);
+    const deletes = events.filter(e => e.type === 'delete' && e.recordName === 'R7ActiveUser');
+    expect(deletes.map(e => String(e.record!.id))).toEqual([String(u1.id)]);
+    await db.close();
+  });
+
+  test('removed filtered record whose base is also removed is skipped without errors', async () => {
+    const UserV1 = new (Entity as any)({
+      name: 'R7bUser',
+      properties: [new (Property as any)({ name: 'active', type: 'boolean' }, { uuid: 'r7b-user-active' })],
+    }, { uuid: 'r7b-user' });
+    const ActiveV1 = new (Entity as any)({
+      name: 'R7bActiveUser',
+      baseEntity: UserV1,
+      matchExpression: MatchExp.atom({ key: 'active', value: ['=', true] }),
+    }, { uuid: 'r7b-active' });
+    const OtherV1 = new (Entity as any)({
+      name: 'R7bOther',
+      properties: [new (Property as any)({ name: 'x', type: 'string' }, { uuid: 'r7b-other-x' })],
+    }, { uuid: 'r7b-other' });
+
+    const db = new PGLiteDB();
+    const systemV1 = new MonoSystem(db);
+    systemV1.conceptClass = KlassByName;
+    const controllerV1 = new Controller({ system: systemV1, entities: [UserV1, ActiveV1, OtherV1], relations: [] });
+    await controllerV1.setup(true);
+    await systemV1.storage.create('R7bUser', { active: true });
+    const oldManifest = createMigrationManifest(controllerV1);
+
+    // v2: both the filtered entity and its base are gone
+    const OtherV2 = new (Entity as any)({
+      name: 'R7bOther',
+      properties: [new (Property as any)({ name: 'x', type: 'string' }, { uuid: 'r7b-other-x' })],
+    }, { uuid: 'r7b-other' });
+    const systemV2 = new MonoSystem(db);
+    systemV2.conceptClass = KlassByName;
+    const controllerV2 = new Controller({ system: systemV2, entities: [OtherV2], relations: [] });
+    const statesV2 = controllerV2.scheduler.createStates();
+    const internalRequirementsV2 = controllerV2.scheduler.createInternalSchemaRequirements();
+    const schemaPlanV2 = await (systemV2 as any).prepareMigrationSchema(
+      controllerV2.entities, controllerV2.relations, statesV2, { internalRequirements: internalRequirementsV2 });
+    const newManifest = createMigrationManifest(controllerV2, schemaPlanV2.schema);
+
+    const events = await recomputeFilteredMemberships(controllerV1, oldManifest, newManifest);
+    expect(events.filter(e => e.recordName === 'R7bActiveUser')).toEqual([]);
+    await db.close();
+  });
+});
+
 describe('r4 F-3: computation dependency cycles fail fast instead of recursing unboundedly', () => {
   test('property dataDep including its own output property is rejected at setup', async () => {
     const Item = Entity.create({
@@ -460,7 +551,7 @@ describe('r4 F-3: computation dependency cycles fail fast instead of recursing u
             name: 'scoreCalcF3a',
             dataDeps: { _current: { type: 'property', attributeQuery: ['price', 'score'] } },
             compute: async function(deps: any) { return (deps._current?.score ?? 0) + 1; },
-            getDefaultValue: () => 0,
+            getInitialValue: () => 0,
           })
         }),
       ]
@@ -483,7 +574,7 @@ describe('r4 F-3: computation dependency cycles fail fast instead of recursing u
             name: 'aCalcF3b',
             dataDeps: { _current: { type: 'property', attributeQuery: ['b'] } },
             compute: async function(deps: any) { calls++; return (deps._current?.b ?? 0) + 1; },
-            getDefaultValue: () => 0,
+            getInitialValue: () => 0,
           })
         }),
         Property.create({
@@ -492,7 +583,7 @@ describe('r4 F-3: computation dependency cycles fail fast instead of recursing u
             name: 'bCalcF3b',
             dataDeps: { _current: { type: 'property', attributeQuery: ['a'] } },
             compute: async function(deps: any) { calls++; return (deps._current?.a ?? 0) + 1; },
-            getDefaultValue: () => 0,
+            getInitialValue: () => 0,
           })
         }),
       ]
@@ -523,7 +614,7 @@ describe('r4 F-3: computation dependency cycles fail fast instead of recursing u
             name: 'doubleCalcF3c',
             dataDeps: { _current: { type: 'property', attributeQuery: ['price'] } },
             compute: async function(deps: any) { return (deps._current?.price ?? 0) * 2; },
-            getDefaultValue: () => 0,
+            getInitialValue: () => 0,
           })
         }),
         Property.create({
@@ -532,7 +623,7 @@ describe('r4 F-3: computation dependency cycles fail fast instead of recursing u
             name: 'quadCalcF3c',
             dataDeps: { _current: { type: 'property', attributeQuery: ['double'] } },
             compute: async function(deps: any) { return (deps._current?.double ?? 0) * 2; },
-            getDefaultValue: () => 0,
+            getInitialValue: () => 0,
           })
         }),
       ]

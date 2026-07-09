@@ -1673,7 +1673,7 @@ export function buildMigrationDiff(
             id: `filtered-predicate:${filteredChange.recordName}`,
             changeType: "changed",
             dataContext: `${filteredChange.isRelation ? "relation" : "entity"}:${filteredChange.recordName}`,
-            reason: `filtered-predicate-changed: matchExpression of filtered ${filteredChange.isRelation ? "relation" : "entity"} "${filteredChange.recordName}" changed from ${stableStringify(filteredChange.oldRecord?.resolvedMatchExpression ?? null)} to ${stableStringify(filteredChange.newRecord.resolvedMatchExpression ?? null)}; existing memberships will be re-evaluated and downstream computations rebuilt`,
+            reason: `filtered-predicate-changed: matchExpression of filtered ${filteredChange.isRelation ? "relation" : "entity"} "${filteredChange.recordName}" changed from ${stableStringify(filteredChange.oldRecord?.resolvedMatchExpression ?? null)} to ${stableStringify(filteredChange.newRecord?.resolvedMatchExpression ?? null)}; existing memberships will be re-evaluated and downstream computations rebuilt`,
         });
     }
 
@@ -2892,8 +2892,8 @@ type FilteredRecordChange = {
     recordName: string;
     isRelation?: boolean;
     oldRecord?: MigrationManifest["storage"]["records"][number];
-    newRecord: MigrationManifest["storage"]["records"][number];
-    changeType: "added" | "predicate-changed";
+    newRecord?: MigrationManifest["storage"]["records"][number];
+    changeType: "added" | "predicate-changed" | "removed";
 };
 
 /**
@@ -2901,13 +2901,18 @@ type FilteredRecordChange = {
  * - added：新增的 filtered 记录（存量成员需要合成 create 事件）；
  * - predicate-changed：已有 filtered 记录的 resolvedMatchExpression / resolvedBaseRecordName 变了
  *   （查询侧是无状态谓词、立即生效，但依赖它的增量计算必须拿到成员进入/退出的 diff 事件并 rebuild，
- *   否则会永久停留在旧基数上——静默脏数据）。
+ *   否则会永久停留在旧基数上——静默脏数据）；
+ * - removed：filtered 记录从新模型中删除（防御性：为旧成员合成 delete 事件，保证事件流完备。
+ *   依赖它的计算在新模型中必然一并移除——否则 setup 会失败——因此当前没有留存消费者，
+ *   但事件回放/审计类消费者需要看到完整的退出事实）。
  */
 export function getFilteredRecordChanges(oldManifest: MigrationManifest, newManifest: MigrationManifest): FilteredRecordChange[] {
     const oldFiltered = new Map(oldManifest.storage.records.filter(record => record.isFiltered).map(record => [record.recordName, record]));
     const changes: FilteredRecordChange[] = [];
+    const newFilteredNames = new Set<string>();
     for (const record of newManifest.storage.records) {
         if (!record.isFiltered) continue;
+        newFilteredNames.add(record.recordName);
         const oldRecord = oldFiltered.get(record.recordName);
         if (!oldRecord) {
             changes.push({ recordName: record.recordName, isRelation: record.isRelation, newRecord: record, changeType: "added" });
@@ -2918,12 +2923,19 @@ export function getFilteredRecordChanges(oldManifest: MigrationManifest, newMani
             changes.push({ recordName: record.recordName, isRelation: record.isRelation, oldRecord, newRecord: record, changeType: "predicate-changed" });
         }
     }
+    for (const [recordName, oldRecord] of oldFiltered) {
+        if (!newFilteredNames.has(recordName)) {
+            changes.push({ recordName, isRelation: oldRecord.isRelation, oldRecord, changeType: "removed" });
+        }
+    }
     return changes;
 }
 
 export function getNewFilteredDataContexts(oldManifest: MigrationManifest, newManifest: MigrationManifest) {
     // 新增和谓词变更都必须作为 rebuild 图的种子节点：两者都改变了 filtered 集合的成员资格。
+    // removed 不进种子：该上下文在新模型中不存在，rebuild 图无从解析。
     return getFilteredRecordChanges(oldManifest, newManifest)
+        .filter(change => change.changeType !== "removed")
         .map(change => `${change.isRelation ? "relation" : "entity"}:${change.recordName}`);
 }
 
@@ -3348,7 +3360,26 @@ export async function recomputeFilteredMemberships(controller: Controller, oldMa
     //  必须归一化成 BoolExp 实例才能传给 storage.find。
     const normalizeMatch = (expression: unknown) => expression ? BoolExp.fromValue(expression as any) : undefined;
     for (const change of getFilteredRecordChanges(oldManifest, newManifest)) {
-        const filteredRecord = change.newRecord;
+        if (change.changeType === "removed") {
+            // 被删除的 filtered 记录：为旧成员合成 delete 事件（防御性事件流完备）。
+            // 旧 base 表可能也被本次迁移删除——此时无从查询也无需要通知的成员，跳过。
+            const oldBaseRecordName = change.oldRecord?.resolvedBaseRecordName;
+            const oldMatchExpression = normalizeMatch(change.oldRecord?.resolvedMatchExpression);
+            const baseStillExists = oldBaseRecordName && newManifest.storage.records.some(record => record.recordName === oldBaseRecordName);
+            if (!baseStillExists || !oldMatchExpression) continue;
+            const removedMembers = await controller.system.storage.find(oldBaseRecordName!, oldMatchExpression, undefined, ["*"]);
+            for (const member of removedMembers) {
+                events.push({
+                    recordName: change.recordName,
+                    type: "delete",
+                    record: member as any,
+                    oldRecord: member as any,
+                });
+            }
+            continue;
+        }
+
+        const filteredRecord = change.newRecord!;
         const baseRecordName = filteredRecord.resolvedBaseRecordName;
         if (!baseRecordName || !filteredRecord.resolvedMatchExpression) continue;
         const matchedRecords = await controller.system.storage.find(baseRecordName, normalizeMatch(filteredRecord.resolvedMatchExpression), undefined, ["*"]);
