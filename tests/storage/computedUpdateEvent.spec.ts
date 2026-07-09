@@ -57,6 +57,9 @@ describe('Computed field update events', () => {
       status: 'active',
       isActive: true
     })
+    // keys 是"实际写入集合"：payload 字段 + 联动重算的 computed 列（StateMachine trigger.keys 等消费方依赖它）
+    expect(updateEvent?.keys).toContain('status')
+    expect(updateEvent?.keys).toContain('isActive')
 
     const updatedTask = await handle.findOne(
       'Task',

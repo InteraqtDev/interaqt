@@ -393,10 +393,14 @@ export class MatchExp {
 
     }
 
-    and(condition: MatchAtom|MatchExp): MatchExp {
+    and(condition: MatchAtom|MatchExp|MatchExpressionData): MatchExp {
         if (condition instanceof MatchExp) {
             assert(this.entityName === condition.entityName, `cannot and match exp of different entity: ${this.entityName} and ${condition.entityName}`)
             return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition.data) : condition.data, this.contextRootEntity)
+        } else if (condition instanceof BoolExp) {
+            // CAUTION 复合的 MatchExpressionData（and/or 过的 BoolExp）必须整棵作为子表达式合并。
+            //  取 .data 只在 atom 上有意义，复合表达式取到 undefined 会在下面的 atom 分支崩溃。
+            return new MatchExp(this.entityName, this.map, this.data ? this.data.and(condition) : condition, this.contextRootEntity)
         } else {
             assert(condition.key !== undefined, 'key cannot be undefined')
             assert(Array.isArray(condition.value) && condition.value.length === 2, 'value must be array')

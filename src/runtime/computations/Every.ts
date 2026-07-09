@@ -221,7 +221,10 @@ export class PropertyEveryHandle implements DataBasedComputation {
                 key: 'id',
                 value: ['=', relationRecord.id]
             }), undefined, this.relationAttributeQuery)
-
+            // 关系记录在事件与增量计算之间可能已被删除（级联/竞态），退回全量重算而不是裸解引用崩溃（与 Count/Summation 一致）。
+            if (!newRelationWithEntity) {
+                return ComputationResult.fullRecompute(`relation record ${relationRecord.id} not found for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+            }
             const relatedRecord = newRelationWithEntity[this.isSource ? 'target' : 'source']
             relatedRecord['&'] = relationRecord
 
@@ -248,8 +251,6 @@ export class PropertyEveryHandle implements DataBasedComputation {
             await this.state!.isItemMatch.setInternal(relationRecord, false)
         } else if (relatedMutationEvent.type === 'update'&&(relatedMutationEvent.recordName === this.relation.name!||relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 关联实体或者关联关系上的字段的更新
-            const currentRecord = mutationEvent.oldRecord!
-
             // 关联关系或者关联实体的更新
             // relatedAttribute 是从当前 dataContext 出发
             // 现在要把匹配的 key 改成从关联关系出发。
@@ -262,6 +263,10 @@ export class PropertyEveryHandle implements DataBasedComputation {
             }) 
 
             const relationRecord = await this.controller.system.storage.findOne(this.relation.name!, relationMatch, undefined, this.relationAttributeQuery)
+            // 关系记录已不可见（被删除/filtered 成员资格变化竞态）时退回全量重算（与 Count/Summation 一致）。
+            if (!relationRecord) {
+                return ComputationResult.fullRecompute(`relation record not found by ${relationMatchKey} for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+            }
             const relatedRecord = relationRecord[this.isSource ? 'target' : 'source']
             relatedRecord['&'] = relationRecord
 

@@ -6,6 +6,69 @@ import { ComputationResult, EventBasedComputation, EventDep, GlobalBoundState, R
 import { EtityMutationEvent } from "../Scheduler.js";
 import { TransitionFinder } from "./TransitionFinder.js";
 import { assert } from "../util.js";
+import { ComputationProtocolError } from "../errors/index.js";
+
+/**
+ * setup 期校验 trigger.keys：
+ * - keys 只对"宿主记录自身的值属性（含 computed）更新"有效。纯关系变更（如 update({profile: {id}})）
+ *   不产生宿主 update 事件，只有关系记录的 create/delete 事件——指向关系属性的 keys 是永不命中的死声明。
+ * - 未声明的属性名同理永不命中（typo 会静默失效）。
+ * - 空数组是 vacuous 匹配（[].every() 恒真），等价于不带 keys 却更容易误读，一律拒绝。
+ * 无法解析的 recordName（系统记录等）跳过校验，交给运行期语义。
+ */
+function validateTriggerKeys(controller: Controller, args: StateMachineInstance, contextName: string) {
+    for (const transfer of args.transfers) {
+        const trigger = transfer.trigger as { recordName?: string, type?: string, keys?: unknown }
+        if (!trigger || trigger.keys === undefined || !trigger.recordName) continue
+        const throwProtocolError = (message: string) => {
+            throw new ComputationProtocolError(
+                `StateMachine ${contextName}: transfer "${transfer.current.name}" -> "${transfer.next.name}" (trigger: ${trigger.recordName} ${trigger.type}): ${message}`,
+                { handleName: 'StateMachine', computationPhase: 'trigger-keys-validation' }
+            )
+        }
+        if (!Array.isArray(trigger.keys) || trigger.keys.length === 0) {
+            throwProtocolError(`trigger.keys must be a non-empty array of property names. An empty array matches every update vacuously — omit keys entirely to match any update.`)
+        }
+        const keys = trigger.keys as string[]
+
+        // 收集记录的有效属性：沿 filtered 链（baseEntity/baseRelation）向下，
+        // 并展开 merged entity（inputEntities）——merged entity 自身没有 properties，
+        // 其有效属性是全部输入实体属性的并集。
+        const recordChainNames = new Set<string>()
+        const propertyNames = new Set<string>(['id'])
+        const start = controller.entities.find(e => e.name === trigger.recordName)
+            ?? controller.relations.find(r => r.name === trigger.recordName) as (typeof controller.entities[number] | typeof controller.relations[number] | undefined)
+        if (!start) continue
+        const pending: unknown[] = [start]
+        const visited = new Set<unknown>()
+        while (pending.length) {
+            const current = pending.pop() as { name?: string, properties?: { name: string }[], baseEntity?: unknown, baseRelation?: unknown, inputEntities?: unknown[] }
+            if (!current || visited.has(current)) continue
+            visited.add(current)
+            if (current.name) recordChainNames.add(current.name)
+            for (const property of (current.properties ?? [])) propertyNames.add(property.name)
+            if (current.baseEntity) pending.push(current.baseEntity)
+            if (current.baseRelation) pending.push(current.baseRelation)
+            for (const input of (current.inputEntities ?? [])) pending.push(input)
+        }
+        // 本记录（含 base 链）上的关系属性
+        const relationAttributes = new Set<string>()
+        for (const relation of controller.relations) {
+            const sourceName = (relation.source as { name?: string } | undefined)?.name
+            const targetName = (relation.target as { name?: string } | undefined)?.name
+            if (sourceName && recordChainNames.has(sourceName) && relation.sourceProperty) relationAttributes.add(relation.sourceProperty)
+            if (targetName && recordChainNames.has(targetName) && relation.targetProperty) relationAttributes.add(relation.targetProperty)
+        }
+
+        for (const key of keys) {
+            if (propertyNames.has(key)) continue
+            if (relationAttributes.has(key)) {
+                throwProtocolError(`trigger.keys ["${key}"] refers to a relation attribute. Relation replacement does not emit a host update event carrying this key, so the transfer would never fire. Declare the trigger on the relation record's create/delete events instead (e.g. { recordName: '<relationName>', type: 'create' }).`)
+            }
+            throwProtocolError(`trigger.keys ["${key}"] does not match any declared property of "${trigger.recordName}", so the transfer would never fire. Declare the property or fix the key name.`)
+        }
+    }
+}
 
 type SourceTargetPair = [EntityIdRef, EntityIdRef][]
 type ComputeRelationTargetResult = SourceTargetPair | {source: EntityIdRef[] | EntityIdRef, target: EntityIdRef[]|EntityIdRef} | undefined
@@ -24,6 +87,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
     constructor(public controller: Controller, public args: StateMachineInstance, public dataContext: DataContext) {
         this.transitionFinder = new TransitionFinder(this.args)
         this.initialState = this.args.initialState
+        validateTriggerKeys(controller, args, `of global dictionary "${(dataContext.id as {name?: string})?.name ?? String(dataContext.id)}"`)
         // 从所有 transfer 中构建 eventDeps
         // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
         // 因为可能有多个 transfer 都是同样的 trigger。
@@ -72,6 +136,7 @@ export class PropertyStateMachineHandle implements EventBasedComputation {
         this.transitionFinder = new TransitionFinder(this.args)
         this.initialState = this.args.initialState
         this.dataContext = dataContext as PropertyDataContext
+        validateTriggerKeys(controller, args, `of property "${this.dataContext.host.name}.${this.dataContext.id.name}"`)
         // 从所有 transfer 中构建 eventDeps
         // 特别注意，这里不能用系统默认的 eventDeps 深度匹配机制。
         // 因为可能有多个 transfer 都是同样的 trigger。

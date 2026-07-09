@@ -128,7 +128,11 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
             sql,
             params
         })
-        return  this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).run(...params) as unknown as EntityIdRef
+        // CAUTION better-sqlite3 对 RETURNING 语句必须用 .all() 才能取回行；
+        //  .run() 只返回 {changes, lastInsertRowid}，这些元数据会被上层 Object.assign 进创建的记录，
+        //  与 PostgreSQL/PGLite 驱动（返回 RETURNING 行）的契约不一致。
+        const rows = this.db.prepare(`${sql} RETURNING ${ROW_ID_ATTR}`).all(...params) as unknown as EntityIdRef[]
+        return rows[0]
     }
     async delete<T> (sql:string, where: unknown[], name='') {
         const context= asyncInteractionContext.getStore() as InteractionContext

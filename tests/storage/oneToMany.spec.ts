@@ -602,17 +602,13 @@ describe('one to many', () => {
                             "id": 2,
                         },
                         "age": 14,
-                        "changes": 1,
                         "id": 3,
-                        "lastInsertRowid": 3,
                         "name": "m2",
                         },
                     },
                     "target":  {
                         "age": 14,
-                        "changes": 1,
                         "id": 3,
-                        "lastInsertRowid": 3,
                         "name": "m2",
                     },
                 }

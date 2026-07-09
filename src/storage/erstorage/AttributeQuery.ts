@@ -171,7 +171,9 @@ export class AttributeQuery {
                     const linkInfo = attributeInfo.getLinkInfo().getBaseLinkInfo()
                     const filteredRelationMatchExp = new MatchExp(linkInfo.name, this.map, attributeInfo.getMatchExpression())
                     const rebasedMatchExp = filteredRelationMatchExp.rebase(attributeInfo.isRecordSource() ? 'target' : 'source')!
-                    const mergedMatchExp = subMatchExp ? rebasedMatchExp.and(subMatchExp.data) : rebasedMatchExp
+                    // CAUTION 用户的 matchExpression 可能是复合 BoolExp（and/or 过的），必须整棵传入。
+                    //  取 .data 只对 atom 有意义，复合表达式会得到 undefined 并在 MatchExp.and 中崩溃。
+                    const mergedMatchExp = subMatchExp ? rebasedMatchExp.and(subMatchExp) : rebasedMatchExp
                     relatedSubQueryData = {
                         ...subQueryData,
                         matchExpression: mergedMatchExp.data

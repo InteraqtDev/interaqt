@@ -275,6 +275,8 @@ export class QueryExecutor {
                     const linkRecordReverseAttributeName = linkRecordAttributeInfo.getReverseInfo()?.attributeName
 
                     for (let record of records) {
+                        // 可空 x:1：关联实体不存在时没有 link 数据，跳过（与 completeXToOneLeftoverRecords 的空守卫一致）。
+                        if (!record[subEntityQuery.attributeName!]?.[LINK_SYMBOL]) continue
                         // 限制 link.id
                         const linkRecordId = record[subEntityQuery.attributeName!][LINK_SYMBOL].id
                         const queryOfThisRecord = subEntityQueryOfSubLink.derive({
@@ -486,6 +488,8 @@ export class QueryExecutor {
             for(let xToOneSubQuery of entityQuery.attributeQuery.parentLinkRecordQuery.attributeQuery.xToOneRecords) {
                 for(let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
                     for(let record of records) {
+                        // 可空关系：反向属性或 link 上的 x:1 不存在时跳过（与下方第 2 步的空守卫一致）。
+                        if (!record[reverseAttributeName]?.[LINK_SYMBOL]?.[xToOneSubQuery.attributeName!]) continue
                         const nextContext = entityQuery.label ? context.concat(record) : context
                         record[reverseAttributeName][LINK_SYMBOL][xToOneSubQuery.attributeName!][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
                             xToManySubSubQuery.parentRecord!,
@@ -524,6 +528,8 @@ export class QueryExecutor {
             // 3. 继续递归 complete x:1 关联实体上的 x:1 关联查询
             for(let xToOneSubSubQuery of xToOneSubQuery.attributeQuery.xToOneRecords) {
                 for(let record of records) {
+                    // 可空 x:1：为 null 时 [].concat 会产生 [null] 传入递归导致崩溃，跳过。
+                    if (!record[xToOneSubQuery.attributeName!]) continue
                     const nextContext = entityQuery.label ? context.concat(record) : context
                     await this.completeXToOneLeftoverRecords(xToOneSubSubQuery, [].concat(record[xToOneSubQuery.attributeName!]), recordQueryRef, nextContext)
                 }

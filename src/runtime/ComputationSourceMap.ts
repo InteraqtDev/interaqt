@@ -188,27 +188,26 @@ export class ComputationSourceMapManager {
      * @returns 是否需要触发计算
      */
     shouldTriggerUpdateComputation(source: EntityEventSourceMap, mutationEvent: RecordMutationEvent): boolean {
+        // CAUTION global 依赖监听的是整张 DICTIONARY_RECORD 表的 create/update 事件，
+        //  必须按 key 过滤，否则任何 dict 的创建/更新（包括本计算自己的输出 dict）都会触发计算——
+        //  对增量计算而言这是把无关事件喂进 incrementalCompute 的直接来源。
+        if ('dataDep' in source && source.dataDep.type === 'global' && mutationEvent.recordName === DICTIONARY_RECORD) {
+            return mutationEvent.record?.key === source.dataDep.source.name
+        }
         if (source.type !== 'update' || !('dataDep' in source)) {
             return true
         }
-        // 特殊处理 Global 类型的数据依赖
-        if (source.dataDep.type === 'global' && mutationEvent.recordName === DICTIONARY_RECORD) {
-            // 检查是否是 state 类型的记录，并且 key 匹配
-            return mutationEvent.record?.key === source.dataDep.source.name
-        } else {
-            // 如果是更新，检查是否是依赖的属性有变化。
-            if (source.attributes!.includes('*')) {
-                return Object.keys(mutationEvent.record || {}).some(attr =>
-                    attr !== 'id' && mutationEvent.record![attr] !== mutationEvent.oldRecord?.[attr]
-                )
-            }
-            const propAttrs = source.attributes!.filter(attr => attr !== 'id')
-            return !propAttrs.every(attr => 
-                !mutationEvent.record!.hasOwnProperty(attr) || 
-                (mutationEvent.record![attr] === mutationEvent.oldRecord![attr])
+        // 如果是更新，检查是否是依赖的属性有变化。
+        if (source.attributes!.includes('*')) {
+            return Object.keys(mutationEvent.record || {}).some(attr =>
+                attr !== 'id' && mutationEvent.record![attr] !== mutationEvent.oldRecord?.[attr]
             )
         }
-        
+        const propAttrs = source.attributes!.filter(attr => attr !== 'id')
+        return !propAttrs.every(attr => 
+            !mutationEvent.record!.hasOwnProperty(attr) || 
+            (mutationEvent.record![attr] === mutationEvent.oldRecord![attr])
+        )
     }
 
     /**

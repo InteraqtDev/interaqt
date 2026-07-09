@@ -142,11 +142,13 @@ export class RecordsTransformHandle implements DataBasedComputation {
                     sourceRecordId,
                     sourceDataDep.attributeQuery
                 )
-                if (!sourceRecord) {
-                    return []
+                // CAUTION 源记录锁不到（事件与 patch 应用之间被并发删除）时不能直接返回空 patch：
+                //  那会让已映射的派生行成为孤儿。按 delete 语义继续走下面的流程，
+                //  transformedRecords 为空 → 全部既有映射行进入 delete patch（幂等，与 delete 事件路径一致）。
+                if (sourceRecord) {
+                    const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
+                    transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
                 }
-                const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
-                transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             }
             const match = MatchExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
             const mappedRecords = await this.controller.system.storage.atomic.lockRows(dataContext.id.name!, match, ['*'])

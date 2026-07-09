@@ -3366,9 +3366,13 @@ export async function recomputeFilteredMemberships(controller: Controller, oldMa
 
         // predicate-changed：旧成员集合来自旧谓词（旧谓词引用的属性可能已被删除——
         // 那类破坏性变更会先被 storage blocking check 拦截，这里可以直接用旧谓词查询新库）。
+        // CAUTION 旧成员必须在旧 base 上求值。rebase（同名 filtered 换 base）当前会被
+        //  blocking check（physical-path-move: fact record table changed）在 migrate 入口拦截，
+        //  这里用 oldRecord 的 base 是防御性正确：若未来 rebase 被支持，旧成员查询不能落在新表上。
+        const oldBaseRecordName = change.oldRecord?.resolvedBaseRecordName ?? baseRecordName;
         const oldMatchExpression = normalizeMatch(change.oldRecord?.resolvedMatchExpression);
         const oldMatchedRecords = oldMatchExpression
-            ? await controller.system.storage.find(baseRecordName, oldMatchExpression, undefined, ["*"])
+            ? await controller.system.storage.find(oldBaseRecordName, oldMatchExpression, undefined, ["*"])
             : [];
         const oldIds = new Set(oldMatchedRecords.map(record => String((record as { id: unknown }).id)));
         const newIds = new Set(matchedRecords.map(record => String((record as { id: unknown }).id)));
