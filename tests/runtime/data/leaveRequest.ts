@@ -96,7 +96,9 @@ const sendRequestRelation = Relation.create({
     source: RequestEntity,
     sourceProperty: 'from',
     target: UserEntity,
-    targetProperty: 'request',
+    // CAUTION 同一实体上不同 relation 的反向属性名必须唯一（r9 起 setup 期强制校验），
+    //  否则后注册的 relation 会在共享属性命名空间里静默覆盖先注册的。
+    targetProperty: 'sentRequests',
     type: 'n:1',
     computation:  
     Transform.create({
@@ -291,7 +293,7 @@ const reviewerRelation = Relation.create({
     source: RequestEntity,
     sourceProperty: 'to',
     target: UserEntity,
-    targetProperty: 'request',
+    targetProperty: 'reviewedRequests',
     type: 'n:1',
     properties: [
         Property.create({

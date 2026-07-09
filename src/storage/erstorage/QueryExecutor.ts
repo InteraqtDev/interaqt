@@ -178,8 +178,12 @@ export class QueryExecutor {
         }
 
         // 检查一下是否已经产生了循环。因为所有的子查询都会以这个函数为入口，所以可以再这里判断。
+        // CAUTION 环不一定回到起点：A→B→C→B 这样的环里，栈首（A/B）永远不等于栈尾，
+        //  只比较 stack[0] 会导致无限递归（栈溢出/挂起）。只要当前记录在本轮递归路径上
+        //  出现过（任意位置）就说明进入了环，停止展开。
         if (entityQuery.label && context.label === entityQuery.label && context.stack.length > 1) {
-            if ((context.stack[0] as Record).id === (context.stack.at(-1) as Record).id) {
+            const lastRecord = context.stack.at(-1) as Record
+            if (context.stack.slice(0, -1).some(record => (record as Record).id === lastRecord.id)) {
                 return []
             }
         }

@@ -1700,6 +1700,16 @@ Custom.create(config: CustomConfig): CustomInstance
 
 If `incrementalCompute` or `incrementalPatchCompute` is provided without `incrementalDataDeps` or `planIncremental`, runtime setup fails with `ComputationProtocolError`. Incremental callbacks receive only the planned partial `dataDeps`, not all declared dependencies.
 
+**Mutation event snapshots**
+
+Snapshot shapes differ by event type:
+
+- `create`: `record` = the written fields (defaults + payload), `oldRecord` = `undefined`
+- `update`: `record` = **only the changed fields** (plus `id`), `oldRecord` = full pre-update snapshot
+- `delete`: `record` = full deleted snapshot, `oldRecord` = `undefined`
+
+Never read a field straight off `mutationEvent.record` on update unless you know it was part of the update — it silently evaluates to `undefined` otherwise and corrupts the incremental result. Reconstruct the full new state with `{ ...mutationEvent.oldRecord, ...mutationEvent.record }`, or re-fetch the record via `this.controller.system.storage.findOne(...)` when computed columns or related data are needed (this is what the built-in aggregations do). The same applies to the third `record` parameter: it is only guaranteed to identify the dirty record, not to carry all of its fields.
+
 **Retry safety**
 
 Custom `compute`, `incrementalCompute`, `incrementalPatchCompute`, and `asyncReturn` callbacks may be replayed after transaction retry. Keep them deterministic and avoid irreversible external IO. Put post-commit external work in `recordMutationSideEffects`.
@@ -1774,9 +1784,20 @@ const counterDict = Dictionary.create({
         },
         incrementalCompute: async function(lastValue, mutationEvent, record, dataDeps) {
             console.log('Previous value:', lastValue);
-            const delta = mutationEvent.type === 'delete'
-                ? -(mutationEvent.oldRecord?.value || 0)
-                : (mutationEvent.record?.value || 0) - (mutationEvent.oldRecord?.value || 0);
+            // CAUTION mutation event snapshot shapes differ by type:
+            // - create: record = written fields (defaults + payload), oldRecord = undefined
+            // - update: record = ONLY the changed fields (+ id), oldRecord = full pre-update snapshot
+            // - delete: record = full deleted snapshot, oldRecord = undefined
+            // Reading a field straight off mutationEvent.record on update silently yields
+            // undefined when that field was not part of the update. Reconstruct the full
+            // new state by overlaying the changed fields on the old snapshot.
+            const newRecord = mutationEvent.type === 'delete'
+                ? undefined
+                : { ...(mutationEvent.oldRecord || {}), ...(mutationEvent.record || {}) };
+            const previousRecord = mutationEvent.type === 'delete'
+                ? mutationEvent.record
+                : mutationEvent.oldRecord;
+            const delta = (newRecord?.value || 0) - (previousRecord?.value || 0);
             const total = (lastValue?.total || 0) + delta;
             
             return {

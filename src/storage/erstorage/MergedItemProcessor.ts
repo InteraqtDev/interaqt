@@ -25,6 +25,11 @@ export interface ProcessMergedItemsResult {
      * 以及内部生成的虚拟 base 名。
      */
     abstractNames: Set<string>;
+    /**
+     * 持有 `__type` 判别列的物理 base 名集合（merged item 自身或其虚拟 base）。
+     * 判别列由框架管理（记录创建时按使用的名字写入），公共写入口据此拒绝显式覆写。
+     */
+    discriminatorHostNames: Set<string>;
 }
 
 function isEntity(item: MergedItem): item is EntityInstance {
@@ -120,6 +125,7 @@ export function processMergedItems(
 ): ProcessMergedItemsResult {
     const refContainer = new RefContainer(entities, relations);
     const abstractNames = new Set<string>();
+    const discriminatorHostNames = new Set<string>();
 
     // 1. 基于原始（克隆前的）图计算每个名字的具体类型值：
     //    typeValue(name) = 沿 base 链走到根的名字；根是 merged item 时该名字是抽象的（不可创建）。
@@ -145,14 +151,14 @@ export function processMergedItems(
     const relationTree = buildItemTree(relations);
 
     for (const mergedEntity of mergedEntities) {
-        processSingleMergedItem(mergedEntity, refContainer, 'entity', entityTree, typeValueByName, compiledByName, abstractNames);
+        processSingleMergedItem(mergedEntity, refContainer, 'entity', entityTree, typeValueByName, compiledByName, abstractNames, discriminatorHostNames);
     }
     for (const mergedRelation of mergedRelations) {
-        processSingleMergedItem(mergedRelation, refContainer, 'relation', relationTree, typeValueByName, compiledByName, abstractNames);
+        processSingleMergedItem(mergedRelation, refContainer, 'relation', relationTree, typeValueByName, compiledByName, abstractNames, discriminatorHostNames);
     }
 
     const result = refContainer.getAll();
-    return { ...result, abstractNames };
+    return { ...result, abstractNames, discriminatorHostNames };
 }
 
 /**
@@ -238,6 +244,7 @@ function processSingleMergedItem<T extends MergedItem>(
     typeValueByName: Map<string, string>,
     compiledByName: Map<string, CompiledMergedInfo>,
     abstractNames: Set<string>,
+    discriminatorHostNames: Set<string>,
 ): void {
     const isEntityType = itemType === 'entity';
     const itemName = getItemName(mergedItem);
@@ -312,6 +319,7 @@ function processSingleMergedItem<T extends MergedItem>(
         hostedTypes,
         physicalBaseName: getItemName(registeredBaseItem),
     });
+    discriminatorHostNames.add(getItemName(registeredBaseItem));
 
     // 4. 把每个 input 替换成物理 base 上的 filtered item
     //    rootBaseName -> 该 root base 承载的类型集合，用于保持 root base 的可查询性（IS-A 语义）。

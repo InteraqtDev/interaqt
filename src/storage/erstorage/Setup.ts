@@ -485,6 +485,53 @@ export class DBSetup {
     }
 
     /**
+     * 验证 filtered entity / filtered relation 不能声明自己的新 value property。
+     *
+     * filtered item 是 base 之上的视图，与 base 共享同一张物理表和同一个属性命名空间：
+     * DBSetup 不会（也不应该）为 filtered item 单独建列，查询编译统一按 resolvedBaseRecordName
+     * 解析属性。历史行为是把这些属性静默丢弃——列不存在、写入被悄悄忽略、挂在其上的
+     * computation 只维护 bound state 而可见值永远不落库（静默数据丢失）。
+     * 这里改为声明期 fail-fast，指引用户把属性声明到 base 上。
+     *
+     * 与 base 链上同名的 property 声明仍然合法（解析到 base 列）：merged item 编译管线
+     * 会把 input entity rebase 成携带原属性列表的 filtered item，这些属性都已合并进物理 base。
+     */
+    private validateFilteredItemProperties() {
+        const collectBaseChainPropertyNames = (item: EntityInstance | RelationInstance): Set<string> => {
+            const names = new Set<string>()
+            let current: EntityInstance | RelationInstance | undefined =
+                (item as EntityInstance).baseEntity || (item as RelationInstance).baseRelation
+            while (current) {
+                for (const property of current.properties || []) {
+                    names.add(property.name)
+                }
+                current = (current as EntityInstance).baseEntity || (current as RelationInstance).baseRelation
+            }
+            return names
+        }
+
+        const validateItem = (item: EntityInstance | RelationInstance, kind: 'entity' | 'relation') => {
+            const isFiltered = !!((item as EntityInstance).baseEntity || (item as RelationInstance).baseRelation)
+            if (!isFiltered || !item.properties?.length) return
+            const baseNames = collectBaseChainPropertyNames(item)
+            const newProperties = item.properties.filter(property => !baseNames.has(property.name))
+            if (newProperties.length) {
+                const rootName = this.resolveEndpointRootName(item)
+                throw new Error(
+                    `Filtered ${kind} '${item.name}' cannot declare its own propert${newProperties.length > 1 ? 'ies' : 'y'} ` +
+                    `${newProperties.map(p => `'${p.name}'`).join(', ')}. ` +
+                    `Filtered ${kind === 'entity' ? 'entities' : 'relations'} are views sharing the base ${kind}'s table row, ` +
+                    `so new properties (including computed/computation properties) must be declared on the base ${kind} '${rootName}'. ` +
+                    `Re-declaring a property name that already exists on the base is allowed and resolves to the base column.`
+                )
+            }
+        }
+
+        this.entities.forEach(entity => validateItem(entity, 'entity'))
+        this.relations.forEach(relation => validateItem(relation, 'relation'))
+    }
+
+    /**
      * 验证 relations
      * 
      * 检查 filtered entity 上的关系属性名是否与其 base entity 的关系属性名冲突。
@@ -562,14 +609,16 @@ export class DBSetup {
         })
         familyProps.forEach((props, rootName) => {
             props.forEach((entry, prop) => {
-                // 同一个 relation 的对称两端共用同一属性名是合法的（symmetric relation）。
-                const hasFilteredDeclarer = Array.from(entry.declarers).some(name => name !== rootName)
-                if (entry.relations.size > 1 && hasFilteredDeclarer) {
+                // 同一个 relation 的对称两端共用同一属性名是合法的（symmetric relation，Set 去重后 size 为 1）。
+                // 除此之外，同一 base record 家族里（base 自身 + 全部 filtered 变体）多个 relation 声明
+                // 同一属性名必然互相覆盖：属性表按名登记，后注册者静默赢得该名字，先注册的 relation
+                // 从此不可达（查询走错关系、级联漏删）。无论声明方是否 filtered，一律 fail-fast。
+                if (entry.relations.size > 1) {
                     throw new Error(
                         `Relation property name conflict: property '${prop}' is declared by multiple relations ` +
                         `within the same base record family '${rootName}' (declared on: ${Array.from(entry.declarers).join(', ')}). ` +
-                        `Filtered entities share the base entity's attribute namespace, ` +
-                        `so each relation property name must be unique across the base entity and all its filtered entities.`
+                        `Each relation property name must be unique across the base entity and all its filtered entities — ` +
+                        `otherwise the relations silently overwrite each other in the shared attribute namespace.`
                     )
                 }
             })
@@ -781,7 +830,10 @@ export class DBSetup {
 
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();
-        
+
+        // 0.5. 验证：filtered entity/relation 不能声明 base 上不存在的新 property（视图无独立列）
+        this.validateFilteredItemProperties();
+
         // 1. 验证：不允许 filtered entity 作为 relation 的 source 或 target
         this.validateRelations();
         
@@ -816,6 +868,7 @@ export class DBSetup {
      * 统一处理 merged entities 和 merged relations
      */
     private mergedAbstractNames: Set<string> = new Set()
+    private mergedDiscriminatorHostNames: Set<string> = new Set()
     private processMergedItems() {
         const result = processMergedItems(
             this.entities,
@@ -825,6 +878,7 @@ export class DBSetup {
         this.entities = result.entities;
         this.relations = result.relations;
         this.mergedAbstractNames = result.abstractNames;
+        this.mergedDiscriminatorHostNames = result.discriminatorHostNames;
     }
 
     /**
@@ -836,6 +890,11 @@ export class DBSetup {
         for (const name of this.mergedAbstractNames) {
             if (this.map.records[name]) {
                 this.map.records[name].isMergedAbstract = true
+            }
+        }
+        for (const name of this.mergedDiscriminatorHostNames) {
+            if (this.map.records[name]) {
+                this.map.records[name].hasMergedDiscriminator = true
             }
         }
     }

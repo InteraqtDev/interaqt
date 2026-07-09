@@ -68,6 +68,9 @@ export type RecordMapItem = {
     // CAUTION merged item 是抽象联合类型（union），不允许以它的名义直接创建记录（explicit control）。
     //  同样地，以 merged item 为 base 的 filtered entity 也无法确定具体的 __type，禁止创建。
     isMergedAbstract?: boolean
+    // 该 record 是 merged item 编译出的物理 base，持有框架管理的 __type 判别列。
+    // 判别列的值只能由"创建时使用的名字"决定，公共写入口必须拒绝显式写入。
+    hasMergedDiscriminator?: boolean
 }
 
 type RecordMap = {

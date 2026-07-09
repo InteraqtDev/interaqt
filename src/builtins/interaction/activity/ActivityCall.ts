@@ -297,7 +297,18 @@ export class ActivityCall {
             value: ['=', activityId],
         })
         const results = await storage.system.storage.find(ActivityCall.ACTIVITY_RECORD, match, undefined, ['*'])
-        return results.map((a: any) => ({ ...a, state: a.state, refs: a.refs }))[0]
+        const activity = results.map((a: any) => ({ ...a, state: a.state, refs: a.refs }))[0]
+        // fail-fast：activityId 是 API 边界输入，可能属于另一个 Activity 定义。
+        //  不校验归属会用本 Activity 的图去解释别的流程的 state/refs——轻则在深处抛
+        //  "Cannot read properties of undefined" 的裸 TypeError，重则（两个 Activity 共用
+        //  同一个 Interaction 实例、节点 uuid 相同时）把状态推进/授权判定错绑到别的流程上。
+        if (activity && activity.uuid !== this.activity.uuid) {
+            throw new Error(
+                `activity instance ${activityId} belongs to activity "${activity.name}", ` +
+                `not "${this.activity.name}" — check the activityId passed to this dispatch`
+            )
+        }
+        return activity
     }
     async setActivity(storage: StorageAccess, activityId: string, value: any) {
         const match = BoolExp.atom({
