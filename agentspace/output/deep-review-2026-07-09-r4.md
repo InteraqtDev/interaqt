@@ -1,5 +1,16 @@
 # 全代码库深度 Review 报告（2026-07-09 第四轮）
 
+> **维护说明（2026-07-09 更新）**：本报告发现的问题已在同分支（`cursor/deep-code-review-r4-9580`）修复：
+>
+> - **致命 F-1 ~ F-3 全部修复**，回归测试见 `tests/runtime/review-fixes-2026-07-09-r4.spec.ts`（5 个用例）与 `tests/builtins/serialization-r4.spec.ts`（4 个用例）：
+>   - F-1：`ActivityCall.isActivityHead` 函数体改用递归参数 `head`（原来误读 `this.graph.head` 导致 group 起点无限递归）。group 起点的多分支创建语义维持与线性 activity 一致：「head interaction 无 activityId = 隐式创建新 activity」，第二个分支带 activityId 在同一 activity 内推进；回归测试覆盖 every group 双分支完成的全流程。
+>   - F-2 / I-7：builtins 序列化统一接入 core 管线——`Interaction.stringify` 改用 `stringifyInstance`（嵌套 Klass 编码为 `uuid::` 引用、函数编码为 `func::`）；全部 builtins 的 `parse` 与 core 对齐（`decodeFunctionValues` + 保持 uuid 身份）；`Transfer`/`ActivityGroup`/`Attributives` 注册进 `builtins/init.ts`。graph 级 round-trip（`createInstances`）现在可完整还原含 interactions/transfers/groups/conditions（含函数）的 Activity 图；standalone `parse` 的契约（`uuid::` 引用需 graph 管线）与 core 一致并在测试中固化。
+>   - F-3：新增 `interaqt/drivers` 子路径导出（`vite.prod.config.ts` 多 entry + `package.json` exports）；四个驱动改为从主入口 `"interaqt"` 导入共享单例（`asyncInteractionContext` 等），drivers bundle 对主包保持 external（包自引用）。已验证 `npm run build` 后 `import('interaqt/drivers')` 可获得全部四个驱动，并以发布包形态跑通最小 controller 冒烟测试。README 快速示例补上 `import { PGLiteDB } from 'interaqt/drivers'`（README 其他位置早已使用该路径——文档承诺的导入路径此前在包里并不存在）。
+> - **重要项修复**：R-1（`checkActivityState`/`completeInteractionState` 对不存在的 activityId 抛业务级 `activity ... not found` 错误）、R-2（`computeDirtyRecords` 归一化 computeTarget 四种返回形态：`{id}`/`{id}[]`/`{source,target}`/`[[s,t]]`，端点形态在 relation 宿主上按端点查询 relation 记录，entity 宿主上 fail-fast 抛 `ComputationProtocolError`）、R-3（source-map 对 `_self` 宿主 create 监听与业务 dataDep 已注册的宿主 create 监听去重，computeCalls 2→1，global dict 更新触发不受影响）、R-6.1（Property Average 负 count 守卫，与 PropertyCount 对齐）。
+> - **明确遗留（建议独立 PR）**：R-4（`program` ActivityGroup 完成语义的产品决策）、R-5（Global StateMachine `initialState.computeValue` 契约文档化）、R-6.2/6.3（聚合 handle recordName 校验对齐 + relation 属性 update 增量测试，随六 handle 模板抽取一并处理）、R-7（dictionary defaultValue 进 modelHash + stableStringify undefined 处理）、第四节全部改进项。
+>
+> 修复后全量测试 1725 passed / 26 skipped（基线 1716，新增 9 个用例，更新 10 个既有序列化用例以匹配「parse 保持 uuid 身份」的统一契约）；`npm run check` 与 `npm run build` 通过。下文正文保留 review 时的原始判定，作为问题背景与复现依据。
+
 - 日期：2026-07-09
 - 基线：`main` @ `b9ee8404`（PR #20 合入之后，前三轮 review 修复全部落地）
 - 范围：`src/core`、`src/runtime`（含 computations、migration）、`src/storage`、`src/builtins`（重点：Activity/序列化）、`src/drivers`、打包与发布配置（`package.json` / `vite.prod.config.ts`）
