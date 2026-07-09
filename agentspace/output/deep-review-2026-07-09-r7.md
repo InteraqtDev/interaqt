@@ -5,9 +5,11 @@
 > - **F-1 / F-2（新发现，已复现）**：对称 n:n 关系（`source===target` 且 `sourceProperty===targetProperty`）的删除与 update 替换只清理「实体在 source 侧」的 link 行，实体在 target 侧的关系被漏删/漏 unlink——留下孤儿 link、对称 Count 偏高、新旧关系并存。修复：`DeletionExecutor.deleteNotReliantSeparateLinkRecords` 与 `UpdateExecutor.handleUpdateReliance` 对 `isLinkManyToManySymmetric()` 的 link 用 `source.id IN ids OR target.id IN ids` 匹配。
 > - **F-3（新发现，已复现，数据暴露级）**：`dataPolicy.modifier` 浅合并只覆盖同名键，policy 声明 `limit` 时调用方仍可追加 `offset` 逐页翻取全表。修复：policy 声明了 `limit` 时锁定分页/排序键（`offset`/`orderBy`），调用方引入 policy 未声明的键即报明确错误。
 > - **F-5（既有遗留，已确认仍在，已复现）**：`'program'` ActivityGroup 注册了类型但无完成语义，子分支跑完后 group 永久卡死、后续 transfer 不可达。修复：不再注册该死类型——`buildGraph` 的 `GroupStateNodeType.has()` 守卫对 `type:'program'` 抛清晰的「not supported」声明期错误（与 Gateway 一致的 fail-fast），而非运行时静默死锁。
-> - **明确遗留（未修，建议独立处理）**：r5 的 R-1（大 IN 崩溃）、R-2（重复 ref 崩溃）、R-3（`contains` 非数组裸 DB 错误）本轮**复现确认仍然存在**；reliance 关系 `{rel: null}` 抛内部 assert；以及 r6 之后的其余 R/I 项。详见第三、四节。
+> - **r5 遗留崩溃项（本轮核实仍在 → 已一并修复）**：r5 的 R-1（大 IN 崩溃）、R-2（重复 ref 崩溃）、R-3（`contains` 非数组裸 DB 错误）曾被前几轮列为「明确遗留、独立 PR」。本轮先复现确认三者在基线上**全部仍然崩溃**，随后按「显式控制 + 明确错误」原则修复为编译期/执行前的受控错误（不做隐式分片、不改变语义），回归测试见 `tests/storage/review-fixes-2026-07-09-r7.spec.ts`（6 用例）。
+> - **新增预言机设施**：`tests/storage/referentialIntegrityMatrix.spec.ts`（4 用例）——引入**不信任写路径**的引用完整性不变式（无悬挂端点 + 对称边双向可见），专门堵住 r6 计算一致性预言机结构性看不见的一类写路径腐蚀（正是 F-1 逃逸的根因，见上一轮问答分析）。
+> - **仍为明确遗留（未修，语义/债务类）**：reliance 关系 `{rel: null}` 抛业务级 assert（现有消息已指明「只能删记录」，属可接受的 fail-fast，见第四节 I-1）；Activity liveness 专用预言机、六聚合 handle 模板抽取等。
 >
-> 修复后 `npm run check` 通过；`npm test` 全量 **1737 passed / 26 skipped**（基线 1733，净 +4；新增 4 个 r7 回归用例，修正 1 个编码了错误行为的对称删除测试与 1 个断言 `program` 为受支持类型的既有测试）。下文正文保留 review 时的原始判定。
+> 修复后 `npm run check` 通过；`npm test` 全量 **1747 passed / 26 skipped**（基线 1733，净 +14；新增 4 个 r7 致命回归 + 6 个 r5 遗留崩溃回归 + 4 个引用完整性预言机用例，修正 1 个编码了错误行为的对称删除测试与 1 个断言 `program` 为受支持类型的既有测试）。下文正文保留 review 时的原始判定。
 
 - 日期：2026-07-09
 - 基线：`main` @ `66cda53c`（PR #23 合入之后，r1–r6 的致命/重要修复全部落地）
@@ -88,22 +90,21 @@ dispatch after → error: "interaction ... not available"  ❌（group 永不完
 
 ---
 
-## 三、遗留问题复现确认（r5 明确遗留，本轮实测仍然存在，未修）
+## 三、r5 遗留崩溃项：复现确认仍在 → 本轮已修复
 
-用户要求核实历史报告遗留项是否仍存在。以下三项 r5 报告已列为「明确遗留、建议独立 PR」，本轮编写复现在 `66cda53c` 上实测**全部仍然崩溃**：
+用户要求核实历史报告遗留项是否仍存在。以下三项 r5 报告已列为「明确遗留、建议独立 PR」，本轮先编写复现在 `66cda53c` 上实测**全部仍然崩溃**，随后一并修复：
 
-| 编号 | 现象（实测） | 位置 |
+| 编号 | 现象（修复前实测） | 修复方案（显式控制 + 明确错误） |
 |------|------|------|
-| r5-R-1 | `find(..., ['in', 40000 个值])` → SQLite `too many SQL variables` | `MatchExp.ts` L256（`IN` 每元素一占位符，无分片） |
-| r5-R-2 | `update('User', …, { teams: [{id:t1},{id:t1}] })` → `cannot create ... link already exist` | `CreationExecutor.ts` L437 `assert(!existRecord)`，`handleUpdateReliance` 无去重 |
-| r5-R-3 | `type:'object'` 属性 + `['contains','key']` → `cannot call json_array_elements_text on a non-array` | `PGLite.ts` L206 / `PostgreSQL.ts` L349 |
+| r5-R-1 | `find(..., ['in', 40000 个值])` → SQLite `too many SQL variables`（裸 DB 错误） | `Database.maxQueryParams` 能力声明（SQLite 32000 / PG·MySQL 65000），`MatchExp` 编译期对超限 `IN`/`NOT IN` 抛带指引的受控错误。**不做隐式分片**——拆分会破坏原子性，应由调用方显式决策 |
+| r5-R-2 | `update('User', …, { teams: [{id:t1},{id:t1}] })` → `cannot create ... link already exist`（内部断言） | `NewRecordData` 对 xToMany 引用数组按 id 幂等去重（完全相同的重复引用 = 同一终态）；同 id 携带**矛盾的 `&` link 数据**则 fail-fast 报明确错误 |
+| r5-R-3 | `type:'object'` 属性 + `['contains','key']` → `cannot call json_array_elements_text on a non-array`（裸 DB 错误） | `MatchExp` 编译期校验 `contains` 只能用于 `collection: true` 属性，否则报指明属性名与出路的受控错误 |
 
-均为「合法输入 → 崩溃于内部断言或裸 DB 错误」，非静默错值，用户可观测。本轮按前几轮既定分工不合并修复（避免 PR 过大），此处仅提供复现坐标以供独立 PR 直接转回归。
+三者均为「合法输入 → 崩溃于内部断言或裸 DB 错误」，非静默错值。修复统一遵循框架气质：**编译期/执行前 fail-fast、错误消息指向用户写法与出路、不引入隐式行为**。回归见 `tests/storage/review-fixes-2026-07-09-r7.spec.ts`。
 
-此外，以下更早遗留项经代码核对**结构仍在**：
-- `'program'`（本轮已修，见 F-5）；
-- reliance 关系 `{rel: null}`：`DeletionExecutor.unlink` L297 `assert(!linkInfo.isTargetReliance, 'cannot unlink reliance data, ...')`——`update('User', …, { item: null })`（`item` 为 1:1 reliance）抛内部 assert（见第四节 I-1）；
-- 六聚合 handle 模板抽取（r1 I-1 起至今，累计十余处漂移）；`asyncInteractionContext`（r1 R-8）；RealTime 无时间调度器（r3 R-5）；合表内部行删除/插入不传 events（r2 I-7~I-9）——均维持既往结论。
+此外，以下更早遗留项经代码核对**结构仍在，维持既往结论**（未在本 PR 修）：
+- reliance 关系 `{rel: null}`：`DeletionExecutor.unlink` `assert(!linkInfo.isTargetReliance, 'cannot unlink reliance data, you can only delete record')`——属**可接受的 fail-fast**（消息已明确指出「只能删记录」，非静默、非无关崩溃）。改成 null 触发级联删除是语义决策，不宜单方面改动（见第四节 I-1）；
+- 六聚合 handle 模板抽取（r1 I-1 起至今，累计十余处漂移）；`asyncInteractionContext`（r1 R-8）；RealTime 无时间调度器（r3 R-5）；合表内部行删除/插入不传 events（r2 I-7~I-9）。
 
 ---
 
@@ -141,7 +142,18 @@ dispatch after → error: "interaction ... not available"  ❌（group 永不完
 
 ---
 
-## 五、本轮证伪的候选与复查确认健康的区域
+## 五、新增预言机：引用完整性矩阵（回应「矩阵为何漏掉 F-1」）
+
+r6 的聚合一致性矩阵有两条自校验预言机——「增量值 == 从 storage 全量重算」与「update 终态 == create 终态」，**两边都以 storage 里的数据为 ground truth**。F-1 的失效形态恰是「删除后孤儿 link 物理残留在库里」：增量 Count 与全量重算都读到那行孤儿、**一致地错**，预言机结构性失明。
+
+`tests/storage/referentialIntegrityMatrix.spec.ts` 补上一条**不信任写路径**的预言机：
+
+- **INV-1 无悬挂端点**：任何 mutation 之后，枚举每个关系的全部 link 行，其 `source.id`/`target.id` 必须指向存活的实体行。孤儿 link 是计算一致性预言机看不见的腐蚀。
+- **INV-2 对称双向可见**：对称关系里 A 的邻居集含 B ⟺ B 的邻居集含 A。
+
+并补齐 r6 关系维度跳过的**退化点**：对称 n:n、自引用 1:n、以及「预置链在 target 侧」的装置变体（退化点 self/empty/boundary 应是每个维度的默认必选值）。这条矩阵在 F-1/F-2 修复前会直接报红，修复后转为常驻回归守卫。
+
+## 六、本轮证伪的候选与复查确认健康的区域
 
 | 候选/区域 | 结论 |
 |------|------|
@@ -153,13 +165,14 @@ dispatch after → error: "interaction ... not available"  ❌（group 永不完
 
 ---
 
-## 六、修复优先级建议
+## 七、修复优先级建议
 
-**已在本轮修复（P0，全部有回归）：** F-1/F-2 对称关系删除与 update 的双侧匹配、F-3 `dataPolicy.modifier` 分页锁定、F-5 `'program'` ActivityGroup fail-fast。
+**已在本轮修复（全部有回归）：**
+- F-1/F-2 对称关系删除与 update 的双侧匹配；F-3 `dataPolicy.modifier` 分页锁定；F-5 `'program'` ActivityGroup fail-fast；
+- r5-R-1 大 IN 受控错误（`maxQueryParams` 能力声明）；r5-R-2 重复 ref 幂等 + 矛盾 `&` fail-fast；r5-R-3 `contains` 编译期类型防护；
+- 新增引用完整性预言机矩阵（堵 F-1 类写路径腐蚀的盲区）。
 
-**建议独立 PR（P1，已复现仍崩溃）：** r5-R-1 大 IN 分片、r5-R-2 重复 ref 幂等/明确错误、r5-R-3 `contains` 类型防护。
-
-**建议独立 PR（P2，契约与债务）：** I-1 reliance null 业务级错误、I-2 对称 link 级操作归一化、I-5 StateMachine delete-trigger 声明期拒绝、I-10~I-13 死 API/未知参数 fail-fast（含 Klass 工厂一次性根治）、六聚合 handle 模板抽取（累计遗留最久、投入产出比最高）。
+**建议独立 PR（契约与债务）：** I-2 对称 link 级 delete/add 归一化、I-5 StateMachine delete-trigger 声明期拒绝、I-10~I-13 死 API/未知参数 fail-fast（含 Klass 工厂一次性根治）、六聚合 handle 模板抽取（累计遗留最久、投入产出比最高）、Activity liveness 专用预言机。
 
 ---
 
