@@ -83,6 +83,98 @@ describe('r4 F-1: symmetric n:n cascade delete cleans up both directions', () =>
     const remaining = await system.storage.find(rel.name!, undefined, undefined, ['*', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]);
     expect(remaining.length).toBe(1);
     expect(remaining[0].source.id).toBe(a2.id);
+  });
+});
 
+describe('r4 F-2: dataPolicy.attributeQuery is enforced', () => {
+  async function setupGetInteraction() {
+    const UserD = Entity.create({
+      name: 'UserD',
+      properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({ name: 'secret', type: 'string' }),
+      ]
+    });
+    const Profile = Entity.create({
+      name: 'ProfileD',
+      properties: [
+        Property.create({ name: 'bio', type: 'string' }),
+        Property.create({ name: 'privateNote', type: 'string' }),
+      ]
+    });
+    const profileRel = Relation.create({ source: UserD, sourceProperty: 'profile', target: Profile, targetProperty: 'owner', type: '1:1' });
+    const GetUsers = Interaction.create({
+      name: 'GetUsersD',
+      action: GetAction,
+      data: UserD,
+      dataPolicy: DataPolicy.create({
+        attributeQuery: ['id', 'name', ['profile', { attributeQuery: ['id', 'bio'] }]],
+      })
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [UserD, Profile], relations: [profileRel], eventSources: [GetUsers] });
+    await controller.setup(true);
+    const u = await system.storage.create('UserD', { name: 'n1', secret: 's3cret', profile: { bio: 'hello', privateNote: 'hidden' } });
+    return { controller, system, GetUsers, u };
+  }
+
+  test('query.attributeQuery ["*"] is rejected when the policy declares a whitelist', async () => {
+    const { controller, GetUsers, u } = await setupGetInteraction();
+    const res: any = await controller.dispatch(GetUsers, { user: { id: u.id }, query: { attributeQuery: ['*'] } });
+    expect(res.error).toBeDefined();
+    expect(String((res.error as Error).message)).toContain('dataPolicy');
+  });
+
+  test('explicit field beyond the whitelist is rejected', async () => {
+    const { controller, GetUsers, u } = await setupGetInteraction();
+    const res: any = await controller.dispatch(GetUsers, { user: { id: u.id }, query: { attributeQuery: ['id', 'secret'] } });
+    expect(res.error).toBeDefined();
+    expect(String((res.error as Error).message)).toContain('secret');
+  });
+
+  test('nested relation field beyond the nested whitelist is rejected', async () => {
+    const { controller, GetUsers, u } = await setupGetInteraction();
+    const res: any = await controller.dispatch(GetUsers, {
+      user: { id: u.id },
+      query: { attributeQuery: ['id', ['profile', { attributeQuery: ['privateNote'] }]] as any }
+    });
+    expect(res.error).toBeDefined();
+    expect(String((res.error as Error).message)).toContain('privateNote');
+  });
+
+  test('narrowing within the whitelist works, and omitting attributeQuery uses the policy projection', async () => {
+    const { controller, GetUsers, u } = await setupGetInteraction();
+
+    const narrowed: any = await controller.dispatch(GetUsers, {
+      user: { id: u.id },
+      query: { attributeQuery: ['id', 'name', ['profile', { attributeQuery: ['bio'] }]] as any }
+    });
+    expect(narrowed.error).toBeUndefined();
+    expect(narrowed.data[0].name).toBe('n1');
+    expect(narrowed.data[0].secret).toBeUndefined();
+    expect(narrowed.data[0].profile.bio).toBe('hello');
+    expect(narrowed.data[0].profile.privateNote).toBeUndefined();
+
+    const defaulted: any = await controller.dispatch(GetUsers, { user: { id: u.id } });
+    expect(defaulted.error).toBeUndefined();
+    expect(defaulted.data[0].name).toBe('n1');
+    expect(defaulted.data[0].secret).toBeUndefined();
+  });
+
+  test('without a dataPolicy.attributeQuery the caller keeps full projection control', async () => {
+    const Doc = Entity.create({
+      name: 'DocF2',
+      properties: [Property.create({ name: 'title', type: 'string' })]
+    });
+    const GetDocs = Interaction.create({ name: 'GetDocsF2', action: GetAction, data: Doc });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Doc], relations: [], eventSources: [GetDocs] });
+    await controller.setup(true);
+    const d = await system.storage.create('DocF2', { title: 't1' });
+    const res: any = await controller.dispatch(GetDocs, { user: { id: d.id }, query: { attributeQuery: ['*'] } });
+    expect(res.error).toBeUndefined();
+    expect(res.data[0].title).toBe('t1');
   });
 });

@@ -553,15 +553,76 @@ async function checkConcept(controller: GuardController, eventArgs: InteractionE
   };
 }
 
+// attributeQuery items are either plain field names or [name, { attributeQuery, ... }] tuples.
+type NormalizedAttributeQueryItem = { name: string, nested?: unknown[] }
+
+function normalizeAttributeQueryItem(item: unknown): NormalizedAttributeQueryItem | undefined {
+  if (typeof item === 'string') return { name: item };
+  if (Array.isArray(item) && typeof item[0] === 'string') {
+    const opts = item[1];
+    const nested = opts && typeof opts === 'object' ? (opts as { attributeQuery?: unknown[] }).attributeQuery : undefined;
+    return { name: item[0], nested };
+  }
+  return undefined;
+}
+
+// dataPolicy.attributeQuery is a projection ceiling: the caller may only narrow it.
+// Every requested field (including nested relation traversals) must be granted by the
+// policy at the same level; `*` is only allowed if the policy itself grants `*`.
+function assertAttributeQueryWithinPolicy(requested: unknown[], allowed: unknown[], path: string) {
+  const allowedItems = allowed.map(normalizeAttributeQueryItem).filter(Boolean) as NormalizedAttributeQueryItem[];
+  const allowsStar = allowedItems.some(item => item.name === '*');
+  if (allowsStar) return;
+
+  for (const rawItem of requested) {
+    const item = normalizeAttributeQueryItem(rawItem);
+    if (!item) {
+      throw new InteractionGuardError(`dataPolicy check failed: unrecognized attributeQuery item at "${path}": ${JSON.stringify(rawItem)}`, {
+        type: 'data policy attributeQuery check failed',
+        checkType: 'dataPolicy',
+      });
+    }
+    const grant = allowedItems.find(allowedItem => allowedItem.name === item.name);
+    if (!grant) {
+      throw new InteractionGuardError(`dataPolicy check failed: attribute "${path}${item.name}" is not granted by dataPolicy.attributeQuery`, {
+        type: 'data policy attributeQuery check failed',
+        checkType: 'dataPolicy',
+      });
+    }
+    if (item.nested) {
+      // A plain-string grant only covers the attribute itself; traversing into a
+      // related record requires the policy to grant a nested attributeQuery.
+      if (!grant.nested) {
+        throw new InteractionGuardError(`dataPolicy check failed: relation traversal into "${path}${item.name}" is not granted by dataPolicy.attributeQuery`, {
+          type: 'data policy attributeQuery check failed',
+          checkType: 'dataPolicy',
+        });
+      }
+      assertAttributeQueryWithinPolicy(item.nested, grant.nested, `${path}${item.name}.`);
+    }
+  }
+}
+
 async function retrieveData(controller: Controller, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (Entity.is(interaction.data) || Relation.is(interaction.data)) {
     const recordName = (interaction.data as EntityInstance).name!;
 
     const fixedMatch = interaction.dataPolicy?.match;
     const fixedModifier = interaction.dataPolicy?.modifier;
+    const fixedAttributeQuery = interaction.dataPolicy?.attributeQuery as unknown[] | undefined;
 
     const modifier = { ...(eventArgs.query?.modifier || {}), ...(fixedModifier || {}) };
-    const attributeQuery = eventArgs.query?.attributeQuery || [];
+
+    // CAUTION dataPolicy.attributeQuery 是字段级安全上限，必须实施：
+    //  调用方未提供投影时直接采用策略投影；提供了则逐项（含嵌套遍历）校验只能收窄，越界即拒绝。
+    let attributeQuery = eventArgs.query?.attributeQuery || [];
+    if (fixedAttributeQuery) {
+      if (!attributeQuery.length) {
+        attributeQuery = fixedAttributeQuery as typeof attributeQuery;
+      } else {
+        assertAttributeQueryWithinPolicy(attributeQuery, fixedAttributeQuery, '');
+      }
+    }
 
     const matchValue = typeof fixedMatch === 'function'
       ? await fixedMatch.call(controller, eventArgs)
