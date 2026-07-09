@@ -58,9 +58,17 @@ export class UpdateExecutor {
         
         const matchedEntities = await this.agent.findRecords(updateRecordQuery, `find record for updating ${entityName}`)
         // 注意下面使用的都是 updateRecordQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
-        const changedFields = Object.keys(newEntityData.getData())
+        const payloadFields = Object.keys(newEntityData.getData())
         const result: Record[] = []
         for (let matchedEntity of matchedEntities) {
+            // CAUTION changedFields 必须是"实际写入集合"而不是 payload 键：
+            //  computed 属性会随输入字段联动重算并落库（getSameRowFieldAndValue，与 update 事件的 keys 同源）。
+            //  filtered entity 的谓词可能建立在 computed 列上——若这里只用 payload 键做依赖过滤，
+            //  computed 列的变更将跳过成员资格快照，查询侧正确而事件/下游增量计算永久脏数据（静默错误）。
+            const changedFields = Array.from(new Set([
+                ...payloadFields,
+                ...newEntityData.getSameRowFieldAndValue(matchedEntity).map(field => field.name)
+            ]))
             // 0. 成员资格快照：必须在任何物理变更之前采集（无状态 membership diff，见 FilteredEntityManager）。
             //  - membershipChecks：本记录（以及经反向路径受影响的记录）在依赖 changedFields 的 filtered entity 中的成员资格；
             //  - linkChecks：通过行内字段（merged link / combined）新建关系时另一端既有记录的成员资格。
