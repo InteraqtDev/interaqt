@@ -3,7 +3,7 @@ import { Entity, Property, Relation, Interaction, GetAction, DataPolicy } from '
 import { PGLiteDB } from '@drivers';
 import {
   Controller, KlassByName,
-  MonoSystem, Count,
+  MonoSystem, Count, WeightedSummation,
   MatchExp, Custom,
 } from 'interaqt';
 
@@ -250,6 +250,96 @@ describe('r4 R-3: filtered entity predicates with unknown simple keys fail at se
     await system.storage.create('BaseR3b', { status: 'archived' });
     const rows = await system.storage.find('FilteredR3b', undefined, undefined, ['*']);
     expect(rows.length).toBe(1);
+  });
+});
+
+describe('r4 R-4: PropertyCount / PropertyWeightedSummation guard drift', () => {
+  async function setupPropertyAggregates() {
+    const Task = Entity.create({
+      name: 'TaskR4',
+      properties: [
+        Property.create({ name: 'done', type: 'boolean' }),
+        Property.create({ name: 'points', type: 'number' }),
+      ],
+    });
+    const Project = Entity.create({
+      name: 'ProjectR4',
+      properties: [
+        Property.create({ name: 'name', type: 'string' }),
+        Property.create({
+          name: 'taskCount', type: 'number',
+          computation: Count.create({
+            property: 'tasks',
+            attributeQuery: ['done'],
+            callback: (task: any) => !!task.done,
+          }),
+        }),
+        Property.create({
+          name: 'totalPoints', type: 'number',
+          computation: WeightedSummation.create({
+            property: 'tasks',
+            attributeQuery: ['points'],
+            callback: (task: any) => ({ weight: 1, value: task.points || 0 }),
+          }),
+        }),
+      ],
+    });
+    const ProjectTask = Relation.create({
+      source: Project, sourceProperty: 'tasks', target: Task, targetProperty: 'project', type: '1:n',
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Project, Task], relations: [ProjectTask] });
+    await controller.setup(true);
+    const project = await system.storage.create('ProjectR4', { name: 'p' });
+    await system.storage.create('TaskR4', { done: true, points: 3, project: { id: project.id } });
+    const handles = Array.from((controller.scheduler as any).computationsHandles.values()) as any[];
+    const countHandle = handles.find(h => h.dataContext?.type === 'property' && h.dataContext?.id?.name === 'taskCount');
+    const weightedHandle = handles.find(h => h.dataContext?.type === 'property' && h.dataContext?.id?.name === 'totalPoints');
+    expect(countHandle).toBeTruthy();
+    expect(weightedHandle).toBeTruthy();
+    return { system, project, countHandle, weightedHandle };
+  }
+
+  test('missing relatedMutationEvent falls back to fullRecompute instead of crashing', async () => {
+    const { system, project, countHandle, weightedHandle } = await setupPropertyAggregates();
+    const syntheticEvent = {
+      recordName: 'ProjectR4',
+      type: 'update',
+      relatedAttribute: ['tasks'],
+      record: { id: project.id },
+      oldRecord: { id: project.id },
+      // no relatedMutationEvent
+    };
+    for (const handle of [countHandle, weightedHandle]) {
+      const result = await system.storage.runInTransaction({ name: 'r4-guard-test' }, async () =>
+        handle.incrementalCompute(1, syntheticEvent, { id: project.id }, {})
+      );
+      expect(result?.type ?? result?.constructor?.name).toMatch(/fullRecompute|ComputationResultFullRecompute/i);
+    }
+  });
+
+  test('update events from unrelated record names fall back to fullRecompute (aligned with Every/Any)', async () => {
+    const { system, project, countHandle, weightedHandle } = await setupPropertyAggregates();
+    const syntheticEvent = {
+      recordName: 'ProjectR4',
+      type: 'update',
+      relatedAttribute: ['tasks'],
+      record: { id: project.id },
+      oldRecord: { id: project.id },
+      relatedMutationEvent: {
+        recordName: 'SomeUnrelatedRecord',
+        type: 'update',
+        record: { id: 'x' },
+        oldRecord: { id: 'x' },
+      },
+    };
+    for (const handle of [countHandle, weightedHandle]) {
+      const result = await system.storage.runInTransaction({ name: 'r4-guard-test-2' }, async () =>
+        handle.incrementalCompute(1, syntheticEvent, { id: project.id }, {})
+      );
+      expect(result?.type ?? result?.constructor?.name).toMatch(/fullRecompute|ComputationResultFullRecompute/i);
+    }
   });
 });
 

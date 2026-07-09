@@ -214,7 +214,11 @@ export class PropertyCountHandle implements DataBasedComputation {
             return ComputationResult.fullRecompute('mutationEvent.recordName not match')
         }
 
-        const relatedMutationEvent = mutationEvent.relatedMutationEvent!;
+        const relatedMutationEvent = mutationEvent.relatedMutationEvent;
+        // 与 Summation/Average 保持一致：缺失 related 事件时退回全量重算而不是裸解引用崩溃。
+        if (!relatedMutationEvent) {
+            return ComputationResult.fullRecompute(`No related mutation event for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
+        }
         
         let delta = 0
 
@@ -256,7 +260,7 @@ export class PropertyCountHandle implements DataBasedComputation {
             } else {
                 delta = -1;
             }
-        } else if (relatedMutationEvent.type === 'update') {
+        } else if (relatedMutationEvent.type === 'update' && (relatedMutationEvent.recordName === this.relation.name! || relatedMutationEvent.recordName === this.relatedRecordName)) {
             // 这里可能是关联关系上的更新，也可能是关联实体的更新。不管哪一种，我们都重新查询一遍。
             if(this.callback) {
                 // relatedAttribute 是从当前 dataContext 出发
