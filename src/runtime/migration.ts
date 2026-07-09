@@ -3318,7 +3318,12 @@ class MigrationScheduler {
                     if (event) events.push(event);
                     continue;
                 }
-                const dirtyRecordsAndEvents = await this.controller.scheduler.computeDataBasedDirtyRecordsAndEvents(source as DataBasedEntityEventsSourceMap, mutationEvent);
+                // 与 live Scheduler 的事件路由保持同一守卫：filtered 源的 update 监听挂在物理 base 名上，
+                //  必须做成员资格判定并把事件名改写回 filtered 名，否则链式 rebuild 会把
+                //  「成员资格事件 + 字段 update」双计，或把 stay-out 记录的更新错误路由进聚合。
+                const routedEvent = await this.controller.scheduler.resolveFilteredUpdateEvent(source, mutationEvent, mutationEvents);
+                if (!routedEvent) continue;
+                const dirtyRecordsAndEvents = await this.controller.scheduler.computeDataBasedDirtyRecordsAndEvents(source as DataBasedEntityEventsSourceMap, routedEvent);
                 for (const [record, event] of dirtyRecordsAndEvents) {
                     events.push(...await this.runOneDirtyComputation(computation as DataBasedComputation, event, record));
                 }

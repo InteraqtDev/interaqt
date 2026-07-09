@@ -424,8 +424,11 @@ export class Scheduler {
      *
      * 带 targetPath 的（property/关联路径）监听不需要此守卫：computeDirtyDataDepRecords
      * 与各 handle 的增量分支都通过 filtered 路径查询定位记录，成员资格由查询本身保证。
+     *
+     * CAUTION 非 private：MigrationScheduler（migration.ts）的增量重算路径必须复用同一守卫，
+     *  否则迁移期的链式 rebuild 对 filtered 源会出现「成员资格事件 + 字段 update」双计或错误路由。
      */
-    private async resolveFilteredUpdateEvent(
+    async resolveFilteredUpdateEvent(
         source: EntityEventSourceMap,
         mutationEvent: RecordMutationEvent,
         batchEvents: RecordMutationEvent[]
