@@ -912,12 +912,14 @@ describe('Get Data Interaction', () => {
                 views: 300 
             })
 
-            // Call with additional user filters
+            // Call with additional user filters. dataPolicy.attributeQuery is a projection
+            // ceiling (r4 F-2): requesting fields beyond it (e.g. 'status') is rejected,
+            // so the caller only asks for whitelisted fields here.
             const result = await controller.dispatch(GetPublishedArticles, {
                 user: { id: 'test-user' },
                 query: {
                     match: MatchExp.atom({ key: 'views', value: ['>=', 500] }),
-                    attributeQuery: ['id', 'title', 'author', 'views', 'status']
+                    attributeQuery: ['id', 'title', 'author', 'views']
                 }
             })
 
@@ -925,8 +927,8 @@ describe('Get Data Interaction', () => {
             const data = result.data as any[]
             // Should be limited to 5 by fixed modifier
             expect(data.length).toBeLessThanOrEqual(5)
-            // All should be published (from fixed match) AND have views >= 500 (from user match)
-            expect(data.every((a: any) => a.status === 'published' && a.views >= 500)).toBe(true)
+            // All should have views >= 500 (from user match); status stays hidden by the policy
+            expect(data.every((a: any) => a.views >= 500 && a.status === undefined)).toBe(true)
             // Should be ordered by views desc (from fixed modifier)
             if (data.length > 1) {
                 for (let i = 1; i < data.length; i++) {
