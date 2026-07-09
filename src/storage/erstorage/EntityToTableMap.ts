@@ -380,8 +380,10 @@ export class EntityToTableMap {
     getReverseAttribute(entityName: string, attribute: string) : string {
         assert(this.data.records[entityName], `entity ${entityName} not found`)
         const record = this.data.records[entityName]
-        if (record.isRelation) {
-            assert(attribute ==='source' || attribute ==='target', `wrong attribute ${attribute} for relation ${entityName}`)
+        // CAUTION relation 记录上除 source/target 外还可以携带普通关系属性
+        //  （relation-as-source 建模，如 Relation.create({ source: someRelation, sourceProperty: 'tags', ... })），
+        //  它们与实体上的关系属性同构，必须走下面通用的 linkName 反查分支，不能一律按 source/target 断言。
+        if (record.isRelation && (attribute === 'source' || attribute === 'target')) {
             const linkData = this.data.links[entityName]
             if (attribute === 'source') {
                 return `${linkData.sourceProperty!}.&`
@@ -389,7 +391,9 @@ export class EntityToTableMap {
                 return `${linkData.targetProperty!}.&`
             }
         } else {
-            const relationName = (this.data.records[entityName].attributes[attribute] as RecordAttribute).linkName
+            const recordAttribute = this.data.records[entityName].attributes[attribute] as RecordAttribute
+            assert(!!recordAttribute?.linkName, `${entityName}.${attribute} is not a record attribute`)
+            const relationName = recordAttribute.linkName
             const relationData = this.data.links[relationName]
             if (relationData.sourceRecord === entityName && relationData.sourceProperty === attribute) {
                 return relationData.targetProperty!
