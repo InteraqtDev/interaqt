@@ -202,6 +202,21 @@ export class MatchExp {
         return `${tableAlias}.${rawFieldName}`
     }
 
+    // CAUTION IN/NOT IN 的每个元素占一个绑定参数，数据库对单条 SQL 的参数总量有硬上限
+    //  （SQLite 32766 / PG 与 MySQL 65535）。超限时驱动抛出的裸错误（如 "too many SQL variables"）
+    //  与用户写法完全脱节。这里在编译期 fail-fast 给出带指引的受控错误。
+    //  不做隐式分片：把一次查询拆成多条会破坏原子性（并发写入下多条查询之间可见中间态），
+    //  拆分与合并的决策应由调用方显式做出（explicit control）。
+    private assertParamCountWithinDriverLimit(key: string, op: string, count: number, db?: Database) {
+        const limit = db?.maxQueryParams
+        if (limit !== undefined && count > limit) {
+            throw new Error(
+                `match operator '${op}' on key "${key}" has ${count} values, exceeding the database's bind-parameter limit (${limit}). ` +
+                `Split the value list and run multiple queries (merging results yourself), or narrow the match with a different condition.`
+            )
+        }
+    }
+
     getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database): [string, unknown[]] {
         let fieldValue =''
         let fieldParams:unknown[] = []
@@ -246,6 +261,7 @@ export class MatchExp {
             if (!Array.isArray(value[1])) {
                 throw new Error(`match operator 'in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
+            this.assertParamCountWithinDriverLimit(key, 'in', value[1].length, db)
             if (value[1].length === 0) {
                 // 空数组的 IN 语义上恒为 false（任何值都不在空集合中）。
                 // `IN ()` 是非法 SQL，这里生成跨数据库合法且恒为 false 的表达式：
@@ -261,6 +277,7 @@ export class MatchExp {
             if (!Array.isArray(value[1])) {
                 throw new Error(`match operator 'not in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
+            this.assertParamCountWithinDriverLimit(key, 'not in', value[1].length, db)
             if (value[1].length === 0) {
                 // 空集合的 NOT IN 语义上恒为 true（任何值都不在空集合中）。
                 // 依赖 buildWhereClause 对原子加括号，保证 OR 不会泄漏到外层表达式。
@@ -331,6 +348,20 @@ export class MatchExp {
             if (attributeInfo.isValue) {
                 // CAUTION 路径中只可能有一个 n:n symmetric 关系。因为路径中有多个的在语义逻辑上就不正确。
                 //  有一个的情况还是用在 findRelatedRecords 的时候才有意义。因为它会通过 id 限定关系，而即使是 n:n 的关系，任意两个实体中只会有一个关系数据。所以这个时候能找到唯一的数据，是有意义的。
+
+                // CAUTION 'contains' 的语义是「collection 属性包含某元素」，各驱动都以 JSON 数组实现
+                //  （PG json_array_elements_text / SQLite json_each / MySQL JSON_CONTAINS）。
+                //  用在非 collection 属性（如 type:'object'）上会在执行期抛出与用户写法无关的裸数据库错误
+                //  （"cannot call json_array_elements_text on a non-array"）。这里在编译期 fail-fast。
+                if (typeof exp.data.value?.[0] === 'string'
+                    && exp.data.value[0].toLowerCase() === 'contains'
+                    && !attributeInfo.isCollection) {
+                    throw new Error(
+                        `match operator 'contains' on key "${exp.data.key}" requires a collection property, ` +
+                        `but "${this.entityName}.${exp.data.key}" is not declared with collection: true. ` +
+                        `To match inside a non-collection JSON object, query a dedicated value property instead.`
+                    )
+                }
 
                 const fieldNamePath = this.getFinalFieldName(matchAttributePath)
                 const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)

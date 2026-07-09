@@ -27,6 +27,8 @@ export class MysqlDB implements Database{
     db!: Connection
     // MySQL 8.0+ 支持 SELECT ... FOR UPDATE OF <alias>
     supportsSelectForUpdate = true
+    // MySQL prepared statement 的占位符数量上限为 65535；留出安全余量。
+    maxQueryParams = 65000
     transactionCapability: TransactionCapability = {
         transactions: false,
         isolationLevels: [],

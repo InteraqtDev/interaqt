@@ -234,7 +234,7 @@ describe('S22: unknown ActivityGroup type fails at build time', () => {
             groups: [group],
         });
         expect(() => new ActivityManager([activity]))
-            .toThrowError(/ActivityGroup type "parallel-nonsense".*Supported types: 'any', 'every', 'race', 'program'/);
+            .toThrowError(/ActivityGroup type "parallel-nonsense".*Supported types: 'any', 'every', 'race'/);
     });
 });
 

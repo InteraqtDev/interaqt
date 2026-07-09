@@ -665,19 +665,25 @@ describe('many to many', () => {
 
         // Check that delete events for relations have both source and target
         const relationDeleteEvents = events.filter(e => e.type === 'delete' && e.recordName === 'User_friends_friends_User')
-        
-        expect(relationDeleteEvents.length).toBe(1)
-        
-        const event = relationDeleteEvents[0]
-        expect(event.record).toHaveProperty('source')
-        expect(event.record).toHaveProperty('target')
-        expect(event.record!.source).toHaveProperty('id')
-        expect(event.record!.target).toHaveProperty('id')
-        
-        // Verify that user1 is involved in each relation
-        const isUser1Source = event.record!.source.id === user1.id
-        const isUser1Target = event.record!.target.id === user1.id
-        expect(isUser1Source || isUser1Target).toBe(true)
+
+        // user1 participates in BOTH symmetric links (as source of relation1, as target of
+        // relation2). Deleting user1 must remove both — the symmetric relation is matched on
+        // source.id OR target.id, not source.id alone.
+        expect(relationDeleteEvents.length).toBe(2)
+
+        for (const event of relationDeleteEvents) {
+            expect(event.record).toHaveProperty('source')
+            expect(event.record).toHaveProperty('target')
+            expect(event.record!.source).toHaveProperty('id')
+            expect(event.record!.target).toHaveProperty('id')
+            const isUser1Source = event.record!.source.id === user1.id
+            const isUser1Target = event.record!.target.id === user1.id
+            expect(isUser1Source || isUser1Target).toBe(true)
+        }
+
+        // No orphan links remain after the owner is deleted.
+        const remaining = await handle.findRelationByName('User_friends_friends_User', undefined, undefined, ['*'])
+        expect(remaining.length).toBe(0)
     })
 })
 

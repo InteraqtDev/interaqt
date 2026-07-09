@@ -466,7 +466,8 @@ class RaceActivityStateNode extends InteractionState{
 }
 InteractionState.GroupStateNodeType.set('race', RaceActivityStateNode)
 
-
-class ProgrammaticActivityStateNode extends InteractionState{
-}
-InteractionState.GroupStateNodeType.set('program', ProgrammaticActivityStateNode)
+// CAUTION 'program' ActivityGroup 曾被注册但从未实现完成语义（onChange 为空、无程序化 complete 入口），
+//  子分支全部完成后父 group 永远停留、后续 transfer 目标永不可达（activity 静默卡死）。这与 Gateway 一样
+//  是「类型系统接受但运行时不可用」的死路径。按显式控制原则，不再注册该类型——buildGraph 的
+//  GroupStateNodeType.has() 守卫会对 type:'program' 抛出清晰的「not supported」声明期错误，而不是运行时死锁。
+//  若将来要支持程序化完成的 group，需要同时实现 onChange/complete 入口与配套测试后再注册。

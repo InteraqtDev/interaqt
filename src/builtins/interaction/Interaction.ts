@@ -550,6 +550,18 @@ async function retrieveData(controller: Controller, interaction: InteractionInst
     const fixedModifier = interaction.dataPolicy?.modifier;
 
     const modifier = { ...(eventArgs.query?.modifier || {}), ...(fixedModifier || {}) };
+    // CAUTION policy 声明的 modifier 键（如 limit/offset/orderBy）是固定约束，调用方不得绕过。
+    //  浅合并只覆盖同名键，若 policy 只声明 limit，调用方仍可追加 offset 逐页翻取全表——limit 授权形同虚设。
+    //  因此凡是 policy 声明了 limit，就锁定 modifier 的整组分页/排序键（limit/offset/orderBy），
+    //  调用方不能引入 policy 未声明的分页/排序键来扩大可见范围（数据暴露级缺陷）。
+    if (fixedModifier && typeof fixedModifier === 'object' && 'limit' in fixedModifier) {
+      const callerModifier = (eventArgs.query?.modifier || {}) as Record<string, unknown>;
+      for (const key of ['offset', 'orderBy'] as const) {
+        if (!(key in fixedModifier) && key in callerModifier) {
+          throw new Error(`Interaction "${interaction.name}": caller cannot override modifier "${key}" restricted by dataPolicy`);
+        }
+      }
+    }
     // CAUTION dataPolicy.attributeQuery 是交互作者声明的固定投影，声明了就必须生效（policy wins）。
     //  与 modifier 的合并方向一致：调用方不能越权拓宽可见字段——否则 policy 形同虚设，
     //  任何调用方都可以请求任意字段（含 '*'），这是数据暴露级缺陷（r5 F-2）。
