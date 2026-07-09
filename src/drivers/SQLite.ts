@@ -109,6 +109,11 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
             sql:finalSQL,
             params
         })
+        // CAUTION better-sqlite3 对 RETURNING 语句必须用 .all() 才能取回行；
+        //  .run() 只返回 {changes, lastInsertRowid}，与 PostgreSQL/PGLite 驱动的返回行契约不一致。
+        if (idField) {
+            return this.db.prepare(finalSQL).all(...params) as unknown as EntityIdRef[]
+        }
         return this.db.prepare(finalSQL).run(...params)  as unknown as EntityIdRef[]
     }
     async insert (sql:string, values:unknown[], name='')  {
