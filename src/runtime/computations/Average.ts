@@ -307,7 +307,8 @@ export class PropertyAverageHandle implements DataBasedComputation {
 
         const sum = await this.state.sum.increment(mutationEvent.record, sumDelta);
         const count = await this.state.count.increment(mutationEvent.record, countDelta);
-        
+        // 与 PropertyCount 的负值守卫对齐：count 为负说明事件序与绑定状态已不一致，静默返回比例是错误数据。
+        if (count < 0) throw new Error(`PropertyAverage count became negative for ${this.dataContext.host.name}.${this.dataContext.id.name}`)
         return count > 0 ? sum / count : 0;
     }
 }
