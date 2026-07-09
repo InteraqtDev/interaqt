@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.0.1](https://github.com/interaqtdev/interaqt/compare/v2.0.0...v2.0.1) (2026-07-09)
+
+### Bug Fixes
+
+* **build:** publish drivers as the interaqt/drivers subpath entry — drivers import shared singletons from the main entry; README quick-start import (F-3) ([de4bca4](https://github.com/interaqtdev/interaqt/commit/de4bca40673474ce19a9628ebf79db5a418fec8e))
+* **builtins+storage:** dataPolicy.attributeQuery enforced as fixed projection (policy wins, callers cannot widen); computed properties fail fast on relation access instead of silently corrupting ([dad1260](https://github.com/interaqtdev/interaqt/commit/dad126075b1474326b915d786eaa78c276fbb3de))
+* **builtins:** isActivityHead uses the recursion head param — group-head activities no longer stack-overflow; activityId fail-closed (F-1, R-1) ([58f62fe](https://github.com/interaqtdev/interaqt/commit/58f62fe05409fea23a705db69b0188f6c06fcb3c))
+* **builtins:** serialization joins the unified core pipeline — Interaction.stringify via stringifyInstance, parse decodes functions and preserves uuid, Transfer/ActivityGroup/Attributives registered (F-2, I-7) ([ffc2393](https://github.com/interaqtdev/interaqt/commit/ffc23936f2cf74503ff363465431c180579108c8))
+* **core+builtins:** serialization round-trip completeness — Payload/PayloadItem/DataPolicy via stringifyInstance, EventSource registered with full public schema ([c13bba7](https://github.com/interaqtdev/interaqt/commit/c13bba76f6ea3601d3a694ba7c205ab443f3cec2))
+* **drivers:** atomic parameterized id allocation for SQLite/MySQL; safe MySQL database bootstrap; document MySQL transaction limitation ([e6386d0](https://github.com/interaqtdev/interaqt/commit/e6386d0cc069b7bfa54a964296fe9547420b13e7))
+* **drivers:** SQLite insert() returns RETURNING rows instead of run() metadata (R-2) ([ce25ed1](https://github.com/interaqtdev/interaqt/commit/ce25ed12de3aeed71e3566712a17ca74ba3e07f0))
+* **runtime+storage:** filtered-source aggregations react to in-member field updates; '&' link data survives update/1:1/1:n paths; 1:n ownership steal no longer crashes ([0f3dfb3](https://github.com/interaqtdev/interaqt/commit/0f3dfb3e913e798119842cd81d0ee04a7f2d0026))
+* **runtime:** Custom records dataDep requires explicit attributeQuery (F-3) ([f588b7c](https://github.com/interaqtdev/interaqt/commit/f588b7c49f37a9caa7b5683a8a89dee5a617b9f0))
+* **runtime:** dedupe the _self host-create listener against dataDep-registered ones — global+property dataDeps no longer double-run the computation (R-3) ([7698b66](https://github.com/interaqtdev/interaqt/commit/7698b664136dd08d7426b16492f82497829679f4))
+* **runtime:** filtered membership diff evaluates old members on the old base record (R-9) ([40bec9c](https://github.com/interaqtdev/interaqt/commit/40bec9c5d9580de5e46d05c9e23e8b858109a4f8))
+* **runtime:** global dict dataDep events are filtered by key for create and update (F-5) ([41a4c57](https://github.com/interaqtdev/interaqt/commit/41a4c57af772172f01063e325cbb8022783ba05c))
+* **runtime:** lifecycle edge hardening — atomic scheduler listener swap, migration filtered-event routing parity, clear recovery guidance ([36e8883](https://github.com/interaqtdev/interaqt/commit/36e888334daaffd51af84db60e258442382382d3))
+* **runtime:** PropertyAverage guards against negative count, aligned with PropertyCount (R-6.1) ([a53f14a](https://github.com/interaqtdev/interaqt/commit/a53f14a55f361ba8b33b0fa8327d91928e9c705d))
+* **runtime:** PropertyEvery/PropertyAny fall back to fullRecompute on missing relation records (R-3) ([621ca99](https://github.com/interaqtdev/interaqt/commit/621ca990abcfddce4bf8772368519c5f359ec00d))
+* **runtime:** StateMachine computeTarget results normalized to {id}[] — {source,target}/pair forms resolve relation records, invalid forms fail fast (R-2) ([f6e7a44](https://github.com/interaqtdev/interaqt/commit/f6e7a44c484001c5290da331e839fb57f4a45334))
+* **runtime:** StateMachine trigger.keys validated at setup — relation attributes, unknown properties and empty arrays are rejected (R-1) ([2836635](https://github.com/interaqtdev/interaqt/commit/28366353cbd11bbd721ba1b4eccc300650a7b228))
+* **runtime:** Transform update patch cleans up derived rows when the source row is gone (R-7) ([a352260](https://github.com/interaqtdev/interaqt/commit/a352260b2ad8b315e48210dcd6daab8542ae6212))
+* **runtime:** trigger.keys validation expands merged entity inputEntities; docs: Custom dataDeps contract notes ([feab45b](https://github.com/interaqtdev/interaqt/commit/feab45be8420cf0152afdc2c04586c2960fe0a9e))
+* **storage+builtins:** fail-fast for silently-corrupting declarations — filtered-item own properties, duplicate relation property names, __type discriminator writes; goto cycle detection covers interior cycles; cross-activity activityId validation; document mutation-event snapshot shapes in knowledge base ([bc288d6](https://github.com/interaqtdev/interaqt/commit/bc288d62e72404a4a8ccab4221192e1c15f17d69))
+* **storage+builtins:** symmetric relation delete/update covers both endpoint sides; dataPolicy.modifier limit cannot be paginated around; 'program' ActivityGroup fails fast ([50ac850](https://github.com/interaqtdev/interaqt/commit/50ac85018b32f02bd6413e3d8e19f1f048000baf))
+* **storage+runtime+core:** honest oldRecord semantics, combined-record event oracle, fromObject contract, cascade event backfill perf, serialization trust boundary docs ([ed806d9](https://github.com/interaqtdev/interaqt/commit/ed806d97058c2f840c0694fd33c8524f7e40b018))
+* **storage+runtime:** relations on filtered-entity endpoints survive setup; aggregation create path fetches full record; callback without attributeQuery fails fast ([3628671](https://github.com/interaqtdev/interaqt/commit/362867103c475ca6e5cfb5de6a9802793d74255f))
+* **storage:** compound matchExpression merges whole BoolExp on filtered relation attributes (F-2) ([2b2b71b](https://github.com/interaqtdev/interaqt/commit/2b2b71b3d62f3695f27d00196d5c4e08f068747a))
+* **storage:** controlled errors for previously-deferred crashes — big IN over driver bind-param limit, duplicate xToMany refs are idempotent (conflicting '&' fails fast), 'contains' on non-collection property ([c00dfbc](https://github.com/interaqtdev/interaqt/commit/c00dfbc92a4ac4f1a3f2c348ff4c0fd0d7469bd7))
+* **storage:** filtered membership changedFields uses the actual write set incl. computed columns (F-1) ([4dc16db](https://github.com/interaqtdev/interaqt/commit/4dc16dbedd53a0a84ff872b78d27e6b305e50bcc))
+* **storage:** relation-side x:n attributes resolve reverse info; null-link guards in query executor (F-4) ([7247cee](https://github.com/interaqtdev/interaqt/commit/7247cee99dd8431dbd740945d46cb85601e891d3))
+
 ## [2.0.0](https://github.com/interaqtdev/interaqt/compare/v2.0.0-alpha.0...v2.0.0) (2026-07-09)
 
 ## [2.0.0-alpha.0](https://github.com/interaqtdev/interaqt/compare/v1.7.0-alpha.0...v2.0.0-alpha.0) (2026-07-09)
