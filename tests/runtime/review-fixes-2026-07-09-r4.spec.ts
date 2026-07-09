@@ -178,3 +178,70 @@ describe('r4 F-2: dataPolicy.attributeQuery is enforced', () => {
     expect(res.data[0].title).toBe('t1');
   });
 });
+
+describe('r4 F-4: circular baseEntity chains are rejected at setup', () => {
+  test('two filtered entities forming a base cycle fail fast with a clear error', async () => {
+    const Base = Entity.create({
+      name: 'BaseF4',
+      properties: [Property.create({ name: 'status', type: 'string' })]
+    });
+    const FA: any = Entity.create({
+      name: 'FAF4',
+      baseEntity: Base,
+      matchExpression: MatchExp.atom({ key: 'status', value: ['=', 'a'] })
+    });
+    const FB: any = Entity.create({
+      name: 'FBF4',
+      baseEntity: FA,
+      matchExpression: MatchExp.atom({ key: 'status', value: ['=', 'b'] })
+    });
+    FA.baseEntity = FB; // create the cycle
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Base, FA, FB], relations: [] });
+    await expect(controller.setup(true)).rejects.toThrow(/Circular baseEntity\/baseRelation chain detected: FAF4 -> FBF4 -> FAF4/);
+  });
+
+  test('self-referencing baseEntity fails fast', async () => {
+    const SA: any = Entity.create({
+      name: 'SelfF4',
+      properties: [Property.create({ name: 'status', type: 'string' })],
+      matchExpression: MatchExp.atom({ key: 'status', value: ['=', 'a'] })
+    });
+    SA.baseEntity = SA;
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [SA], relations: [] });
+    await expect(controller.setup(true)).rejects.toThrow(/Circular baseEntity\/baseRelation chain detected/);
+  });
+
+  test('legal nested filtered entity chains still work', async () => {
+    const Base = Entity.create({
+      name: 'BaseF4b',
+      properties: [
+        Property.create({ name: 'status', type: 'string' }),
+        Property.create({ name: 'priority', type: 'number' }),
+      ]
+    });
+    const Active = Entity.create({
+      name: 'ActiveF4b',
+      baseEntity: Base,
+      matchExpression: MatchExp.atom({ key: 'status', value: ['=', 'active'] })
+    });
+    const ActiveHigh = Entity.create({
+      name: 'ActiveHighF4b',
+      baseEntity: Active,
+      matchExpression: MatchExp.atom({ key: 'priority', value: ['>', 5] })
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [Base, Active, ActiveHigh], relations: [] });
+    await controller.setup(true);
+    await system.storage.create('BaseF4b', { status: 'active', priority: 9 });
+    await system.storage.create('BaseF4b', { status: 'active', priority: 1 });
+    const rows = await system.storage.find('ActiveHighF4b', undefined, undefined, ['*']);
+    expect(rows.length).toBe(1);
+  });
+});

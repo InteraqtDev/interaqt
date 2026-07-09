@@ -702,9 +702,34 @@ export class DBSetup {
         })
     }
 
+    /**
+     * 校验 baseEntity/baseRelation 链无环。
+     * CAUTION 解析链的代码（resolveRootBaseRecordNameAndMatchExpression / getBaseEntityChain /
+     *  collectAllFilteredEntities）都是无守卫的 while/递归：循环链会同步死循环直至 OOM 进程崩溃，
+     *  必须在一切处理之前 fail-fast。
+     */
+    private validateBaseChains() {
+        for (const item of [...this.entities, ...this.relations]) {
+            const path: string[] = [this.getItemEffectiveName(item)]
+            const visited = new Set<unknown>([item])
+            let current = (item as any).baseEntity || (item as any).baseRelation
+            while (current) {
+                path.push(this.getItemEffectiveName(current))
+                if (visited.has(current)) {
+                    throw new Error(`Circular baseEntity/baseRelation chain detected: ${path.join(' -> ')}. Filtered entity/relation base chains must be acyclic.`)
+                }
+                visited.add(current)
+                current = current.baseEntity || current.baseRelation
+            }
+        }
+    }
+
     buildMap() {
         // -1. 校验所有 entity/relation 的 name（name 会直接进入 SQL，必须先于一切处理）
         this.validateRecordNames();
+
+        // -0.5. 校验 baseEntity/baseRelation 链无环（循环链会让后续解析死循环直至 OOM）
+        this.validateBaseChains();
 
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();
