@@ -1,5 +1,19 @@
 # 全代码库深度 Review 报告（2026-07-09 第三轮）
 
+> **维护说明（2026-07-09 更新）**：本报告发现的问题已在同分支（`cursor/deep-code-review-r3-e56f`）修复：
+>
+> - **致命 F-1 ~ F-5 全部修复**，回归测试见 `tests/runtime/review-fixes-2026-07-09-r3.spec.ts`（16 个用例）：
+>   - F-1：`UpdateExecutor` 的成员资格 `changedFields` 改用**实际写入集合**（`getSameRowFieldAndValue` 的输出，含联动重算的 computed 列，与 update 事件的 `keys` 同源）。
+>   - F-2：`MatchExp.and` 支持复合 `BoolExp` 作为子表达式；`AttributeQuery` 对 filtered relation 的用户 matchExpression 整棵传入而非取 `.data`。
+>   - F-3：Custom 的 records dataDep 缺 `attributeQuery` 时在 setup 抛 `ComputationProtocolError`；显式 `attributeQuery: []` 表示「仅依赖成员资格」仍然合法（与 r2 的 property 依赖 fail-fast 对齐）。
+>   - F-4：`getReverseAttribute` 对 relation 记录上除 source/target 外的普通关系属性走通用 linkName 反查；顺带补齐 `QueryExecutor` 三处可空 x:1/link 的空守卫（含原 I-4）。
+>   - F-5：source map 对 global dict 依赖的 **create 与 update** 事件统一按 key 过滤（自身输出 dict、无关 dict 的事件不再触发计算）。`incrementalDataDeps` 的语义澄清为「增量执行时解析并传入的依赖值」，事件来源需在 `incrementalCompute` 中按 `event.recordName` 区分（既有 `transactionRetry`/`migration` spec 依赖该契约，不宜收窄）。
+> - **重要项修复**：R-1（StateMachine `trigger.keys` setup 期校验：关系属性 / 未声明属性 / 空数组一律拒绝，附带修复 IM-2 空数组 vacuous 匹配）、R-2（SQLite `insert()` 改 `.all()` 返回 RETURNING 行；`oneToMany.spec.ts` 中固化了旧垃圾字段的断言一并修正）、R-3（Every/Any 移植 findOne 空守卫 + 清理死赋值 IM-4）、R-7（Transform lockRecord miss 按 delete 语义清理派生行）、R-9（旧成员在旧 base 上求值的防御性修正）。
+> - **测试补强**：新增 `tests/runtime/filteredMembershipMatrix.spec.ts` —— filtered 成员资格组合矩阵（谓词列类型[普通/computed/跨实体] × 宿主[entity/relation] × 层级[单层/嵌套] × 变更方式[create命中/不命中、update进入/退出/无关字段、relink、级联delete]，每步断言「查询 == 事件推导 == Count」三方一致性不变式，6 个矩阵用例）；I-17（`computedUpdateEvent.spec.ts` 补 `keys` 断言）；I-18（filtered relation 谓词变更迁移回归）。
+> - **明确遗留（建议独立 PR）**：R-4（asyncReturn advisory lock，需真实 PG 并发验证）、R-5（RealTime 时间调度器：实现或文档化的产品决策）、R-6（迁移终态 phase）、R-8（批量 1:n 孤儿告警）、六个聚合 handle 的共享模板抽取（大型重构，三轮累计 7 个缺陷的根治项）、I-1/I-2/I-3/I-5~I-16。
+>
+> 修复后全量测试 1715 passed / 26 skipped（基线 1693，新增 22 个用例）；`npm run check` 通过。下文正文保留 review 时的原始判定，作为问题背景与复现依据。
+
 - 日期：2026-07-09
 - 基线：`main` @ `9e2b1e99`（PR #18 合入之后，前两轮 review 修复全部落地）
 - 范围：`src/core`、`src/runtime`（含 computations、migration、ScopedSequence）、`src/storage`、`src/builtins`、`src/drivers` 全量
