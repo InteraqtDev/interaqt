@@ -1,5 +1,20 @@
 # 全代码库深度 Review 报告（2026-07-09 第八轮）
 
+> **维护说明二（2026-07-09 追加）**：本报告第三节（R-1~R-4）与第六节优先级清单（1~5）的**显著改进项已在同分支全部完成**：
+>
+> - **优先级 1 · 六聚合 handle 模板抽取（含 R-2）**：新增 `src/runtime/computations/aggregationTemplate.ts`——`GlobalRecordsAggregationHandle` / `PropertyRelationAggregationHandle` 收敛全部共享骨架（事件守卫、拉全记录、竞态防御、逐项绑定状态复位、负值守卫入口）；六个聚合（12 个 handle，原 ~1440 行）只声明「单项贡献 / 增量应用 / 全量落盘」三件事（净 -700 行）。绑定状态名与形状全部保留（兼容既有部署）。顺带统一了历史漂移：负值守卫补齐到 GlobalAverage/GlobalEvery/GlobalAny/PropertyEvery/PropertyAny，x:n 断言补齐到 PropertyEvery（原 Any 独有），attributeQuery 非空校验补齐到 PropertySum/PropertyAverage（原 global 独有），create 路径的 `&` 一律挂载回查后的关系记录（原 Count/Every/Any 挂事件局部 record）。
+> - **优先级 2 · R-1**：`MigrationScheduler.runIncrementalRecompute` 复用 live Scheduler 的 `resolveFilteredUpdateEvent` 守卫（该方法从 private 改为共享并注明用途），filtered 源的链式 rebuild 不再可能双计成员资格+字段更新或路由 stay-out 记录。
+> - **优先级 3 · 生命周期三件套**（回归测试 `tests/runtime/review-improvements-2026-07-09.spec.ts`，3 用例）：`Scheduler.setup` 改为**原子切换**（先完整构建新 listener 再注销旧的，构建失败不再留下零监听的静默系统，r5 R-4）；`Controller.setup(true)` 半途失败抛带恢复指引的 `SchedulerError`（指向重跑 install，不再落进误导性的 `MigrationBaselineError` 死角，r5 R-5）；`Controller.migrate` 后的 `scheduler.setup` 失败同样抛明确指引（「数据库已迁移完成，修复后 setup(false)，不要重跑迁移」，r3 R-6）。
+> - **优先级 4 · 序列化往返收尾**（回归测试 `tests/builtins/serialization-r8.spec.ts`，3 用例）：`Payload.stringify`/`PayloadItem.stringify`（itemRef 不再丢失）/`DataPolicy.stringify`（match 函数编码为 func::）全部走统一 `stringifyInstance` 管线；`EventSource` 注册进 `core/init.ts`、补齐 `static public`（含全部生命周期回调）、stringify/parse 与统一契约对齐。
+> - **优先级 5 · 驱动一致性**（回归测试 `tests/storage/driverIdAllocation.spec.ts`；MySQL 侧对真实 MariaDB 10.11 实测验证）：SQLite `getAutoId` 改单语句 UPSERT（唯一索引 IF NOT EXISTS 兼容旧表）；MySQL `getAutoId` 改 `ON DUPLICATE KEY UPDATE + LAST_INSERT_ID(expr)`（两语句对用本地分配链防会话交错——修复前实测并发 30 次分配全部撞同一 id）；MySQL 建库路径参数化/反引号转义；MySQL 事务按「文档化不支持」处置（AGENTS.md + 驱动 capability note，dispatch 已 fail-fast）；SQLite `number → INT` 经核实为非问题（动态类型按值存储，注释文档化，不改声明避免触发存量 schema 迁移）。
+> - **R-3**：以预言机测试固化 combined record 挤出/搬迁的**正确事件语义**（物理行搬迁不发实体级事件、只发 link 事实——`tests/storage/combinedRecordEvents.spec.ts` 2 用例，两条路径实测事件完整），两个函数补上语义注释；`mergeLinks` 的去留仍是产品决策（参数未从 MonoSystem 暴露）。
+> - **R-4**：删除 `computeOldRecord` 占位（FIXME 兑现）——关联路径合成事件的 `oldRecord` 如实置 undefined（真实快照在 `relatedMutationEvent` 上），不再用现值副本冒充；global dict 扇出事件的 `oldRecord` 改为独立副本防别名污染。
+> - **附带快速项**：`MatchExp.fromObject` 签名与实现对齐（原始相等值 + 空对象 fail-fast，r3 I-1）；`deleteDifferentTableReliance` 事件回填只扫描本级新增区间（消除 O(n×m)）；`decodeFunctionValues`/`createInstances` 文档化 `func::`/new Function 信任边界（r3 I-16）。
+>
+> **有意不做（需维护者决策，非本轮遗漏）**：SQL NULL 键缺失语义（API 行为变更需评审，r4 I-1）；x:n 谓词分页/orderBy 代表行（查询编译器级重设计，r3 I-2）；global dict 变更触发宿主全表扫描（需要依赖粒度追踪设计，S3）；`dispatch` 默认吞错返回 `{error}`（既定 API 语义）；payload `base` 弱校验矩阵与 `userRef`/Entity `itemRef` 死 API（行为契约变更家族，r7 I-11~I-14，现状已有测试固化）；MySQL 事务的**实现**路线（本轮选择文档化不支持）。
+>
+> 完成后 `npm run check` 通过；`npm test` 全量 **1768 passed / 26 skipped**（r8 致命修复后基线 1758，净 +10 回归用例：生命周期 3 + 序列化 3 + id 分配 2 + combined 事件预言机 2）。
+>
 > **维护说明（2026-07-09）**：本报告的致命项已在同分支（`cursor/deep-code-review-r8-c6a5`）修复，回归测试见 `tests/storage/review-fixes-2026-07-09-r8.spec.ts`（4 用例）+ `tests/runtime/review-fixes-2026-07-09-r8.spec.ts`（7 用例）：
 >
 > - **F-1（新发现，已复现，schema 级腐蚀）**：以 filtered entity 为端点的 relation（`Relation.create({ source: ActiveUser, ... })`，`filteredEntityRelationValidation.spec.ts` 明确断言该声明合法），其关系属性在 `DBSetup.buildMap` 里被 `copyAttributesToFilteredEntities` **整体抹掉**——查询编译按 `resolvedBaseRecordName` 解析属性直接崩溃（`attribute activePosts not found in User`），删除 base 实体时级联清理看不到该关系、留下**孤儿 link**。修复：`populateRecordAttributes` 把 filtered 端点的关系属性同步登记到 resolved base record（copy 阶段自然回流到所有 filtered 变体）；`LinkInfo.isRelationSource` 按 resolved 名比较端点；`EntityToTableMap.getReverseAttribute` 改用属性自身的 `isSource` 判向；`validateRelations` 补齐家族级（兄弟 filtered entity 之间）属性名冲突校验。
