@@ -6,7 +6,8 @@ import {
   MonoSystem, Count, WeightedSummation,
   MatchExp, Custom, createMigrationManifest,
 } from 'interaqt';
-import { recomputeFilteredMemberships, getNewFilteredDataContexts, getFilteredRecordChanges } from '@runtime';
+import { recomputeFilteredMemberships, getNewFilteredDataContexts, getFilteredRecordChanges, RecordsTransformHandle } from '@runtime';
+import { Transform } from 'interaqt';
 
 // Regression tests for the fourth-round deep code review findings
 // (agentspace/output/deep-review-2026-07-09-r4.md).
@@ -641,6 +642,59 @@ describe('r4 F-3: computation dependency cycles fail fast instead of recursing u
     const updated = await system.storage.findOne('ItemF3c', MatchExp.atom({ key: 'id', value: ['=', r.id] }), undefined, ['*']);
     expect(updated.double).toBe(10);
     expect(updated.quadruple).toBe(20);
+  });
+});
+
+describe('r4 improvements: declared Klass constraints are enforced at create (I-16)', () => {
+  test('duplicate property names are rejected at Entity.create with a clear error', () => {
+    expect(() => Entity.create({
+      name: 'DocI16',
+      properties: [
+        Property.create({ name: 'title', type: 'string' }),
+        Property.create({ name: 'title', type: 'number' }),
+      ]
+    })).toThrow(/Entity constraint "eachNameUnique" on field "properties" failed for "DocI16"/);
+  });
+
+  test('duplicate relation property names are rejected at Relation.create', () => {
+    const A = Entity.create({ name: 'AI16', properties: [Property.create({ name: 'x', type: 'string' })] });
+    const B = Entity.create({ name: 'BI16', properties: [Property.create({ name: 'y', type: 'string' })] });
+    expect(() => Relation.create({
+      source: A, sourceProperty: 'bs', target: B, targetProperty: 'as', type: 'n:n',
+      properties: [
+        Property.create({ name: 'weight', type: 'number' }),
+        Property.create({ name: 'weight', type: 'string' }),
+      ]
+    })).toThrow(/Relation constraint "eachNameUnique" on field "properties" failed/);
+  });
+});
+
+describe('r4 improvements: AttributeQuery.mergeAttributeQueryData preserves query options (I-4)', () => {
+  test('merging duplicate relation entries keeps matchExpression/modifier of the first entry', async () => {
+    const { AttributeQuery } = await import('@storage');
+    const match = MatchExp.atom({ key: 'status', value: ['=', 'published'] });
+    const merged = AttributeQuery.mergeAttributeQueryData(
+      [['posts', { attributeQuery: ['title'], matchExpression: match, modifier: { limit: 5 } } as any]],
+      [['posts', { attributeQuery: ['content'] } as any]]
+    );
+    const entry = merged.find(item => Array.isArray(item) && item[0] === 'posts') as any;
+    expect(entry).toBeTruthy();
+    expect(entry[1].matchExpression).toBe(match);
+    expect(entry[1].modifier).toEqual({ limit: 5 });
+    expect(entry[1].attributeQuery).toEqual(expect.arrayContaining(['title', 'content']));
+  });
+});
+
+describe('r4 improvements: Transform planIncremental honors context.skip (I-8)', () => {
+  test('a skip context returns a skip plan instead of running the patch compute', async () => {
+    const Source = Entity.create({ name: 'SourceI8', properties: [Property.create({ name: 'title', type: 'string' })] });
+    const args = Transform.create({ record: Source, attributeQuery: ['title'], callback: (r: any) => ({ label: r.title }) });
+    const handle = Object.create(RecordsTransformHandle.prototype);
+    handle.args = args;
+    const plan = RecordsTransformHandle.prototype.planIncremental.call(handle, { type: 'create' } as any, undefined, {
+      skip: true, reason: 'records match excludes mutation event', depRole: 'primary',
+    } as any);
+    expect(plan.type).toBe('skip');
   });
 });
 

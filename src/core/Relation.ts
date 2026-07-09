@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { stringifyInstance, decodeFunctionValues } from './utils.js';
+import { stringifyInstance, decodeFunctionValues, enforceDeclaredConstraints } from './utils.js';
 import { PropertyInstance, Property } from './Property.js';
 import { EntityInstance } from './Entity.js';
 import type { ComputationInstance } from './types.js';
@@ -299,7 +299,10 @@ export class Relation implements RelationInstance {
     }
 
     const instance = new Relation(args, options);
-    
+
+    // 执行 public 里声明的约束（eachNameUnique / mergedRelationNoProperties 等）。
+    enforceDeclaredConstraints(this, instance);
+
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
