@@ -450,6 +450,40 @@ describe("review fixes 2026-07-09 r3", () => {
         await db.close();
     });
 
+    test("R-1: trigger.keys on merged entity properties (from inputEntities) is accepted", async () => {
+        // merged entity 自身没有 properties，有效属性来自输入实体的并集——校验不能误拒。
+        const Employee = Entity.create({
+            name: "R3KeysMergedEmployee",
+            properties: [Property.create({ name: "level", type: "number" })],
+        });
+        const Partner = Entity.create({
+            name: "R3KeysMergedPartner",
+            properties: [Property.create({ name: "level", type: "number" })],
+        });
+        const Staff = Entity.create({ name: "R3KeysMergedStaff", inputEntities: [Employee, Partner] });
+        const idle = StateNode.create({ name: "idle" });
+        const touched = StateNode.create({ name: "touched" });
+        const marker = Dictionary.create({
+            name: "r3KeysMergedMarker", type: "string", collection: false,
+            computation: StateMachine.create({
+                states: [idle, touched],
+                initialState: idle,
+                transfers: [StateTransfer.create({
+                    trigger: { recordName: "R3KeysMergedStaff", type: "update", keys: ["level"] } as any,
+                    current: idle, next: touched,
+                })],
+            }),
+        });
+        const db = new PGLiteDB();
+        const system = new MonoSystem(db);
+        system.conceptClass = KlassByName;
+        // 构造不抛错即为通过（level 是输入实体贡献的合法属性）
+        const controller = new Controller({ system, entities: [Employee, Partner, Staff], relations: [], dict: [marker] });
+        await controller.setup(true);
+        expect(await system.storage.dict.get("r3KeysMergedMarker")).toBe("idle");
+        await db.close();
+    });
+
     test("R-1: trigger.keys on declared value properties still transitions", async () => {
         const db = new PGLiteDB();
         const controller = buildKeysController(["name"], db);

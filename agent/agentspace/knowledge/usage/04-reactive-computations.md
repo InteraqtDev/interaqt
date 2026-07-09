@@ -89,6 +89,11 @@ Custom computations are different because interaqt cannot inspect user callback 
 
 Custom incremental computations must declare an incremental plan. Use `incrementalDataDeps: [...]` for the common case, or `planIncremental(event, record, context)` when the computation needs to choose between incremental, full recompute, and skip per event. Incremental callbacks receive only the planned partial `dataDeps`; the runtime no longer resolves all declared dependencies before incremental execution.
 
+Two contract details for Custom `dataDeps`:
+
+- **`records` dataDeps must declare `attributeQuery`.** Setup fails fast otherwise, because an undeclared field set would resolve to id-only records and field updates would never re-trigger the computation. Declare the fields your `compute` reads (e.g. `attributeQuery: ['price']`), or pass an explicit `attributeQuery: []` when the computation only depends on record membership (create/delete).
+- **`incrementalDataDeps` names the dependency values to resolve and pass into `incrementalCompute`; it is not an event filter.** Events from every declared `dataDep` reach `incrementalCompute` — distinguish sources by `event.recordName` inside the callback, or use `planIncremental` to return different plans per dependency. (Create/update events of unrelated global dicts are already filtered by key at the source-map level and never trigger the computation.)
+
 Because retry replays the transaction attempt, `guard`, `mapEventData`, `resolve`, computation callbacks, `afterDispatch`, and `asyncReturn` must be deterministic and retry-safe. Put irreversible external IO in `postCommit` for interaction-specific effects or `recordMutationSideEffects` for mutation-driven effects; both run after the final commit.
 
 ### Scoped Atomic Sequences

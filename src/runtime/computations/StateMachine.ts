@@ -31,17 +31,25 @@ function validateTriggerKeys(controller: Controller, args: StateMachineInstance,
         }
         const keys = trigger.keys as string[]
 
-        // 沿 filtered 链收集记录名与属性名
+        // 收集记录的有效属性：沿 filtered 链（baseEntity/baseRelation）向下，
+        // 并展开 merged entity（inputEntities）——merged entity 自身没有 properties，
+        // 其有效属性是全部输入实体属性的并集。
         const recordChainNames = new Set<string>()
         const propertyNames = new Set<string>(['id'])
-        let current = controller.entities.find(e => e.name === trigger.recordName)
+        const start = controller.entities.find(e => e.name === trigger.recordName)
             ?? controller.relations.find(r => r.name === trigger.recordName) as (typeof controller.entities[number] | typeof controller.relations[number] | undefined)
-        if (!current) continue
-        while (current) {
+        if (!start) continue
+        const pending: unknown[] = [start]
+        const visited = new Set<unknown>()
+        while (pending.length) {
+            const current = pending.pop() as { name?: string, properties?: { name: string }[], baseEntity?: unknown, baseRelation?: unknown, inputEntities?: unknown[] }
+            if (!current || visited.has(current)) continue
+            visited.add(current)
             if (current.name) recordChainNames.add(current.name)
             for (const property of (current.properties ?? [])) propertyNames.add(property.name)
-            const base: unknown = (current as { baseEntity?: unknown }).baseEntity ?? (current as { baseRelation?: unknown }).baseRelation
-            current = base as typeof current
+            if (current.baseEntity) pending.push(current.baseEntity)
+            if (current.baseRelation) pending.push(current.baseRelation)
+            for (const input of (current.inputEntities ?? [])) pending.push(input)
         }
         // 本记录（含 base 链）上的关系属性
         const relationAttributes = new Set<string>()
