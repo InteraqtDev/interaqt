@@ -818,7 +818,7 @@ export class Scheduler {
             }
             const fullDeps = computation.dataDeps ? await this.resolveAllDataDeps(computation, record) : {}
             if (!computation.compute) {
-                throw new ComputationError('compute must be defined for planned full recompute', {
+                throw new ComputationError('This computation only defines incrementalCompute/incrementalPatchCompute, but the current event requires a full recompute (e.g. an external dependency changed or the incremental path cannot handle this event shape). Define compute() as a full-recompute fallback, or make planIncremental()/incremental paths cover this event.', {
                     handleName: computation.constructor.name,
                     computationName: computation.args.constructor.displayName,
                     dataContext: computation.dataContext,

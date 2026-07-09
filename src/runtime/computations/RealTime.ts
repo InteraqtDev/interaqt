@@ -27,7 +27,20 @@ function resolveNextRecomputeTime(
         }
         return now + nextRecomputeTime(now, dataDeps)
     }
-    const solved = result.solve()
+    // solve() 对多变量/不支持的表达式形态会直接 throw（而不是返回 null）；
+    //  与"无解"同样处理：回退到用户声明的 nextRecomputeTime，两者都没有时给出明确错误。
+    let solved: number | null | undefined
+    try {
+        solved = result.solve()
+    } catch (error) {
+        if (!nextRecomputeTime) {
+            throw new ComputationError(
+                `RealTime computation "${contextName}" returned an expression whose next boundary cannot be solved automatically (${error instanceof Error ? error.message : String(error)}). Declare nextRecomputeTime to schedule recomputation explicitly.`,
+                { computationName: 'RealTime', causedBy: error instanceof Error ? error : undefined }
+            )
+        }
+        return now + nextRecomputeTime(now, dataDeps)
+    }
     if (solved === undefined || solved === null || Number.isNaN(solved)) {
         return nextRecomputeTime ? now + nextRecomputeTime(now, dataDeps) : null
     }
