@@ -58,6 +58,9 @@ interface StorageAccess {
             create(name: string, data: any): Promise<any>
             find(name: string, match?: any, modifier?: any, attributeQuery?: any): Promise<any[]>
             update(name: string, match: any, data: any): Promise<any>
+            atomic: {
+                compareAndSet(target: { recordName: string, id: string, field: string }, expected: unknown, next: unknown, options?: { defaultValue?: unknown }): Promise<boolean>
+            }
         }
     }
     ignoreGuard: boolean
@@ -349,21 +352,24 @@ export class ActivityCall {
         state.completeInteraction(interactionUuid)
         const nextState = state.toJSON()
 
-        // CAUTION optimistic concurrency control: state advancement is a read-modify-write,
-        //  so the write is conditioned on the version we read. A concurrent dispatch that
-        //  advanced the state in between makes this update match zero rows — fail with a
-        //  clear error (aborting this transaction) instead of silently losing an update.
+        // CAUTION optimistic concurrency control: state advancement is a read-modify-write.
+        //  storage.update(match) is find-then-update-by-id and therefore NOT an atomic
+        //  compare-and-set under READ COMMITTED (both concurrent transactions can pass the
+        //  non-locking find). Use the atomic CAS primitive (single conditional UPDATE, whose
+        //  WHERE clause is re-evaluated after lock waits) to advance the version; a loser
+        //  gets zero rows and aborts this transaction — including its saveUserRefs write —
+        //  instead of silently losing an update.
         const currentVersion = activity.stateVersion ?? 0
-        const match = BoolExp.atom({ key: 'id', value: ['=', activityId] })
-            .and({ key: 'stateVersion', value: ['=', currentVersion] })
-        const updated = await storage.system.storage.update(
-            ActivityCall.ACTIVITY_RECORD,
-            match,
-            { state: nextState, stateVersion: currentVersion + 1 }
+        const won = await storage.system.storage.atomic.compareAndSet(
+            { recordName: ActivityCall.ACTIVITY_RECORD, id: activityId, field: 'stateVersion' },
+            currentVersion,
+            currentVersion + 1,
+            { defaultValue: 0 }
         )
-        if (!updated || (Array.isArray(updated) && updated.length === 0)) {
+        if (!won) {
             throw new Error(`activity ${activityId} state was modified concurrently while completing interaction ${interactionUuid}; the dispatch has been aborted and can be retried`)
         }
+        await this.setActivity(storage, activityId, { state: nextState })
     }
 
     async saveUserRefs(storage: StorageAccess, activityId: string, interaction: InteractionInstance, interactionEventArgs: InteractionEventArgs) {
