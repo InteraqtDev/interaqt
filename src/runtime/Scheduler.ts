@@ -326,7 +326,8 @@ export class Scheduler {
         }
         this.registeredMutationListeners = []
     }
-    addMutationPropertyComputationDefaultValueListeners() {
+    private buildPropertyDefaultValueListeners(): RecordMutationCallback[] {
+        const listeners: RecordMutationCallback[] = []
         for(const computation of this.computationsHandles.values()) {
             if(computation.getInitialValue) {
                 if (computation.dataContext.type==='property') {
@@ -338,7 +339,7 @@ export class Scheduler {
                     assert(!propertyDataContext.id.defaultValue, `${propertyDataContext.host.name}.${propertyDataContext.id.name} property shuold not has a defaultValue, because it will be overridden by computation`)
 
                     // TODO 未来合成一个 listener ?
-                    this.registerMutationListener(async (mutationEvents) => {
+                    listeners.push(async (mutationEvents) => {
                         for(let mutationEvent of mutationEvents){
                             if (mutationEvent.type === 'create' && mutationEvent.recordName === propertyDataContext.host.name) {
                                 const defaultValue = await computation.getInitialValue?.(mutationEvent.record)
@@ -353,6 +354,7 @@ export class Scheduler {
                 }
             }
         }
+        return listeners
     }
     async setupGlobalComputationDefaultValue() {
         for(const computation of this.computationsHandles.values()) {
@@ -382,11 +384,11 @@ export class Scheduler {
     }
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
-    addMutationComputationListeners() {
+    private buildComputationMutationListener(): RecordMutationCallback {
         this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
 
-        this.registerMutationListener(async (mutationEvents) => {
+        return (async (mutationEvents) => {
             for(let mutationEvent of mutationEvents){
                 const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                 if (sources.length > 0) {
@@ -1295,10 +1297,18 @@ export class Scheduler {
     
     async setup(createDefaultDictValue: boolean = false) {
         try {
-            // 幂等：重复 setup（或 migrate 后的重建）先注销上一次注册的 listener。
+            // CAUTION 原子切换：先完整构建新 listener（含 sourceMapManager.initialize 等可抛出的路径），
+            //  全部构建成功后才注销旧的、注册新的。如果先注销再构建，构建中途抛出会留下一个
+            //  「零监听」的静默系统——事实写入照常、所有增量计算冻结、无任何后续报错。
+            const listeners = [
+                ...this.buildPropertyDefaultValueListeners(),
+                this.buildComputationMutationListener()
+            ]
+            // 幂等：重复 setup（或 migrate 后的重建）注销上一次注册的 listener，否则同一 mutation 会触发多次计算。
             this.removeRegisteredMutationListeners()
-            this.addMutationPropertyComputationDefaultValueListeners()
-            this.addMutationComputationListeners()
+            for (const listener of listeners) {
+                this.registerMutationListener(listener)
+            }
             if (createDefaultDictValue) {   
                 // 一定要先把 bound state default value 设置后，因为后面开始设置 dict default value 时，可能触发 computation。可能要读 state。
                 await this.setupGlobalBoundStateDefaultValues()
