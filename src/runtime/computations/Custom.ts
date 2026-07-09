@@ -40,6 +40,25 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     // 设置自定义的 dataDeps
     if (args.dataDeps) {
       this.dataDeps = args.dataDeps as {[key: string]: DataDep};
+      // CAUTION fail fast：records 依赖不带 attributeQuery 时，取数只会返回 id、update 也不注册任何监听。
+      //  用户 compute 里读取字段会静默拿到 undefined（错误值而非报错），必须在 setup 阶段拒绝。
+      //  显式声明 attributeQuery: [] 表示"只依赖记录集合本身（id / 增删），不依赖字段"，仍然允许。
+      Object.entries(this.dataDeps).forEach(([key, dep]) => {
+        if (dep.type === 'records' && dep.attributeQuery === undefined) {
+          throw new ComputationProtocolError(
+            `Records dataDep "${key}" of Custom computation "${args.name}" must declare attributeQuery. ` +
+            `Without it the dependency resolves to id-only records and field updates never re-trigger the computation. ` +
+            `Declare the fields your compute reads, e.g. { type: 'records', source, attributeQuery: ['fieldA'] }, ` +
+            `or explicitly pass attributeQuery: [] if the computation only depends on record membership (create/delete).`,
+            {
+              handleName: this.constructor.name,
+              computationName: args.name,
+              dataContext: this.dataContext,
+              computationPhase: 'custom-data-deps-validation'
+            }
+          )
+        }
+      })
     }
     if (args.incrementalDataDeps) {
       this.incrementalDataDepKeys = args.incrementalDataDeps;
@@ -196,6 +215,11 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       if (context.requiresFullRecompute) {
         return { type: 'fullRecompute', reason: context.reason || 'Custom dependency requires full recompute' }
       }
+      // CAUTION incrementalDataDeps 声明的是"增量执行时需要解析并传入的依赖值"（[] 表示不需要任何依赖值），
+      //  不是事件过滤器：任何已声明 dataDep 的事件都会走到 incrementalCompute。
+      //  多依赖的 Custom 必须在 incrementalCompute 里按 event.recordName 区分事件来源，
+      //  或改用 planIncremental 对不同依赖返回不同的计划。
+      //  （无关 dict 的 create/update 噪音已在 source map 层按 key 过滤，见 ComputationSourceMap。）
       return {
         type: 'incremental',
         dataDepKeys: this.incrementalDataDepKeys,
