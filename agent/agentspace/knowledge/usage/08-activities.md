@@ -1,5 +1,15 @@
 # How to Use Activities for Process Management
 
+> **⚠️ Maintenance note (2026-07-09)**: parts of this guide are outdated. The REAL Activity API is:
+> `Activity.create({ name, interactions, transfers, groups? })` with `Transfer.create({ name, source, target })`,
+> where `source`/`target` are Interaction / ActivityGroup instances. **There is no string-based
+> `Transfer.create({ from, to, interaction, condition })` form** — examples below using that shape are
+> historical sketches and do not run. Activities are dispatched through `ActivityManager`:
+> compile with `new ActivityManager(activities).getOutput()`, pass the output entities/relations/eventSources
+> to the Controller, then `controller.dispatch(controller.findEventSourceByName('ActivityName:interactionName'), { user, activityId? })`.
+> For a runnable end-to-end example see `agent/agentspace/knowledge/usage/13-testing.md` §12.2.2
+> and `tests/runtime/activity.spec.ts`. A full rewrite of this guide is tracked as follow-up work.
+
 Activities are the core mechanism in interaqt for managing complex business processes. They allow you to define multi-step, multi-role business processes and control the execution order and conditions of processes through a state machine model.
 
 ## Understanding Activity Concepts

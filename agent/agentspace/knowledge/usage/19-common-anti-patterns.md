@@ -232,7 +232,11 @@ StateMachine.create({
     StateTransfer.create({
       current: 'active',  // Should be object reference!
       next: 'inactive',   // Should be object reference!
-      trigger: SomeInteraction
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: SomeInteraction.name }
+      }
     })
   ],
   initialState: 'active'  // Should be object reference!
@@ -248,7 +252,11 @@ StateMachine.create({
     StateTransfer.create({
       current: activeState,     // Object reference
       next: inactiveState,      // Object reference
-      trigger: SomeInteraction
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: SomeInteraction.name }
+      }
     })
   ],
   initialState: activeState     // Object reference

@@ -629,8 +629,12 @@ const User = Entity.create({
           StateTransfer.create({
             current: NameUpdatedState,
             next: NameUpdatedState,
-            trigger: UpdateUserProfile,
-            computeTarget: (event) => ({ id: event.payload.userId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: UpdateUserProfile.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.userId })
           })
         ],
         initialState: NameUpdatedState
@@ -645,8 +649,12 @@ const User = Entity.create({
           StateTransfer.create({
             current: BioUpdatedState,
             next: BioUpdatedState,
-            trigger: UpdateUserProfile,
-            computeTarget: (event) => ({ id: event.payload.userId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: UpdateUserProfile.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.userId })
           })
         ],
         initialState: BioUpdatedState
@@ -704,20 +712,32 @@ const Post = Entity.create({
           StateTransfer.create({
             current: draftState,
             next: publishedState,
-            trigger: PublishPost,
-            computeTarget: (event) => ({ id: event.payload.postId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: PublishPost.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.postId })
           }),
           StateTransfer.create({
             current: publishedState,
             next: deletedState,
-            trigger: DeletePost,
-            computeTarget: (event) => ({ id: event.payload.postId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: DeletePost.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.postId })
           }),
           StateTransfer.create({
             current: draftState,
             next: deletedState,
-            trigger: DeletePost,
-            computeTarget: (event) => ({ id: event.payload.postId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: DeletePost.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.postId })
           })
         ]
       })
@@ -821,26 +841,42 @@ const Order = Entity.create({
           StateTransfer.create({
             current: pendingState,
             next: confirmedState,
-            trigger: ConfirmPayment,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: ConfirmPayment.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
           }),
           StateTransfer.create({
             current: confirmedState,
             next: shippedState,
-            trigger: ShipOrder,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: ShipOrder.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
           }),
           StateTransfer.create({
             current: shippedState,
             next: deliveredState,
-            trigger: ConfirmDelivery,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: ConfirmDelivery.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
           }),
           StateTransfer.create({
             current: pendingState,
             next: cancelledState,
-            trigger: CancelOrder,
-            computeTarget: (event) => ({ id: event.payload.orderId })
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: CancelOrder.name }
+            },
+            computeTarget: (event) => ({ id: event.record.payload.orderId })
           })
         ]
       })
@@ -1130,14 +1166,22 @@ const OrderStateMachine = StateMachine.create({
     StateTransfer.create({
       current: PendingState,
       next: PaidState,
-      trigger: PayOrder,
-      computeTarget: (event) => ({ id: event.payload.orderId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: PayOrder.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.orderId })
     }),
     StateTransfer.create({
       current: PaidState,
       next: ShippedState,
-      trigger: ShipOrder,
-      computeTarget: (event) => ({ id: event.payload.orderId })
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: ShipOrder.name }
+      },
+      computeTarget: (event) => ({ id: event.record.payload.orderId })
     })
   ]
 });

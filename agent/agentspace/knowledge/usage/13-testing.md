@@ -574,121 +574,72 @@ describe('User Interactions', () => {
 
 ### 12.2.2 Activity Testing
 
+An Activity is an ordered composition of Interactions (`Activity.create({ name, interactions, transfers })`, with `Transfer.create({ name, source, target })` connecting them — NOT StateNode/StateTransfer, which belong to StateMachine). Use `ActivityManager` to compile activities into dispatchable event sources named `activityName:interactionName`, and drive them through `controller.dispatch`:
+
 ```typescript
 // tests/activities/approvalProcess.spec.ts
+import {
+  Activity, ActivityManager, Transfer, Interaction, Action,
+  Controller, MonoSystem, KlassByName
+} from 'interaqt';
+import { PGLiteDB } from '@drivers';
+
 describe('Approval Process Activity', () => {
   test('should handle complete approval workflow', async () => {
     const system = new MonoSystem(new PGLiteDB());
-    
-    // Create request entity
-    const requestEntity = Entity.create({
-      name: 'Request',
-      properties: [
-        Property.create({ name: 'title', type: 'string' }),
-        Property.create({ name: 'status', type: 'string' }),
-        Property.create({ name: 'submitterId', type: 'string' })
-      ]
-    });
-    
-    // Create activity states
-    const submittedState = StateNode.create({ name: 'submitted' });
-    const reviewingState = StateNode.create({ name: 'reviewing' });
-    const approvedState = StateNode.create({ name: 'approved' });
-    const rejectedState = StateNode.create({ name: 'rejected' });
-    
-    // Create interactions
-    const submitInteraction = Interaction.create({
+    system.conceptClass = KlassByName;
+
+    // 1. Declare the interactions of the workflow
+    const submit = Interaction.create({
       name: 'submit',
       action: Action.create({ name: 'submit' })
     });
-    
-    const approveInteraction = Interaction.create({
+    const approve = Interaction.create({
       name: 'approve',
       action: Action.create({ name: 'approve' })
     });
-    
-    const rejectInteraction = Interaction.create({
-      name: 'reject',
-      action: Action.create({ name: 'reject' })
-    });
-    
-    // Create state transfers
-    const submitTransfer = StateTransfer.create({
-      trigger: submitInteraction,
-      current: submittedState,
-      next: reviewingState
-    });
-    
-    const approveTransfer = StateTransfer.create({
-      trigger: approveInteraction,
-      current: reviewingState,
-      next: approvedState
-    });
-    
-    const rejectTransfer = StateTransfer.create({
-      trigger: rejectInteraction,
-      current: reviewingState,
-      next: rejectedState
-    });
-    
-    // Create activity
+
+    // 2. Compose them into an activity: submit → approve
     const approvalActivity = Activity.create({
       name: 'ApprovalProcess',
-      states: [submittedState, reviewingState, approvedState, rejectedState],
-      transfers: [submitTransfer, approveTransfer, rejectTransfer],
-      initialState: submittedState
+      interactions: [submit, approve],
+      transfers: [
+        Transfer.create({ name: 'submitToApprove', source: submit, target: approve })
+      ]
     });
-    
+
+    // 3. ActivityManager compiles the activity into event sources / records
+    const activityManager = new ActivityManager([approvalActivity]);
+    const activityOutput = activityManager.getOutput();
+
     const controller = new Controller({
       system,
-      entities: [requestEntity],
-      relations: [],
-      activities: [approvalActivity],  // activities
-      interactions: [submitInteraction, approveInteraction, rejectInteraction],  // interactions
-      dict: []
+      entities: [...activityOutput.entities],
+      relations: [...activityOutput.relations],
+      eventSources: [...activityOutput.eventSources]
     });
     await controller.setup(true);
-    
-    // Create request
-    const request = await system.storage.create('Request', {
-      title: 'Test Request',
-      status: 'submitted',
-      submitterId: 'user123'
-    });
-    
-    // Execute submit interaction
-    await controller.callInteraction(submitInteraction.name, {
-      user: { id: 'user123' },  // Add user object
-      payload: {
-        requestId: request.id
-      }
-    });
-    
-    // Verify state transition
-    let updatedRequest = await system.storage.findOne(
-      'Request',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'title', 'status', 'submitterId']  // Specify fields
-    );
-    expect(updatedRequest.status).toBe('reviewing');
-    
-    // Execute approve interaction
-    await controller.callInteraction(approveInteraction.name, {
-      user: { id: 'admin-user' },  // Add user object
-      payload: {
-        requestId: request.id
-      }
-    });
-    
-    // Verify final state
-    updatedRequest = await system.storage.findOne(
-      'Request',
-      MatchExp.atom({ key: 'id', value: ['=', request.id] }),
-      undefined,
-      ['id', 'title', 'status', 'submitterId']  // Specify fields
-    );
-    expect(updatedRequest.status).toBe('approved');
+
+    const submitES = controller.findEventSourceByName('ApprovalProcess:submit')!;
+    const approveES = controller.findEventSourceByName('ApprovalProcess:approve')!;
+
+    // 4. The head interaction creates the activity instance
+    const res1 = await controller.dispatch(submitES, { user: { id: 'user123' } });
+    expect(res1.error).toBeUndefined();
+    const activityId = res1.context!.activityId as string;
+
+    // 5. Subsequent interactions must carry the activityId
+    const res2 = await controller.dispatch(approveES, { user: { id: 'admin-user' }, activityId });
+    expect(res2.error).toBeUndefined();
+
+    // 6. The activity is complete: no further interaction is available
+    const res3 = await controller.dispatch(approveES, { user: { id: 'admin-user' }, activityId });
+    expect(res3.error).toBeDefined();
+
+    // 7. Verify the activity state directly
+    const activityCall = activityManager.getActivityCallByName('ApprovalProcess')!;
+    const state = await activityCall.getState(controller, activityId);
+    expect(state.current).toBeUndefined();  // undefined = completed
   });
 });
 ```

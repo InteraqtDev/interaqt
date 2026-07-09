@@ -1,5 +1,11 @@
 # 外部系统集成挑战
 
+> **维护说明（2026-07-09）**：本文是历史设计讨论，其中的代码块（`transitions/from/to/on`、`ExternalEvent`、`AsyncTransform` 等）是**当时的假设性 API 推演，均不是真实 API**。文中提出的核心挑战已由后续设计解决：
+> - `StateTransfer.trigger` 是 `RecordMutationEventPattern`，可以匹配**任意**记录的 mutation 事件（不限于用户 Interaction）——外部回调写入的同步记录可以直接触发状态转移；
+> - 异步计算已通过 task 记录 + `asyncReturn` 独立事务机制支持（见 `agentspace/knowledge/external-resource-sync-abstractions.md` 与 `tests/runtime/asyncComputed.spec.ts`）。
+>
+> 真实 API 的用法请以 `agent/agentspace/knowledge/usage/04-reactive-computations.md` 为准。
+
 ## 业务场景：支付与第三方服务集成
 
 ### 具体需求

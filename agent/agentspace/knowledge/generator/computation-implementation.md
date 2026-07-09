@@ -124,7 +124,11 @@ When using `InteractionEventEntity` as the Transform input source, understand th
      states: [updatedState],
      transfers: [
        StateTransfer.create({
-         trigger: UpdateStyleInteraction,
+         trigger: {
+           recordName: InteractionEventEntity.name,
+           type: 'create',
+           record: { interactionName: UpdateStyleInteraction.name }
+         },
          current: updatedState,
          next: updatedState,
          computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
@@ -142,7 +146,11 @@ When using `InteractionEventEntity` as the Transform input source, understand th
      initialState: activeState,  // StateMachine controls initial value
      transfers: [
        StateTransfer.create({
-         trigger: DeleteStyleInteraction,
+         trigger: {
+           recordName: InteractionEventEntity.name,
+           type: 'create',
+           record: { interactionName: DeleteStyleInteraction.name }
+         },
          current: activeState,
          next: deletedState,
          computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
@@ -336,19 +344,30 @@ Used for status changes and field updates.
 
 **🔴 IMPORTANT: StateTransfer Trigger Parameter**
 
-The `trigger` parameter in `StateTransfer.create()` must ALWAYS be an Interaction instance reference, NOT a string!
+The `trigger` parameter in `StateTransfer.create()` is a **RecordMutationEventPattern** — an object pattern matched against record mutation events (`{ recordName, type, keys?, record?, oldRecord? }`). It is NOT a string and NOT an Interaction instance. For interaction-triggered transitions, match the creation of the interaction's event record:
 
 ```typescript
-// ❌ WRONG: Using string as trigger
+// ❌ WRONG: Using a string as trigger
 StateTransfer.create({
-  trigger: 'PublishStyle',  // ERROR! Don't use string!
+  trigger: 'PublishStyle',  // ERROR! Never matches any event
   current: draftState,
   next: activeState
 })
 
-// ✅ CORRECT: Using Interaction instance reference
+// ❌ WRONG: Using an Interaction instance as trigger
 StateTransfer.create({
-  trigger: PublishStyle,  // Correct! Reference to Interaction instance
+  trigger: PublishStyle,  // ERROR! Never matches any event
+  current: draftState,
+  next: activeState
+})
+
+// ✅ CORRECT: Match the interaction's event record creation
+StateTransfer.create({
+  trigger: {
+    recordName: InteractionEventEntity.name,
+    type: 'create',
+    record: { interactionName: PublishStyle.name }
+  },
   current: draftState,
   next: activeState
 })
@@ -397,13 +416,21 @@ statusProperty.computation = StateMachine.create({
     StateTransfer.create({
       current: draftState,
       next: activeState,
-      trigger: PublishStyle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: PublishStyle.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     }),
     StateTransfer.create({
       current: activeState,
       next: offlineState,
-      trigger: DeleteStyle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: DeleteStyle.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
@@ -443,7 +470,11 @@ updatedAtProperty.computation = StateMachine.create({
     StateTransfer.create({
       current: updatedState,
       next: updatedState,  // Self-loop to same state
-      trigger: UpdateStyle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: UpdateStyle.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
@@ -506,7 +537,11 @@ modificationInfoProperty.computation = StateMachine.create({
     StateTransfer.create({
       current: modifiedState,
       next: modifiedState,
-      trigger: UpdateArticle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: UpdateArticle.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
@@ -869,7 +904,11 @@ updatedAtProperty.computation = StateMachine.create({
     StateTransfer.create({
       current: updatedState,
       next: updatedState,
-      trigger: UpdateStyle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: UpdateStyle.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
@@ -905,7 +944,11 @@ statusProperty.computation = StateMachine.create({
     StateTransfer.create({
       current: activeState,
       next: offlineState,
-      trigger: DeleteStyle,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: DeleteStyle.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]
@@ -977,7 +1020,11 @@ updatedAtProperty.computation = StateMachine.create({
     StateTransfer.create({
       current: updatedState,
       next: updatedState,
-      trigger: UpdateInteraction,
+      trigger: {
+        recordName: InteractionEventEntity.name,
+        type: 'create',
+        record: { interactionName: UpdateInteraction.name }
+      },
       computeTarget: (mutationEvent) => ({ id: mutationEvent.record.payload.id })
     })
   ]

@@ -225,7 +225,7 @@ const deletionStateMachine = StateMachine.create({
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: function(event) {
-                return { id: event.payload.userId }
+                return { id: event.record.payload.userId }
             }
         })
     ]
@@ -313,7 +313,7 @@ deletionProperty.computation = StateMachine.create({
             current: NON_DELETED_STATE,
             next: DELETED_STATE,
             computeTarget: function(event) {
-                return { id: event.payload.articleId }
+                return { id: event.record.payload.articleId }
             }
         })
     ]

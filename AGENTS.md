@@ -225,14 +225,38 @@ Property.create({
 ### StateMachine
 
 ```typescript
+const pendingState = StateNode.create({ name: 'pending' });
+const approvedState = StateNode.create({ name: 'approved' });
+const rejectedState = StateNode.create({ name: 'rejected' });
+
 Property.create({
   name: 'status',
   computation: StateMachine.create({
-    states: ['pending', 'approved', 'rejected'],
-    default: 'pending',
-    transitions: [
-      { from: 'pending', to: 'approved', on: 'ApproveRequest' },
-      { from: 'pending', to: 'rejected', on: 'RejectRequest' }
+    states: [pendingState, approvedState, rejectedState],
+    initialState: pendingState,
+    transfers: [
+      StateTransfer.create({
+        current: pendingState,
+        next: approvedState,
+        // trigger is a RecordMutationEventPattern matched against mutation events
+        trigger: {
+          recordName: InteractionEventEntity.name,
+          type: 'create',
+          record: { interactionName: ApproveRequest.name }
+        },
+        // property-level state machines must locate the target record(s)
+        computeTarget: (event) => ({ id: event.record.payload.requestId })
+      }),
+      StateTransfer.create({
+        current: pendingState,
+        next: rejectedState,
+        trigger: {
+          recordName: InteractionEventEntity.name,
+          type: 'create',
+          record: { interactionName: RejectRequest.name }
+        },
+        computeTarget: (event) => ({ id: event.record.payload.requestId })
+      })
     ]
   })
 })
