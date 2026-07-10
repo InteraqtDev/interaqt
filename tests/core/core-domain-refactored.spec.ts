@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach } from "vitest";
 import {
   Entity, Property, Relation, clearAllInstances
 } from "@core";
-import { Interaction, Action } from "interaqt";
+import { Interaction, Action, GetAction } from "interaqt";
 
 describe("Core Domain Classes Refactored", () => {
   beforeEach(() => {
@@ -208,13 +208,11 @@ describe("Core Domain Classes Refactored", () => {
 
     test("should create interaction with entity data", () => {
       const userEntity = Entity.create({ name: "User" });
-      // r11: data is only meaningful on the query action ('get'); declaring it on
-      // other actions is now a declaration-time error.
-      const getAction = Action.create({ name: "get" });
-
+      // r11: data is only meaningful on the exported GetAction constant; declaring it
+      // on any other action is now a declaration-time error.
       const interaction = Interaction.create({
         name: "GetUser",
-        action: getAction,
+        action: GetAction,
         data: userEntity
       });
 

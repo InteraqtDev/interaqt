@@ -17,6 +17,7 @@ import {
   // Interaction-related
   Interaction,
   Action,
+  GetAction,        // the built-in query action constant — required for data/dataPolicy interactions
   Payload,
   PayloadItem,
   

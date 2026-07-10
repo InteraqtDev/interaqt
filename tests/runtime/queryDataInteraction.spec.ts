@@ -608,13 +608,13 @@ describe('Get Data Interaction', () => {
                 ]
             })
 
-            // r11: data/dataPolicy on a non-get action used to be silently ignored
+            // r11: data/dataPolicy on a non-GetAction used to be silently ignored
             // (dispatch succeeded but never returned data). It is now a declaration error.
             expect(() => Interaction.create({
                 name: 'createUser',
                 action: Action.create({ name: 'create' }),  // Not GetAction
                 data: User
-            })).toThrow(/declares data\/dataPolicy but its action "create" is not the query action/)
+            })).toThrow(/declares data\/dataPolicy but its action "create" is not the built-in query action/)
         })
     })
 

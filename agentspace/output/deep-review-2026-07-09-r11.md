@@ -6,7 +6,7 @@
 - 方法：与 r1–r10 报告**逐条去重** → 对每个致命/重要候选**编写最小复现测试实际运行**（PGLiteDB/SQLiteDB）。只有「已运行复现确认」的问题列为致命/重要；证伪或重新归类的候选明确记录（见第五节）。
 - 基线健康度：`npm run check` 通过；`npm test` 全量 1795 passed / 26 skipped。
 
-> **维护说明（2026-07-09）**：本报告的致命项与重要项已在同分支（`cursor/deep-code-review-r11-5327`）全部修复。回归测试：`tests/runtime/review-fixes-2026-07-09-r11.spec.ts`（10 用例）+ `tests/runtime/review-fixes-2026-07-09-r11-serialization.spec.ts`（1 用例）+ `tests/storage/review-fixes-2026-07-09-r11.spec.ts`（6 用例）。修复后 `npm run check` 通过；`npm test` 全量 **1812 passed / 26 skipped**。顺带修正 4 处被新 fail-fast 暴露的既有测试反模式（`queryDataInteraction.spec.ts` / `core-domain-refactored.spec.ts` / `ignorePermission.spec.ts` / `computationEdgeCases.spec.ts` 均在非 get action 上声明 data——此前静默失效，现改为 get action 或删除死配置并断言声明期错误）。另按 I-1 在知识库 `generator/api-reference.md` 补充 `storage.listen` 事务语义（事务内、pre-commit）与 `RecordMutationSideEffect`（post-commit）的契约分工。
+> **维护说明（2026-07-09，2026-07-10 按评审意见修订 F-3 设计）**：本报告的致命项与重要项已在同分支（`cursor/deep-code-review-r11-5327`）全部修复。回归测试：`tests/runtime/review-fixes-2026-07-09-r11.spec.ts`（12 用例）+ `tests/runtime/review-fixes-2026-07-09-r11-serialization.spec.ts`（2 用例）+ `tests/storage/review-fixes-2026-07-09-r11.spec.ts`（6 用例）。修复后 `npm run check` 通过；`npm test` 全量 **1815 passed / 26 skipped**。顺带修正 4 处被新 fail-fast 暴露的既有测试反模式（`queryDataInteraction.spec.ts` / `core-domain-refactored.spec.ts` / `ignorePermission.spec.ts` / `computationEdgeCases.spec.ts` 均在非 get action 上声明 data——此前静默失效，现改为 get action 或删除死配置并断言声明期错误）。另按 I-1 在知识库 `generator/api-reference.md` 补充 `storage.listen` 事务语义（事务内、pre-commit）与 `RecordMutationSideEffect`（post-commit）的契约分工。
 
 ---
 
@@ -78,7 +78,11 @@ stringifyAllInstances → clearAllInstances → createInstances
 ```
 
 - 影响：形态二意味着**任何**经过序列化管线（migration manifest、代码生成、跨进程传输）的查询交互都会静默失去查询能力——r8 已把 Payload/DataPolicy/EventSource 纳入 round-trip 治理，但 GetAction 的单例身份从未被审视。形态一是 r7 I-10（data/dataPolicy 挂非 get action 静默失效）的对偶：get 形状的 action 也可以静默失效。
-- 修复：查询语义按 `action.name === 'get'` 识别（名字是序列化中稳定的身份，引用不是）；并把 r7 I-10 一并收口——`data`/`dataPolicy` 挂在非 get action 上声明期 fail-fast。既有测试 `queryDataInteraction.spec.ts` 的「非 GetAction 不返回数据」用例改为断言声明期错误（该用例此前固化的正是静默失效行为）。round-trip 回归：反序列化后的 get 交互 `resolve` 正常重建。
+- 修复（评审后定稿：绑定在**显式导出常量的固定身份**上，而不是名字上——`'get'` 是常用词，用户自建同名 Action 不应在不知情的情况下获得查询语义）：
+  1. `GetAction` 单例改用固定 uuid（导出常量 `GET_ACTION_UUID = 'interaqt:builtin:action:get'`），查询语义按该 uuid 识别。固定 uuid 随序列化保留，round-trip / 跨进程后身份仍可识别；普通 Action 的 uuid 是进程内递增值，不会与之冲突；
+  2. `Action.create` 对该固定 uuid 幂等：注册表里已有单例时直接返回它（反序列化路径不再撞 duplicate uuid，且 restored.action 回到同一个单例）；固定 uuid 配非 'get' 名字属于损毁数据，fail-fast；
+  3. r7 I-10 一并收口——`data`/`dataPolicy` 挂在非 GetAction 上声明期 fail-fast，错误信息指引 `import { GetAction } from 'interaqt'`；action 恰好名为 'get' 时额外提示「同名不等于查询 action」。
+- 测试矩阵连带修正：`queryDataInteraction.spec.ts` 的「非 GetAction 不返回数据」用例改为断言声明期错误（此前固化的正是静默失效行为）；`core-domain-refactored.spec.ts` / `ignorePermission.spec.ts` / `computationEdgeCases.spec.ts` 三处在非 get action 上声明 data 的死配置分别改用 GetAction 常量或删除。round-trip 回归覆盖「注册表未清空（幂等复用单例）」与「冷注册表（模拟跨进程）」两种形态。知识库 `generator/api-reference.md` 与 `usage/18-api-exports-reference.md` 明确「查询语义来自导出常量，同名自建 Action 无效」。
 
 ---
 
@@ -154,7 +158,7 @@ stringifyAllInstances → clearAllInstances → createInstances
 
 - F-1：互相派生的 Transform → `create` 应抛 `propagation exceeded the maximum depth`；dict 自引用 dataDep → setup 应抛 `references the computation's own output`；X→Y→X 间接环 → setup 应抛深度错误；合法两跳链不误报。
 - F-2：collection 属性 `['in', [['alpha','beta']]]` → PGLite/SQLite 均应正确命中快照；`not in` 排除且 NULL 行不参与；空数组恒 false/true。
-- F-3：`Action.create({name:'get'})` + data → dispatch 应返回数据；data 挂非 get action → 声明期错误；round-trip 后 `resolve` 应存在。
+- F-3：`GetAction` 常量 + data → dispatch 应返回数据；`Action.create({name:'get'})` 不获得查询语义（+ data 时声明期错误并提示导入 GetAction）；round-trip 后 `resolve` 应存在且 action 幂等复用单例；`Action.create({name:'x'}, {uuid: GET_ACTION_UUID})` 应被拒绝。
 - R-1：两个同名 eventSource → Controller 构造期抛 `Duplicate eventSource name`。
 - R-2：无 attributeQuery/dataDeps 的 property RealTime → 构造期错误；同形态 global RealTime 保持合法。
 - R-3/R-4：`['LIKE','%x%']` 应正常命中；`['between', 25]` 应抛 two-element array 错误。

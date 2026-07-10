@@ -2596,7 +2596,12 @@ const CreatePostInteraction = Interaction.create({
 
 2. **Get Data Interactions**
 
-To retrieve data, use `GetAction` and specify the `data` field:
+To retrieve data, use `GetAction` and specify the `data` field.
+
+⚠️ `GetAction` is an exported **constant** with a fixed built-in identity — you must
+`import { GetAction } from 'interaqt'`. An Action you create yourself with the name
+`'get'` (`Action.create({ name: 'get' })`) is just an ordinary action and carries no
+query semantics; declaring `data`/`dataPolicy` with it is a declaration-time error.
 
 ```typescript
 // Get all users

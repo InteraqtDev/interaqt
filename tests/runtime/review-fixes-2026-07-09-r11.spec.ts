@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
     Entity, Property, KlassByName,
     Controller, MonoSystem,
-    Interaction, Action, DataPolicy,
+    Interaction, Action, GetAction, GET_ACTION_UUID, DataPolicy,
     Transform, Custom, Dictionary, RealTime,
 } from 'interaqt';
 import { PGLiteDB } from '@drivers';
@@ -18,11 +18,14 @@ import { PGLiteDB } from '@drivers';
  *        - 其余环路由传播深度守卫（AsyncLocalStorage 计数，上限 100）在运行期抛出
  *          带传播轨迹的受控错误。
  *
- * F-3: GetAction 查询语义此前按引用同一性（args.action === GetAction）绑定 resolve。
- *      用户自建 Action.create({ name: 'get' })、或序列化 round-trip 重建的 Action
- *      （uuid 相同但对象不同）都会让判定失败——声明看起来是查询交互，dispatch 却
- *      静默返回 data: undefined。现在按 action name（'get'）识别；并且 data/dataPolicy
- *      挂在非 get action 上（合法声明、永不生效的死配置）在声明期 fail-fast。
+ * F-3: GetAction 查询语义此前按引用同一性（args.action === GetAction）绑定 resolve，
+ *      而 GetAction 的 uuid 每进程随机——序列化 round-trip 重建的 Action 对象必然
+ *      `!==` 单例，resolve 静默丢失、dispatch 返回 data: undefined。
+ *      现在 GetAction 拥有固定 uuid（导出常量 GET_ACTION_UUID），查询语义按这个
+ *      跨序列化稳定的显式身份识别：普通 Action.create({name:'get'}) 不再特殊
+ *      （'get' 是常用词，同名不应隐式获得查询语义），带 data/dataPolicy 的非
+ *      GetAction 声明（合法声明、永不生效的死配置）在声明期 fail-fast 并指引
+ *      使用导出常量。反序列化按固定 uuid 重建 GetAction 时幂等返回单例。
  *
  * R-1: Controller 中同名 eventSource 静默后写覆盖先写（findEventSourceByName 只命中
  *      最后注册者，先注册者的 guard/权限链不可达）。现在构造期 fail-fast。
@@ -130,15 +133,15 @@ describe('r11 F-1: computation propagation cycle guard', () => {
     })
 })
 
-describe('r11 F-3: GetAction is recognized by name, data on non-get actions is rejected', () => {
-    test('a user-created Action named "get" resolves data', async () => {
+describe('r11 F-3: query semantics bound to the exported GetAction identity (fixed uuid)', () => {
+    test('the exported GetAction constant resolves data', async () => {
         const Post = Entity.create({
             name: 'R11F3Post',
             properties: [Property.create({ name: 'title', type: 'string' })],
         })
         const ListPosts = Interaction.create({
             name: 'R11F3ListPosts',
-            action: Action.create({ name: 'get' }),  // not the GetAction singleton
+            action: GetAction,
             data: Post,
             dataPolicy: DataPolicy.create({ attributeQuery: ['id', 'title'] }),
         })
@@ -153,16 +156,44 @@ describe('r11 F-3: GetAction is recognized by name, data on non-get actions is r
         await system.destroy()
     })
 
-    test('data/dataPolicy on a non-get action fails fast at declaration time', () => {
+    test('an Action merely named "get" gains no query semantics; with data it fails fast with a GetAction hint', () => {
         const Post = Entity.create({
             name: 'R11F3Post2',
+            properties: [Property.create({ name: 'title', type: 'string' })],
+        })
+        // 普通同名 action 完全合法，只是没有查询语义（不挂 resolve）
+        const plain = Interaction.create({
+            name: 'R11F3PlainGet',
+            action: Action.create({ name: 'get' }),
+        })
+        expect((plain as any).resolve).toBeUndefined()
+        // 带 data 时声明期报错，并明确指引使用导出的 GetAction 常量
+        expect(() => Interaction.create({
+            name: 'R11F3NamedGet',
+            action: Action.create({ name: 'get' }),
+            data: Post,
+        })).toThrow(/An Action merely named "get" is not the query action.*GetAction/)
+    })
+
+    test('data/dataPolicy on a non-get action fails fast at declaration time', () => {
+        const Post = Entity.create({
+            name: 'R11F3Post3',
             properties: [Property.create({ name: 'title', type: 'string' })],
         })
         expect(() => Interaction.create({
             name: 'R11F3CreatePost',
             action: Action.create({ name: 'create' }),
             data: Post,
-        })).toThrow(/is not the query action/)
+        })).toThrow(/is not the built-in query action.*GetAction/)
+    })
+
+    test('re-creating the GetAction identity is idempotent; hijacking its uuid with another name is rejected', () => {
+        // 反序列化路径会带固定 uuid 重新 create：应返回同一个单例而不是抛 duplicate uuid
+        const recreated = Action.create({ name: 'get' }, { uuid: GET_ACTION_UUID })
+        expect(recreated).toBe(GetAction)
+        // 固定 uuid 配其他名字属于损毁数据
+        expect(() => Action.create({ name: 'hijack' }, { uuid: GET_ACTION_UUID }))
+            .toThrow(/must be named "get"/)
     })
 })
 

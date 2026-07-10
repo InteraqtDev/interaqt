@@ -215,7 +215,7 @@ test('should create and update style', async () => {
 // ❌ WRONG: Creating query interactions just for testing
 const GetStyleBySlug = Interaction.create({  // Don't create this just for tests!
   name: 'GetStyleBySlug',
-  action: Action.create({ name: 'get' }),
+  action: GetAction,  // query semantics come from the exported GetAction constant
   // ...
 })
 ```
