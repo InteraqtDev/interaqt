@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.0.1](https://github.com/interaqtdev/interaqt/compare/v2.0.4...v3.0.1) (2026-07-10)
+
+### ⚠ BREAKING CHANGES
+
+* **builtins+core:** remove the Attributive concept — Condition is the single guard concept
+
+### Bug Fixes
+
+* **runtime+storage+builtins+drivers:** r13 review — guard boolean contract, undefined write-through, transform id collision ([60f7ab5](https://github.com/interaqtdev/interaqt/commit/60f7ab5c92288c19f0b55a6e8a4282ca148cc6f3))
+* **runtime+storage+builtins:** r15 deep review — statemachine computeValue contract, migration cross-process resume, ComputationResult envelope guard ([86d1bff](https://github.com/interaqtdev/interaqt/commit/86d1bff6732d5a5996d2a1320fed1852f6df1eae))
+* **runtime+storage+drivers:** resolve all r13 significant-improvement items (I-1..I-10) ([52e57fe](https://github.com/interaqtdev/interaqt/commit/52e57fe9bfad08ca471b406d8f4afc94d7b03dd5))
+
+### Code Refactoring
+
+* **builtins+core:** remove the Attributive concept — Condition is the single guard concept ([0c43aee](https://github.com/interaqtdev/interaqt/commit/0c43aee95104f467c61fac3eacbc1b172753b5ba))
+
 ## [3.0.0](https://github.com/interaqtdev/interaqt/compare/v2.0.4...v3.0.0) (2026-07-10)
 
 ### ⚠ BREAKING CHANGES
