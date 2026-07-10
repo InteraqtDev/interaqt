@@ -50,6 +50,8 @@ export class MysqlDB implements Database{
     supportsSelectForUpdate = true
     // MySQL prepared statement 的占位符数量上限为 65535；留出安全余量。
     maxQueryParams = 65000
+    // mysql2 默认解析 JSON 列（jsonStrings: false），读路径不得再 JSON.parse。
+    returnsParsedJSON = true
     transactionCapability: TransactionCapability = {
         transactions: false,
         isolationLevels: [],

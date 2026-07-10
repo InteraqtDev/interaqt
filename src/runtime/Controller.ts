@@ -15,7 +15,7 @@ import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
 import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
-import { SchedulerError, SideEffectError } from "./errors/index.js";
+import { ComputationError, SchedulerError, SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
@@ -616,8 +616,20 @@ export class Controller {
 
         const patches = Array.isArray(patch) ? patch : [patch]
         for(const patch of patches) {
+            // fail fast：patch 必须是 {type: 'insert'|'update'|'delete', ...} 信封。
+            //  未知形态静默跳过（或对 global 直接写入信封对象）都是零告警的数据损坏。
+            if (!patch || (patch.type !== 'insert' && patch.type !== 'update' && patch.type !== 'delete')) {
+                throw new ComputationError(
+                    `incrementalPatchCompute must return ComputationResultPatch envelope(s) ({type: 'insert'|'update'|'delete', data?, affectedId?}), got: ${JSON.stringify(patch)?.slice(0, 200)}. To return a plain value, use incrementalCompute instead.`,
+                    { computationPhase: 'apply-result-patch' }
+                )
+            }
                 if (dataContext.type === 'global') {
-                    await this.system.storage.dict.set(dataContext.id.name, patch)
+                    // CAUTION global dict 只有一个值，patch 的语义是"新值在 patch.data 里"。
+                    //  直接把 patch 信封对象（{type, data, affectedId}）写进 dict 会污染所有
+                    //  下游读取方（依赖该 dict 的计算读到的是信封而不是值）。
+                    //  insert/update 写入 patch.data，delete 写入 null（与 property 路径一致）。
+                    await this.system.storage.dict.set(dataContext.id.name, patch.type === 'delete' ? null : patch.data)
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
                 if (patch.type === 'insert') {  

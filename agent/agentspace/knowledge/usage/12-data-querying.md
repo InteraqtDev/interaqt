@@ -242,6 +242,19 @@ const usersWithHighScore = await system.storage.find(
   {},
   ['id', 'username', 'currentScore', 'bestScore']
 );
+
+// Reference value can also traverse x:1 relations (compare against a related record's field).
+// The relation path is joined automatically; records without the related record (NULL) don't match.
+const usersEarningLessThanLeader = await system.storage.find(
+  'User',
+  MatchExp.atom({ 
+    key: 'salary', 
+    value: ['<', 'leader.salary'], 
+    isReferenceValue: true 
+  }),
+  {},
+  ['id', 'username', 'salary']
+);
 ```
 
 ## 11.3 Modifiers and Sorting

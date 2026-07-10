@@ -54,3 +54,23 @@ export function deepMerge(a: ObjectContainer, b: ObjectContainer) {
 export function indexBy(arr: Record<string, unknown>[], key: string) {
 return Object.fromEntries(arr.map(o => [o[key], o]))
 }
+
+/**
+ * 与 JSON.stringify 等价，但对象键按字典序排序（递归），产出规范形（canonical form）。
+ *
+ * json 列的写入与等值匹配都用这个序列化：文本型比较的驱动（SQLite 未实现 json 方言时的
+ * 回退路径）对键序不再敏感，与 PG 系（::jsonb）/ MySQL（CAST AS JSON）的语义相等比较对齐。
+ * 数组顺序是 JSON 语义的一部分，保持不变。
+ */
+export function canonicalJSONStringify(value: unknown): string {
+    return JSON.stringify(sortObjectKeysDeep(value))
+}
+
+function sortObjectKeysDeep(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(item => sortObjectKeysDeep(item))
+    if (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+        const record = value as Record<string, unknown>
+        return Object.fromEntries(Object.keys(record).sort().map(key => [key, sortObjectKeysDeep(record[key])]))
+    }
+    return value
+}

@@ -1,5 +1,6 @@
 import { Database } from "@runtime";
 import { BoolExp } from "@core";
+import { canonicalJSONStringify } from "../utils.js";
 import { EntityToTableMap } from "./EntityToTableMap.js";
 import { FieldMatchAtom, MatchExp } from "./MatchExp.js";
 import { AttributeQuery } from "./AttributeQuery.js";
@@ -483,12 +484,15 @@ VALUES
     }
     
     /**
-     * 构建 UPDATE 语句
+     * 构建 UPDATE 语句。
+     * CAUTION 与 INSERT 一致走 prepareFieldValue：否则 json 列在 update 路径上由驱动
+     *  兜底 JSON.stringify（非规范形、且字符串值不 stringify），与 create 路径的存储形态
+     *  漂移——字符串值甚至会让读路径的 JSON.parse 直接报错。
      */
     buildUpdateSQL(
         entityName: string,
         idRef: { id: string | number },
-        columnAndValue: Array<{ field: string, value: unknown }>
+        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string }>
     ): [string, unknown[]] {
         if (!columnAndValue.length) {
             return ['', []]
@@ -502,7 +506,7 @@ UPDATE "${entityInfo.table}"
 SET ${columnAndValue.map(({ field }) => `"${field}" = ${p()}`).join(',')}
 WHERE "${entityInfo.idField}" = (${p()})
 `
-        const params = [...columnAndValue.map(({ value }) => value), idRef.id]
+        const params = [...columnAndValue.map(({ value, fieldType }) => this.prepareFieldValue(value, fieldType)), idRef.id]
         
         return [sql, params]
     }
@@ -557,11 +561,13 @@ WHERE "${recordInfo.idField}" = ${p()}
     }
     
     /**
-     * 准备字段值（处理 JSON 等特殊类型）
+     * 准备字段值（处理 JSON 等特殊类型）。
+     * CAUTION json 用规范序列化（键排序）：等值匹配的文本比较回退路径（MatchExp）
+     *  依赖写入与匹配两侧的序列化一致，非规范形会让键序不同的等价对象匹配失败。
      */
     prepareFieldValue(value: unknown, fieldType?: string): unknown {
         if (fieldType?.toLowerCase() === 'json') {
-            return JSON.stringify(value)
+            return canonicalJSONStringify(value)
         }
         return value
     }

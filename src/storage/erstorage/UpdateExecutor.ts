@@ -146,12 +146,13 @@ export class UpdateExecutor {
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
         const newEntityDataWithIdsWithFlashOutRecords = await this.agent.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
         const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue(matchedEntity)
-        const columnAndValue = allSameRowData.map(({field, value}: { field: string, value: string }) => (
+        const columnAndValue = allSameRowData.map(({field, value, fieldType}: { field: string, value: string, fieldType?: string }) => (
             {
                 field,
                 /// TODO value 要考虑引用自身或者 related entity 其他 field 的情况？例如 age+5
-                // value: JSON.stringify(value)
-                value: value
+                value: value,
+                // fieldType 让 buildUpdateSQL 走 prepareFieldValue（json 规范序列化），与 create 路径一致。
+                fieldType
             }
         ))
 

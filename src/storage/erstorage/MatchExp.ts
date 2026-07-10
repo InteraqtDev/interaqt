@@ -1,6 +1,6 @@
 import {BoolExp, BoolExpressionRawData, ExpressionData} from "@core";
 import {EntityToTableMap, RecordAttribute} from "./EntityToTableMap.js";
-import {assert} from "../utils.js";
+import {assert, canonicalJSONStringify} from "../utils.js";
 import {RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "@runtime";
 import {PlaceholderGen} from "./SQLBuilder.js";
@@ -163,6 +163,19 @@ export class MatchExp {
             const namePath = [this.entityName].concat(matchAttributePath)
             const attributeInfo = this.map.getInfoByPath(namePath)!
 
+            // CAUTION isReferenceValue 的引用路径（value[1]，如 'leader.salary'）也会被编译成
+            //  列引用（getReferenceFieldValue），如果引用穿过关联实体而该关联没有出现在
+            //  attributeQuery 或 match key 里，JOIN 不会被构建，SQL 直接报
+            //  "missing FROM-clause entry"。这里把引用路径也加入 query tree。
+            //  例外：exist 子查询里 contextRootEntity 指向外层查询的根，引用解析的是外层
+            //  已在作用域内的别名，不能加进本层的 tree。
+            if (matchData.data.isReferenceValue && typeof matchData.data.value[1] === 'string' && !this.contextRootEntity) {
+                const referencePath = (matchData.data.value[1] as string).split('.')
+                if (referencePath.length > 1) {
+                    recordQueryTree.addField(referencePath)
+                }
+            }
+
             // 直接就是 value 的情况不用管，没有 query 其他的实体。
             //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
             if ((matchAttributePath.length === 1 && attributeInfo.isValue)) {
@@ -246,18 +259,18 @@ export class MatchExp {
                 }
                 fieldParams = []
             } else if (fieldType?.toLowerCase() === 'json' && (value[0] === '=' || value[0] === '!=')) {
-                // CAUTION json 列的写入路径统一走 JSON.stringify（SQLBuilder.prepareFieldValue），
+                // CAUTION json 列的写入路径统一走规范序列化（SQLBuilder.prepareFieldValue），
                 //  匹配参数若不做同样的序列化：文本型存储（SQLite/MySQL 文本比较）恒零命中，
                 //  PG/PGLite 直接抛 "operator does not exist: json = unknown" 的裸数据库错误。
                 //  优先给驱动方言机会（PG 系需要 ::jsonb 做语义相等比较），否则退化为与写入
-                //  路径一致的序列化文本相等比较。
+                //  路径一致的规范序列化文本相等比较（键序不敏感，与 PG 系语义对齐）。
                 const dialectResult = db?.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this), p)
                 if (dialectResult) {
                     fieldValue = dialectResult.fieldValue
                     fieldParams = dialectResult.fieldParams || []
                 } else {
                     fieldValue = `${value[0]} ${p()}`
-                    fieldParams = [JSON.stringify(value[1])]
+                    fieldParams = [canonicalJSONStringify(value[1])]
                 }
             } else {
                 fieldValue = `${value[0]} ${p()}`
@@ -290,17 +303,17 @@ export class MatchExp {
                 fieldValue = fieldType?.toLowerCase() === 'json' ? `IS NOT NULL AND 1=0` : `IN (NULL) AND 1=0`
                 fieldParams = []
             } else if (fieldType?.toLowerCase() === 'json') {
-                // CAUTION 与 =/!= 同理（见上）：json 列的写入路径统一 JSON.stringify，
+                // CAUTION 与 =/!= 同理（见上）：json 列的写入路径统一规范序列化，
                 //  IN/NOT IN 的元素参数不做同样的序列化会导致 PG 系裸报 "operator does not exist"、
                 //  SQLite 把数组元素展开成多余绑定参数直接崩溃。优先给驱动方言机会（PG 系 ::jsonb），
-                //  否则退化为与写入路径一致的序列化文本比较。
+                //  否则退化为与写入路径一致的规范序列化文本比较。
                 const dialectResult = db?.parseMatchExpression?.(key, value, fieldName, fieldType!, isReferenceValue, this.getReferenceFieldValue.bind(this), p)
                 if (dialectResult) {
                     fieldValue = dialectResult.fieldValue
                     fieldParams = dialectResult.fieldParams || []
                 } else {
                     fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
-                    fieldParams = value[1].map((item: unknown) => JSON.stringify(item))
+                    fieldParams = value[1].map((item: unknown) => canonicalJSONStringify(item))
                 }
             } else {
                 fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
@@ -325,7 +338,7 @@ export class MatchExp {
                     fieldParams = dialectResult.fieldParams || []
                 } else {
                     fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`
-                    fieldParams = value[1].map((item: unknown) => JSON.stringify(item))
+                    fieldParams = value[1].map((item: unknown) => canonicalJSONStringify(item))
                 }
             } else {
                 fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`

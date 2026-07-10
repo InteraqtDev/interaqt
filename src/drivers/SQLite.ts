@@ -62,8 +62,19 @@ export class SQLiteDB implements Database{
         this.idSystem = new IDSystem(this)
         this.logger = this.options?.logger || dbConsoleLogger
     }
-    async open() {
+    async open(forceDrop = false) {
         this.db = new SQLite(this.file, this.options)
+        // CAUTION forceDrop 必须真正清空已有表。忽略它的话 :memory: 库碰巧没问题（每次
+        //  new 都是新库），但文件库上 setup(true) 会在 CREATE TABLE 处报 "table already
+        //  exists"——与 PG/PGLite 的 forceDrop 语义（重建）不一致。
+        if (forceDrop) {
+            const tables = this.db.prepare(
+                `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+            ).all() as Array<{ name: string }>
+            for (const table of tables) {
+                this.db.prepare(`DROP TABLE IF EXISTS "${table.name.replace(/"/g, '""')}"`).run()
+            }
+        }
         await this.idSystem.setup()
     }
     async openForSchemaRead() {

@@ -105,6 +105,8 @@ export class PostgreSQLDB implements Database{
     supportsSelectForUpdate = true
     // PostgreSQL wire protocol 的绑定参数数量是 Int16（65535）；留出安全余量。
     maxQueryParams = 65000
+    // node-postgres 返回已解析的 JSON 列值（对象/数组/字符串原值），读路径不得再 JSON.parse。
+    returnsParsedJSON = true
     transactionCapability: TransactionCapability = {
         transactions: true,
         isolationLevels: ['READ COMMITTED', 'SERIALIZABLE'],
