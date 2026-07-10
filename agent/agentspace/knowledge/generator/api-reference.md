@@ -2596,7 +2596,12 @@ const CreatePostInteraction = Interaction.create({
 
 2. **Get Data Interactions**
 
-To retrieve data, use `GetAction` and specify the `data` field:
+To retrieve data, use `GetAction` and specify the `data` field.
+
+⚠️ `GetAction` is an exported **constant** with a fixed built-in identity — you must
+`import { GetAction } from 'interaqt'`. An Action you create yourself with the name
+`'get'` (`Action.create({ name: 'get' })`) is just an ordinary action and carries no
+query semantics; declaring `data`/`dataPolicy` with it is a declaration-time error.
 
 ```typescript
 // Get all users
@@ -4088,6 +4093,14 @@ storage.listen(async (events) => {
   }
 })
 ```
+
+⚠️ **Transaction semantics**: `listen` callbacks run **inside** the dispatch transaction,
+**before** it commits. If a later step of the same dispatch fails (guard, resolve,
+computation), the transaction rolls back — database writes made by the callback roll
+back with it, but any **external** side effects (HTTP calls, message queues, logs)
+have already happened and cannot be undone. For external side effects that must only
+fire for committed data, use `RecordMutationSideEffect` instead: it runs **after
+commit** and its results are reported in `DispatchResponse.sideEffects`.
 
 #### AttributeQueryData Format
 

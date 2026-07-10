@@ -189,6 +189,14 @@ export class Controller {
 
         for (const es of this.eventSources) {
             if (es.name) {
+                // CAUTION fail fast：同名 eventSource 静默后写覆盖先写——findEventSourceByName
+                //  只会命中最后注册者，先注册者的 guard/权限链从此不可达（按名 dispatch 的调用方
+                //  可能走到完全不同的授权路径）。Activity 内的 interaction 以 "activity:interaction"
+                //  作用域名注册，不受影响。
+                const existing = this.eventSourcesByName.get(es.name)
+                if (existing && existing !== es) {
+                    throw new Error(`Duplicate eventSource name "${es.name}". Event source names must be unique within a Controller; findEventSourceByName would silently resolve to only one of them.`)
+                }
                 this.eventSourcesByName.set(es.name, es)
             }
             this.eventSourcesByUUID.set(es.uuid, es)

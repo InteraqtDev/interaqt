@@ -210,6 +210,16 @@ export class MysqlDB implements Database{
                     fieldParams: [JSON.stringify(value[1])]
                 }
             }
+            // IN / NOT IN 与 =/!= 同理：逐元素 CAST 成 JSON 做语义比较。NULL 行不参与匹配。
+            const lowerOp = value[0].toLowerCase()
+            if ((lowerOp === 'in' || lowerOp === 'not in') && Array.isArray(value[1]) && value[1].length > 0) {
+                const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
+                const placeholders = (value[1] as unknown[]).map(() => `CAST(${p()} AS JSON)`).join(',')
+                return {
+                    fieldValue: `IS NOT NULL AND ${fieldNameWithQuotes} ${lowerOp === 'in' ? 'IN' : 'NOT IN'} (${placeholders})`,
+                    fieldParams: (value[1] as unknown[]).map(item => JSON.stringify(item))
+                }
+            }
         }
     }
 

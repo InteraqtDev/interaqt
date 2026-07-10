@@ -83,7 +83,8 @@ describe('Controller ignorePermission parameter', () => {
                 ]
             }),
             conditions: restrictedCondition,
-            data: Post
+            // r11: data on a non-get action is a declaration-time error (it was silently
+            // ignored before); this test only exercises conditions/ignorePermission.
         })
     })
 

@@ -218,6 +218,16 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
                     fieldParams: [JSON.stringify(value[1])]
                 }
             }
+            // IN / NOT IN 与 =/!= 同理：逐元素做 jsonb 语义比较。NULL 行不参与匹配。
+            const lowerOp = value[0].toLowerCase()
+            if ((lowerOp === 'in' || lowerOp === 'not in') && Array.isArray(value[1]) && value[1].length > 0) {
+                const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
+                const placeholders = (value[1] as unknown[]).map(() => `${p()}::jsonb`).join(',')
+                return {
+                    fieldValue: `IS NOT NULL AND ${fieldNameWithQuotes}::jsonb ${lowerOp === 'in' ? 'IN' : 'NOT IN'} (${placeholders})`,
+                    fieldParams: (value[1] as unknown[]).map(item => JSON.stringify(item))
+                }
+            }
         }
     }
 

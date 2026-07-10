@@ -34,10 +34,11 @@ describe('Transform computation edge cases', () => {
         });
 
         const createAction = Action.create({ name: 'create' });
+        // r11: data on a non-get action is a declaration-time error (it was silently
+        // ignored before); this Transform test only needs the interaction event.
         const interaction = Interaction.create({
             name: 'createTfSource',
             action: createAction,
-            data: SourceEntity,
         });
 
         const system = new MonoSystem(new PGLiteDB());

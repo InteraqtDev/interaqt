@@ -60,6 +60,10 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
 
     constructor(public controller: Controller, public args: RealTimeInstance, public dataContext: DataContext) {
         this.dataDeps = (this.args.dataDeps ?? {}) as {[key: string]: DataDep};
+        // 注意：global RealTime 允许零 dataDeps——迁移 rebuild 是合法的计算触发路径
+        //  （migration 会全量重算新增的 global computation），值保持 null 直到被触发。
+        //  property 形态则不允许（见 PropertyRealTimeComputation：getInitialValue 会
+        //  在每次 create 时持久化误导性的 0）。
         this.callback = (now: Expression, dataDeps: Record<string, unknown>) => {
             return this.args.callback.call(this.controller, now, dataDeps);
         };
@@ -119,6 +123,18 @@ export class PropertyRealTimeComputation implements DataBasedComputation {
                 }
             } : {}),
             ...(this.args.dataDeps || {})
+        }
+        // CAUTION fail fast：时间驱动的重算调度器尚未实现。既没有 attributeQuery 也没有 dataDeps 的
+        //  property RealTime 注册不出任何监听——callback 一次都不会执行，值被 getInitialValue
+        //  持久化为 0 后永远不变（静默错误值）。必须在 setup 阶段拒绝。
+        if (Object.keys(this.dataDeps).length === 0) {
+            const host = (this.dataContext as { host?: { name?: string } }).host?.name ?? ''
+            throw new ComputationError(
+                `RealTime computation on property "${host}.${(this.dataContext.id as { name?: string })?.name ?? String(this.dataContext.id)}" declares neither attributeQuery nor dataDeps. ` +
+                `Time-based rescheduling is not implemented yet, so this computation would never run and the property would silently stay at its initial value (0). ` +
+                `Declare attributeQuery (host fields) or dataDeps whose mutations should trigger recomputation.`,
+                { computationName: 'RealTime' }
+            )
         }
         this.isResultNumber = (this.dataContext.id as PropertyInstance).type === 'number'
         this.callback = (now: Expression, dataDeps: Record<string, unknown>) => {

@@ -5,7 +5,7 @@ import {
     stringifyInstance, decodeFunctionValues
 } from '@core';
 import type { Controller } from '@runtime';
-import { ActionInstance, GetAction } from './Action.js';
+import { ActionInstance, GET_ACTION_UUID } from './Action.js';
 import { ConditionInstance } from './Condition.js';
 import { ConditionsInstance, Conditions } from './Conditions.js';
 import { AttributiveInstance, AttributivesInstance, Attributive, Attributives } from './Attributive.js';
@@ -156,6 +156,20 @@ export class Interaction implements InteractionInstance {
     if (Attributives.is(args.userAttributives) && !args.userAttributives.content) {
       throw new Error(`Interaction "${args.name}" declares userAttributives with an Attributives instance that has no content. Provide content (an Attributive BoolExp), or omit the userAttributives field.`);
     }
+    // CAUTION 查询语义按 GetAction 的固定 uuid（GET_ACTION_UUID）识别：
+    //  - 不能按引用同一性（args.action === GetAction）：序列化 round-trip 重建的 Action
+    //    对象 `===` 判定必然失败，resolve 静默丢失、dispatch 返回 data: undefined；
+    //  - 也不能按 name === 'get'：'get' 是常用词，用户自建同名 Action 不应在不知情的
+    //    情况下获得查询语义。固定 uuid 随序列化保留，是跨进程稳定的显式身份。
+    const isGetAction = args.action?.uuid === GET_ACTION_UUID;
+    // fail-fast：data/dataPolicy 只在查询语义下被消费。挂在非 GetAction 上是合法声明、
+    //  永不生效的死配置（dispatch 成功但永远不返回数据），必须在声明期拒绝。
+    if (!isGetAction && (args.data !== undefined || args.dataPolicy !== undefined)) {
+      const namedGetHint = args.action?.name === 'get'
+        ? ` An Action merely named "get" is not the query action.`
+        : '';
+      throw new Error(`Interaction "${args.name}" declares data/dataPolicy but its action "${args.action?.name}" is not the built-in query action.${namedGetHint} Import { GetAction } from 'interaqt' and declare action: GetAction, or remove data/dataPolicy.`);
+    }
 
     const instance = new Interaction(args, options);
     
@@ -169,7 +183,7 @@ export class Interaction implements InteractionInstance {
     instance.guard = buildInteractionGuard(instance);
     instance.mapEventData = buildInteractionMapEventData(instance);
 
-    if (args.action === GetAction) {
+    if (isGetAction) {
       instance.resolve = buildInteractionResolve(instance);
     }
     
