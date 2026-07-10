@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/interaqtdev/interaqt/compare/v2.0.2...v2.0.3) (2026-07-10)
+
+### Bug Fixes
+
+* **runtime+storage+builtins:** r11 review — propagation cycle guard, GetAction name binding, json IN/NOT IN, duplicate eventSource names, RealTime zero-trigger fail-fast ([523dc31](https://github.com/interaqtdev/interaqt/commit/523dc31662f0c72cf11f88355c46ea7d1ed05424))
+* **runtime:** allow zero-dataDeps global RealTime (migration rebuild is a valid trigger); test matrix corrections for r11 fail-fasts; docs: storage.listen transaction semantics ([02a5ebf](https://github.com/interaqtdev/interaqt/commit/02a5ebfbe38efc18c10b2e14513510607df33cf3))
+
 ## [2.0.2](https://github.com/interaqtdev/interaqt/compare/v2.0.1...v2.0.2) (2026-07-09)
 
 ### Bug Fixes
