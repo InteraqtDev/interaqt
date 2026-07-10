@@ -76,6 +76,34 @@ type EntityTargetResult = EntityIdRef|EntityIdRef[]|undefined
 type ComputeSourceResult = ComputeRelationTargetResult| EntityTargetResult
 
 /**
+ * 执行 StateNode.computeValue 并校验返回值。
+ * CAUTION 必须拒绝 undefined：调用方（incrementalCompute）在调用本函数**之前**已通过
+ *  setInternal 推进了 bound currentState，而 applyResult 对 undefined 统一 skip（r13 F-2）。
+ *  若放行 undefined，本次转移就变成「内部状态已推进、可见属性没写」——状态机后续按新状态
+ *  取转移，读方却仍看到旧值，两者静默脱钩且无任何告警。抛错会让整个 dispatch 事务回滚
+ *  （bound state 的推进一并回滚），保持一致。保留上一个值请显式 `return lastValue`；
+ *  清空请 `return null`。
+ */
+async function resolveComputeValue(
+    controller: Controller,
+    state: StateNodeInstance,
+    previousValue: unknown,
+    event: unknown,
+    describeContext: () => string
+): Promise<unknown> {
+    if (!state.computeValue) return state.name
+    const value = await state.computeValue.call(controller, previousValue, event)
+    if (value === undefined) {
+        throw new ComputationProtocolError(
+            `StateMachine ${describeContext()}: computeValue of state "${state.name}" returned undefined (did you forget a return statement?). ` +
+            `Return the value to persist, "return lastValue" to keep the previous value, or "return null" to clear it.`,
+            { handleName: 'StateMachine', computationPhase: 'compute-value' }
+        )
+    }
+    return value
+}
+
+/**
  * 归一化 computeTarget 的返回值为 `{id}[]`。
  * 支持的形态：`{id}`、`{id}[]`、`undefined/null`（skip）；
  * 宿主为 relation 时额外支持按端点定位：`{source, target}`（source/target 为 `{id}` 或 `{id}[]`，取笛卡尔积）
@@ -164,7 +192,10 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         }
     }
     async getInitialValue(event:any) {
-        return this.initialState.computeValue ? await this.initialState.computeValue.call(this.controller, undefined, event) : this.initialState.name
+        return resolveComputeValue(this.controller, this.initialState, undefined, event, () => this.describeContext())
+    }
+    private describeContext() {
+        return `of global dictionary "${(this.dataContext.id as {name?: string})?.name ?? String(this.dataContext.id)}"`
     }
     async incrementalCompute(lastValue: string, mutationEvent: EtityMutationEvent, dirtyRecord: any) {
         // Now we can handle any mutationEvent, not just interaction events
@@ -175,7 +206,7 @@ export class GlobalStateMachineHandle implements EventBasedComputation {
         await this.state.currentState.setInternal(nextState.name)
 
         const previousValue = await this.controller.retrieveLastValue(this.dataContext)
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, previousValue, mutationEvent)) : nextState.name
+        return resolveComputeValue(this.controller, nextState, previousValue, mutationEvent, () => this.describeContext())
     }
 }
 
@@ -228,11 +259,10 @@ if you want to save the use the initial value, you need to define computeValue i
 Or if you want to use state name as value, you should not set ${this.dataContext.host.name}.${this.dataContext.id.name} when ${this.dataContext.host.name} created.
 `
         )
-        if (lastValue !== undefined || this.initialState.computeValue) {
-            return await this.initialState.computeValue!.call(this.controller, lastValue, undefined)
-        } else {
-            return this.initialState.name
-        }
+        return resolveComputeValue(this.controller, this.initialState, lastValue, undefined, () => this.describeContext())
+    }
+    private describeContext() {
+        return `of property "${this.dataContext.host.name}.${this.dataContext.id.name}"`
     }
     async computeDirtyRecords(mutationEvent: RecordMutationEvent) {
         // Now directly use mutationEvent for matching
@@ -271,7 +301,7 @@ Or if you want to use state name as value, you should not set ${this.dataContext
 
         await this.state.currentState.setInternal(lockedRecord, nextState.name)
         const previousValue = lockedRecord[this.dataContext.id.name]
-        return nextState.computeValue? (await nextState.computeValue.call(this.controller, previousValue, mutationEvent)) : nextState.name
+        return resolveComputeValue(this.controller, nextState, previousValue, mutationEvent, () => this.describeContext())
     }
     // 给外部用的，因为可能在 Transform 里面设置初始值。
     async createStateData(state: StateNodeInstance) {

@@ -53,7 +53,7 @@
 ### runtime 模块
 - 使用 shared 中定义的类型来：
   - 创建控制器(Controller)管理实体、关系、交互
-  - 执行交互调用(InteractionCall)
+  - 分发事件源(Controller.dispatch / runInteractionGuard)
   - 管理活动流程(ActivityManager)
   - 调度计算任务(Scheduler)
 

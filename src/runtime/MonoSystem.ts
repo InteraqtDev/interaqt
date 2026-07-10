@@ -77,15 +77,16 @@ class MonoStorage implements Storage{
         tables: [],
         constraints: []
     }
-    public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void>, registerDefaults?: (defaults: Map<string, () => unknown>) => void }
+    public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void>, registerDefaults?: (defaults: Map<string, unknown>) => void }
     public atomic: AtomicStorage
     private transactionContext = new AsyncLocalStorage<StorageTransactionContext>()
-    // 声明驱动的 dict 读回退（Scheduler.setup 从 Dictionary 声明注册）。
+    // 声明驱动的 dict 读回退（Scheduler 从 Dictionary 声明求值一次后注册）。
     //  install 时 setupDictDefaultValue 会把默认值持久化；但 setup(false) 路径下新增声明、
     //  或行被手工删除时，get 返回 undefined 会让下游计算静默走偏——按声明回退更符合
     //  「声明了 defaultValue 就应生效」的直觉。只在**无存储行**时回退：已存储的 null
-    //  是显式值，不回退。
-    private dictDefaults: Map<string, () => unknown> = new Map()
+    //  是显式值，不回退。注册的是**已求值**的默认值（非工厂）：每次读 miss 重新求值会让
+    //  非幂等工厂（Date.now、对象字面量）在同一事务内产出漂移的"事实"。
+    private dictDefaults: Map<string, unknown> = new Map()
     
     constructor(public db: Database) {
         // Initialize dict property with get/set methods
@@ -94,8 +95,12 @@ class MonoStorage implements Storage{
                 const match = MatchExp.atom({key: 'key', value: ['=', key]})
                 const record = await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value'])
                 if (!record) {
-                    const defaultValueFn = this.dictDefaults.get(key)
-                    return defaultValueFn ? defaultValueFn() : undefined
+                    if (!this.dictDefaults.has(key)) return undefined
+                    const defaultValue = this.dictDefaults.get(key)
+                    // 与存储路径的读语义对齐：存储值每次读都经 JSON codec 产出独立副本，
+                    // 回退值同样按 JSON round-trip 复制，避免多个读方共享同一可变对象引用。
+                    if (defaultValue === undefined || defaultValue === null || typeof defaultValue !== 'object') return defaultValue
+                    return JSON.parse(JSON.stringify(defaultValue))
                 }
                 return record.value?.raw
             },
@@ -105,7 +110,7 @@ class MonoStorage implements Storage{
             setInternal: async (key: string, value: unknown): Promise<void> => {
                 await this.setDictionaryValue(key, value, false)
             },
-            registerDefaults: (defaults: Map<string, () => unknown>) => {
+            registerDefaults: (defaults: Map<string, unknown>) => {
                 this.dictDefaults = defaults
             }
         }

@@ -332,9 +332,27 @@ export class Scheduler {
      * 长生命周期进程（热重载、多租户单进程）反复 new Controller + setup 时，
      * 不 teardown 会让旧 controller 的计算闭包永驻 storage 的回调集合——内存泄漏，
      * 且旧计算仍会被新写入触发。
+     * dict 读回退一并清除：teardown 后 storage 若继续被使用（如另一个 controller
+     * setup 之前的窗口期），不应再返回本 controller 声明的默认值。
      */
     teardown() {
         this.removeRegisteredMutationListeners()
+        this.controller.system.storage.dict.registerDefaults?.(new Map())
+    }
+    /**
+     * 把声明的 Dictionary.defaultValue 注册为 dict 读回退（无存储行时生效）。
+     * CAUTION 工厂在这里**求值一次**、注册求出的值——与 install 路径（setupDictDefaultValue
+     * 求值一次并持久化）语义对齐。若把工厂原样下放到每次读 miss 时求值，非幂等工厂
+     * （`() => Date.now()`、`() => ({...})`）会让同一事务内的两次读拿到不同的"事实"。
+     */
+    registerDictDefaults() {
+        const dictDefaults = new Map<string, unknown>()
+        for (const dict of this.controller.dict) {
+            if (dict.defaultValue !== undefined) {
+                dictDefaults.set(dict.name, dict.defaultValue())
+            }
+        }
+        this.controller.system.storage.dict.registerDefaults?.(dictDefaults)
     }
     private buildPropertyDefaultValueListeners(): RecordMutationCallback[] {
         const listeners: RecordMutationCallback[] = []
@@ -895,6 +913,14 @@ export class Scheduler {
         }
 
         const context = this.buildDataDepEventContext(computation, erRecordMutationEvent)
+        // CAUTION context.skip 由框架集中执行，不依赖 planIncremental 自觉遵守：
+        //  skip 只在「事件记录对该 records 依赖的 match 确定性地新旧都不匹配」时为 true
+        //  （本地无法确定时走 requiresFullRecompute，不走 skip），即该事件不可能影响计算结果。
+        //  自定义 planIncremental 忽略 context.skip 返回 incremental 时，增量计算会拿着
+        //  无关事件产出错误值且零告警——这里先于 planIncremental 收口。
+        if (context.skip) {
+            return { mode: 'skip' }
+        }
         const plan = computation.planIncremental?.(erRecordMutationEvent, record, context)
         if (!plan) {
             throw new ComputationProtocolError('Incremental data-based computation must implement planIncremental()', {
@@ -1344,14 +1370,8 @@ export class Scheduler {
             for (const listener of listeners) {
                 this.registerMutationListener(listener)
             }
-            // 把声明的 dict defaultValue 注册为读回退（无存储行时按声明求值）。
-            const dictDefaults = new Map<string, () => unknown>()
-            for (const dict of this.controller.dict) {
-                if (dict.defaultValue !== undefined) {
-                    dictDefaults.set(dict.name, dict.defaultValue as () => unknown)
-                }
-            }
-            this.controller.system.storage.dict.registerDefaults?.(dictDefaults)
+            // 把声明的 dict defaultValue 注册为读回退（无存储行时返回声明的默认值）。
+            this.registerDictDefaults()
             if (createDefaultDictValue) {   
                 // 一定要先把 bound state default value 设置后，因为后面开始设置 dict default value 时，可能触发 computation。可能要读 state。
                 await this.setupGlobalBoundStateDefaultValues()
