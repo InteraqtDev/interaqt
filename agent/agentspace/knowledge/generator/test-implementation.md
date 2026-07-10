@@ -301,15 +301,16 @@ The interaqt framework wraps all exceptions in the return value, so you NEVER ne
 ### Error Types
 
 ```typescript
-// 1. Permission errors
+// 1. Permission errors (condition checks)
 const result = await controller.callInteraction('DeleteStyle', {
   user: viewerUser,  // viewer role cannot delete
   payload: { id: style.id }
 })
 expect(result.error).toBeDefined()
-expect((result.error as any).type).toBe('check user failed')
+expect((result.error as any).type).toBe('condition check failed')
+expect((result.error as any).error.data.name).toBe('AdminOnly')  // which condition failed
 
-// 2. Validation errors (payload attributive checks)
+// 2. Payload content validation errors (also condition checks)
 const result = await controller.callInteraction('PublishStyle', {
   user: adminUser,
   payload: { 
@@ -317,7 +318,7 @@ const result = await controller.callInteraction('PublishStyle', {
   }
 })
 expect(result.error).toBeDefined()
-expect((result.error as any).type).toBe('id not match attributive')
+expect((result.error as any).type).toBe('condition check failed')
 
 // 3. Missing required fields
 const result = await controller.callInteraction('CreateStyle', {
@@ -328,7 +329,7 @@ const result = await controller.callInteraction('CreateStyle', {
   }
 })
 expect(result.error).toBeDefined()
-expect((result.error as any).type).toBe('payload label missing')
+expect((result.error as any).type).toBe('label missing')
 
 // 4. Business rule violations (condition checks)
 const result = await controller.callInteraction('CreateStyle', {

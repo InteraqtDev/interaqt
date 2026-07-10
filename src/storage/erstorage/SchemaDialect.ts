@@ -14,6 +14,10 @@ export type SchemaDialect = {
     name: SchemaDialectName,
     maxIdentifierLength: number,
     supportsCreateIndexIfNotExists: boolean,
+    // 数据库是否真的强制 maxIdentifierLength（PG 静默截断、MySQL 报错 → true；
+    //  SQLite 实际无标识符长度限制，声明的 63 只用于约束名缩短的治理 → false）。
+    //  Setup 只对强制方言做表名长度 fail-fast。
+    enforceMaxIdentifierLength?: boolean,
     encodeLiteral: (value: ConstraintPredicateValue) => string,
     constraints: ConstraintCapabilities,
 }
@@ -27,6 +31,7 @@ export const DEFAULT_SCHEMA_DIALECT: SchemaDialect = {
     name: 'postgres',
     maxIdentifierLength: 63,
     supportsCreateIndexIfNotExists: true,
+    enforceMaxIdentifierLength: true,
     encodeLiteral: defaultEncodeLiteral,
     constraints: {
         unique: true,

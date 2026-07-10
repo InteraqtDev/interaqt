@@ -249,21 +249,15 @@ describe('SideEffectError', () => {
 describe('ConditionError', () => {
     test('constructor sets condition-specific fields', () => {
         const err = new ConditionError('check failed', {
-            checkType: 'user',
+            checkType: 'condition',
             fieldName: 'role',
             payload: { role: 'admin' },
         });
 
-        expect(err.checkType).toBe('user');
+        expect(err.checkType).toBe('condition');
         expect(err.fieldName).toBe('role');
         expect(err.payload).toEqual({ role: 'admin' });
         expect(err.severity).toBe(ErrorSeverity.HIGH);
-    });
-
-    test('static factory: userCheckFailed', () => {
-        const err = ConditionError.userCheckFailed(new Error('no perms'));
-        expect(err.checkType).toBe('user');
-        expect(err.type).toBe('check user failed');
     });
 
     test('static factory: payloadValidationFailed', () => {
@@ -278,18 +272,6 @@ describe('ConditionError', () => {
         const err = ConditionError.conditionCheckFailed(evaluateError);
         expect(err.checkType).toBe('condition');
         expect(err.type).toBe('condition check failed');
-    });
-
-    test('static factory: attributiveCheckFailed', () => {
-        const err = ConditionError.attributiveCheckFailed('role', 'not allowed');
-        expect(err.checkType).toBe('attributive');
-        expect(err.type).toBe('role not allowed');
-    });
-
-    test('static factory: conceptCheckFailed', () => {
-        const err = ConditionError.conceptCheckFailed('entity', new Error('not found'));
-        expect(err.checkType).toBe('concept');
-        expect(err.type).toBe('entity check concept failed');
     });
 });
 

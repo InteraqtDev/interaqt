@@ -262,15 +262,20 @@ Property.create({
 })
 ```
 
-### Permission control (Attributive)
+### Permission control (Condition)
 
 ```typescript
 const DeletePost = Interaction.create({
   name: 'DeletePost',
-  attributives: {
-    target: (user, { payload }) =>
-      user.id === payload.post.author.id
-  }
+  action: Action.create({ name: 'deletePost' }),
+  // conditions receive the full event args: user, payload, query, activityId.
+  // Guard callbacks must return an actual boolean (fail-closed otherwise).
+  conditions: Condition.create({
+    name: 'onlyAuthor',
+    content: async function(event) {
+      return event.user.id === event.payload.post.author.id
+    }
+  })
 });
 ```
 

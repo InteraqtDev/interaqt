@@ -281,14 +281,15 @@ export class MatchExp {
                 throw new Error(`match operator '${value[0]}' requires null as its value, got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
             fieldValue = lowerOp === 'is null' ? `IS NULL` : `IS NOT NULL`
-        } else if (value[0] === 'not') {
+        } else if (lowerOp === 'not') {
             // CAUTION 'not' 只支持 null（表示 IS NOT NULL）。
             //  其他值会生成 `"field" not $1` 这种非法 SQL，必须显式报错。
+            //  操作符与 simpleOp/in/between 一致按小写归一（'NOT' 与 'not' 等价）。
             if (value[1] !== null) {
                 throw new Error(`match operator 'not' only supports null (meaning IS NOT NULL). To exclude a value use '!=', got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
             fieldValue = `IS NOT NULL`
-        } else if (value[0].toLowerCase() === 'in') {
+        } else if (lowerOp === 'in') {
             assert(!isReferenceValue, 'reference value cannot use IN to match')
             if (!Array.isArray(value[1])) {
                 throw new Error(`match operator 'in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
@@ -344,7 +345,7 @@ export class MatchExp {
                 fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`
                 fieldParams = value[1]
             }
-        } else if (value[0].toLowerCase() === 'between') {
+        } else if (lowerOp === 'between') {
             if (!Array.isArray(value[1]) || value[1].length !== 2) {
                 throw new Error(`match operator 'between' requires a two-element array value [min, max], got: ${JSON.stringify(value[1])} for key "${key}"`)
             }

@@ -8,7 +8,7 @@ import {
     Interaction,
     GetAction,
     Action,
-    Attributive, DataPolicy,
+    DataPolicy,
     MatchExp,
     Condition,
     Conditions,
@@ -398,10 +398,10 @@ describe('Get Data Interaction', () => {
             })
 
             // Only admins can get secret documents
-            const isAdmin = Attributive.create({
+            const isAdmin = Condition.create({
                 name: 'isAdmin',
-                content: function(this: Controller, user: any, event: any) {
-                    return user.role === 'admin'
+                content: async function(this: Controller, event: any) {
+                    return event.user.role === 'admin'
                 }
             })
 
@@ -409,7 +409,7 @@ describe('Get Data Interaction', () => {
                 name: 'getSecretDocuments',
                 action: GetAction,
                 data: SecretDocument,
-                userAttributives: isAdmin
+                conditions: isAdmin
             })
 
             controller = new Controller({

@@ -2656,7 +2656,7 @@ const GetPostsPaginated = Interaction.create({
 > **⚠️ SECURITY: always declare `dataPolicy.match` for row-level access control.**
 > The caller-supplied `query.match` is merged with `dataPolicy.match` using AND — it can only *narrow* the
 > policy-defined scope. But if an interaction has **no** `dataPolicy.match`, the caller fully controls the filter
-> and can read **any** rows of the entity (userAttributives only decide *whether* the interaction may run,
+> and can read **any** rows of the entity (conditions only decide *whether* the interaction may run,
 > not *which rows* are visible). Every `GetAction` interaction on non-public data MUST declare `dataPolicy.match`.
 
 **Usage Examples for Get Data Interactions**
@@ -2971,12 +2971,11 @@ PayloadItem.create(config: PayloadItemConfig): PayloadItemInstance
 - `config.name` (string, required): Parameter name
 - `config.required` (boolean, optional): Whether it's required, defaults to false
 - `config.isCollection` (boolean, optional): Whether it's a collection type, defaults to false
-- `config.itemRef` (Attributive|Entity, optional): Used to reference entities defined in other interactions within Activity
 
 **Examples**
 ```typescript
 // Reference existing user
-const userRef = PayloadItem.create({
+const userItem = PayloadItem.create({
     name: 'user',
     required: true
 })
@@ -2991,12 +2990,6 @@ const postData = PayloadItem.create({
 const reviewersItem = PayloadItem.create({
     name: 'reviewers',
     isCollection: true
-})
-
-// Activity item reference
-const activityItem = PayloadItem.create({
-    name: 'to',
-    itemRef: userRefB
 })
 ```
 

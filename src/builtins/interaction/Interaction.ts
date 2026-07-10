@@ -1,21 +1,18 @@
 import {
-    IInstance, SerializedData, generateUUID, Concept, ConceptAlias, ConceptInstance, DerivedConcept,
+    IInstance, SerializedData, generateUUID,
     EntityInstance, Entity, RelationInstance, Relation, Property,
-    BoolExp, ExpressionData, BoolExpressionRawData, EventSourceInstance,
+    BoolExp, BoolExpressionRawData, EventSourceInstance,
     stringifyInstance, decodeFunctionValues
 } from '@core';
 import type { Controller } from '@runtime';
 import { ActionInstance, GET_ACTION_UUID } from './Action.js';
 import { ConditionInstance } from './Condition.js';
 import { ConditionsInstance, Conditions } from './Conditions.js';
-import { AttributiveInstance, AttributivesInstance, Attributive, Attributives } from './Attributive.js';
 import { PayloadInstance } from './Payload.js';
 import { DataPolicyInstance } from './Data.js';
 
 export interface InteractionInstance extends EventSourceInstance<InteractionEventArgs, unknown> {
   conditions?: ConditionsInstance | ConditionInstance;
-  userAttributives?: AttributivesInstance | AttributiveInstance;
-  userRef?: AttributiveInstance;
   action: ActionInstance;
   payload?: PayloadInstance;
   data?: EntityInstance | RelationInstance;
@@ -62,8 +59,6 @@ export const InteractionEventEntity = Entity.create({
 export interface InteractionCreateArgs {
   name: string;
   conditions?: ConditionsInstance | ConditionInstance;
-  userAttributives?: AttributivesInstance | AttributiveInstance;
-  userRef?: AttributiveInstance;
   action: ActionInstance;
   payload?: PayloadInstance;
   data?: EntityInstance | RelationInstance;
@@ -76,8 +71,6 @@ export class Interaction implements InteractionInstance {
   public _options?: { uuid?: string };
   public name: string;
   public conditions?: ConditionsInstance | ConditionInstance;
-  public userAttributives?: AttributivesInstance | AttributiveInstance;
-  public userRef?: AttributiveInstance;
   public action: ActionInstance;
   public payload?: PayloadInstance;
   public data?: EntityInstance | RelationInstance;
@@ -93,8 +86,6 @@ export class Interaction implements InteractionInstance {
     this.uuid = generateUUID(options);
     this.name = args.name;
     this.conditions = args.conditions;
-    this.userAttributives = args.userAttributives;
-    this.userRef = args.userRef;
     this.action = args.action;
     this.payload = args.payload;
     this.data = args.data;
@@ -114,15 +105,6 @@ export class Interaction implements InteractionInstance {
     conditions: {
       type: ['Conditions', 'Condition'] as const,
       required: false as const,
-      collection: false as const,
-    },
-    userAttributives: {
-      type: ['Attributives', 'Attributive'] as const,
-      required: false as const,
-      collection: false as const,
-    },
-    userRef: {
-      type: 'Attributive' as const,
       collection: false as const,
     },
     action: {
@@ -147,14 +129,21 @@ export class Interaction implements InteractionInstance {
   };
   
   static create(args: InteractionCreateArgs, options?: { uuid?: string }): InteractionInstance {
-    // fail-fast：挂在守卫链上的容器必须可执行。content 为空的 Conditions/Attributives
+    // fail-fast：挂在守卫链上的容器必须可执行。content 为空的 Conditions
     //  会在每次 dispatch 时深入到 BoolExp 构造器才抛出与用户写法无关的内部错误
     //  （"BoolExp raw data cannot be undefined"），必须在声明期给出业务级错误。
     if (Conditions.is(args.conditions) && !args.conditions.content) {
       throw new Error(`Interaction "${args.name}" declares conditions with a Conditions instance that has no content. Provide content (a Condition BoolExp), or omit the conditions field.`);
     }
-    if (Attributives.is(args.userAttributives) && !args.userAttributives.content) {
-      throw new Error(`Interaction "${args.name}" declares userAttributives with an Attributives instance that has no content. Provide content (an Attributive BoolExp), or omit the userAttributives field.`);
+    // 显式拒绝已废弃的 Attributive 概念参数：静默丢弃会让旧代码以为权限仍然生效（fail-open）。
+    const legacyArgs = args as unknown as Record<string, unknown>;
+    for (const legacyKey of ['userAttributives', 'userRef'] as const) {
+      if (legacyArgs[legacyKey] !== undefined) {
+        throw new Error(
+          `Interaction "${args.name}" declares "${legacyKey}", but the Attributive concept has been removed. ` +
+          `Express the check as a Condition (conditions receives the full event args: user, payload, activityId).`
+        );
+      }
     }
     // CAUTION 查询语义按 GetAction 的固定 uuid（GET_ACTION_UUID）识别：
     //  - 不能按引用同一性（args.action === GetAction）：序列化 round-trip 重建的 Action
@@ -205,8 +194,6 @@ export class Interaction implements InteractionInstance {
       action: instance.action
     };
     if (instance.conditions !== undefined) args.conditions = instance.conditions;
-    if (instance.userAttributives !== undefined) args.userAttributives = instance.userAttributives;
-    if (instance.userRef !== undefined) args.userRef = instance.userRef;
     if (instance.payload !== undefined) args.payload = instance.payload;
 
     if (instance.data !== undefined) args.data = instance.data;
@@ -272,25 +259,17 @@ function buildInteractionResolve(interaction: InteractionInstance): (this: Contr
 // type keeps them callable from both Controller and the activity runtime wrappers.
 export type GuardController = { system: { storage: any }, ignoreGuard?: boolean }
 
-// isRef user attributives can only be resolved inside an activity, where previously
-// saved refs are available. The activity runtime provides this hook.
-export type CheckUserRefHandle = (attributive: AttributiveInstance) => Promise<boolean> | boolean
-
-export type InteractionGuardOptions = {
-  checkUserRef?: CheckUserRefHandle
-}
-
 // The single guard runner shared by standalone interactions (buildInteractionGuard)
-// and activity-wrapped interactions (ActivityCall.fullGuardWithUserRef), so the two
-// paths cannot drift apart.
+// and activity-wrapped interactions (ActivityCall.fullGuard), so the two
+// paths cannot drift apart. Conditions are the only guard concept: they receive the
+// full event args (user, payload, query, activityId) and can express user checks,
+// payload checks and cross-record checks uniformly.
 export async function runInteractionGuard(
   controller: GuardController,
   interaction: InteractionInstance,
-  args: InteractionEventArgs,
-  options?: InteractionGuardOptions
+  args: InteractionEventArgs
 ): Promise<void> {
   await checkCondition(controller, interaction, args);
-  await checkUser(controller, interaction, args, options?.checkUserRef);
   await checkPayload(controller, interaction, args);
 }
 
@@ -314,8 +293,13 @@ export async function checkCondition(controller: GuardController, interaction: I
       const errorMessage = e instanceof Error ? e.message : String(e);
       return `Condition '${condition.name}' threw exception: ${errorMessage}`;
     }
-    if (result === undefined) {
-      return `Condition '${condition.name}' returned undefined; guard callbacks must explicitly return a boolean (did you forget a return statement?)`;
+    // CAUTION 守卫回调必须严格返回 boolean。非 boolean 的返回值在 BoolExp 组合下按 truthiness
+    //  求值：truthy 的类型错误（`return user.role`）静默放行；更危险的是 falsy 的类型错误
+    //  （null / 0 / ''，如 `return user.profile && user.profile.isAdmin` 短路出 null）在
+    //  not(...) 组合下会被取反成"通过"——权限检查的 fail-open。错误字符串在 BoolExp 中
+    //  无论是否处于 not 之下都判为失败（fail-closed）。
+    if (typeof result !== 'boolean') {
+      return `Condition '${condition.name}' returned ${result === undefined ? 'undefined' : JSON.stringify(result)} (${typeof result}); guard callbacks must explicitly return a boolean (did you forget a return statement, or a !! coercion?)`;
     }
     return result;
   };
@@ -325,65 +309,6 @@ export async function checkCondition(controller: GuardController, interaction: I
     throw new InteractionGuardError(`Condition check failed: ${(result as any)?.data?.name}`, {
       type: 'condition check failed',
       checkType: 'condition',
-      error: result,
-    });
-  }
-}
-
-// Returns `true`/`false` from the attributive callback, or an error-message string
-// (treated as failure by BoolExp.evaluateAsync) for definition-level problems.
-export async function checkAttributive(controller: GuardController, attributive: AttributiveInstance, eventArgs: InteractionEventArgs | undefined, target: unknown): Promise<boolean | string> {
-  // fail-closed: an attributive on the guard chain without executable content
-  // must not silently grant access.
-  if (!attributive.content) {
-    return `Attributive '${attributive.name ?? '(unnamed)'}' has no content to execute`;
-  }
-  let result;
-  try {
-    result = await attributive.content.call(controller, target, eventArgs);
-  } catch (e) {
-    // CAUTION 与 Condition 一致：异常作为错误信息透出（fail-closed），而不是吞成 false。
-    //  吞成 false 会让运维无法区分权限误配与真实拒绝；更严重的是在 not(attributive)
-    //  组合下 false 会被取反成 true，异常反而变成放行（fail-open）。
-    //  错误字符串在 BoolExp.evaluateAsync 中无论是否处于 not 之下都判为失败。
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    return `Attributive '${attributive.name ?? '(unnamed)'}' threw exception: ${errorMessage}`;
-  }
-  if (result === undefined) {
-    return `Attributive '${attributive.name ?? '(unnamed)'}' returned undefined; guard callbacks must explicitly return a boolean (did you forget a return statement?)`;
-  }
-  return result;
-}
-
-async function checkUser(controller: GuardController, interaction: InteractionInstance, eventArgs: InteractionEventArgs, checkUserRef?: CheckUserRefHandle) {
-  if (!interaction.userAttributives) return;
-
-  const userAttributiveCombined = Attributives.is(interaction.userAttributives)
-    ? BoolExp.fromValue<AttributiveInstance>(interaction.userAttributives.content! as ExpressionData<AttributiveInstance>)
-    : BoolExp.atom<AttributiveInstance>(interaction.userAttributives as AttributiveInstance);
-
-  const checkHandle = (attributive: AttributiveInstance) => {
-    if (attributive.isRef) {
-      // `isRef` means "must be the specific user bound in the activity refs".
-      // Inside an activity the runtime provides checkUserRef; outside, there are no
-      // refs, so evaluating it would silently degrade to an unrelated role check —
-      // reject the definition instead.
-      if (checkUserRef) {
-        return checkUserRef(attributive);
-      }
-      throw new InteractionGuardError(
-        `Attributive '${attributive.name ?? '(unnamed)'}' has isRef: true, which can only be checked inside an activity. Use it on an activity interaction, or remove isRef for a standalone interaction.`,
-        { type: 'isRef attributive outside activity', checkType: 'user' }
-      );
-    }
-    return checkAttributive(controller, attributive, eventArgs, eventArgs.user);
-  };
-
-  const result = await userAttributiveCombined.evaluateAsync(checkHandle);
-  if (result !== true) {
-    throw new InteractionGuardError('User check failed', {
-      type: 'check user failed',
-      checkType: 'user',
       error: result,
     });
   }
@@ -463,112 +388,38 @@ export async function checkPayload(controller: GuardController, interaction: Int
       }
     }
 
-    // isRef payloads must reference an existing record of the declared entity/relation:
-    // a made-up id (or an id belonging to another entity) must be rejected at the guard,
-    // before any event record is created with wrong semantics.
-    const baseRecordName = Entity.is(payloadDef.base) || Relation.is(payloadDef.base)
-      ? (payloadDef.base as EntityInstance).name
-      : undefined;
-    if (payloadDef.isRef && baseRecordName) {
-      const items = (payloadDef.isCollection ? payloadItem : [payloadItem]) as { id: string }[];
-      for (const item of items) {
-        const existing = await controller.system.storage.findOne(
-          baseRecordName,
-          BoolExp.atom({ key: 'id', value: ['=', item.id] }),
-          undefined,
-          ['id']
-        );
-        if (!existing) {
-          throw new InteractionGuardError(
-            `Payload validation failed for field '${payloadDef.name}': referenced ${baseRecordName} with id '${item.id}' does not exist`,
-            { type: `${payloadDef.name} ref not found`, checkType: 'payload' }
-          );
-        }
-      }
-    }
-
     if (payloadDef.base) {
+      // Declaration time already guarantees base is an Entity or a Relation.
+      const baseRecordName = (payloadDef.base as EntityInstance).name;
       const items = payloadDef.isCollection ? (payloadItem as unknown[]) : [payloadItem];
       for (const item of items) {
-        const result = await checkConcept(controller, eventArgs, item, payloadDef.base as unknown as Concept);
-        if (result !== true) {
+        // Structural check: an entity/relation payload must be an object.
+        if (!item || typeof item !== 'object') {
           throw new InteractionGuardError(
-            `Concept check failed for field '${payloadDef.name}'`,
-            { type: `${payloadDef.name} check concept failed`, checkType: 'concept', error: result }
+            `Payload validation failed for field '${payloadDef.name}': expected ${baseRecordName} data (object), got ${item === null ? 'null' : typeof item}`,
+            { type: `${payloadDef.name} check concept failed`, checkType: 'payload' }
           );
+        }
+        // isRef payloads must reference an existing record of the declared entity/relation:
+        // a made-up id (or an id belonging to another entity) must be rejected at the guard,
+        // before any event record is created with wrong semantics.
+        if (payloadDef.isRef) {
+          const existing = await controller.system.storage.findOne(
+            baseRecordName,
+            BoolExp.atom({ key: 'id', value: ['=', (item as { id: string }).id] }),
+            undefined,
+            ['id']
+          );
+          if (!existing) {
+            throw new InteractionGuardError(
+              `Payload validation failed for field '${payloadDef.name}': referenced ${baseRecordName} with id '${(item as { id: string }).id}' does not exist`,
+              { type: `${payloadDef.name} ref not found`, checkType: 'payload' }
+            );
+          }
         }
       }
     }
   }
-}
-
-// Evaluates an Attributive or an Attributives (bool expression of attributives)
-// attached to a concept against a payload item.
-async function checkConceptAttributive(controller: GuardController, attributive: unknown, eventArgs: InteractionEventArgs, target: unknown): Promise<boolean | string> {
-  if (Attributives.is(attributive)) {
-    // fail-closed：content 为空的 Attributives 无法求值。给出业务级错误，
-    //  而不是让 BoolExp 构造器抛出与声明处无关的内部错误。
-    if (!(attributive as AttributivesInstance).content) {
-      return `Attributives instance has no content to evaluate — declare content (an Attributive BoolExp) or remove the attributives declaration`;
-    }
-    const combined = BoolExp.fromValue<AttributiveInstance>((attributive as AttributivesInstance).content! as ExpressionData<AttributiveInstance>);
-    const result = await combined.evaluateAsync((atom: AttributiveInstance) => checkAttributive(controller, atom, eventArgs, target));
-    return result === true ? true : 'attributives check failed';
-  }
-  if (Attributive.is(attributive)) {
-    return checkAttributive(controller, attributive, eventArgs, target);
-  }
-  return `unsupported attributive type in concept: ${JSON.stringify(attributive)}`;
-}
-
-async function checkConcept(controller: GuardController, eventArgs: InteractionEventArgs, instance: ConceptInstance, concept: Concept): Promise<true | { name: string, type: string, error: string }> {
-  if (Attributive.is(concept as unknown) || Attributives.is(concept as unknown)) {
-    const result = await checkConceptAttributive(controller, concept, eventArgs, instance);
-    if (result === true) return true;
-    return {
-      name: (concept as { name?: string }).name || '',
-      type: 'attributiveCheck',
-      error: typeof result === 'string' ? result : 'attributive check failed'
-    };
-  }
-
-  if (Entity.is(concept as unknown) || Relation.is(concept as unknown)) {
-    if (instance && typeof instance === 'object') return true;
-    return { name: (concept as { name?: string }).name || '', type: 'conceptCheck', error: 'invalid entity data' };
-  }
-
-  if ((concept as ConceptAlias).for) {
-    for (const c of (concept as ConceptAlias).for!) {
-      const result = await checkConcept(controller, eventArgs, instance, c);
-      if (result === true) return true;
-    }
-    return { name: (concept as { name?: string }).name || '', type: 'conceptAlias', error: 'no match' };
-  }
-
-  if ((concept as DerivedConcept).base) {
-    const derived = concept as DerivedConcept;
-    const baseResult = await checkConcept(controller, eventArgs, instance, derived.base!);
-    if (baseResult !== true) return baseResult;
-    if (derived.attributive) {
-      const result = await checkConceptAttributive(controller, derived.attributive, eventArgs, instance);
-      if (result !== true) {
-        return {
-          name: derived.name || '',
-          type: 'derivedConceptCheck',
-          error: typeof result === 'string' ? result : 'attributive check failed'
-        };
-      }
-    }
-    return true;
-  }
-
-  // fail-closed: an unrecognized concept type on a payload definition is a definition
-  // error, not a license to skip validation.
-  return {
-    name: (concept as { name?: string })?.name || '',
-    type: 'conceptCheck',
-    error: `unknown concept type; payload base must be an Entity, Relation, Attributive(s), ConceptAlias or DerivedConcept`
-  };
 }
 
 async function retrieveData(controller: Controller, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {

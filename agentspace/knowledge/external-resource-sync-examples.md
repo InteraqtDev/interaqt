@@ -242,10 +242,9 @@ const UpdateUploadProgress = Interaction.create({
   dataSchema: {
     fileId: 'string',
     progress: 'number'
-  },
-  dataAttributives: {
-    uploadProgress: ({ payload }) => payload.progress
   }
+  // uploadProgress 等属性更新通过实体上的响应式计算（如 StateMachine）声明，
+  // 由该交互的事件触发
 })
 
 const CompleteUpload = Interaction.create({
@@ -254,12 +253,8 @@ const CompleteUpload = Interaction.create({
     fileId: 'string',
     s3Key: 'string',
     cdnUrl: 'string'
-  },
-  dataAttributives: {
-    s3Key: ({ payload }) => payload.s3Key,
-    cdnUrl: ({ payload }) => payload.cdnUrl,
-    uploadedAt: () => new Date().toISOString()
   }
+  // s3Key / cdnUrl / uploadedAt 等属性更新同样在实体属性的 computation 中声明
 })
 
 const ProcessFile = Interaction.create({

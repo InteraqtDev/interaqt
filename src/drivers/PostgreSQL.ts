@@ -126,6 +126,7 @@ export class PostgreSQLDB implements Database{
         name: 'postgres' as const,
         maxIdentifierLength: 63,
         supportsCreateIndexIfNotExists: true,
+        enforceMaxIdentifierLength: true,
         encodeLiteral: defaultEncodeLiteral,
         constraints: { unique: true, filteredUnique: true, nonNull: true },
     }
@@ -150,18 +151,21 @@ export class PostgreSQLDB implements Database{
             ...this.options,
         })
         await adminClient.connect()
-        // 要不要有存在 就删掉的？
-        // SELECT 'DROP DATABASE your_database_name' WHERE EXISTS (SELECT FROM pg_database WHERE dataname = 'your_database_name');
-        const databaseExist = await adminClient.query(`SELECT FROM pg_database WHERE datname = $1`, [this.database])
-        if (databaseExist.rows.length === 0) {
-            await adminClient.query(`CREATE DATABASE "${this.database}"`)
-        } else {
-            if (forceDrop) {
-                await adminClient.query(`DROP DATABASE "${this.database}" WITH (FORCE)`)
+        // CAUTION 管理语句失败（权限不足、库名冲突、连接上限）时也必须释放管理连接，
+        //  否则反复 open() 失败会累积悬挂连接直至撞上服务端连接上限。
+        try {
+            const databaseExist = await adminClient.query(`SELECT FROM pg_database WHERE datname = $1`, [this.database])
+            if (databaseExist.rows.length === 0) {
                 await adminClient.query(`CREATE DATABASE "${this.database}"`)
+            } else {
+                if (forceDrop) {
+                    await adminClient.query(`DROP DATABASE "${this.database}" WITH (FORCE)`)
+                    await adminClient.query(`CREATE DATABASE "${this.database}"`)
+                }
             }
+        } finally {
+            await adminClient.end()
         }
-        await adminClient.end()
 
         if (!this.pool) {
             this.pool = this.createPool()
@@ -385,6 +389,11 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     }
     mapToDBFieldType(type: string, collection?: boolean) {
         if (type === 'pk') {
+            // CAUTION 与 PGLite（SERIAL PRIMARY KEY）/SQLite（INTEGER PRIMARY KEY）存在
+            //  已知的声明差异：这里不带 PRIMARY KEY 约束。不能补齐——fieldType 字符串
+            //  参与迁移 manifest 的 modelHash（storage schema 全量入哈希），改动会让所有
+            //  存量 PG 部署在 setup(false) 时撞 manifest mismatch、被迫走迁移。
+            //  _rowId 无外键引用、唯一性由 IDENTITY 生成保证，缺约束无实际损坏路径。
             return 'INT GENERATED ALWAYS AS IDENTITY'
         } else if (type === 'id') {
             return 'INT'

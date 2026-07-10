@@ -93,11 +93,19 @@ export function isRequireSerializableRetry(error: unknown): boolean {
     return collectErrorChain(error).some(item => item instanceof RequireSerializableRetry);
 }
 
+// CAUTION 可重试判定只收录「重跑同一事务即可自愈」的错误形态：
+//  - PG 40001（serialization_failure）/ 40P01（deadlock_detected）：事务级冲突，标准重试对象；
+//  - PG 57P01（admin_shutdown，连接池空闲连接被服务端回收）与 Node 网络层
+//    ECONNRESET/EPIPE：连接级瞬断——重试会从池里取新连接，事务从头执行；
+//  - SQLite SQLITE_BUSY：另一连接持有写锁，短退避后重试。
+//  不收录 ECONNREFUSED/认证失败等基础设施持续性错误：重试只会拖延失败暴露。
+const RETRYABLE_ERROR_CODES = new Set(["40001", "40P01", "57P01", "ECONNRESET", "EPIPE", "SQLITE_BUSY"]);
+
 export function isRetryableTransactionError(error: unknown): boolean {
     return collectErrorChain(error).some(item => {
         if (!item || typeof item !== "object") return false;
         const code = (item as ErrorLike).code;
-        return code === "40001" || code === "40P01";
+        return typeof code === "string" && RETRYABLE_ERROR_CODES.has(code);
     });
 }
 

@@ -7,10 +7,7 @@ import {
     StateMachine,
     Any, Count, Every, Dictionary,
     Transfer,
-    Attributive,
-    createUserRoleAttributive,
-    boolExpToAttributives,
-    BoolExp,
+    Condition,
     Controller,
     Action, Activity, Interaction, Payload, PayloadItem, USER_ENTITY, ActivityGroup,
     HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE
@@ -39,29 +36,39 @@ export function createData() {
     
     
     
-     const OtherAttr = Attributive.create({
-        name: 'Other',
-        content: function Other(targetUser: any, { user }: { user: any }){ 
-            return user.id !== targetUser.id 
+    // Attributive 已废弃：跨交互的授权（"必须是发起人指定的用户"）用 Condition 表达——
+    // 条件回调收到完整 event args（含 activityId），通过查询本 activity 的既有交互事件定位角色。
+    async function findSendEvent(controller: Controller, activityId: string) {
+        const match = MatchExp.atom({
+            key: 'interactionName',
+            value: ['=', 'sendRequest']
+        }).and({
+            key: 'activity.id',
+            value: ['=', activityId]
+        })
+        return controller.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
+    }
+
+    const mustBeRequestReceiver = Condition.create({
+        name: 'mustBeRequestReceiver',
+        content: async function (this: Controller, event: any) {
+            if (!event.activityId) return false
+            const sendEvent = await findSendEvent(this, event.activityId)
+            return !!sendEvent && (sendEvent.payload?.to as { id?: string })?.id === event.user.id
         }
     })
-    
-     const Admin = createUserRoleAttributive( {
-        name: 'Admin'
+
+    const mustBeRequestSender = Condition.create({
+        name: 'mustBeRequestSender',
+        content: async function (this: Controller, event: any) {
+            if (!event.activityId) return false
+            const sendEvent = await findSendEvent(this, event.activityId)
+            return !!sendEvent && (sendEvent.user as { id?: string })?.id === event.user.id
+        }
     })
-    
-     const Anonymous = createUserRoleAttributive( {
-        name: 'Anonymous'
-    })
-    
-     const globalUserRole = createUserRoleAttributive({} )
-    
-    
-    const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
-     const userRefB = createUserRoleAttributive({name: 'B', isRef: true})
+
      const sendInteraction = Interaction.create({
         name: 'sendRequest',
-        userRef: userRefA,
         action: Action.create({name: 'sendRequest'}),
         payload: Payload.create({
             items: [
@@ -70,7 +77,6 @@ export function createData() {
                     type: 'Entity',
                     isRef:true,
                     base: UserEntity,
-                    itemRef: userRefB
                 }),
                 PayloadItem.create({
                     name: 'message',
@@ -81,33 +87,15 @@ export function createData() {
         })
     })
     
-     const MyFriend = Attributive.create({
-        name: 'MyFriend',
-        content:
-            async function MyFriend(this: Controller, target: any, { user }: { user: any }){
-                const relationName = this.system.storage.getRelationName('User', 'friends')
-                const match = MatchExp.atom({
-                    key: 'source.id',
-                    value: ['=', user.id]
-                }).and({
-                    key: 'target.id',
-                    value: ['=', target.id]
-                })
-    
-                return !!(await this.system.storage.findOneRelationByName(relationName, match))
-            }
-    })
      const approveInteraction = Interaction.create({
         name: 'approve',
-        userAttributives: userRefB,
-        userRef: createUserRoleAttributive({name: '', isRef: true}),
+        conditions: mustBeRequestReceiver,
         action: Action.create({name: 'approve'}),
         payload: Payload.create({})
     })
      const rejectInteraction = Interaction.create({
         name: 'reject',
-        userAttributives: userRefB,
-        userRef: createUserRoleAttributive({name: '', isRef: true}),
+        conditions: mustBeRequestReceiver,
         action: Action.create({name: 'reject'}),
         payload: Payload.create({
             items: [
@@ -121,8 +109,7 @@ export function createData() {
     })
      const cancelInteraction = Interaction.create({
         name: 'cancel',
-        userAttributives: userRefA,
-        userRef: createUserRoleAttributive({name: '', isRef: true}),
+        conditions: mustBeRequestSender,
         action: Action.create({name: 'cancel'}),
         payload: Payload.create({})
     })

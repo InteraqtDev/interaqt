@@ -7,7 +7,7 @@ import { EvaluateError } from '@core'
 export class ConditionError extends FrameworkError {
     public readonly type: string  // For backward compatibility with existing tests
     public readonly error?: EvaluateError<any> | any  // For backward compatibility
-    public readonly checkType: 'user' | 'payload' | 'condition' | 'attributive' | 'concept'
+    public readonly checkType: 'payload' | 'condition'
     public readonly fieldName?: string
     public readonly payload?: any
     public readonly evaluationError?: EvaluateError<any> | any
@@ -16,7 +16,7 @@ export class ConditionError extends FrameworkError {
     constructor(
         message: string,
         options: {
-            checkType: 'user' | 'payload' | 'condition' | 'attributive' | 'concept'
+            checkType: 'payload' | 'condition'
             fieldName?: string
             payload?: any
             evaluationError?: EvaluateError<any> | any
@@ -51,16 +51,6 @@ export class ConditionError extends FrameworkError {
     /**
      * Helper factory methods for common condition error scenarios
      */
-    static userCheckFailed(error: unknown, context?: Record<string, unknown>): ConditionError {
-        return new ConditionError('User check failed', {
-            checkType: 'user',
-            evaluationError: error,
-            severity: ErrorSeverity.HIGH,
-            context,
-            type: 'check user failed'  // For backward compatibility
-        })
-    }
-
     static payloadValidationFailed(fieldName: string, message: string, payload?: any, error?: unknown): ConditionError {
         const fullMessage = `${fieldName} ${message}`
         return new ConditionError(`Payload validation failed for field '${fieldName}': ${message}`, {
@@ -80,28 +70,6 @@ export class ConditionError extends FrameworkError {
             severity: ErrorSeverity.HIGH,
             context,
             type: 'condition check failed'  // For backward compatibility
-        })
-    }
-
-    static attributiveCheckFailed(fieldName: string, message: string, payload?: any, error?: unknown): ConditionError {
-        const fullMessage = `${fieldName} ${message}`
-        return new ConditionError(`Attributive check failed for field '${fieldName}': ${message}`, {
-            checkType: 'attributive',
-            fieldName,
-            payload,
-            evaluationError: error,
-            severity: ErrorSeverity.MEDIUM,
-            type: fullMessage  // For backward compatibility
-        })
-    }
-
-    static conceptCheckFailed(fieldName: string, error: unknown): ConditionError {
-        return new ConditionError(`Concept check failed for field '${fieldName}'`, {
-            checkType: 'concept',
-            fieldName,
-            evaluationError: error,
-            severity: ErrorSeverity.MEDIUM,
-            type: `${fieldName} check concept failed`  // For backward compatibility
         })
     }
 }

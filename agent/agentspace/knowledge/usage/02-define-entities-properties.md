@@ -320,18 +320,23 @@ const User = Entity.create({
 });
 ```
 
-If you need to perform uniqueness checks at the application level, you can implement them through the Attributive system:
+If you need to perform uniqueness checks at the application level, you can implement them as a Condition on the relevant Interaction:
 
 ```javascript
-const UniqueEmailAttributive = Attributive.create({
+const UniqueEmail = Condition.create({
   name: 'UniqueEmail',
-  content: async function(user, { system }) {
-    const existingUser = await system.storage.findOne('User', 
-      MatchExp.atom({ key: 'email', value: ['=', user.email] })
+  content: async function(event) {
+    const existingUser = await this.system.storage.findOne('User', 
+      MatchExp.atom({ key: 'email', value: ['=', event.payload.user.email] }),
+      undefined,
+      ['id']
     );
-    return !existingUser || existingUser.id === user.id;
+    return !existingUser || existingUser.id === event.payload.user.id;
   }
 });
+
+// Attach to the interaction that creates/updates users
+// Interaction.create({ name: 'UpdateUser', ..., conditions: UniqueEmail })
 ```
 
 ## Complete Example

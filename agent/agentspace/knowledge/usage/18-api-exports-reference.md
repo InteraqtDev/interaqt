@@ -40,9 +40,7 @@ import {
   RealTime,
   MathResolver,
   
-  // Attributive and Conditions
-  Attributive,
-  Attributives,
+  // Conditions
   Condition,
   Conditions,
   
@@ -95,8 +93,7 @@ import {
   RelationBasedEvery,  // Only 'Every' exists
   InteractionEvent,    // Correct name is 'InteractionEventEntity'
   FilteredEntity,      // Created via Entity.create with baseEntity
-  SideEffect,          // Not a direct export
-  DataAttributive      // Use Attributive for all purposes
+  SideEffect           // Not a direct export
 } from 'interaqt';
 ```
 

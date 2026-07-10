@@ -1,24 +1,21 @@
-import { IInstance, SerializedData, generateUUID, decodeFunctionValues, stringifyInstance, EntityInstance } from '@core';
-import { AttributiveInstance, AttributivesInstance } from './Attributive.js';
+import { IInstance, SerializedData, generateUUID, decodeFunctionValues, stringifyInstance, EntityInstance, RelationInstance, Entity, Relation } from '@core';
 
 export interface PayloadItemInstance extends IInstance {
   name: string;
   type: string;
-  base?: EntityInstance;
+  base?: EntityInstance | RelationInstance;
   isRef?: boolean;
   required?: boolean;
   isCollection?: boolean;
-  itemRef?: AttributiveInstance | EntityInstance;
 }
 
 export interface PayloadItemCreateArgs {
   name: string;
   type: string;
-  base?: EntityInstance;
+  base?: EntityInstance | RelationInstance;
   isRef?: boolean;
   required?: boolean;
   isCollection?: boolean;
-  itemRef?: AttributiveInstance | EntityInstance;
 }
 
 export class PayloadItem implements PayloadItemInstance {
@@ -26,11 +23,10 @@ export class PayloadItem implements PayloadItemInstance {
   public _type = 'PayloadItem';
   public _options?: { uuid?: string };
   public name: string;
-  public base?: EntityInstance;
+  public base?: EntityInstance | RelationInstance;
   public isRef: boolean;
   public required: boolean;
   public isCollection: boolean;
-  public itemRef?: AttributiveInstance | EntityInstance;
   public type: string;
   constructor(args: PayloadItemCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -41,7 +37,6 @@ export class PayloadItem implements PayloadItemInstance {
     this.isRef = args.isRef ?? false;
     this.required = args.required ?? false;
     this.isCollection = args.isCollection ?? false;
-    this.itemRef = args.itemRef;
   }
   
   // 静态属性和方法
@@ -59,7 +54,7 @@ export class PayloadItem implements PayloadItemInstance {
       required: true as const
     },
     base: {
-      type: 'Entity' as const,
+      type: ['Entity', 'Relation'] as const,
       required: false as const,
       collection: false as const
     },
@@ -77,11 +72,6 @@ export class PayloadItem implements PayloadItemInstance {
       type: 'boolean' as const,
       collection: false as const,
       defaultValue: () => false
-    },
-    itemRef: {
-      collection: false as const,
-      required: false as const,
-      type: ['Attributive', 'Entity'] as const
     }
   };
   
@@ -90,6 +80,24 @@ export class PayloadItem implements PayloadItemInstance {
     //  没有 base 时校验退化成"有 .id 字段就通过"，任何伪造的 {id} 都能穿过 guard。
     if (args.isRef && !args.base) {
       throw new Error(`PayloadItem '${args.name}' has isRef: true but no base. Declare base (the referenced Entity/Relation) so the guard can verify the referenced record exists.`);
+    }
+    // base 只能是 Entity/Relation。Attributive 概念已废弃：payload 级校验用 Interaction 的
+    //  conditions 表达（条件回调可以读取 payload 并做任意检查）。
+    if (args.base !== undefined && !Entity.is(args.base) && !Relation.is(args.base)) {
+      throw new Error(
+        `PayloadItem '${args.name}' has an invalid base: expected an Entity or Relation instance. ` +
+        `To validate payload contents, use the interaction's conditions instead.`
+      );
+    }
+    // 显式拒绝已废弃的 Attributive 概念参数：静默丢弃会让旧代码以为校验仍然生效。
+    const legacyArgs = args as unknown as Record<string, unknown>;
+    for (const legacyKey of ['attributives', 'itemRef'] as const) {
+      if (legacyArgs[legacyKey] !== undefined) {
+        throw new Error(
+          `PayloadItem '${args.name}' declares "${legacyKey}", but the Attributive concept has been removed. ` +
+          `Express the check as a Condition on the interaction (conditions receives the full event args: user, payload, activityId).`
+        );
+      }
     }
     const instance = new PayloadItem(args, options);
     
@@ -104,8 +112,7 @@ export class PayloadItem implements PayloadItemInstance {
   }
   
   // CAUTION 必须走统一的 stringifyInstance 管线（以 static public 为单一事实来源）：
-  //  base/itemRef 编码为 uuid:: 引用。此前手写字段清单漏掉了 itemRef，
-  //  round-trip 后 activity 的 ref 绑定静默丢失。
+  //  base 编码为 uuid:: 引用。
   static stringify(instance: PayloadItemInstance): string {
     return stringifyInstance(this, instance);
   }
@@ -119,7 +126,6 @@ export class PayloadItem implements PayloadItemInstance {
     if (instance.isRef !== false) args.isRef = instance.isRef;
     if (instance.required !== false) args.required = instance.required;
     if (instance.isCollection !== false) args.isCollection = instance.isCollection;
-    if (instance.itemRef !== undefined) args.itemRef = instance.itemRef;
     
     return this.create(args);
   }
@@ -136,4 +142,4 @@ export class PayloadItem implements PayloadItemInstance {
     const data: SerializedData<PayloadItemCreateArgs> = JSON.parse(json);
     return this.create(decodeFunctionValues(data.public), { ...data.options, uuid: data.uuid });
   }
-} 
+}

@@ -354,7 +354,7 @@ npm install @electric-sql/pglite
 - **StateMachine** — Model entity lifecycles with explicit state transitions triggered by events
 - **Filtered Entities** — Virtual views over entities, like reactive database views
 - **Activities** — Compose multi-step business workflows from ordered Interactions
-- **Attributive Permissions** — Declarative, entity-aware access control
+- **Condition Guards** — Declarative access control with full event context
 - **Dictionary** — Global reactive key-value state
 - **Schema Constraints** — Persistent unique constraints with structured duplicate errors
 - **Hard Deletion** — Built-in support for both soft and hard delete patterns

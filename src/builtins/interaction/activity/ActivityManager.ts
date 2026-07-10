@@ -4,6 +4,7 @@ import { Entity, Property, Relation, EventSourceInstance, EntityInstance, Relati
 import { assert } from '@runtime';
 import type { Controller } from '@runtime';
 import { ActivityCall } from './ActivityCall.js';
+import { ActivityStateError } from '../errors/ActivityErrors.js';
 
 export { INTERACTION_RECORD };
 export const ACTIVITY_RECORD = '_Activity_'
@@ -31,11 +32,6 @@ export const ActivityStateEntity = Entity.create({
         Property.create({
             name: 'stateVersion',
             type: 'number',
-            collection: false,
-        }),
-        Property.create({
-            name: 'refs',
-            type: 'object',
             collection: false,
         })
     ]
@@ -110,17 +106,16 @@ export class ActivityManager {
                 const created = await activityCall.create(this)
                 args.activityId = created.activityId
             } else if (isHeadInteraction && args.activityId) {
-                // CAUTION 带 activityId 的 head（如 every/race 组里第二个分支的 head）已经有
-                //  activity refs 可用，必须与非 head 一样走 fullGuardWithUserRef——否则 isRef
-                //  userAttributives 会落到 standalone guard 的 "isRef outside activity" 拒绝分支。
+                // 带 activityId 的 head（如 every/race 组里第二个分支的 head）：
+                // 先校验状态可达，再走与非 head 相同的完整守卫。
                 await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
-                await activityCall.fullGuardWithUserRef(this, interaction, args)
+                await activityCall.fullGuard(this, interaction, args)
             } else {
                 if (!args.activityId) {
-                    throw new Error('activityId must be provided for non-head interaction of an activity')
+                    throw new ActivityStateError('activityId must be provided for non-head interaction of an activity', { activityName: activityCall.activity.name })
                 }
                 await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
-                await activityCall.fullGuardWithUserRef(this, interaction, args)
+                await activityCall.fullGuard(this, interaction, args)
             }
         }
 
@@ -137,7 +132,6 @@ export class ActivityManager {
         const wrappedAfterDispatch = async function(this: Controller, args: InteractionEventArgs, result: { data?: unknown }) {
             const activityId = args.activityId!
 
-            await activityCall.saveUserRefs(this, activityId, interaction, args)
             await activityCall.completeInteractionState(this, activityId, interaction.uuid)
 
             const interactionResult = interaction.afterDispatch

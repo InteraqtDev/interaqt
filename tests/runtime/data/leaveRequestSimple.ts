@@ -1,9 +1,5 @@
 import {
     Action,
-    Attributive,
-    BoolExp,
-    boolExpToAttributives,
-    createUserRoleAttributive,
     Entity,
     GetAction,
     Interaction,
@@ -22,9 +18,6 @@ import {
     Count,
     DataPolicy
 } from 'interaqt';
-
-export const globalUserRole = createUserRoleAttributive({})
-
 
 const UserEntity = Entity.create({
     name: 'User',

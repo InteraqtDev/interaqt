@@ -1,7 +1,7 @@
 import { ActivityGroup, ActivityGroupInstance, ActivityInstance, TransferInstance } from '../Activity.js';
-import { Attributive, AttributiveInstance } from '../Attributive.js';
 import { Gateway, GatewayInstance } from '../Gateway.js';
-import { InteractionInstance, InteractionEventArgs, EventUser, runInteractionGuard } from '../Interaction.js';
+import { InteractionInstance, InteractionEventArgs, runInteractionGuard } from '../Interaction.js';
+import { ActivityError, ActivityStateError } from '../errors/ActivityErrors.js';
 import { assert } from "@runtime";
 import { BoolExp } from "@core";
 
@@ -183,7 +183,7 @@ class ActivityState{
     completeInteraction(uuid: string) {
         const stateNode = this.root.findStateNode(uuid)
         if (!stateNode) {
-            throw new Error(`interaction ${uuid} is not available in the current activity state; it may have been completed by a concurrent dispatch`)
+            throw new ActivityStateError(`interaction ${uuid} is not available in the current activity state; it may have been completed by a concurrent dispatch`, { activityName: this.graph.activity.name })
         }
         stateNode.complete()
         return true
@@ -210,7 +210,7 @@ export class ActivityCall {
         //  gets stuck on a node that can never be dispatched), so reject the definition
         //  explicitly. Use ActivityGroup (type 'any' / 'every' / 'race') to model branches.
         if (activity.gateways?.length || activity.transfers?.some(t => Gateway.is(t.source) || Gateway.is(t.target))) {
-            throw new Error(`Activity "${activity.name}" uses Gateway nodes, which are not supported by the activity runtime. Model branching with ActivityGroup (type 'any'/'every'/'race') instead.`)
+            throw new ActivityError(`Activity "${activity.name}" uses Gateway nodes, which are not supported by the activity runtime. Model branching with ActivityGroup (type 'any'/'every'/'race') instead.`, { activityName: activity.name })
         }
 
         const seq = {}
@@ -220,7 +220,7 @@ export class ActivityCall {
             //  在活动图中出现两次会静默覆盖先注册的节点——transfer 解析、状态推进、guard 都可能
             //  绑到错误的节点上（症状从误导性的 "start node must one" 到静默的错误状态推进不等）。
             if (this.uuidToNode.has(interaction.uuid)) {
-                throw new Error(`Interaction "${interaction.name}" appears more than once in activity "${this.activity.name}". Each graph node must be a distinct Interaction instance — create a separate Interaction (a new Interaction.create call) for each step.`)
+                throw new ActivityError(`Interaction "${interaction.name}" appears more than once in activity "${this.activity.name}". Each graph node must be a distinct Interaction instance — create a separate Interaction (a new Interaction.create call) for each step.`, { activityName: this.activity.name })
             }
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
@@ -232,18 +232,18 @@ export class ActivityCall {
             // with `new undefined()` deep inside the state machine.
             if (!InteractionState.GroupStateNodeType.has(group.type!)) {
                 const supported = Array.from(InteractionState.GroupStateNodeType.keys()).map(t => `'${t}'`).join(', ')
-                throw new Error(`ActivityGroup type "${group.type}" in activity "${activity.name}" is not supported. Supported types: ${supported}.`)
+                throw new ActivityError(`ActivityGroup type "${group.type}" in activity "${activity.name}" is not supported. Supported types: ${supported}.`, { activityName: activity.name })
             }
             // fail-fast: 与 interaction 同理，group 实例复用同样会静默覆盖图节点。
             if (this.uuidToNode.has(group.uuid)) {
-                throw new Error(`ActivityGroup (type '${group.type}') appears more than once in activity "${this.activity.name}". Each graph node must be a distinct ActivityGroup instance.`)
+                throw new ActivityError(`ActivityGroup (type '${group.type}') appears more than once in activity "${this.activity.name}". Each graph node must be a distinct ActivityGroup instance.`, { activityName: this.activity.name })
             }
             // fail-fast: a group with no child activities can never complete (group state
             // only advances via child-branch onChange callbacks, and an empty group has no
             // branches to trigger them), so any transfer out of the group is permanently
             // unreachable — the activity deadlocks silently at runtime.
             if (!group.activities?.length) {
-                throw new Error(`ActivityGroup (type '${group.type}') in activity "${activity.name}" has no child activities. An empty group can never complete, so the activity would deadlock — declare at least one child activity or remove the group.`)
+                throw new ActivityError(`ActivityGroup (type '${group.type}') in activity "${activity.name}" has no child activities. An empty group can never complete, so the activity would deadlock — declare at least one child activity or remove the group.`, { activityName: activity.name })
             }
             const node: ActivityGroupNode = {
                 uuid: group.uuid,
@@ -270,7 +270,7 @@ export class ActivityCall {
             // the same source would silently overwrite the first one — the built graph would
             // no longer match the declaration. Branching must be modeled with ActivityGroup.
             if (sourceNode.next) {
-                throw new Error(`Activity "${activity.name}" declares multiple transfers from the same source "${(transfer.source as InteractionInstance).name}". Each node can have only one outgoing transfer; model branching with ActivityGroup (type 'any'/'every'/'race') instead.`)
+                throw new ActivityError(`Activity "${activity.name}" declares multiple transfers from the same source "${(transfer.source as InteractionInstance).name}". Each node can have only one outgoing transfer; model branching with ActivityGroup (type 'any'/'every'/'race') instead.`, { activityName: activity.name })
             }
             sourceNode.next = targetNode
             targetNode.prev = sourceNode
@@ -279,8 +279,8 @@ export class ActivityCall {
             candidateStart.delete(transfer.target as InteractionInstance)
         })
 
-        if (candidateStart.size !== 1 ) throw new Error(`start node must one, current: ${candidateStart.size}`)
-        if (candidateEnd.size !== 1 ) throw new Error(`end node must be one, current: ${candidateEnd.size}`)
+        if (candidateStart.size !== 1 ) throw new ActivityError(`start node must one, current: ${candidateStart.size}`, { activityName: this.activity.name })
+        if (candidateEnd.size !== 1 ) throw new ActivityError(`end node must be one, current: ${candidateEnd.size}`, { activityName: this.activity.name })
 
         Object.assign((seq as Seq), {
             head :  this.rawToNode.get([...candidateStart.values()][0]!) as InteractionNode|ActivityGroupNode,
@@ -299,7 +299,6 @@ export class ActivityCall {
             uuid: this.activity.uuid,
             state: initialStateData,
             stateVersion: 0,
-            refs: {},
         })
         return {
             activityId: activity.id,
@@ -320,15 +319,16 @@ export class ActivityCall {
             value: ['=', activityId],
         })
         const results = await storage.system.storage.find(ActivityCall.ACTIVITY_RECORD, match, undefined, ['*'])
-        const activity = results.map((a: any) => ({ ...a, state: a.state, refs: a.refs }))[0]
+        const activity = results[0]
         // fail-fast：activityId 是 API 边界输入，可能属于另一个 Activity 定义。
-        //  不校验归属会用本 Activity 的图去解释别的流程的 state/refs——轻则在深处抛
+        //  不校验归属会用本 Activity 的图去解释别的流程的 state——轻则在深处抛
         //  "Cannot read properties of undefined" 的裸 TypeError，重则（两个 Activity 共用
         //  同一个 Interaction 实例、节点 uuid 相同时）把状态推进/授权判定错绑到别的流程上。
         if (activity && activity.uuid !== this.activity.uuid) {
-            throw new Error(
+            throw new ActivityStateError(
                 `activity instance ${activityId} belongs to activity "${activity.name}", ` +
-                `not "${this.activity.name}" — check the activityId passed to this dispatch`
+                `not "${this.activity.name}" — check the activityId passed to this dispatch`,
+                { activityName: this.activity.name, activityInstanceId: activityId }
             )
         }
         return activity
@@ -340,9 +340,7 @@ export class ActivityCall {
         })
         const data = { ...value }
         delete data.state
-        delete data.refs
         if (value.state) data.state = value.state
-        if (value.refs) data.refs = value.refs
         return await storage.system.storage.update(ActivityCall.ACTIVITY_RECORD, match, data)
     }
     async setState(storage: StorageAccess, activityId: string, state: any) {
@@ -373,26 +371,25 @@ export class ActivityCall {
         //  否则 new ActivityState(undefined) 会在深处抛 "Cannot read properties of undefined" 的裸 TypeError。
         const stateData = await this.getState(storage, activityId)
         if (!stateData) {
-            throw new Error(`activity ${activityId} not found for activity "${this.activity.name}"`)
+            throw new ActivityStateError(`activity ${activityId} not found for activity "${this.activity.name}"`, { activityName: this.activity.name, activityInstanceId: activityId })
         }
         const state = new ActivityState(stateData, this)
         if (!state.isInteractionAvailable(interactionUuid)) {
-            throw new Error(`interaction ${interactionUuid} not available`)
+            throw new ActivityStateError(`interaction ${interactionUuid} not available`, { activityName: this.activity.name, activityInstanceId: activityId, currentState: stateData })
         }
     }
 
     // 与独立 interaction 的 guard 共用同一个 runner（runInteractionGuard），
-    // 仅额外提供 activity refs 的 isRef 解析。
-    async fullGuardWithUserRef(controller: StorageAccess, interaction: InteractionInstance, args: InteractionEventArgs) {
-        await runInteractionGuard(controller, interaction, args, {
-            checkUserRef: (attributive: AttributiveInstance) => this.checkUserRef(controller, attributive, args.user, args.activityId!)
-        })
+    // 两条路径的守卫语义不允许漂移。Condition 收到完整 event args（含 activityId），
+    // 跨交互的授权（"必须是发起人指定的用户"）通过查询本 activity 的既有交互事件表达。
+    async fullGuard(controller: StorageAccess, interaction: InteractionInstance, args: InteractionEventArgs) {
+        await runInteractionGuard(controller, interaction, args)
     }
 
     async completeInteractionState(storage: StorageAccess, activityId: string, interactionUuid: string) {
         const activity = await this.getActivity(storage, activityId)
         if (!activity) {
-            throw new Error(`activity ${activityId} not found for activity "${this.activity.name}"`)
+            throw new ActivityStateError(`activity ${activityId} not found for activity "${this.activity.name}"`, { activityName: this.activity.name, activityInstanceId: activityId })
         }
         const state = new ActivityState(activity.state, this)
         state.completeInteraction(interactionUuid)
@@ -413,44 +410,11 @@ export class ActivityCall {
             { defaultValue: 0 }
         )
         if (!won) {
-            throw new Error(`activity ${activityId} state was modified concurrently while completing interaction ${interactionUuid}; the dispatch has been aborted and can be retried`)
+            throw new ActivityStateError(`activity ${activityId} state was modified concurrently while completing interaction ${interactionUuid}; the dispatch has been aborted and can be retried`, { activityName: this.activity.name, activityInstanceId: activityId })
         }
         await this.setActivity(storage, activityId, { state: nextState })
     }
 
-    async saveUserRefs(storage: StorageAccess, activityId: string, interaction: InteractionInstance, interactionEventArgs: InteractionEventArgs) {
-        const refs = (await this.getActivity(storage, activityId))?.refs! || {}
-        if (interaction.userRef?.name) {
-            refs[interaction.userRef?.name] = interactionEventArgs.user.id
-        }
-
-        interaction.payload?.items!.forEach((payloadDef) => {
-            if (Attributive.is(payloadDef.itemRef) && payloadDef.itemRef?.name && interactionEventArgs.payload![payloadDef.name!]) {
-                const payloadItem = interactionEventArgs.payload![payloadDef.name!]
-                if (payloadDef.isCollection) {
-                    // collection payload 是数组，必须逐项取 id，否则 refs 里存的是 undefined
-                    if(!refs[payloadDef.itemRef!.name!]) refs[payloadDef.itemRef!.name!] = []
-
-                    refs[payloadDef.itemRef!.name!].push(...(payloadItem as {id: string}[]).map(item => item.id))
-                } else {
-                    refs[payloadDef.itemRef!.name!] = (payloadItem as {id: string}).id
-                }
-            }
-        })
-
-        await this.setActivity(storage, activityId, {refs})
-    }
-
-    checkUserRef = async (storage: StorageAccess, attributive: AttributiveInstance, eventUser: EventUser, activityId: string): Promise<boolean> => {
-        assert(attributive.isRef, 'attributive must be ref')
-        const refs = (await this.getActivity(storage, activityId))?.refs
-        const ref = refs?.[attributive.name!]
-        // collection itemRef 保存的是 id 数组：按成员资格判断
-        if (Array.isArray(ref)) {
-            return ref.includes(eventUser.id)
-        }
-        return ref === eventUser.id
-    }
 }
 
 

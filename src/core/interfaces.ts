@@ -37,23 +37,6 @@ export function generateUUID(options?: { uuid?: string }): string {
   return options?.uuid || `id_${++globalIdCounter}`;
 }
 
-// 概念相关的类型
-export interface Concept {
-  name: string;
-  [key: string]: unknown;
-}
-
-export interface DerivedConcept extends Concept {
-  base?: Concept;
-  attributive?: unknown;
-}
-
-export interface ConceptAlias extends Concept {
-  for: Concept[];
-}
-
-export type ConceptInstance = unknown;
-
 // Entity/Relation/Property type aliases
 export type EntityInstanceType = import('./Entity.js').EntityInstance;
 export type RelationInstanceType = import('./Relation.js').RelationInstance;

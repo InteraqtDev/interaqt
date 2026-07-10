@@ -3,7 +3,7 @@ import {
     Entity, Property, Relation, KlassByName,
     Controller, MonoSystem,
     Interaction, Action, Activity, Transfer, ActivityManager, ActivityGroup,
-    Conditions, Condition, Attributives, Attributive,
+    Conditions, Condition,
     StateMachine, StateNode, StateTransfer,
 } from 'interaqt';
 import { MatchExp } from '@storage';
@@ -76,12 +76,12 @@ describe('r10 R-2: content-less guard containers are rejected at declaration tim
         })).toThrow(/Conditions instance that has no content/)
     })
 
-    test('Attributives without content', () => {
+    test('legacy userAttributives declaration is rejected (Attributive removed)', () => {
         expect(() => Interaction.create({
             name: 'R10BadAttr',
             action: Action.create({ name: 'r10badAttr' }),
-            userAttributives: Attributives.create({}),
-        })).toThrow(/Attributives instance that has no content/)
+            userAttributives: {},
+        } as any)).toThrow(/Attributive concept has been removed/)
     })
 
     test('well-formed Conditions still dispatch normally', async () => {

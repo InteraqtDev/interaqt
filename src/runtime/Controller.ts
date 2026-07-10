@@ -296,6 +296,20 @@ export class Controller {
         }
     }
 
+    /**
+     * Detach this controller from the system: unregister all reactive computation
+     * listeners registered by its scheduler. After teardown the controller no longer
+     * reacts to storage mutations; the system (and its database connection) stays
+     * usable and can host a new controller.
+     *
+     * Call this before discarding a controller in long-lived processes (hot reload,
+     * multi-tenant single process); otherwise the old controller's computation
+     * closures stay registered on the storage callback set and keep firing.
+     */
+    teardown() {
+        this.scheduler.teardown()
+    }
+
     // Recovery path for a migration process that died without releasing the
     // bookkeeping lock. Only call after confirming no migration is running.
     async forceReleaseMigrationLock() {
@@ -550,11 +564,16 @@ export class Controller {
     }
     async applyResult(dataContext: DataContext, result: unknown, record?: Record<string, unknown>) {
         if (result instanceof ComputationResultSkip) return
+        // CAUTION undefined 统一视为"无值可写"（与 entity/relation 分支及 incrementalPatchCompute
+        //  的 undefined 语义一致）。此前 global/property 分支会把 undefined 写穿——compute/
+        //  incrementalCompute 漏写 return 时，dict 值与 property 列被静默抹掉（数据损坏且零告警）。
+        //  null 是合法值域（可显式清空 global/property），继续写入。
+        if (result === undefined) return
 
         if (dataContext.type === 'global') {
             return this.system.storage.dict.set(dataContext.id.name, result)
         } else if (dataContext.type === 'entity') {
-            if (result === undefined || result === null) return
+            if (result === null) return
             if (this.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
                 throw new RequireSerializableRetry('entity replace result')
             }
@@ -565,7 +584,7 @@ export class Controller {
                 await this.system.storage.create(entityContext.id.name!, item)
             }
         } else if (dataContext.type === 'relation') {
-            if (result === undefined || result === null) return
+            if (result === null) return
             if (this.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
                 throw new RequireSerializableRetry('relation replace result')
             }
@@ -744,10 +763,14 @@ export class Controller {
             }))
         } catch (e) {
             if (this.forceThrowDispatchError) throw e
+            // 与成功路径同形态（data/context 显式为 undefined）：直接序列化 DispatchResponse
+            //  的调用方（HTTP 层等）拿到的 JSON 键集合在成功/失败两条路径上保持一致。
             result = {
                 error: e,
+                data: undefined,
                 effects: [],
-                sideEffects: {}
+                sideEffects: {},
+                context: undefined
             }
         }
 

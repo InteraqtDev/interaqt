@@ -1124,17 +1124,18 @@ PayloadItem.create(config: PayloadItemConfig): KlassInstance<typeof PayloadItem>
 
 **Parameters**
 - `config.name` (string, required): Parameter name
-- `config.base` (Entity, optional): Parameter entity type, only needed when isRef is true
+- `config.type` (string, optional): Primitive type check ('string', 'number', 'boolean', 'object')
+- `config.base` (Entity|Relation, optional): Parameter entity type, only needed when isRef is true
 - `config.isRef` (boolean, optional): Whether it's a reference type, defaults to false
 - `config.required` (boolean, optional): Whether it's required, defaults to false
 - `config.isCollection` (boolean, optional): Whether it's a collection type, defaults to false
-- `config.attributives` (Attributive|Attributives, optional): Parameter permission attributives
-- `config.itemRef` (Attributive|Entity, optional): Used to reference entities defined in other interactions within Activity
+
+Payload **content** validation (e.g. "post must have title and content") is expressed as `conditions` on the Interaction — see Condition.create().
 
 **Examples**
 ```typescript
 // Reference existing user
-const userRef = PayloadItem.create({
+const userItem = PayloadItem.create({
     name: 'user',
     base: User,
     isRef: true,
@@ -1145,13 +1146,15 @@ const userRef = PayloadItem.create({
 const postData = PayloadItem.create({
     name: 'postData',
     base: Post,
-    required: true,
-    attributives: Attributive.create({
-        name: 'ValidPost',
-        content: function(post) {
-            return post.title && post.content
-        }
-    })
+    required: true
+})
+
+// Content validation goes on the Interaction's conditions
+const ValidPost = Condition.create({
+    name: 'ValidPost',
+    content: async function(event) {
+        return !!(event.payload.postData.title && event.payload.postData.content)
+    }
 })
 
 // Collection type reference
@@ -1159,19 +1162,7 @@ const reviewersItem = PayloadItem.create({
     name: 'reviewers',
     base: User,
     isRef: true,
-    isCollection: true,
-    attributives: Attributives.create({
-        content: BoolAtomData.create({data: ReviewerAttr, type: 'atom'})
-    })
-})
-
-// Activity item reference
-const activityItem = PayloadItem.create({
-    name: 'to',
-    base: User,
-    isRef: true,
-    attributives: boolExpToAttributives(BoolExp.atom(OtherAttr)),
-    itemRef: userRefB
+    isCollection: true
 })
 ```
 
@@ -1244,7 +1235,7 @@ const ApprovalTransfer = Transfer.create({
 
 ### Condition.create()
 
-Create activity execution condition.
+Create an execution condition — the single guard concept for interactions (permission checks, payload content checks, activity user binding).
 
 **Syntax**
 ```typescript
@@ -1253,15 +1244,20 @@ Condition.create(config: ConditionConfig): KlassInstance<typeof Condition>
 
 **Parameters**
 - `config.name` (string, required): Condition name
-- `config.content` (function, required): Condition judgment function
+- `config.content` (function, required): Condition judgment function. Called with the Controller as `this` and the full event args (`user`, `payload`, `query`, `activityId`). Must return a strict boolean — any non-boolean result fails the check (fail-closed).
 
 **Examples**
 ```typescript
 const OrderValueCondition = Condition.create({
     name: 'highValueOrder',
-    content: function(order) {
-        return order.totalAmount > 1000
+    content: async function(event) {
+        return event.payload.order.totalAmount > 1000
     }
+})
+
+// Combine multiple conditions with Conditions.create + BoolExp
+const AdminHighValueOrder = Conditions.create({
+    content: BoolExp.atom(AdminOnly).and(OrderValueCondition)
 })
 ```
 
@@ -1474,44 +1470,6 @@ const condition = MatchExp.fromObject({
     city: 'Beijing'
 })
 // Equivalent to: status='active' AND age=25 AND city='Beijing'
-```
-
-### Attributive.create()
-
-Create permission attributive for access control.
-
-**Syntax**
-```typescript
-Attributive.create(config: AttributiveConfig): KlassInstance<typeof Attributive>
-```
-
-**Parameters**
-- `config.name` (string, optional): Attributive name
-- `config.content` (function, required): Permission judgment function
-- `config.isRef` (boolean, optional): Whether it's a reference
-
-**Examples**
-```typescript
-// Admin permission
-const AdminAttributive = Attributive.create({
-    name: 'Admin',
-    content: function(target, { user }) {
-        return user.role === 'admin'
-    }
-})
-
-// Resource owner permission
-const OwnerAttributive = Attributive.create({
-    name: 'Owner',
-    content: function(target, { user }) {
-        return target.userId === user.id
-    }
-})
-
-// Combined permissions (using BoolExp)
-const AdminOrOwnerAttributives = boolExpToAttributives(
-    BoolExp.atom(AdminAttributive).or(OwnerAttributive)
-)
 ```
 
 ### BoolExp

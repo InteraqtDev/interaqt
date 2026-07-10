@@ -42,6 +42,24 @@ expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
 - `'no permission'` → Never used (legacy)
 - `'condition check failed'` → What you'll actually see
 
+### Guard Callback Return Contract (strict boolean)
+
+Condition callbacks must return an actual `boolean` (`true` or `false`).
+Any non-boolean return value — including truthy values like `'admin'` and falsy values
+like `null` / `0` / `''` — is treated as a definition error and the check fails
+(fail-closed), with an error message telling you what was returned.
+
+Why falsy non-booleans matter: under a `not(...)` combination, a sloppy falsy value
+would otherwise be inverted into a pass. Always coerce explicitly:
+
+```typescript
+// ❌ WRONG: short-circuit expressions can produce null/undefined/0
+content: async (event) => event.user.profile && event.user.profile.isAdmin
+
+// ✅ CORRECT: coerce to boolean
+content: async (event) => !!(event.user.profile && event.user.profile.isAdmin)
+```
+
 ## Testing Permission Patterns
 
 ### 1. Role-Based Permission Test

@@ -1,10 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { clearAllInstances, BoolExp, BoolAtomData, BoolExpressionData } from '@core';
-import {
-    Attributive,
-    Attributives,
-    boolExpToAttributives,
-} from '../../src/builtins/interaction/Attributive.js';
+import { Condition } from '../../src/builtins/interaction/Condition.js';
 import { Conditions } from '../../src/builtins/interaction/Conditions.js';
 import {
     Activity,
@@ -14,111 +10,43 @@ import {
 
 beforeEach(() => {
     clearAllInstances(
-        Attributive, Attributives,
-        Conditions, Activity, ActivityGroup, Transfer,
+        Condition, Conditions, Activity, ActivityGroup, Transfer,
         BoolAtomData, BoolExpressionData,
     );
 });
 
-describe('Attributive serialization', () => {
+describe('Condition serialization', () => {
     test('stringify/parse round-trip preserves data', () => {
-        const content = (user: any) => user.role === 'admin';
-        const instance = Attributive.create({ content, name: 'isAdmin' }, { uuid: 'attr-1' });
+        const content = (event: any) => event.user.role === 'admin';
+        const instance = Condition.create({ content, name: 'isAdmin' }, { uuid: 'cond-atom-1' });
 
-        const json = Attributive.stringify(instance);
+        const json = Condition.stringify(instance);
         const data = JSON.parse(json);
-        expect(data.type).toBe('Attributive');
+        expect(data.type).toBe('Condition');
         expect(data.public.name).toBe('isAdmin');
         expect(data.public.content).toMatch(/^func::/);
 
-        clearAllInstances(Attributive);
-        const parsed = Attributive.parse(json);
-        expect(parsed.uuid).toBe('attr-1');
+        clearAllInstances(Condition);
+        const parsed = Condition.parse(json);
+        expect(parsed.uuid).toBe('cond-atom-1');
         expect(parsed.name).toBe('isAdmin');
         expect(typeof parsed.content).toBe('function');
     });
 
     test('is() positive and negative', () => {
-        const instance = Attributive.create({ content: () => true });
-        expect(Attributive.is(instance)).toBe(true);
-        expect(Attributive.is(null)).toBe(false);
-        expect(Attributive.is({ _type: 'Attributives' })).toBe(false);
-    });
-
-    test('check() validates object shape', () => {
-        expect(Attributive.check({ uuid: 'abc' })).toBe(true);
-        expect(Attributive.check(null)).toBe(false);
-        expect(Attributive.check({})).toBe(false);
+        const instance = Condition.create({ content: () => true });
+        expect(Condition.is(instance)).toBe(true);
+        expect(Condition.is(null)).toBe(false);
+        expect(Condition.is({ _type: 'Conditions' })).toBe(false);
     });
 
     test('clone() creates independent copy', () => {
         const content = () => true;
-        const instance = Attributive.create({ content, name: 'test', isRef: true });
-        const cloned = Attributive.clone(instance, false);
+        const instance = Condition.create({ content, name: 'test' });
+        const cloned = Condition.clone(instance, false);
         expect(cloned.uuid).not.toBe(instance.uuid);
         expect(cloned.content).toBe(content);
         expect(cloned.name).toBe('test');
-        expect(cloned.isRef).toBe(true);
-    });
-});
-
-describe('Attributives', () => {
-    test('is() positive and negative', () => {
-        const instance = Attributives.create({});
-        expect(Attributives.is(instance)).toBe(true);
-        expect(Attributives.is(null)).toBe(false);
-        expect(Attributives.is({ _type: 'Attributive' })).toBe(false);
-    });
-
-    test('check() validates object shape', () => {
-        expect(Attributives.check({ uuid: 'x' })).toBe(true);
-        expect(Attributives.check(null)).toBe(false);
-    });
-
-    test('stringify/parse round-trip', () => {
-        const instance = Attributives.create({}, { uuid: 'attrs-1' });
-        const json = Attributives.stringify(instance);
-        clearAllInstances(Attributives);
-        const parsed = Attributives.parse(json);
-        expect(parsed.uuid).toBe('attrs-1');
-    });
-
-    test('clone() creates independent copy', () => {
-        const instance = Attributives.create({});
-        const cloned = Attributives.clone(instance, false);
-        expect(cloned.uuid).not.toBe(instance.uuid);
-    });
-});
-
-describe('boolExpToAttributives', () => {
-    test('converts atom BoolExp to Attributives', () => {
-        const attr = Attributive.create({ content: () => true, name: 'check' });
-        const boolExp = BoolExp.atom(attr);
-        const result = boolExpToAttributives(boolExp);
-
-        expect(Attributives.is(result)).toBe(true);
-        expect(result.content).toBeTruthy();
-    });
-
-    test('converts AND expression to Attributives', () => {
-        const a1 = Attributive.create({ content: () => true, name: 'a1' });
-        const a2 = Attributive.create({ content: () => false, name: 'a2' });
-        const boolExp = BoolExp.atom(a1).and(a2);
-        const result = boolExpToAttributives(boolExp);
-
-        expect(Attributives.is(result)).toBe(true);
-        expect(result.content).toBeTruthy();
-        expect((result.content as any)._type).toBe('BoolExpressionData');
-    });
-
-    test('converts OR expression to Attributives', () => {
-        const a1 = Attributive.create({ content: () => true, name: 'a1' });
-        const a2 = Attributive.create({ content: () => false, name: 'a2' });
-        const boolExp = BoolExp.atom(a1).or(a2);
-        const result = boolExpToAttributives(boolExp);
-
-        expect(Attributives.is(result)).toBe(true);
-        expect(result.content).toBeTruthy();
     });
 });
 
@@ -127,7 +55,7 @@ describe('Conditions serialization', () => {
         const instance = Conditions.create({});
         expect(Conditions.is(instance)).toBe(true);
         expect(Conditions.is(null)).toBe(false);
-        expect(Conditions.is({ _type: 'Attributives' })).toBe(false);
+        expect(Conditions.is({ _type: 'Condition' })).toBe(false);
     });
 
     test('check() validates object shape', () => {

@@ -22,7 +22,7 @@ Master declarative data computation.
 ### 6. 🎮 [Interactions](./05-interactions.md)
 Learn how to define user interactions (Remember: Action is just an identifier!).
 
-### 7. 🔐 [Attributive Permissions](./06-attributive-permissions.md)
+### 7. 🔐 [Permission Control (Conditions)](./06-attributive-permissions.md)
 Understand how to control access permissions.
 
 ### 8. 📦 [Payload Parameters](./07-payload-parameters.md)
@@ -124,7 +124,7 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 ### Reactive System
 5. [Reactive Computations](./04-reactive-computations.md) - Declarative data computation
 6. [Interactions](./05-interactions.md) - User interaction definition
-7. [Attributive Permissions](./06-attributive-permissions.md) - Access control
+7. [Permission Control (Conditions)](./06-attributive-permissions.md) - Access control
 8. [Payload Parameters](./07-payload-parameters.md) - Interaction parameter validation
 9. [Activities](./08-activities.md) - Complex business processes
 

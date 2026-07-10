@@ -1,10 +1,7 @@
 import {
     Action,
     Any,
-    Attributive, BoolExp,
-    boolExpToAttributives,
     Controller,
-    createUserRoleAttributive,
     Custom,
     Entity,
     Every,
@@ -20,17 +17,11 @@ import {
     HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE,
     Condition
 } from 'interaqt';
-import { OtherAttr } from "./roles";
 
 export function createData() {
     const UserEntity = Entity.create({ name: USER_ENTITY })
 const nameProperty = Property.create({ name: 'name', type: PropertyTypes.String })
 UserEntity.properties.push(nameProperty)
-
- const globalUserRole = createUserRoleAttributive({name: 'user'}  )
-const userRefA = createUserRoleAttributive({name: 'A', isRef: true})
-
-
 
  const sendInteraction = Interaction.create({
     name: 'sendRequest',
@@ -125,23 +116,6 @@ const sendRequestRelation = Relation.create({
 
 
 
-const MyAttr = Attributive.create({
-    name: 'Mine',
-    content:
-    async function Mine(this: Controller, request: any, {user}: {user: any}) {
-        const {MatchExp}  = this.globals
-        const match = MatchExp.atom({
-            key: 'id', 
-            value: ['=', request.id]
-        })
-        const {to} = await this.system.storage.findOne('Request',match, undefined, [['to', {attributeQuery: ['id']}]] )
-
-        return user.id === to.id
-    }
-
-})
-
-
 // 同意
  const approveInteraction = Interaction.create({
     name: 'approve',
@@ -186,7 +160,6 @@ const rejectInteraction = Interaction.create({
 // 加签
  const addReviewersInteraction = Interaction.create({
     name: 'addReviewers',
-    userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'addReviewers'}),
     payload: Payload.create({
         items: [
@@ -211,7 +184,6 @@ const rejectInteraction = Interaction.create({
 // 转移
  const transferReviewersInteraction = Interaction.create({
     name: 'transferReviewer',
-    userRef: createUserRoleAttributive({name: '', isRef: true}),
     action: Action.create({name: 'transferReviewer'}),
     payload: Payload.create({
         items: [

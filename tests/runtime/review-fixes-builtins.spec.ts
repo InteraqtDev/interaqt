@@ -1,23 +1,22 @@
 /**
  * Regression tests for the builtins findings of
  * agentspace/output/core-runtime-builtins-review.md:
- * - S17: collection payload itemRef must save every item id into activity refs,
- *   and isRef user attributives must match against array refs by membership.
+ * - S17 (post-Attributive): collection payload membership checks are expressed as a
+ *   Condition that queries the activity's own interaction events.
  * - S19: findStateNode must return the matched node itself in nested groups,
  *   not the `.current` of the first-level child sequence.
  * - S20: PayloadItem.type ('string'/'number'/'boolean'/'object') is enforced at runtime.
  * - S22: an unknown ActivityGroup type fails at definition/build time with a clear
  *   error instead of `new undefined()` at dispatch time.
  * - S23: head and non-head activity interactions share the same guard runner
- *   (conditions/user attributives/payload checks cannot drift apart).
+ *   (conditions/payload checks cannot drift apart).
  */
 import { describe, expect, test } from 'vitest';
 import {
-    Entity, Property, KlassByName,
+    Entity, Property, KlassByName, MatchExp,
     Controller, MonoSystem,
     Interaction, Action, Activity, ActivityGroup, Transfer, ActivityManager,
-    Payload, PayloadItem, Condition,
-    createUserRoleAttributive,
+    Payload, PayloadItem, Condition, InteractionEventEntity,
     USER_ENTITY,
 } from 'interaqt';
 import { SQLiteDB } from '@drivers';
@@ -42,11 +41,10 @@ async function buildController(activities: any[], eventSources: any[] = []) {
     return { controller, system, activityManager };
 }
 
-describe('S17: collection payload itemRef in activities', () => {
-    test('every item id is saved into refs and membership is checked for isRef attributives', async () => {
+describe('S17: collection payload membership in activities (via Condition)', () => {
+    test('membership against the assigning event payload is checked for later interactions', async () => {
         // PayloadItem.base 引用的 User entity 需要先存在于 registry：buildController 里创建。
         const User = Entity.create({ name: USER_ENTITY, properties: [Property.create({ name: 'name', type: 'string' })] });
-        const reviewerRef = createUserRoleAttributive({ name: 'Reviewer', isRef: true });
         const start = makeInteraction('assignReviewers', {
             payload: Payload.create({
                 items: [
@@ -56,12 +54,26 @@ describe('S17: collection payload itemRef in activities', () => {
                         base: User,
                         isRef: true,
                         isCollection: true,
-                        itemRef: reviewerRef,
                     }),
                 ],
             }),
         });
-        const review = makeInteraction('submitReview', { userAttributives: reviewerRef });
+        const mustBeAssignedReviewer = Condition.create({
+            name: 'mustBeAssignedReviewer',
+            content: async function (this: Controller, event: any) {
+                if (!event.activityId) return false;
+                const assignEvent = await this.system.storage.findOne(
+                    InteractionEventEntity.name,
+                    MatchExp.atom({ key: 'interactionName', value: ['=', 'assignReviewers'] })
+                        .and({ key: 'activity.id', value: ['=', event.activityId] }),
+                    undefined,
+                    ['*']
+                );
+                const reviewers = (assignEvent?.payload?.reviewers ?? []) as { id: string }[];
+                return reviewers.some(r => r.id === event.user.id);
+            }
+        });
+        const review = makeInteraction('submitReview', { conditions: mustBeAssignedReviewer });
         const activity = Activity.create({
             name: 'reviewFlow',
             interactions: [start, review],
@@ -95,16 +107,11 @@ describe('S17: collection payload itemRef in activities', () => {
         expect(res1.error).toBeUndefined();
         const activityId = res1.context!.activityId as string;
 
-        // refs must contain both reviewer ids (previously: [undefined])
-        const activityCall = activityManager.getActivityCallByName('reviewFlow')!;
-        const record = await activityCall.getActivity(controller, activityId);
-        expect(record.refs.Reviewer).toEqual([reviewer1.id, reviewer2.id]);
-
-        // a non-member must be rejected by the isRef user attributive
+        // a non-member must be rejected by the membership condition
         const resOutsider = await controller.dispatch(reviewES, { user: outsider, activityId });
         expect(resOutsider.error).toBeTruthy();
 
-        // a member must pass (previously: `=== ` against an array was always false)
+        // a member must pass
         const resMember = await controller.dispatch(reviewES, { user: reviewer2, activityId });
         expect(resMember.error).toBeUndefined();
 

@@ -45,7 +45,6 @@
 - **RealTime**: 实时值计算
 
 #### 其他核心概念
-- **Attributive** (attributive.ts): 定义属性修饰符，用于权限和验证
 - **BoolExp** (BoolExp.ts): 布尔表达式系统，支持复杂条件组合
 - **Dictionary** (dictionary/): 全局字典定义，用于存储全局状态
 

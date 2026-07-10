@@ -728,6 +728,11 @@ const User = Entity.create({
 
 ```javascript
 // ✅ Correct: Create a derived entity based on another entity
+// ⚠️ IMPORTANT: the callback must NOT return a top-level `id` field.
+//    Derived-record identity is managed by the framework; spreading the source
+//    record (`(product) => ({...product})`) carries its id along and fails fast.
+//    Strip it first: `({id: _, ...rest}) => ({...rest})`.
+//    (Nested references like `{author: {id}}` are fine — that's how relations attach.)
 const Product = Entity.create({
   name: 'Product',
   properties: [
@@ -1237,7 +1242,7 @@ Note: if several transfers share the same `current` state and their triggers mat
 
 ### Guarding Transitions
 
-There is no `condition` field on `StateTransfer`. Preconditions belong to the interaction layer (use `conditions` / `userAttributives` on the Interaction so unauthorized or invalid calls never produce an event), and fine-grained per-record filtering is expressed in `computeTarget` — return `null`/`undefined` (or an empty array) to skip the transition for records that should not transition:
+There is no `condition` field on `StateTransfer`. Preconditions belong to the interaction layer (use `conditions` on the Interaction so unauthorized or invalid calls never produce an event), and fine-grained per-record filtering is expressed in `computeTarget` — return `null`/`undefined` (or an empty array) to skip the transition for records that should not transition:
 
 ```javascript
 StateTransfer.create({
