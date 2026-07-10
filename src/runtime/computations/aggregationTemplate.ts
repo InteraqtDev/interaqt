@@ -66,12 +66,26 @@ export type AggregationOptions = {
     requireXToMany?: boolean
 }
 
-/** 从 attributeQuery 解析聚合字段路径（Summation/Average 共用） */
-export function parseAggregationFieldPath(attributeQuery: AttributeQueryData): string[] {
+/**
+ * 从 attributeQuery 解析聚合字段路径（Summation/Average 共用）。
+ * CAUTION Summation/Average 没有 callback，attributeQuery 就是唯一的聚合字段声明，
+ *  语义上必须是单链路径（['score'] 或 [['team', {attributeQuery: ['budget']}]]）。
+ *  此前对 ['score', 'bonus'] 这类多字段声明静默只取第一个字段——用户以为在聚合多个字段，
+ *  实际结果零告警地少算。声明期 fail-fast，多字段派生值请用 WeightedSummation + callback。
+ */
+export function parseAggregationFieldPath(attributeQuery: AttributeQueryData, describeOwner?: () => string): string[] {
     const path: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- attributeQuery 是递归的异构结构
     let attrPointer: any = attributeQuery
     while (attrPointer) {
+        if (describeOwner && Array.isArray(attrPointer) && attrPointer.length > 1) {
+            throw new Error(
+                `${describeOwner()} declares ${attrPointer.length} sibling fields in attributeQuery (${JSON.stringify(attrPointer.map((item: unknown) => Array.isArray(item) ? item[0] : item))}); ` +
+                `only a single field path can be aggregated, and the extra fields would be silently ignored. ` +
+                `Declare exactly one field (e.g. ['score']) or one nested path (e.g. [['team', {attributeQuery: ['budget']}]]). ` +
+                `To aggregate a value derived from multiple fields, use WeightedSummation with a callback.`
+            )
+        }
         path.push(Array.isArray(attrPointer[0]) ? attrPointer[0][0] : attrPointer[0])
         attrPointer = Array.isArray(attrPointer[0]) ? attrPointer[0][1].attributeQuery : null
     }

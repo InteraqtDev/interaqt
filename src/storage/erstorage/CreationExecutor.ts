@@ -1,4 +1,4 @@
-import { EntityIdRef, Database, RecordMutationEvent } from "@runtime";
+import { EntityIdRef, Database, RecordMutationEvent, ROW_ID_ATTR } from "@runtime";
 import { EntityToTableMap } from "./EntityToTableMap.js";
 import { MatchExp, MatchExpressionData, MatchAtom } from "./MatchExp.js";
 import { AttributeQuery, AttributeQueryData } from "./AttributeQuery.js";
@@ -63,8 +63,11 @@ export class CreationExecutor {
                 const newLinkRecordData = mergedLinkTargetRecord.linkRecordData.merge({
                     [mergedLinkTargetRecord.info!.isRecordSource() ? 'target' : 'source']: { id: newDepIdRef.id }
                 })
-                // 所有 Link dep 也准备好了
-                const newLinkRecordDataWithDep = await this.createRecordDependency(newLinkRecordData)
+                // 所有 Link dep 也准备好了。
+                // CAUTION events 必须透传：link 数据（`&`）自身携带的嵌套新记录会在这条递归里
+                //  createRecord，漏传 events 会让这些记录的 create 事件与 filtered 成员资格钩子
+                //  静默缺失（combined 路径一直透传，此处是漏项）。
+                const newLinkRecordDataWithDep = await this.createRecordDependency(newLinkRecordData, events)
 
                 newRecordDataWithDeps[mergedLinkTargetRecord.info!.attributeName][LINK_SYMBOL] = newLinkRecordDataWithDep.getData()
             }
@@ -118,8 +121,15 @@ export class CreationExecutor {
 
         // 关系两端既有记录的成员资格结算（diff 产生 create/delete 事件）
         await this.filteredEntityManager.settleMembershipChecks(linkChecks, events)
-        // 新记录自身的成员资格：满足谓词即产生 filtered entity 的 create 事件
-        await this.filteredEntityManager.handleRecordCreation(newEntityData.recordName, newRecordIdRef.id, fullRecord, events)
+        // 新记录自身的成员资格：满足谓词即产生 filtered entity 的 create 事件。
+        // CAUTION 事件 payload 必须与 base create 事件同一契约（defaults + payload，见
+        //  preprocessSameRowData）：漏掉 defaultValues 会让 filtered/merged 视图的 create 事件
+        //  缺 __type 判别列与仅有默认值的字段——按这些字段做模式匹配的下游（StateMachine trigger、
+        //  Transform eventDeps）对同一条记录"查询可见、事件不可见"。insert 返回值里的内部
+        //  ROW_ID_ATTR 不属于 API 面，一并剔除。
+        const membershipEventPayload = Object.assign({}, newEntityDataWithDep.defaultValues, fullRecord)
+        delete membershipEventPayload[ROW_ID_ATTR]
+        await this.filteredEntityManager.handleRecordCreation(newEntityData.recordName, newRecordIdRef.id, membershipEventPayload, events)
 
         // 更新 relianceResult 的信息
         return Object.assign(newRecordIdRef, relianceResult)

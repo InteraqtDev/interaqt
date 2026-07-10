@@ -1,7 +1,7 @@
 import { Summation } from "@core";
 import { Controller } from "../Controller.js";
 import { SummationInstance } from "@core";
-import { DataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
+import { DataContext, describeDataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
 import { GlobalRecordsAggregationHandle, parseAggregationFieldPath, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
 
 /** null/undefined/NaN/Infinity 一律按 0 计，避免一条脏记录通过 increment 永久污染总和。 */
@@ -24,7 +24,7 @@ export class GlobalSumHandle extends GlobalRecordsAggregationHandle<number, numb
 
     constructor(controller: Controller, args: SummationInstance, dataContext: DataContext) {
         super(controller, args, dataContext, { computationName: 'Summation', requireAttributeQueryField: true })
-        this.sumFieldPath = parseAggregationFieldPath(this.args.attributeQuery!)
+        this.sumFieldPath = parseAggregationFieldPath(this.args.attributeQuery!, () => `Summation computation of ${describeDataContext(dataContext)}`)
     }
 
     createState() {
@@ -62,7 +62,7 @@ export class PropertySumHandle extends PropertyRelationAggregationHandle<number,
 
     constructor(controller: Controller, args: SummationInstance, dataContext: PropertyDataContext) {
         super(controller, args, dataContext, { computationName: 'Summation', requireAttributeQueryField: true })
-        this.sumFieldPath = parseAggregationFieldPath(this.args.attributeQuery!)
+        this.sumFieldPath = parseAggregationFieldPath(this.args.attributeQuery!, () => `Summation computation of ${describeDataContext(dataContext)}`)
     }
 
     createState() {

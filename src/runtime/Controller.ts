@@ -678,6 +678,21 @@ export class Controller {
                     { computationPhase: 'apply-result-patch' }
                 )
             }
+            if (patch.type === 'insert' || patch.type === 'update') {
+                // fail fast：insert/update 信封显式声明了"要写入 data"，data 缺失只能是回调实现
+                //  遗漏（如漏赋值）。若放行，global/property 分支会把 undefined 写穿（已有值被静默
+                //  抹成 null），entity/relation 分支则以 undefined 调 storage 在远处抛无关错误——
+                //  与 applyResult 对 undefined 的 skip 语义不同，信封形态下缺 data 是矛盾声明。
+                if (patch.data === undefined) {
+                    throw new ComputationError(
+                        `ComputationResultPatch of type '${patch.type}' has no "data". An insert/update patch must carry the value to write (use null to clear, or return ComputationResult.skip() / undefined to leave the value unchanged).`,
+                        { computationPhase: 'apply-result-patch' }
+                    )
+                }
+                // fail fast：patch.data 里嵌 ComputationResult 信封与 applyResult 路径同罪——
+                //  r15 R-1 收口了 applyResult 直写信封，patch.data 是同族的漏网通道。
+                this.assertNotComputationEnvelope(dataContext, patch.data)
+            }
                 if (dataContext.type === 'global') {
                     // CAUTION global dict 只有一个值，patch 的语义是"新值在 patch.data 里"。
                     //  直接把 patch 信封对象（{type, data, affectedId}）写进 dict 会污染所有
