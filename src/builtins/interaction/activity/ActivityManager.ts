@@ -100,9 +100,8 @@ export class ActivityManager {
 
         const wrappedGuard = async function(this: Controller, args: InteractionEventArgs) {
             if (isHeadInteraction && !args.activityId) {
-                if (interaction.guard) {
-                    await interaction.guard.call(this, args)
-                }
+                // 与其余两个分支同走 fullGuard（runInteractionGuard）：三条路径的守卫语义不允许漂移。
+                await activityCall.fullGuard(this, interaction, args)
                 const created = await activityCall.create(this)
                 args.activityId = created.activityId
             } else if (isHeadInteraction && args.activityId) {

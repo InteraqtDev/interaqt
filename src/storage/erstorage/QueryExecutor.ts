@@ -397,11 +397,15 @@ export class QueryExecutor {
         const reverseAttributeName = info.getReverseInfo()?.attributeName!
         const resultKey = relatedRecordQuery.alias || relatedRecordQuery.attributeName!
 
-        // 保证每个父记录都有数组（没有子记录的父记录也一样）
+        // 保证每个父记录都有数组（没有子记录的父记录也一样）。
+        // CAUTION key 一律 String(id)：父记录 id 与子记录反向端点 id 可能以不同 JS 类型返回
+        //  （整型发号驱动 number/string 混用、BIGINT 以字符串返回等），裸值 Map 匹配失败时
+        //  子记录会被**静默丢弃**（父记录拿到空集合、无任何报错）。与 NewRecordData.dedupeRefItems
+        //  的既有归一化策略一致。
         const parentById = new Map<string, Record>()
         for (const parent of parentRecords) {
             parent[resultKey] = []
-            parentById.set(parent.id, parent)
+            parentById.set(String(parent.id), parent)
         }
 
         // 分组需要每条子记录带上父 id。如果用户没有查询反向属性，这里追加 [reverseAttr, {attributeQuery: ['id']}]
@@ -444,7 +448,7 @@ export class QueryExecutor {
 
             for (const item of data) {
                 const parentId = item[reverseAttributeName]?.id
-                const parent = parentId !== undefined ? parentById.get(parentId) : undefined
+                const parent = parentId !== undefined ? parentById.get(String(parentId)) : undefined
 
                 // 和 findXToManyRelatedRecords 一致：把和父亲的关系数据挂到 & 上，并去掉临时的反向属性
                 if (shouldQueryParentLink) {

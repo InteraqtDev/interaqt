@@ -2755,7 +2755,11 @@ async function resolveDataDepsForMigration(controller: Controller, computation: 
         }
         if (dep.type === "global") {
             const stored = await readHandle.findOne(DICTIONARY_RECORD, MatchExp.atom({ key: "key", value: ["=", dep.source.name!] }), undefined, ["value"]);
-            return [name, (stored?.value as { raw?: unknown } | undefined)?.raw];
+            if (stored) return [name, (stored.value as { raw?: unknown } | undefined)?.raw];
+            // 与运行时 dict.get 的声明驱动回退对齐：无存储行时按 Dictionary.defaultValue 求值，
+            // 否则 dry-run / destructive-scope 评估读到 undefined，与迁移后运行时的取值不一致。
+            const declared = controller.dict.find(dictionary => dictionary.name === dep.source.name);
+            return [name, declared?.defaultValue !== undefined ? declared.defaultValue() : undefined];
         }
         throw new MigrationError(`Unknown data dependency type '${(dep as { type?: string }).type}' for ${dataContextPath(computation.dataContext)}`);
     }));

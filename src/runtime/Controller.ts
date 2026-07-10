@@ -486,6 +486,16 @@ export class Controller {
             const order: MigrationPhase[] = ['pending', 'schema-applied', 'computation-applied', 'constraints-applied', 'manifest-written', 'succeeded']
             return order.indexOf(phase) >= order.indexOf(target)
         }
+        // CAUTION 迁移重算期间不允许本 controller 的反应式监听在场：重算顺序由 rebuildPlan
+        //  显式管理，监听器对重算写入的即时反应会与之互相干扰（双重计算、阶段乱序）。
+        //  fresh controller 上这是 no-op；对已 setup 过的 controller 是必要的防御。
+        //  同一 system 上其他 controller 的监听器无法从这里注销——共享 system 的进程必须
+        //  在 migrate 前对旧 controller 调用 teardown()。迁移成功后 scheduler.setup(false)
+        //  会重新注册监听。
+        this.scheduler.teardown()
+        // 迁移重算读取 global dataDeps 时走 dict.get，声明了 defaultValue 的新字典此时还没有
+        //  存储行（setup 尚未运行）——先注册声明驱动的读回退，保证重算与迁移后运行时读到同一批默认值。
+        this.scheduler.registerDictDefaults()
         try {
             migrationRun = await migrationSystem.beginMigration?.(
                 nextManifest.modelHash,
@@ -494,8 +504,14 @@ export class Controller {
                 approvedDiff.decisions.length,
             )
             const phase = migrationRun?.phase || 'pending'
+            // CAUTION applyMigrationSchema 必须无条件执行：它除了 DDL（经 operation log 幂等，
+            //  已完成的操作会被跳过）之外还初始化本进程的 storage queryHandle/map/schema。
+            //  此前按 phase 跳过它时，跨进程 resume（DDL 已应用、phase 已记 schema-applied、
+            //  进程崩溃后在全新进程上重试）会带着未初始化的 queryHandle 进入重算事务，
+            //  在第一次 storage 读写处抛出与迁移无关的 "Cannot read properties of undefined"，
+            //  迁移永久卡死在不可恢复的 resume 循环里。
+            await migrationSystem.applyMigrationSchema(executionSchemaPlan, migrationRun?.id)
             if (!reached(phase, 'schema-applied')) {
-                await migrationSystem.applyMigrationSchema(executionSchemaPlan, migrationRun?.id)
                 if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'schema-applied')
             }
             if (!reached(phase, 'manifest-written')) {
@@ -569,6 +585,11 @@ export class Controller {
         //  incrementalCompute 漏写 return 时，dict 值与 property 列被静默抹掉（数据损坏且零告警）。
         //  null 是合法值域（可显式清空 global/property），继续写入。
         if (result === undefined) return
+        // fail fast：能到达这里的 ComputationResult 只剩协议误用形态——fullRecompute 只能由
+        //  增量路径返回（compute() 本身就是全量重算）、async/resolved 应已被 Scheduler 拆解。
+        //  此前 compute()/asyncReturn() 返回这些信封对象时会被当作普通值原样写进 dict/property
+        //  （如 dict 值变成 {"reason":"..."}），污染所有下游读取方且零告警。
+        this.assertNotComputationEnvelope(dataContext, result)
 
         if (dataContext.type === 'global') {
             return this.system.storage.dict.set(dataContext.id.name, result)
@@ -615,8 +636,22 @@ export class Controller {
      * record), so downstream consumers observe the initial value as part of the create event.
      * Derived events (e.g. filtered-entity membership changes) are still dispatched normally.
      */
+    private assertNotComputationEnvelope(dataContext: DataContext, result: unknown) {
+        if (result instanceof ComputationResult) {
+            const contextName = dataContext.type === 'property'
+                ? `${(dataContext as PropertyDataContext).host.name}.${dataContext.id.name}`
+                : `${dataContext.type}:${(dataContext.id as { name?: string })?.name ?? String(dataContext.id)}`
+            throw new ComputationError(
+                `Computation for ${contextName} returned a ${result.constructor.name} envelope where a plain value is expected. ` +
+                `ComputationResult.fullRecompute() is only meaningful as an incrementalCompute return value (compute() IS the full recomputation); ` +
+                `ComputationResult.async()/resolved() must be resolved before the result is applied. Return the computed value itself (or ComputationResult.skip()).`,
+                { computationPhase: 'result-application' }
+            )
+        }
+    }
     async applyInitialValue(dataContext: PropertyDataContext, result: unknown, record: Record<string, unknown>) {
         if (result instanceof ComputationResultSkip) return
+        this.assertNotComputationEnvelope(dataContext, result)
 
         if (dataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
             await this.system.storage.delete(dataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record.id]}))

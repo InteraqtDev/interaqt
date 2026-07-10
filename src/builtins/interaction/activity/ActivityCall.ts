@@ -400,8 +400,7 @@ export class ActivityCall {
         //  compare-and-set under READ COMMITTED (both concurrent transactions can pass the
         //  non-locking find). Use the atomic CAS primitive (single conditional UPDATE, whose
         //  WHERE clause is re-evaluated after lock waits) to advance the version; a loser
-        //  gets zero rows and aborts this transaction — including its saveUserRefs write —
-        //  instead of silently losing an update.
+        //  gets zero rows and aborts this transaction instead of silently losing an update.
         const currentVersion = activity.stateVersion ?? 0
         const won = await storage.system.storage.atomic.compareAndSet(
             { recordName: ActivityCall.ACTIVITY_RECORD, id: activityId, field: 'stateVersion' },

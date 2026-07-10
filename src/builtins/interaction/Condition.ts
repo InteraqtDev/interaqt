@@ -42,6 +42,15 @@ export class Condition implements ConditionInstance {
   };
   
   static create(args: ConditionCreateArgs, options?: { uuid?: string }): ConditionInstance {
+    // fail-fast：content 是守卫的可执行体。缺失/非函数的 content 在运行期会被 checkCondition
+    //  fail-closed 拒绝（每次 dispatch 都报错），但错误暴露点与声明处脱节——配置错误应在
+    //  声明期发现，而不是等到第一个用户请求。
+    if (typeof args.content !== 'function') {
+      throw new Error(
+        `Condition${args.name ? ` "${args.name}"` : ''} requires a function "content" (got ${args.content === undefined ? 'undefined' : typeof args.content}). ` +
+        `Provide the guard callback, e.g. Condition.create({ name, content: async function(event) { return !!event.user.isAdmin } }).`
+      );
+    }
     const instance = new Condition(args, options);
     
     // 检查 uuid 是否重复
