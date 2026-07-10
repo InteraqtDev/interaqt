@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.0.2](https://github.com/interaqtdev/interaqt/compare/v3.0.1...v3.0.2) (2026-07-10)
+
+### Bug Fixes
+
+* **runtime+storage:** r16 deep review — patch envelope guard, membership create event contract, single-field aggregation, migration chained event-rebuild ([182aa4e](https://github.com/interaqtdev/interaqt/commit/182aa4e5e24ce019e41848a56d13e3bae75c4e1b))
+
 ## [3.0.1](https://github.com/interaqtdev/interaqt/compare/v2.0.4...v3.0.1) (2026-07-10)
 
 ### ⚠ BREAKING CHANGES
