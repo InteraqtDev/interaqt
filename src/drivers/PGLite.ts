@@ -45,6 +45,7 @@ export class PGLiteDB implements Database{
         name: 'postgres' as const,
         maxIdentifierLength: 63,
         supportsCreateIndexIfNotExists: true,
+        enforceMaxIdentifierLength: true,
         encodeLiteral: defaultEncodeLiteral,
         constraints: { unique: true, filteredUnique: true, nonNull: true },
     }

@@ -296,6 +296,20 @@ export class Controller {
         }
     }
 
+    /**
+     * Detach this controller from the system: unregister all reactive computation
+     * listeners registered by its scheduler. After teardown the controller no longer
+     * reacts to storage mutations; the system (and its database connection) stays
+     * usable and can host a new controller.
+     *
+     * Call this before discarding a controller in long-lived processes (hot reload,
+     * multi-tenant single process); otherwise the old controller's computation
+     * closures stay registered on the storage callback set and keep firing.
+     */
+    teardown() {
+        this.scheduler.teardown()
+    }
+
     // Recovery path for a migration process that died without releasing the
     // bookkeeping lock. Only call after confirming no migration is running.
     async forceReleaseMigrationLock() {
@@ -749,10 +763,14 @@ export class Controller {
             }))
         } catch (e) {
             if (this.forceThrowDispatchError) throw e
+            // 与成功路径同形态（data/context 显式为 undefined）：直接序列化 DispatchResponse
+            //  的调用方（HTTP 层等）拿到的 JSON 键集合在成功/失败两条路径上保持一致。
             result = {
                 error: e,
+                data: undefined,
                 effects: [],
-                sideEffects: {}
+                sideEffects: {},
+                context: undefined
             }
         }
 

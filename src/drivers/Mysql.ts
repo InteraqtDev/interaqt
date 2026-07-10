@@ -66,6 +66,7 @@ export class MysqlDB implements Database{
         name: 'mysql' as const,
         maxIdentifierLength: 64,
         supportsCreateIndexIfNotExists: false,
+        enforceMaxIdentifierLength: true,
         encodeLiteral: defaultEncodeLiteral,
         constraints: { unique: false, filteredUnique: false, nonNull: false },
     }

@@ -77,23 +77,36 @@ class MonoStorage implements Storage{
         tables: [],
         constraints: []
     }
-    public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void> }
+    public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void>, registerDefaults?: (defaults: Map<string, () => unknown>) => void }
     public atomic: AtomicStorage
     private transactionContext = new AsyncLocalStorage<StorageTransactionContext>()
+    // 声明驱动的 dict 读回退（Scheduler.setup 从 Dictionary 声明注册）。
+    //  install 时 setupDictDefaultValue 会把默认值持久化；但 setup(false) 路径下新增声明、
+    //  或行被手工删除时，get 返回 undefined 会让下游计算静默走偏——按声明回退更符合
+    //  「声明了 defaultValue 就应生效」的直觉。只在**无存储行**时回退：已存储的 null
+    //  是显式值，不回退。
+    private dictDefaults: Map<string, () => unknown> = new Map()
     
     constructor(public db: Database) {
         // Initialize dict property with get/set methods
         this.dict = {
             get: async (key: string) => {
                 const match = MatchExp.atom({key: 'key', value: ['=', key]})
-                const value = (await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value']))?.value
-                return value?.raw
+                const record = await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value'])
+                if (!record) {
+                    const defaultValueFn = this.dictDefaults.get(key)
+                    return defaultValueFn ? defaultValueFn() : undefined
+                }
+                return record.value?.raw
             },
             set: async (key: string, value: unknown): Promise<void> => {
                 await this.setDictionaryValue(key, value, true)
             },
             setInternal: async (key: string, value: unknown): Promise<void> => {
                 await this.setDictionaryValue(key, value, false)
+            },
+            registerDefaults: (defaults: Map<string, () => unknown>) => {
+                this.dictDefaults = defaults
             }
         }
         this.atomic = this.createAtomicStorage()
@@ -1067,19 +1080,51 @@ RETURNING "lastValue" AS value`,
             },
             lockRows: async (recordName: string, match: MatchExpressionData, attributeQuery = ['*']) => {
                 this.requireTransaction(`atomic lockRows ${recordName}`)
-                const rows = await this.queryHandle!.find(recordName, match, undefined, ['id'])
-                // 按 id 排序保证并发事务以一致顺序取行锁，避免互相持有对方等待的行导致死锁。
-                const ids = rows.map(row => row.id).sort((a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)
-                if (!ids.length) return []
                 const { tableName, idField } = this.resolveRecordTable(recordName)
-                const p = this.getPlaceholder()
-                const placeholders = ids.map(() => p()).join(',')
-                await this.db.query(
-                    `SELECT "${idField}" AS id FROM "${tableName}" WHERE "${idField}" IN (${placeholders})${this.supportsForUpdate() ? ' FOR UPDATE' : ''}`,
-                    ids,
-                    `atomic lockRows ${recordName}`
+                // CAUTION find-then-lock 是两步操作，READ COMMITTED 下两步之间行集可以漂移：
+                //  并发 insert 的新匹配行不在锁集、并发 update/delete 让已锁 id 不再匹配。
+                //  这里锁后**重查 match** 做稳定化：
+                //  - 返回集 = match ∧ 已锁 id（已漂出的行自然剔除，不返回陈旧行）；
+                //  - 出现锁集之外的新匹配 id 时，扩锁重试（有界），直到行集稳定；
+                //  - 无 FOR UPDATE 能力的驱动（SQLite 单进程事务串行）单轮即稳定。
+                const MAX_STABILIZE_ROUNDS = 5
+                // key 用 String(id) 去重，value 保留原始 id 值（数字 id 不能以字符串形态回填查询参数）。
+                const lockedIds = new Map<string, unknown>()
+                for (let round = 0; round < MAX_STABILIZE_ROUNDS; round++) {
+                    const matchingRows = await this.queryHandle!.find(recordName, match, undefined, ['id'])
+                    const newIds = matchingRows.map(row => row.id).filter(id => !lockedIds.has(String(id)))
+                    if (!newIds.length) {
+                        // 行集稳定：所有当前匹配行都已在锁集内。
+                        if (!lockedIds.size) return []
+                        const allIds = [...lockedIds.values()]
+                        return this.queryHandle!.find(
+                            recordName,
+                            match.and({ key: 'id', value: ['in', allIds] }),
+                            undefined,
+                            attributeQuery
+                        )
+                    }
+                    // 按 id 排序保证并发事务以一致顺序取行锁，避免互相持有对方等待的行导致死锁。
+                    const sortedNewIds = newIds.sort((a, b) => String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)
+                    const p = this.getPlaceholder()
+                    const placeholders = sortedNewIds.map(() => p()).join(',')
+                    await this.db.query(
+                        `SELECT "${idField}" AS id FROM "${tableName}" WHERE "${idField}" IN (${placeholders})${this.supportsForUpdate() ? ' FOR UPDATE' : ''}`,
+                        sortedNewIds,
+                        `atomic lockRows ${recordName} (round ${round + 1})`
+                    )
+                    sortedNewIds.forEach(id => lockedIds.set(String(id), id))
+                    if (!this.supportsForUpdate()) break
+                }
+                // 超过稳定化轮次（持续高并发插入）或无锁能力驱动：按当前锁集返回 match 内的行。
+                const allIds = [...lockedIds.values()]
+                if (!allIds.length) return []
+                return this.queryHandle!.find(
+                    recordName,
+                    match.and({ key: 'id', value: ['in', allIds] }),
+                    undefined,
+                    attributeQuery
                 )
-                return this.queryHandle!.find(recordName, MatchExp.atom({ key: 'id', value: ['in', ids] }), undefined, attributeQuery)
             }
         }
     }

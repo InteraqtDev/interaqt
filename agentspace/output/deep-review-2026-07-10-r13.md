@@ -7,6 +7,8 @@
 - 基线健康度：`npm run check` 通过；`npm test` 全量 1829 passed / 26 skipped。
 
 > **维护说明（2026-07-10）**：本报告的致命项与重要项已在同分支（`cursor/deep-code-review-r13-f820`）全部修复。回归测试：`tests/runtime/review-fixes-2026-07-10-r13.spec.ts`（8 用例）+ `tests/storage/review-fixes-2026-07-10-r13.spec.ts`（4 用例）。修复后 `npm run check` 通过；`npm test` 全量 **1841 passed / 26 skipped**（净 +12 回归用例，零既有用例回归——本轮修复的 fail-open / 静默写穿形态同样没有任何测试固化过）。
+>
+> **维护说明二（2026-07-10 追加，r14 后续轮）**：第四节 I-1~I-10 全部显著改进项已在同分支修复/决策完毕（I-9 经迁移 manifest 哈希影响评估后决策为「文档化奠定性差异、不改 DDL」）；同轮按框架决策废弃了 `Attributive` 概念（守卫收敛为 Condition 单一概念）。详见 `deep-review-2026-07-10-r14-followup.md`。回归测试：`tests/runtime/review-fixes-2026-07-10-r14.spec.ts`（8 用例）+ `tests/storage/review-fixes-2026-07-10-r14.spec.ts`（4 用例）。
 
 ---
 

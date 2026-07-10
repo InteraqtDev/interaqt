@@ -49,10 +49,22 @@ export class Modifier {
                 return
             }
             
-            // 如果有多个部分，说明需要 JOIN 关联表
-            // 最后一个是属性名，前面的是关系路径
-            const relationPath = pathParts.slice(0, -1)
+            // CAUTION orderBy 路径只允许 x:1 关系段。x:n 段（如 'posts.title'）在 SQL 层是
+            //  LEFT JOIN 扇出后按匹配行排序再去重——排序语义未定义（近似"按每宿主最小关联值"，
+            //  但不保证），且与 limit/offset 的 post-pagination 交互后结果更不可预测。
+            //  fail-fast 并指引显式表达（computed 属性做聚合，或在应用层排序）。
+            for (let i = 1; i < pathParts.length; i++) {
+                const info = this.map.getInfoByPath([this.recordName, ...pathParts.slice(0, i)])
+                if (info?.isRecord && info.isXToMany) {
+                    throw new Error(
+                        `orderBy path "${key}" traverses the x:n relation "${pathParts.slice(0, i).join('.')}" — ` +
+                        `ordering by a to-many path has no defined semantics (which related row should represent the record?). ` +
+                        `Order by an aggregated computed property instead, or sort in application code.`
+                    )
+                }
+            }
             
+            // 如果有多个部分，说明需要 JOIN 关联表
             // 添加到查询树中，确保会生成 JOIN
             result.addField(pathParts)
         })

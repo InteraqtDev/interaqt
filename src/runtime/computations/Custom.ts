@@ -34,8 +34,14 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   asyncReturn?: (...args: any[]) => Promise<ComputationResult|any>
 
   constructor(public controller: Controller, public args: CustomInstance, public dataContext: DataContext) {
-    // 设置 useLastValue
-    this.useLastValue = args.useLastValue !== undefined ? args.useLastValue : true;
+    // 设置 useLastValue。
+    // CAUTION entity/relation 上下文的 lastValue 是「计算输出的全部记录」——每次增量都全表
+    //  拉取（retrieveLastValue 对 entity/relation 走 find(name, undefined, undefined, ['*'])），
+    //  大表上是 OOM/超时悬崖。默认关闭；确有小表 diff 需求时显式声明 useLastValue: true
+    //  （知情选择），或在 incrementalCompute 里按需查询。global/property 的 lastValue 是
+    //  单值/单记录字段，保持默认开启。
+    const wholeTableLastValue = dataContext.type === 'entity' || dataContext.type === 'relation';
+    this.useLastValue = args.useLastValue !== undefined ? args.useLastValue : !wholeTableLastValue;
     
     // 设置自定义的 dataDeps
     if (args.dataDeps) {

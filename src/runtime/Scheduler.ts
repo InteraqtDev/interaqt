@@ -327,6 +327,15 @@ export class Scheduler {
         }
         this.registeredMutationListeners = []
     }
+    /**
+     * 注销本 scheduler 注册的全部 mutation listener。
+     * 长生命周期进程（热重载、多租户单进程）反复 new Controller + setup 时，
+     * 不 teardown 会让旧 controller 的计算闭包永驻 storage 的回调集合——内存泄漏，
+     * 且旧计算仍会被新写入触发。
+     */
+    teardown() {
+        this.removeRegisteredMutationListeners()
+    }
     private buildPropertyDefaultValueListeners(): RecordMutationCallback[] {
         const listeners: RecordMutationCallback[] = []
         for(const computation of this.computationsHandles.values()) {
@@ -1335,6 +1344,14 @@ export class Scheduler {
             for (const listener of listeners) {
                 this.registerMutationListener(listener)
             }
+            // 把声明的 dict defaultValue 注册为读回退（无存储行时按声明求值）。
+            const dictDefaults = new Map<string, () => unknown>()
+            for (const dict of this.controller.dict) {
+                if (dict.defaultValue !== undefined) {
+                    dictDefaults.set(dict.name, dict.defaultValue as () => unknown)
+                }
+            }
+            this.controller.system.storage.dict.registerDefaults?.(dictDefaults)
             if (createDefaultDictValue) {   
                 // 一定要先把 bound state default value 设置后，因为后面开始设置 dict default value 时，可能触发 computation。可能要读 state。
                 await this.setupGlobalBoundStateDefaultValues()

@@ -1157,6 +1157,24 @@ export class DBSetup {
             })
         })
 
+        // CAUTION 物理表名必须在标识符长度上限内 fail-fast。字段名（generateShortFieldName）、
+        //  查询别名（AliasManager）、约束名（buildPhysicalConstraintName）都有长度治理，
+        //  表名是唯一直接插值进 DDL 的裸标识符：合表名（EntityA_EntityB_... join）超限时
+        //  PostgreSQL 静默截断（第二张同前缀表 CREATE 撞 already exists，错误与声明完全脱节），
+        //  MySQL 直接报错。不自动缩短——表名变更等于换库（存量数据全部失联），
+        //  必须由用户显式缩短实体名或调整合表（explicit control）。
+        //  只对真正强制长度上限的方言（PG/MySQL）检查：SQLite 无标识符长度限制。
+        const dialect = getSchemaDialect(this.database)
+        if (dialect.enforceMaxIdentifierLength) {
+            for (const tableName of Object.keys(this.tables)) {
+                if (tableName.length > dialect.maxIdentifierLength) {
+                    throw new Error(
+                        `physical table name "${tableName}" is ${tableName.length} characters long, exceeding the ${dialect.name} identifier limit (${dialect.maxIdentifierLength}). ` +
+                        `Long names usually come from merged-table naming (entity names joined with "_"). Shorten the entity names involved.`
+                    )
+                }
+            }
+        }
     }
 
     createTableSQL() {

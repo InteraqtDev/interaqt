@@ -55,6 +55,7 @@ export class SQLiteDB implements Database{
         name: 'sqlite' as const,
         maxIdentifierLength: 63,
         supportsCreateIndexIfNotExists: true,
+        enforceMaxIdentifierLength: false,
         encodeLiteral: sqliteEncodeLiteral,
         constraints: { unique: true, filteredUnique: true, nonNull: false },
     }

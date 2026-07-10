@@ -153,6 +153,8 @@ export type Storage = {
         get: (key: string) => Promise<unknown>
         set: (key: string, value: unknown) => Promise<void>
         setInternal?: (key: string, value: unknown) => Promise<void>
+        // 声明驱动的读回退：key 无存储行时求值声明的 defaultValue（见 MonoStorage.dict.get）。
+        registerDefaults?: (defaults: Map<string, () => unknown>) => void
     }
 
     get: (itemName: string, id: string, initialValue?: unknown) => Promise<unknown>
