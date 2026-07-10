@@ -358,8 +358,28 @@ export class EntityToTableMap {
                 return [linkAlias!, fieldName, linkTable!]
             }
         } else {
-            const fieldName = record.attributes[this.getAttributeAndSymmetricDirection(attributeName)[0]].field
-            return [alias, fieldName!, table]
+            // CAUTION 叶子属性必须显式校验。此前直接 `.field` 解引用：属性名拼写错误抛裸
+            //  TypeError（Cannot read properties of undefined），无物理列的关系属性则生成
+            //  `"表"."undefined"` 的非法 SQL——两者的错误都与用户写法完全脱节。
+            //  这里是 orderBy / isReferenceValue 引用路径 / 约束字段解析等的公共出口。
+            //  注意：带 field 的 record attribute 是合法形态（relation 记录的 source/target、
+            //  合并到本表的链接列），照常返回物理列。
+            const [resolvedAttributeName] = this.getAttributeAndSymmetricDirection(attributeName)
+            const attributeData = record.attributes[resolvedAttributeName]
+            if (!attributeData) {
+                throw new Error(`attribute "${attributeName}" not found on "${namePath.join('.')}"`)
+            }
+            const field = (attributeData as ValueAttribute).field
+            if (!field) {
+                if ((attributeData as RecordAttribute).isRecord) {
+                    throw new Error(
+                        `attribute "${attributeName}" on "${namePath.join('.')}" is a relation, not a value field. ` +
+                        `Use a value path through the relation instead (e.g. "${attributeName}.someField").`
+                    )
+                }
+                throw new Error(`attribute "${attributeName}" on "${namePath.join('.')}" has no physical field`)
+            }
+            return [alias, field, table]
         }
     }
     findManyToManySymmetricPath( namePath: string[]): string[]|undefined {

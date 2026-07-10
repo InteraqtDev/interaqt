@@ -20,7 +20,11 @@ function matchMutationEvent(event: unknown, pattern: unknown): boolean {
 }
 
 function deepPartialMatch(event: unknown, pattern: unknown): boolean {
-    if (pattern === undefined || pattern === null) return true;
+    // CAUTION undefined pattern = "不关心该字段"（声明了键但值为 undefined 时跳过匹配）；
+    //  null pattern 是精确匹配（trigger 里写 {clearedAt: null} 的意图是"该字段必须为 null"）。
+    //  此前 null 也被当成"匹配任何值"，与 ComputationSourceMap.deepMatch 的精确语义相悖，
+    //  声明了 null 约束的 transfer 会被任何值静默触发。
+    if (pattern === undefined) return true;
     if (event === pattern) return true;
     
     // If pattern is not an object, do simple equality check

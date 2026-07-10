@@ -314,8 +314,13 @@ export async function checkCondition(controller: GuardController, interaction: I
       const errorMessage = e instanceof Error ? e.message : String(e);
       return `Condition '${condition.name}' threw exception: ${errorMessage}`;
     }
-    if (result === undefined) {
-      return `Condition '${condition.name}' returned undefined; guard callbacks must explicitly return a boolean (did you forget a return statement?)`;
+    // CAUTION 守卫回调必须严格返回 boolean。非 boolean 的返回值在 BoolExp 组合下按 truthiness
+    //  求值：truthy 的类型错误（`return user.role`）静默放行；更危险的是 falsy 的类型错误
+    //  （null / 0 / ''，如 `return user.profile && user.profile.isAdmin` 短路出 null）在
+    //  not(...) 组合下会被取反成"通过"——权限检查的 fail-open。错误字符串在 BoolExp 中
+    //  无论是否处于 not 之下都判为失败（fail-closed）。
+    if (typeof result !== 'boolean') {
+      return `Condition '${condition.name}' returned ${result === undefined ? 'undefined' : JSON.stringify(result)} (${typeof result}); guard callbacks must explicitly return a boolean (did you forget a return statement, or a !! coercion?)`;
     }
     return result;
   };
@@ -349,8 +354,10 @@ export async function checkAttributive(controller: GuardController, attributive:
     const errorMessage = e instanceof Error ? e.message : String(e);
     return `Attributive '${attributive.name ?? '(unnamed)'}' threw exception: ${errorMessage}`;
   }
-  if (result === undefined) {
-    return `Attributive '${attributive.name ?? '(unnamed)'}' returned undefined; guard callbacks must explicitly return a boolean (did you forget a return statement?)`;
+  // CAUTION 与 Condition 一致：严格 boolean 契约。falsy 的非 boolean（null/0/''）在 not(...)
+  //  组合下会被取反成"通过"（fail-open），truthy 的非 boolean 则无条件放行——都必须拒绝。
+  if (typeof result !== 'boolean') {
+    return `Attributive '${attributive.name ?? '(unnamed)'}' returned ${result === undefined ? 'undefined' : JSON.stringify(result)} (${typeof result}); guard callbacks must explicitly return a boolean (did you forget a return statement, or a !! coercion?)`;
   }
   return result;
 }

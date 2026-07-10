@@ -550,11 +550,16 @@ export class Controller {
     }
     async applyResult(dataContext: DataContext, result: unknown, record?: Record<string, unknown>) {
         if (result instanceof ComputationResultSkip) return
+        // CAUTION undefined 统一视为"无值可写"（与 entity/relation 分支及 incrementalPatchCompute
+        //  的 undefined 语义一致）。此前 global/property 分支会把 undefined 写穿——compute/
+        //  incrementalCompute 漏写 return 时，dict 值与 property 列被静默抹掉（数据损坏且零告警）。
+        //  null 是合法值域（可显式清空 global/property），继续写入。
+        if (result === undefined) return
 
         if (dataContext.type === 'global') {
             return this.system.storage.dict.set(dataContext.id.name, result)
         } else if (dataContext.type === 'entity') {
-            if (result === undefined || result === null) return
+            if (result === null) return
             if (this.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
                 throw new RequireSerializableRetry('entity replace result')
             }
@@ -565,7 +570,7 @@ export class Controller {
                 await this.system.storage.create(entityContext.id.name!, item)
             }
         } else if (dataContext.type === 'relation') {
-            if (result === undefined || result === null) return
+            if (result === null) return
             if (this.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
                 throw new RequireSerializableRetry('relation replace result')
             }

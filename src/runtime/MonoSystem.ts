@@ -44,7 +44,11 @@ import { createUniqueIndexSQL, getSchemaDialect, quoteIdentifier } from "@storag
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
-    return encodeURI(JSON.stringify(value))
+    // CAUTION JSON.stringify(undefined) 返回 undefined（非字符串），encodeURI 会把它 ToString
+    //  成字面量 "undefined" 存进数据库——之后 JSONParse 的 JSON.parse("undefined") 必炸，
+    //  该 key 永久不可读。与 JSON 语义对齐（数组里的 undefined 也序列化为 null）：归一为 null。
+    const serialized = JSON.stringify(value)
+    return encodeURI(serialized === undefined ? 'null' : serialized)
 }
 
 // Migration bookkeeping statements must be parameterized: values such as the
@@ -288,7 +292,7 @@ class MonoStorage implements Storage{
         if (origin) {
             return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [SYSTEM_RECORD, match, { concept, key: key.toString(), value: JSONStringify(value)}], events)
         } else {
-            return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: encodeURI(JSON.stringify(value))}], events)
+            return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: JSONStringify(value)}], events)
         }
     }
     private requiresScopedSequenceState(options?: SystemSchemaOptions) {

@@ -90,6 +90,17 @@ function validateAggregationArgs(args: AggregationArgs, dataContext: DataContext
     }
 }
 
+// fail fast：global（records 源）聚合缺 record 时，如果等到 createStates 才解引用
+//  `this.record.name` 会抛出与声明完全脱节的 "Cannot read properties of undefined"。
+function requireAggregationRecord(args: AggregationArgs, dataContext: DataContext, options: AggregationOptions): EntityInstance | RelationInstance {
+    if (!args.record || !(args.record as { name?: unknown }).name) {
+        throw new Error(
+            `${options.computationName} computation of ${describeDataContext(dataContext)} requires a "record" argument (the Entity or Relation to aggregate over), got: ${JSON.stringify(args.record)}`
+        )
+    }
+    return args.record
+}
+
 /**
  * Global（records 源）聚合模板。
  */
@@ -107,7 +118,7 @@ export abstract class GlobalRecordsAggregationHandle<V extends AggregationItemVa
     constructor(public controller: Controller, public args: TArgs, public dataContext: DataContext, options: AggregationOptions) {
         this.options = options
         validateAggregationArgs(args, dataContext, options)
-        this.record = args.record!
+        this.record = requireAggregationRecord(args, dataContext, options)
         if (args.callback) {
             this.callback = args.callback.bind(this.controller)
         }
@@ -396,6 +407,10 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
                 return ComputationResult.fullRecompute(`relation record ${relationRecordId} not found for ${describeDataContext(this.dataContext)}`)
             }
             const relatedRecord = relationWithEntity[this.relationSide]
+            // 端点实体在事件与增量计算之间被删除（关系行短暂悬挂）时退回全量重算，不裸解引用。
+            if (!relatedRecord) {
+                return ComputationResult.fullRecompute(`relation ${this.relationSide} endpoint missing for ${describeDataContext(this.dataContext)}`)
+            }
             relatedRecord[LINK_SYMBOL] = relationWithEntity
             const value = this.computeItemValue(relatedRecord, dataDeps)
             const replaced = await this.replaceItemState(relationWithEntity, value)
@@ -436,6 +451,10 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
                 return ComputationResult.fullRecompute(`relation record not found by ${relationMatchKey} for ${describeDataContext(this.dataContext)}`)
             }
             const relatedRecord = relationWithEntity[this.relationSide]
+            // 同 create 路径：端点缺失退回全量重算。
+            if (!relatedRecord) {
+                return ComputationResult.fullRecompute(`relation ${this.relationSide} endpoint missing for ${describeDataContext(this.dataContext)}`)
+            }
             relatedRecord[LINK_SYMBOL] = relationWithEntity
             const value = this.computeItemValue(relatedRecord, dataDeps)
             const replaced = await this.replaceItemState(relationWithEntity, value)

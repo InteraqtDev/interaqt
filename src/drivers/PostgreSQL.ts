@@ -150,18 +150,21 @@ export class PostgreSQLDB implements Database{
             ...this.options,
         })
         await adminClient.connect()
-        // 要不要有存在 就删掉的？
-        // SELECT 'DROP DATABASE your_database_name' WHERE EXISTS (SELECT FROM pg_database WHERE dataname = 'your_database_name');
-        const databaseExist = await adminClient.query(`SELECT FROM pg_database WHERE datname = $1`, [this.database])
-        if (databaseExist.rows.length === 0) {
-            await adminClient.query(`CREATE DATABASE "${this.database}"`)
-        } else {
-            if (forceDrop) {
-                await adminClient.query(`DROP DATABASE "${this.database}" WITH (FORCE)`)
+        // CAUTION 管理语句失败（权限不足、库名冲突、连接上限）时也必须释放管理连接，
+        //  否则反复 open() 失败会累积悬挂连接直至撞上服务端连接上限。
+        try {
+            const databaseExist = await adminClient.query(`SELECT FROM pg_database WHERE datname = $1`, [this.database])
+            if (databaseExist.rows.length === 0) {
                 await adminClient.query(`CREATE DATABASE "${this.database}"`)
+            } else {
+                if (forceDrop) {
+                    await adminClient.query(`DROP DATABASE "${this.database}" WITH (FORCE)`)
+                    await adminClient.query(`CREATE DATABASE "${this.database}"`)
+                }
             }
+        } finally {
+            await adminClient.end()
         }
-        await adminClient.end()
 
         if (!this.pool) {
             this.pool = this.createPool()
