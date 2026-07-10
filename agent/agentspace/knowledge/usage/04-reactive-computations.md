@@ -728,6 +728,11 @@ const User = Entity.create({
 
 ```javascript
 // ✅ Correct: Create a derived entity based on another entity
+// ⚠️ IMPORTANT: the callback must NOT return a top-level `id` field.
+//    Derived-record identity is managed by the framework; spreading the source
+//    record (`(product) => ({...product})`) carries its id along and fails fast.
+//    Strip it first: `({id: _, ...rest}) => ({...rest})`.
+//    (Nested references like `{author: {id}}` are fine — that's how relations attach.)
 const Product = Entity.create({
   name: 'Product',
   properties: [
