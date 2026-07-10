@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.4](https://github.com/interaqtdev/interaqt/compare/v2.0.3...v2.0.4) (2026-07-10)
+
+### Bug Fixes
+
+* **runtime+storage+core+builtins+drivers:** r12 review — global patch envelope, reference-value joins, declaration-mode conflicts, json canonical form, driver parity ([3f161e5](https://github.com/interaqtdev/interaqt/commit/3f161e599632a4b35c74c710716b481399e18598))
+
 ## [2.0.3](https://github.com/interaqtdev/interaqt/compare/v2.0.2...v2.0.3) (2026-07-10)
 
 ### Bug Fixes
