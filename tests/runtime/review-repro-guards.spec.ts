@@ -1,23 +1,20 @@
 /**
- * Regression tests for review findings F1 / F5 / F6
- * (agentspace/output/core-runtime-builtins-review.md).
- *
- * Originally committed as failing-by-design (`test.fails`) reproductions;
- * the bugs are fixed, so these now assert the correct guard-chain behavior:
+ * Regression tests for review findings F1 / F5
+ * (agentspace/output/core-runtime-builtins-review.md), updated after the
+ * Attributive concept was removed (Condition is the only guard concept):
  * - F1: a missing optional payload field must not skip later field checks
- * - F5: the guard chain is fail-closed (attributive base executes, unknown
- *   concept types are rejected, isRef payloads must reference existing
- *   records, undefined callback results are rejected, derived-concept
- *   attributives execute)
- * - F6: isRef user attributives are rejected outside an activity instead of
- *   silently degrading to a role check
+ * - F5: the guard chain is fail-closed (invalid payload base declarations are
+ *   rejected at declaration time, isRef payloads must reference existing
+ *   records, non-boolean condition results are rejected)
+ * - Legacy Attributive-era declarations (userAttributives/userRef/attributives/
+ *   itemRef) fail fast at declaration time instead of being silently dropped.
  */
 import { describe, expect, test } from 'vitest';
 import {
-    Entity, Property, KlassByName,
+    Entity, Property, KlassByName, BoolExp,
     Controller, MonoSystem,
     Interaction, Action, Payload, PayloadItem,
-    Attributive, createUserRoleAttributive,
+    Condition, Conditions,
 } from 'interaqt';
 import { SQLiteDB } from '@drivers';
 
@@ -60,62 +57,36 @@ describe('F1: checkPayload must not stop at a missing optional field', () => {
 });
 
 describe('F5: guard chain is fail-closed', () => {
-    test('F5-1: payload item with an Attributive base executes the attributive', async () => {
-        const RejectEverything = Attributive.create({
-            name: 'RejectEverything',
-            content: function () { return false; },
-        });
-        const interaction = Interaction.create({
-            name: 'f5AttributiveBase',
-            action: Action.create({ name: 'f5AttributiveBase' }),
-            payload: Payload.create({
-                items: [
-                    PayloadItem.create({ name: 'thing', type: 'Entity', base: RejectEverything as any }),
-                ],
-            }),
-        });
-        const { controller, system } = await buildController(interaction);
-
-        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { thing: { foo: 1 } } });
-        expect(res.error).toBeTruthy();
-        await system.destroy();
+    test('F5-1: payload base that is not an Entity/Relation is rejected at declaration time', async () => {
+        expect(() => PayloadItem.create({
+            name: 'thing', type: 'Entity', base: { name: 'NotAConcept' } as any
+        })).toThrow(/expected an Entity or Relation instance/);
     });
 
-    test('F5-1b: payload item with an accepting Attributive base passes', async () => {
-        const AcceptEverything = Attributive.create({
-            name: 'AcceptEverything',
-            content: function () { return true; },
+    test('F5-2: payload content checks are expressed as Conditions', async () => {
+        const Doc = Entity.create({ name: 'F5CondDoc', properties: [Property.create({ name: 'title', type: 'string' })] });
+        const titleRequired = Condition.create({
+            name: 'titleRequired',
+            content: async function (event: any) {
+                return typeof event.payload?.doc?.title === 'string' && event.payload.doc.title.length > 0;
+            }
         });
         const interaction = Interaction.create({
-            name: 'f5AttributiveBaseOk',
-            action: Action.create({ name: 'f5AttributiveBaseOk' }),
+            name: 'f5CondPayload',
+            action: Action.create({ name: 'f5CondPayload' }),
+            conditions: titleRequired,
             payload: Payload.create({
                 items: [
-                    PayloadItem.create({ name: 'thing', type: 'Entity', base: AcceptEverything as any }),
+                    PayloadItem.create({ name: 'doc', type: 'Entity', base: Doc }),
                 ],
             }),
         });
-        const { controller, system } = await buildController(interaction);
+        const { controller, system } = await buildController(interaction, [Doc]);
 
-        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { thing: { foo: 1 } } });
-        expect(res.error).toBeUndefined();
-        await system.destroy();
-    });
-
-    test('F5-2: unknown concept type as payload base is rejected instead of silently passing', async () => {
-        const interaction = Interaction.create({
-            name: 'f5UnknownConcept',
-            action: Action.create({ name: 'f5UnknownConcept' }),
-            payload: Payload.create({
-                items: [
-                    PayloadItem.create({ name: 'thing', type: 'Entity', base: { name: 'NotAConcept' } as any }),
-                ],
-            }),
-        });
-        const { controller, system } = await buildController(interaction);
-
-        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { thing: { foo: 1 } } });
-        expect(res.error).toBeTruthy();
+        const bad = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { title: '' } } });
+        expect(bad.error).toBeTruthy();
+        const ok = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { title: 't' } } });
+        expect(ok.error).toBeUndefined();
         await system.destroy();
     });
 
@@ -142,18 +113,18 @@ describe('F5: guard chain is fail-closed', () => {
         await system.destroy();
     });
 
-    test('F5-4: attributive callback returning undefined is fail-closed', async () => {
-        const ForgotReturn = Attributive.create({
+    test('F5-4: condition callback returning undefined is fail-closed', async () => {
+        const ForgotReturn = Condition.create({
             name: 'ForgotReturn',
-            content: function (this: any, user: any) {
+            content: async function (event: any) {
                 // developer forgot `return`; intent was to reject non-admins
-                user.roles?.includes('admin');
-            },
+                event.user.roles?.includes('admin');
+            } as any,
         });
         const interaction = Interaction.create({
             name: 'f5Undefined',
             action: Action.create({ name: 'f5Undefined' }),
-            userAttributives: ForgotReturn,
+            conditions: ForgotReturn,
         });
         const { controller, system } = await buildController(interaction);
 
@@ -162,45 +133,48 @@ describe('F5: guard chain is fail-closed', () => {
         await system.destroy();
     });
 
-    test('F5-5: DerivedConcept attributive is executed, not skipped', async () => {
-        const Doc = Entity.create({ name: 'F5DerivedDoc', properties: [Property.create({ name: 'title', type: 'string' })] });
-        const RejectEverything = Attributive.create({
-            name: 'F5DerivedReject',
-            content: function () { return false; },
-        });
-        const derivedConcept = { name: 'RejectedDoc', base: Doc, attributive: RejectEverything };
+    test('F5-5: non-entity payload value for an entity base is rejected', async () => {
+        const Doc = Entity.create({ name: 'F5StructDoc', properties: [Property.create({ name: 'title', type: 'string' })] });
         const interaction = Interaction.create({
-            name: 'f5Derived',
-            action: Action.create({ name: 'f5Derived' }),
+            name: 'f5Struct',
+            action: Action.create({ name: 'f5Struct' }),
             payload: Payload.create({
                 items: [
-                    PayloadItem.create({ name: 'doc', type: 'Entity', base: derivedConcept as any }),
+                    PayloadItem.create({ name: 'doc', type: 'Entity', base: Doc }),
                 ],
             }),
         });
         const { controller, system } = await buildController(interaction, [Doc]);
 
-        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: { title: 't' } } });
+        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { doc: 'not-an-object' } });
         expect(res.error).toBeTruthy();
         await system.destroy();
     });
 });
 
-describe('F6: isRef attributive on a standalone interaction', () => {
-    // isRef semantics = "must be the specific user bound in the activity refs".
-    // A standalone interaction has no refs context, so an isRef attributive must be
-    // rejected (fail-closed) instead of silently degrading into a role check.
-    test('isRef userAttributive outside an activity must not degrade to a role check', async () => {
-        const boundApprover = createUserRoleAttributive({ name: 'Approver', isRef: true });
-        const interaction = Interaction.create({
-            name: 'f6IsRefStandalone',
-            action: Action.create({ name: 'f6IsRefStandalone' }),
-            userAttributives: boundApprover,
-        });
-        const { controller, system } = await buildController(interaction);
+describe('Legacy Attributive-era declarations fail fast', () => {
+    test('userAttributives on Interaction is rejected at declaration time', () => {
+        expect(() => Interaction.create({
+            name: 'legacyUserAttributives',
+            action: Action.create({ name: 'legacyUserAttributives' }),
+            userAttributives: { some: 'thing' },
+        } as any)).toThrow(/Attributive concept has been removed/);
+    });
 
-        const res = await controller.dispatch(interaction, { user: { id: 'intruder', roles: ['Approver'] } });
-        expect(res.error).toBeTruthy();
-        await system.destroy();
+    test('userRef on Interaction is rejected at declaration time', () => {
+        expect(() => Interaction.create({
+            name: 'legacyUserRef',
+            action: Action.create({ name: 'legacyUserRef' }),
+            userRef: { some: 'thing' },
+        } as any)).toThrow(/Attributive concept has been removed/);
+    });
+
+    test('attributives / itemRef on PayloadItem are rejected at declaration time', () => {
+        expect(() => PayloadItem.create({
+            name: 'legacyAttr', type: 'string', attributives: { some: 'thing' },
+        } as any)).toThrow(/Attributive concept has been removed/);
+        expect(() => PayloadItem.create({
+            name: 'legacyItemRef', type: 'string', itemRef: { some: 'thing' },
+        } as any)).toThrow(/Attributive concept has been removed/);
     });
 });

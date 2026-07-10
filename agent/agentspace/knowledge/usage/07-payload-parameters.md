@@ -27,14 +27,15 @@ const CreatePost = Interaction.create({
 ```javascript
 PayloadItem.create({
   name: 'itemName',           // Parameter name (required)
+  type: 'string',             // Primitive type check (optional)
   base: Entity,               // Reference to Entity/Relation (optional)
   isRef: true,                // Whether it's a reference with id (default: false)
   required: true,             // Whether this parameter is required (default: false)
-  isCollection: true,         // Whether it's an array (default: false)
-  attributives: Attributive,  // Validation rules (optional)
-  itemRef: Entity             // Reference to other concepts (optional)
+  isCollection: true          // Whether it's an array (default: false)
 })
 ```
+
+To validate payload **contents** (e.g. "only published posts can be shared"), write the check as a `Condition` on the Interaction — see [Payload Validation with Conditions](#payload-validation-with-conditions) below.
 
 ## Basic Payload Usage
 
@@ -82,7 +83,7 @@ await controller.callInteraction('SendMessage', {
 **Important**: When `base` is not specified, the framework only checks:
 - Whether required parameters are present
 - Whether collection parameters are arrays
-- No concept validation or attributive checks are performed
+- No concept validation is performed
 
 ### Parameters with Entity Reference
 
@@ -242,18 +243,23 @@ await controller.callInteraction('TagPosts', {
 });
 ```
 
-## Payload Validation with Attributives
+## Payload Validation with Conditions
 
-### Basic Attributive Validation
+Payload content checks are written as `Condition`s on the Interaction. A condition callback receives the full event args (`user`, `payload`, `query`, `activityId`) with the Controller as `this`, so it can read the payload and query storage. It must return a strict boolean — any non-boolean result fails the check (fail-closed).
 
-When PayloadItem has both `base` and `attributives`, the framework validates the payload data:
+### Basic Condition Validation
 
 ```javascript
-// Define validation attributive
-const PublishedPost = Attributive.create({
-  name: 'PublishedPost',
-  content: function(post, eventArgs) {
-    return post.status === 'published';
+// Define validation condition
+const PublishedPostOnly = Condition.create({
+  name: 'PublishedPostOnly',
+  content: async function(event) {
+    const post = await this.system.storage.findOne('Post',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.post.id] }),
+      undefined,
+      ['status']
+    );
+    return post?.status === 'published';
   }
 });
 
@@ -266,11 +272,11 @@ const SharePost = Interaction.create({
         name: 'post',
         base: Post,
         isRef: true,
-        required: true,
-        attributives: PublishedPost  // Only published posts can be shared
+        required: true
       })
     ]
-  })
+  }),
+  conditions: PublishedPostOnly  // Only published posts can be shared
 });
 
 // This will succeed:
@@ -292,20 +298,30 @@ await controller.callInteraction('SharePost', {
 
 ### Complex Validation with BoolExp
 
-You can combine multiple attributives using BoolExp:
+You can combine multiple conditions using `Conditions.create` and BoolExp:
 
 ```javascript
-const ActiveTag = Attributive.create({
-  name: 'ActiveTag',
-  content: function(tag, eventArgs) {
-    return tag.isActive === true;
+const TagsAreActive = Condition.create({
+  name: 'TagsAreActive',
+  content: async function(event) {
+    const tags = await this.system.storage.find('Tag',
+      MatchExp.atom({ key: 'id', value: ['in', event.payload.tags.map(tag => tag.id)] }),
+      undefined,
+      ['isActive']
+    );
+    return tags.every(tag => tag.isActive === true);
   }
 });
 
-const PopularTag = Attributive.create({
-  name: 'PopularTag',
-  content: function(tag, eventArgs) {
-    return tag.usageCount > 100;
+const TagsArePopular = Condition.create({
+  name: 'TagsArePopular',
+  content: async function(event) {
+    const tags = await this.system.storage.find('Tag',
+      MatchExp.atom({ key: 'id', value: ['in', event.payload.tags.map(tag => tag.id)] }),
+      undefined,
+      ['usageCount']
+    );
+    return tags.every(tag => tag.usageCount > 100);
   }
 });
 
@@ -318,26 +334,32 @@ const AddTags = Interaction.create({
         name: 'tags',
         base: Tag,
         isRef: true,
-        isCollection: true,
-        // Tags must be both active AND popular
-        attributives: Attributives.create({
-          content: BoolExp.atom(ActiveTag).and(BoolExp.atom(PopularTag))
-        })
+        isCollection: true
       })
     ]
+  }),
+  // Tags must be both active AND popular
+  conditions: Conditions.create({
+    content: BoolExp.atom(TagsAreActive).and(TagsArePopular)
   })
 });
 ```
 
 ### Validation for Collections
 
-When `isCollection` is true, attributives are checked for **every item** in the array:
+When a payload item is a collection, write the condition to check **every item** in the array:
 
 ```javascript
-const VerifiedUser = Attributive.create({
-  name: 'VerifiedUser',
-  content: function(user, eventArgs) {
-    return user.isVerified === true;
+const AllUsersVerified = Condition.create({
+  name: 'AllUsersVerified',
+  content: async function(event) {
+    const users = await this.system.storage.find('User',
+      MatchExp.atom({ key: 'id', value: ['in', event.payload.users.map(user => user.id)] }),
+      undefined,
+      ['isVerified']
+    );
+    return users.length === event.payload.users.length &&
+           users.every(user => user.isVerified === true);
   }
 });
 
@@ -350,11 +372,11 @@ const InviteUsers = Interaction.create({
         name: 'users',
         base: User,
         isRef: true,
-        isCollection: true,
-        attributives: VerifiedUser  // ALL users must be verified
+        isCollection: true
       })
     ]
-  })
+  }),
+  conditions: AllUsersVerified  // ALL users must be verified
 });
 
 // This will fail if ANY user in the array is not verified
@@ -386,9 +408,8 @@ Framework behavior:
 - ✅ Checks if required parameter is present
 - ✅ Checks if collection parameter is an array (when isCollection: true)
 - ❌ Does NOT perform concept validation
-- ❌ Does NOT check attributives
 - ❌ Does NOT validate data structure
-- **You must handle validation in your own logic**
+- **You must handle validation in your own logic (e.g. through conditions)**
 
 ### When base IS specified
 
@@ -396,8 +417,7 @@ Framework behavior:
 PayloadItem.create({ 
   name: 'post',
   base: Post,      // Entity reference
-  isRef: true,
-  attributives: PublishedPost
+  isRef: true
 })
 ```
 
@@ -405,8 +425,8 @@ Framework behavior:
 - ✅ Checks if required parameter is present
 - ✅ Validates the data matches the concept (Entity/Relation)
 - ✅ If isRef: true, verifies id exists and fetches full record
-- ✅ If attributives exist, validates the data against them
-- ✅ For collections, validates every item
+- ✅ For collections, validates every item against the concept
+- Content-level rules (e.g. "post must be published") are expressed as conditions on the Interaction
 
 ### Payload Storage Behavior
 
@@ -436,11 +456,11 @@ const CreateArticle = Interaction.create({
 
 ```javascript
 // ✅ Good: Use base for entity-related data
+// (content rules like "user must be active" go into the interaction's conditions)
 PayloadItem.create({ 
   name: 'targetUser',
   base: User,
-  isRef: true,
-  attributives: ActiveUser
+  isRef: true
 })
 
 // ✅ Good: Simple parameters without base
@@ -490,12 +510,17 @@ const UpdateUserProfile = Interaction.create({
 ### 3. Consistent Validation Patterns
 
 ```javascript
-// Define reusable attributives
-const CanBeEdited = Attributive.create({
-  name: 'CanBeEdited',
-  content: function(item, eventArgs) {
-    return item.status !== 'locked' && 
-           item.createdBy === eventArgs.user.id;
+// Define a reusable condition factory
+const canBeEdited = (entityName, payloadKey) => Condition.create({
+  name: `${entityName}CanBeEdited`,
+  content: async function(event) {
+    const item = await this.system.storage.findOne(entityName,
+      MatchExp.atom({ key: 'id', value: ['=', event.payload[payloadKey].id] }),
+      undefined,
+      ['status', 'createdBy']
+    );
+    return !!item && item.status !== 'locked' && 
+           item.createdBy === event.user.id;
   }
 });
 
@@ -506,11 +531,11 @@ const EditPost = Interaction.create({
       PayloadItem.create({ 
         name: 'post',
         base: Post,
-        isRef: true,
-        attributives: CanBeEdited
+        isRef: true
       })
     ]
-  })
+  }),
+  conditions: canBeEdited('Post', 'post')
 });
 
 const EditComment = Interaction.create({
@@ -519,11 +544,11 @@ const EditComment = Interaction.create({
       PayloadItem.create({ 
         name: 'comment',
         base: Comment,
-        isRef: true,
-        attributives: CanBeEdited
+        isRef: true
       })
     ]
-  })
+  }),
+  conditions: canBeEdited('Comment', 'comment')
 });
 ```
 
@@ -531,17 +556,15 @@ const EditComment = Interaction.create({
 
 ```javascript
 // In your application code
-try {
-  const result = await controller.callInteraction('SharePost', {
-    user: currentUser,
-    payload: { post: { id: postId } }
-  });
-} catch (error) {
-  if (error instanceof AttributeError) {
-    if (error.type === 'post not match attributive') {
-      // Handle validation failure
-      console.error('Cannot share: Post is not published');
-    }
+const result = await controller.callInteraction('SharePost', {
+  user: currentUser,
+  payload: { post: { id: postId } }
+});
+
+if (result.error) {
+  if (result.error.type === 'condition check failed') {
+    // Handle validation failure; result.error.error.data.name is the failing condition
+    console.error('Cannot share: Post is not published');
   }
 }
 ```
@@ -579,15 +602,15 @@ NOT setting base property maintains the same functionality but avoids the resolu
 
 The Payload system in interaqt provides a powerful way to:
 - Define structured interaction parameters
-- Enforce validation rules through attributives
+- Enforce content validation rules through conditions
 - Ensure type safety with entity references
 - Handle both simple data and complex entity relationships
 
 Key points to remember:
-- **With base**: Framework handles validation and attributive checks
+- **With base**: Framework handles concept validation and reference resolution
 - **Without base**: You handle validation in your own logic
 - **isRef**: Distinguishes between references and new data
-- **attributives**: Only work when base is specified
-- **isCollection**: Validates every item in arrays
+- **conditions**: Payload content rules live on the Interaction, not on PayloadItem
+- **isCollection**: Validates every item in arrays against the concept
 
 By properly using Payload and PayloadItem, you can build robust, type-safe interactions that validate data at the framework level, reducing the need for manual validation code and improving system reliability. 

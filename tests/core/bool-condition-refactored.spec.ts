@@ -3,16 +3,16 @@ import {
   BoolAtomData, BoolExpressionData, clearAllInstances
 } from "@core";
 import {
-  Attributive, Attributives,
+  Condition,
   Conditions
 } from "interaqt";
 
-describe("Bool and Attributive Classes Refactored", () => {
+describe("Bool and Condition Classes Refactored", () => {
   beforeEach(() => {
     // 清空实例列表
     clearAllInstances(
       BoolAtomData, BoolExpressionData,
-      Attributive, Attributives,
+      Condition,
       Conditions
     );
   });
@@ -93,77 +93,39 @@ describe("Bool and Attributive Classes Refactored", () => {
     });
   });
 
-  describe("Attributive", () => {
-    test("should create attributive instance", () => {
-      const attr = Attributive.create({
-        content: (data: any) => data.isValid
+  describe("Condition", () => {
+    test("should create condition instance", () => {
+      const cond = Condition.create({
+        content: (event: any) => event.payload.isValid
       });
 
-      expect(attr.content).toBeDefined();
-      expect(attr._type).toBe("Attributive");
+      expect(cond.content).toBeDefined();
+      expect(cond._type).toBe("Condition");
     });
 
-    test("should create attributive with all options", () => {
-      const attr = Attributive.create({
-        stringContent: "user.isActive",
-        content: (user: any) => user.isActive,
+    test("should create condition with name", () => {
+      const cond = Condition.create({
+        content: (event: any) => event.user.isActive,
         name: "IsActiveCheck",
-        isRef: true
       });
 
-      expect(attr.stringContent).toBe("user.isActive");
-      expect(attr.name).toBe("IsActiveCheck");
-      expect(attr.isRef).toBe(true);
+      expect(cond.name).toBe("IsActiveCheck");
     });
 
-    test("should stringify and parse attributive", () => {
-      const original = Attributive.create({
+    test("should stringify and parse condition", () => {
+      const original = Condition.create({
         content: () => true,
-        name: "TestAttr"
+        name: "TestCond"
       });
       
-      const stringified = Attributive.stringify(original);
+      const stringified = Condition.stringify(original);
       // Clear instances before parsing: parse preserves the uuid (identity round-trip)
-      Attributive.instances.length = 0;
-      const parsed = Attributive.parse(stringified);
+      Condition.instances.length = 0;
+      const parsed = Condition.parse(stringified);
 
-      expect(parsed.name).toBe("TestAttr");
+      expect(parsed.name).toBe("TestCond");
       expect(parsed.content).toBeDefined();
       expect(typeof parsed.content).toBe("function");
-    });
-  });
-
-  describe("Attributives", () => {
-    test("should create attributives instance with no content", () => {
-      const attrs = Attributives.create({});
-
-      expect(attrs.content).toBeUndefined();
-      expect(attrs._type).toBe("Attributives");
-    });
-
-    test("should create attributives with bool atom content", () => {
-      const atom = BoolAtomData.create({ data: { content: () => true } });
-      const attrs = Attributives.create({
-        content: atom
-      });
-
-      expect(attrs.content).toBe(atom);
-    });
-
-    test("should create attributives with bool expression content", () => {
-      const atom1 = BoolAtomData.create({ data: { content: () => true } });
-      const atom2 = BoolAtomData.create({ data: { content: () => false } });
-      const expr = BoolExpressionData.create({
-        operator: "and",
-        left: atom1,
-        right: atom2
-      });
-      
-      const attrs = Attributives.create({
-        content: expr
-      });
-
-      expect(attrs.content).toBe(expr);
     });
   });
 
@@ -189,16 +151,14 @@ describe("Bool and Attributive Classes Refactored", () => {
     test("should have isKlass marker", () => {
       expect(BoolAtomData.isKlass).toBe(true);
       expect(BoolExpressionData.isKlass).toBe(true);
-      expect(Attributive.isKlass).toBe(true);
-      expect(Attributives.isKlass).toBe(true);
+      expect(Condition.isKlass).toBe(true);
       expect(Conditions.isKlass).toBe(true);
     });
 
     test("should have displayName", () => {
       expect(BoolAtomData.displayName).toBe("BoolAtomData");
       expect(BoolExpressionData.displayName).toBe("BoolExpressionData");
-      expect(Attributive.displayName).toBe("Attributive");
-      expect(Attributives.displayName).toBe("Attributives");
+      expect(Condition.displayName).toBe("Condition");
       expect(Conditions.displayName).toBe("Conditions");
     });
 
@@ -206,28 +166,26 @@ describe("Bool and Attributive Classes Refactored", () => {
       const atom1 = BoolAtomData.create({ data: {} });
       const atom2 = BoolAtomData.create({ data: {} });
       const expr1 = BoolExpressionData.create({ left: atom1 });
-      const attr1 = Attributive.create({ content: () => true });
-      const attrs1 = Attributives.create({});
+      const condAtom = Condition.create({ content: () => true });
       const cond1 = Conditions.create({});
 
       expect(BoolAtomData.instances).toHaveLength(2);
       expect(BoolExpressionData.instances).toHaveLength(1);
-      expect(Attributive.instances).toHaveLength(1);
-      expect(Attributives.instances).toHaveLength(1);
+      expect(Condition.instances).toHaveLength(1);
       expect(Conditions.instances).toHaveLength(1);
     });
 
     test("should use is() for type checking", () => {
       const atom = BoolAtomData.create({ data: {} });
       const expr = BoolExpressionData.create({ left: atom });
-      const attr = Attributive.create({ content: () => true });
+      const cond = Condition.create({ content: () => true });
       
       expect(BoolAtomData.is(atom)).toBe(true);
       expect(BoolAtomData.is(expr)).toBe(false);
       expect(BoolExpressionData.is(expr)).toBe(true);
       expect(BoolExpressionData.is(atom)).toBe(false);
-      expect(Attributive.is(attr)).toBe(true);
-      expect(Attributive.is(atom)).toBe(false);
+      expect(Condition.is(cond)).toBe(true);
+      expect(Condition.is(atom)).toBe(false);
     });
 
     test("should prevent duplicate UUIDs", () => {

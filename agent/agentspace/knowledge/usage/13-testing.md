@@ -645,11 +645,11 @@ describe('Approval Process Activity', () => {
 });
 ```
 
-## 12.3 Testing Permissions and Attributives
+## 12.3 Testing Permissions (Conditions)
 
 > **Important: Correct Error Handling Approach**
 > 
-> The interaqt framework automatically catches all errors (including Attributive validation failures, insufficient permissions, etc.) and returns error information through the `error` field in the return value. The framework **does not throw uncaught exceptions**.
+> The interaqt framework automatically catches all errors (including condition check failures, insufficient permissions, etc.) and returns error information through the `error` field in the return value. The framework **does not throw uncaught exceptions**.
 > 
 > Therefore, when writing tests:
 > - ✅ **Correct approach**: Check the `error` field in the return value

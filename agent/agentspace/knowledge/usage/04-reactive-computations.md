@@ -1242,7 +1242,7 @@ Note: if several transfers share the same `current` state and their triggers mat
 
 ### Guarding Transitions
 
-There is no `condition` field on `StateTransfer`. Preconditions belong to the interaction layer (use `conditions` / `userAttributives` on the Interaction so unauthorized or invalid calls never produce an event), and fine-grained per-record filtering is expressed in `computeTarget` — return `null`/`undefined` (or an empty array) to skip the transition for records that should not transition:
+There is no `condition` field on `StateTransfer`. Preconditions belong to the interaction layer (use `conditions` on the Interaction so unauthorized or invalid calls never produce an event), and fine-grained per-record filtering is expressed in `computeTarget` — return `null`/`undefined` (or an empty array) to skip the transition for records that should not transition:
 
 ```javascript
 StateTransfer.create({

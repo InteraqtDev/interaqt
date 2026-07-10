@@ -1,55 +1,17 @@
-import {createUserRoleAttributive, Attributive} from 'interaqt';
+import { Condition } from 'interaqt';
 
-export const NewAttr = Attributive.create({
-    name: 'New',
-    content: function New(){}
-})
-
-export const New2Attr = Attributive.create({
-    name: 'New2',
-    content: function New2(){}
-})
-
-export const New3Attr = Attributive.create({
-    name: 'New3',
-    content: function New3(){}
-})
-
-
-export const OldAttr = Attributive.create({
-    name: 'Old',
-    content: function Old(){}
-})
-
-export const Old2Attr = Attributive.create({
-    name: 'Old2',
-    content: function Old2(){}
-})
-
-export const Old3Attr = Attributive.create({
-    name: 'Old3',
-    content: function Old3(){}
-})
-
-export const OtherAttr = Attributive.create({
-    name: 'Other',
-    content: 
-function Other(targetUser: any, { user }: { user: any }){ 
-    return user.id !== targetUser.id 
+// Attributive 已废弃：角色检查用 Condition 表达（event.user 上的角色数组成员判断）。
+export function createRoleCondition(role?: string) {
+    return Condition.create({
+        name: role || 'anyone',
+        content: role
+            ? function (this: unknown, event: { user?: { roles?: string[] } }) {
+                return !!(event.user?.roles && event.user.roles.includes(role))
+            }
+            : function anyone() { return true },
+    });
 }
 
-    // content: `function Other(){}`
-})
-
-export const User = createUserRoleAttributive( {
-    name: 'User'
-})
-
-export const Admin = createUserRoleAttributive( {
-    name: 'Admin'
-})
-
-export const Anonymous = createUserRoleAttributive( {
-    name: 'Anonymous'
-})
-
+export const UserRole = createRoleCondition('User')
+export const AdminRole = createRoleCondition('Admin')
+export const AnonymousRole = createRoleCondition('Anonymous')

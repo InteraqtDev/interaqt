@@ -44,7 +44,7 @@ expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
 
 ### Guard Callback Return Contract (strict boolean)
 
-Condition / Attributive callbacks must return an actual `boolean` (`true` or `false`).
+Condition callbacks must return an actual `boolean` (`true` or `false`).
 Any non-boolean return value — including truthy values like `'admin'` and falsy values
 like `null` / `0` / `''` — is treated as a definition error and the check fails
 (fail-closed), with an error message telling you what was returned.

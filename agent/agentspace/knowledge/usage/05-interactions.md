@@ -387,9 +387,23 @@ const CreateProduct = Interaction.create({
 
 ### Conditional Parameters
 
-The framework itself doesn't support dynamic required conditions and complex validation functions. These logics should be implemented in interaction handling:
+The framework itself doesn't support dynamic required conditions and complex validation functions. These logics should be implemented as conditions on the Interaction:
 
 ```javascript
+// Validation logic should be implemented through Condition
+const OrderIsValid = Condition.create({
+  name: 'OrderIsValid',
+  content: async function(event) {
+    const { payload } = event;
+    // Shipping address is required for orders under $100
+    if (payload.totalAmount < 100 && !payload.shippingAddress) {
+      return false;
+    }
+    // Coupon validation etc.
+    return true;
+  }
+});
+
 const CreateOrder = Interaction.create({
   name: 'CreateOrder',
   action: Action.create({ name: 'createOrder' }),
@@ -402,29 +416,15 @@ const CreateOrder = Interaction.create({
       }),
       PayloadItem.create({ 
         name: 'shippingAddress'
-        // Conditional required logic should be checked in interaction handling
+        // Conditional required logic is checked by OrderIsValid
       }),
       PayloadItem.create({ 
         name: 'couponCode'
-        // Coupon validation should be implemented in business logic
+        // Coupon validation is checked by OrderIsValid
       })
     ]
-  })
-});
-
-// Validation logic should be implemented in Transform or Attributive
-const orderValidation = Transform.create({
-  record: InteractionEventEntity,
-  callback: function(event) {
-    if (event.interactionName === 'CreateOrder') {
-      // Implement complex validation logic here
-      const { payload } = event;
-      if (payload.totalAmount < 100 && !payload.shippingAddress) {
-        throw new Error('Shipping address is required for orders under $100');
-      }
-      // Coupon validation etc.
-    }
-  }
+  }),
+  conditions: OrderIsValid
 });
 ```
 
@@ -986,6 +986,25 @@ const Review = Entity.create({
 ### Basic Permission Checks
 
 ```javascript
+// Use Condition for permission control
+const CanDeletePost = Condition.create({
+  name: 'canDeletePost',
+  content: async function(event) {
+    // Admin can delete any post
+    if (event.user.role === 'admin') {
+      return true;
+    }
+    
+    // Author can delete their own post
+    const post = await this.system.storage.findOne('Post',
+      MatchExp.atom({ key: 'id', value: ['=', event.payload.postId.id] }),
+      undefined,
+      [['author', { attributeQuery: ['id'] }]]
+    );
+    return !!post && post.author?.id === event.user.id;
+  }
+});
+
 // Interaction with permission requirements
 const DeletePost = Interaction.create({
   name: 'DeletePost',
@@ -995,36 +1014,23 @@ const DeletePost = Interaction.create({
       PayloadItem.create({ name: 'postId', base: Post, isRef: true })
     ]
   }),
-  // Permission logic should be implemented through Attributive
-});
-
-// Use Attributive for permission control
-const DeletePostPermission = Attributive.create({
-  name: 'canDeletePost',
-  type: 'boolean',
-  record: InteractionEventEntity,
-  computation: function(interactionEvent) {
-    if (interactionEvent.interactionName === 'DeletePost') {
-      const user = interactionEvent.user;
-      const postId = interactionEvent.payload.postId;
-      
-      // Admin can delete any post
-      if (user.role === 'admin') {
-        return true;
-      }
-      
-      // Author can delete their own post
-      // This would need to be checked against the actual post data
-      return false; // Simplified for example
-    }
-    return true;
-  }
+  // Permission logic is implemented through conditions
+  conditions: CanDeletePost
 });
 ```
 
 ### Role-Based Permission Control
 
 ```javascript
+// Permission check through Condition
+const CanModerateContent = Condition.create({
+  name: 'canModerateContent',
+  content: async function(event) {
+    // Only moderators and admins can moderate content
+    return ['moderator', 'admin'].includes(event.user.role);
+  }
+});
+
 // Content moderation interaction
 const ModerateContent = Interaction.create({
   name: 'ModerateContent',
@@ -1035,23 +1041,8 @@ const ModerateContent = Interaction.create({
       PayloadItem.create({ name: 'action', required: true }), // approve, reject, flag
       PayloadItem.create({ name: 'reason' })
     ]
-  })
-});
-
-// Permission check through Attributive
-const ModerationPermission = Attributive.create({
-  name: 'canModerateContent',
-  type: 'boolean',
-  record: InteractionEventEntity,
-  computation: function(interactionEvent) {
-    if (interactionEvent.interactionName === 'ModerateContent') {
-      const user = interactionEvent.user;
-      
-      // Only moderators and admins can moderate content
-      return ['moderator', 'admin'].includes(user.role);
-    }
-    return true;
-  }
+  }),
+  conditions: CanModerateContent
 });
 ```
 

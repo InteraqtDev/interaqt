@@ -7,7 +7,7 @@ import {
   Action, PayloadItem, Payload,
   Interaction, Gateway, Event, Activity, ActivityGroup, Transfer,
   Condition, Conditions,
-  DataPolicy, Attributive, Attributives
+  DataPolicy
 } from "interaqt";
 
 describe("Interaction System - createClass functionality", () => {
@@ -255,38 +255,6 @@ describe("Interaction System - createClass functionality", () => {
       expect(policy.modifier).toEqual({ limit: 10, orderBy: { createdAt: "desc" } });
       expect(policy.attributeQuery).toEqual(["id", "title", "content"]);
       expect(policy._type).toBe("DataPolicy");
-    });
-  });
-
-  describe("Attributive", () => {
-    test("should create attributive", () => {
-      const attr = Attributive.create({
-        name: "permission",
-        content: () => "read"
-      });
-
-      expect(attr.name).toBe("permission");
-      expect(attr.content).toBeDefined();
-      expect(attr._type).toBe("Attributive");
-    });
-
-    test("should create attributives collection", () => {
-      const attr1 = Attributive.create({
-        name: "role",
-        content: () => "admin"
-      });
-
-      const atom = BoolAtomData.create({
-        type: "atom",
-        data: attr1 as any
-      });
-
-      const attrs = Attributives.create({
-        content: atom
-      });
-
-      expect(attrs.content).toBeDefined();
-      expect(attrs._type).toBe("Attributives");
     });
   });
 

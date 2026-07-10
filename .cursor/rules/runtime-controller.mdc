@@ -24,7 +24,7 @@ const controller = new Controller({
 ```
 
 ## Dispatch Flow
-1. **Guard** — event source validates preconditions (permissions, attributives, conditions)
+1. **Guard** — event source validates preconditions (permissions, conditions)
 2. **Map Event Data** — transforms raw event args into internal event data
 3. **Resolve** — executes the action: creates/updates/deletes records
 4. **Computations** — reactive computations triggered by record mutations

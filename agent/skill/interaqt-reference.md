@@ -125,13 +125,14 @@ Payload.create(args: {
 PayloadItem.create(args: {
   name: string                        // Parameter name
   type: string                        // Required: data type
-  base?: EntityInstance               // Entity reference for validation
+  base?: EntityInstance | RelationInstance  // Entity/Relation reference for validation
   isRef?: boolean                     // true = reference by ID to existing entity
   required?: boolean                  // true = mandatory parameter
   isCollection?: boolean             // true = array of items
-  itemRef?: AttributiveInstance | EntityInstance  // Reference to entities defined in other interactions (for Activity)
 }): PayloadItemInstance
 ```
+
+Payload content validation is expressed as `conditions` on the Interaction (see Condition.create).
 
 ---
 
@@ -530,19 +531,6 @@ MatchExp.atom({ key: 'author.name', value: ['=', 'Alice'] })
 
 ---
 
-## Attributive.create
-
-```typescript
-Attributive.create(args: {
-  name?: string
-  content: (record: any, eventArgs: any) => boolean
-}): AttributiveInstance
-```
-
-Used on Interaction `userAttributives` to validate user context.
-
----
-
 ## BoolExp
 
 ```typescript
@@ -551,7 +539,7 @@ boolExp.and(other: BoolExp | T): BoolExp
 boolExp.or(other: BoolExp | T): BoolExp
 ```
 
-Combines multiple Attributives, Conditions, or other expressions for complex logic.
+Combines multiple Conditions, match atoms, or other expressions for complex logic.
 
 ---
 
@@ -568,8 +556,9 @@ Conditions.create(args: {
 }): ConditionsInstance
 ```
 
-- `content` returns `true` to allow, `false` to reject
+- `content` returns `true` to allow, `false` to reject; any non-boolean result fails the check (fail-closed)
 - `this` is bound to Controller — can access `this.system.storage`
+- `event` contains `user`, `payload`, `query`, `activityId` — use it for user checks, payload content checks, and activity user binding
 - Failed conditions return `{ error: { type: 'condition check failed' } }`
 
 ---
@@ -652,7 +641,6 @@ import {
   Expression, Inequality, Equation, MathResolver,
 
   // Validation & conditions
-  Attributive, Attributives,
   Condition, Conditions,
 
   // Data policy

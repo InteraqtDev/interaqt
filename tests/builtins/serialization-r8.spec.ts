@@ -2,8 +2,7 @@
  * r8 显著改进项回归：序列化往返收尾（r1 I-10 遗留）。
  *
  * - Payload.stringify / PayloadItem.stringify 走统一 stringifyInstance 管线：
- *   items/base/itemRef 编码为 uuid:: 引用，graph round-trip 保持实例身份；
- *   itemRef 不再被手写字段清单静默丢弃。
+ *   items/base 编码为 uuid:: 引用，graph round-trip 保持实例身份。
  * - DataPolicy.stringify 编码 match 函数（func::），round-trip 后过滤语义保留。
  * - EventSource 注册进 core 的 KlassByName；stringify/parse 走统一管线，
  *   guard/resolve 等回调 round-trip 后可用。
@@ -14,11 +13,10 @@ import { Interaction, InteractionInstance } from '../../src/builtins/interaction
 import { Action } from '../../src/builtins/interaction/Action.js';
 import { Payload, PayloadInstance } from '../../src/builtins/interaction/Payload.js';
 import { PayloadItem, PayloadItemInstance } from '../../src/builtins/interaction/PayloadItem.js';
-import { Attributive, AttributiveInstance } from '../../src/builtins/interaction/Attributive.js';
 import { DataPolicy, DataPolicyInstance } from '../../src/builtins/interaction/Data.js';
 import '../../src/builtins/init.js';
 
-const allKlasses = [Interaction, Action, Payload, PayloadItem, Attributive, DataPolicy, Entity, Property, EventSource];
+const allKlasses = [Interaction, Action, Payload, PayloadItem, DataPolicy, Entity, Property, EventSource];
 
 beforeEach(() => {
     clearAllInstances(...allKlasses);
@@ -31,19 +29,17 @@ function roundTrip(jsons: string[]) {
 }
 
 describe('r8 serialization fixes', () => {
-    test('Payload/PayloadItem round-trip keeps item identity, base reference and itemRef', () => {
+    test('Payload/PayloadItem round-trip keeps item identity and base reference', () => {
         const Post = Entity.create({
             name: 'SerPost',
             properties: [Property.create({ name: 'title', type: 'string' })]
         });
-        const authorRef = Attributive.create({ name: 'SerAuthorRef', content: function() { return true } });
         const item = PayloadItem.create({
             name: 'post',
             type: 'object',
             base: Post,
             isRef: true,
             required: true,
-            itemRef: authorRef
         });
         const payload = Payload.create({ items: [item] });
         const interaction = Interaction.create({
@@ -55,7 +51,6 @@ describe('r8 serialization fixes', () => {
         const jsons = [
             Entity.stringify(Post),
             ...Post.properties.map(p => Property.stringify(p)),
-            Attributive.stringify(authorRef),
             PayloadItem.stringify(item),
             Payload.stringify(payload),
             Action.stringify(interaction.action!),
@@ -66,13 +61,11 @@ describe('r8 serialization fixes', () => {
         const parsedPayload = instances.get(payload.uuid) as PayloadInstance;
         expect(parsedPayload.items).toHaveLength(1);
         const parsedItem = parsedPayload.items[0];
-        // 修复前：items 是裸对象（无 Klass 身份），itemRef 被 stringify 丢弃
+        // 修复前：items 是裸对象（无 Klass 身份）
         expect(PayloadItem.is(parsedItem)).toBe(true);
         expect(parsedItem.uuid).toBe(item.uuid);
         expect(Entity.is(parsedItem.base)).toBe(true);
         expect(parsedItem.base).toBe(instances.get(Post.uuid));
-        expect(Attributive.is(parsedItem.itemRef)).toBe(true);
-        expect((parsedItem.itemRef as AttributiveInstance).name).toBe('SerAuthorRef');
 
         const parsedInteraction = instances.get(interaction.uuid) as InteractionInstance;
         expect(parsedInteraction.payload).toBe(parsedPayload);

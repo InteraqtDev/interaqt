@@ -8,12 +8,13 @@ import {
     Activity,
     ActivityGroup,
     ActivityManager,
+    Condition,
     Controller,
-    createUserRoleAttributive,
     Custom,
     Dictionary,
     Entity,
     Interaction,
+    InteractionEventEntity,
     KlassByName,
     MatchExp,
     MonoSystem,
@@ -189,20 +190,33 @@ describe('r12 R-5: duplicate node instances in one activity graph fail fast', ()
     });
 });
 
-describe('r12 R-6: activity head with activityId resolves isRef attributives via refs', () => {
-    test('second branch head with isRef userAttributives checks saved refs', async () => {
-        // every 组的两个分支各自有 head：分支一 head 保存 userRef，
-        // 分支二 head 用 isRef attributive 要求必须是同一个用户。
-        const starterRef = createUserRoleAttributive({ name: 'r12Starter', isRef: true });
+describe('r12 R-6: activity head with activityId runs the full guard (conditions see activityId)', () => {
+    test('second branch head with an activity-scoped condition checks the first branch user', async () => {
+        // every 组的两个分支各自有 head：分支二 head 的 Condition 要求 dispatch 用户
+        // 必须与分支一 head 的用户相同（通过查询本 activity 的既有交互事件定位）。
+        // 修复前 head+activityId 走 standalone guard 路径，activity 语境的检查不可用。
         const branch1Head = Interaction.create({
             name: 'r12Branch1',
             action: Action.create({ name: 'r12Branch1' }),
-            userRef: starterRef,
+        });
+        const mustBeStarter = Condition.create({
+            name: 'r12MustBeStarter',
+            content: async function (this: Controller, event: any) {
+                if (!event.activityId) return false;
+                const branch1Event = await this.system.storage.findOne(
+                    InteractionEventEntity.name,
+                    MatchExp.atom({ key: 'interactionName', value: ['=', 'r12Branch1'] })
+                        .and({ key: 'activity.id', value: ['=', event.activityId] }),
+                    undefined,
+                    ['*']
+                );
+                return !!branch1Event && (branch1Event.user as { id?: string })?.id === event.user.id;
+            }
         });
         const branch2Head = Interaction.create({
             name: 'r12Branch2',
             action: Action.create({ name: 'r12Branch2' }),
-            userAttributives: starterRef,
+            conditions: mustBeStarter,
         });
         const sub1 = Activity.create({ name: 'r12BranchSub1', interactions: [branch1Head] });
         const sub2 = Activity.create({ name: 'r12BranchSub2', interactions: [branch2Head] });

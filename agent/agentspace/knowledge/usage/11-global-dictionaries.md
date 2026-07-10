@@ -470,6 +470,16 @@ async function setDefaultConfig() {
 ### 10.4.3 Conditional Logic Based on Dictionaries
 
 ```typescript
+// Use Condition to control permissions based on dictionary values
+const MaxUsersNotReached = Condition.create({
+  name: 'MaxUsersNotReached',
+  content: async function(this: Controller, event) {
+    const currentUserCount = await this.system.storage.get('state', 'totalUsers');
+    const maxUsers = await this.system.storage.get('state', 'maxUsers');
+    return currentUserCount < maxUsers;
+  }
+});
+
 // Using dictionary values for conditional logic in interactions
 const createUserInteraction = Interaction.create({
   name: 'createUser',
@@ -481,21 +491,10 @@ const createUserInteraction = Interaction.create({
         base: userEntity
       })
     ]
-  })
+  }),
+  // Dictionary-based permission control
+  conditions: MaxUsersNotReached
 });
-
-// Use Attributive to control permissions based on dictionary values
-const MaxUsersReachedAttributive = Attributive.create({
-  name: 'MaxUsersNotReached',
-  content: async function(context: any) {
-    const currentUserCount = await context.system.storage.get('state', 'totalUsers');
-    const maxUsers = await context.system.storage.get('state', 'maxUsers');
-    return currentUserCount < maxUsers;
-  }
-});
-
-// Add dictionary-based permission control to interaction
-createUserInteraction.attributives = [MaxUsersReachedAttributive];
 ```
 
 ### 10.4.4 Combining Dictionaries with Computations

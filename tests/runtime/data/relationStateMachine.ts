@@ -1,5 +1,4 @@
-import { Entity, Action, BoolExp, boolExpToAttributives, createUserRoleAttributive, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller, HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE } from "interaqt";
-import { OtherAttr } from "./roles";
+import { Entity, Action, BoolExp, Interaction, Payload, PayloadItem, Property, Relation, StateMachine, StateNode, StateTransfer, Transform, InteractionEventEntity, Controller, HardDeletionProperty, DELETED_STATE, NON_DELETED_STATE } from "interaqt";
 
 export function createData() {
     const UserEntity = Entity.create({
@@ -61,7 +60,6 @@ export function createData() {
     // 转移
     const transferReviewersInteraction = Interaction.create({
         name: 'transferReviewer',
-        userRef: createUserRoleAttributive({name: '', isRef: true}),
         action: Action.create({name: 'transferReviewer'}),
         payload: Payload.create({
             items: [

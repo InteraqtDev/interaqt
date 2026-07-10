@@ -5,7 +5,6 @@ import { PGLiteDB } from '@drivers';
 import { Action, GetAction } from '../../src/builtins/interaction/Action.js';
 import { Payload } from '../../src/builtins/interaction/Payload.js';
 import { PayloadItem } from '../../src/builtins/interaction/PayloadItem.js';
-import { Attributive } from '../../src/builtins/interaction/Attributive.js';
 import {
     checkPayload,
     checkCondition,
@@ -268,116 +267,27 @@ describe('checkCondition edge paths', () => {
     });
 });
 
-describe('checkPayload with DerivedConcept and ConceptAlias', () => {
-    test('checkPayload with DerivedConcept base validates via base entity', async () => {
-        const BaseEntity = Entity.create({ name: 'DerivedBase' });
-        const derivedConcept = {
-            base: BaseEntity,
-            attributive: Attributive.create({ content: () => true, name: 'isValid' }),
-        };
-
-        const payloadItem = PayloadItem.create({
+describe('payload base declaration validation (post-Attributive)', () => {
+    test('non Entity/Relation base is rejected at declaration time', () => {
+        expect(() => PayloadItem.create({
             name: 'item',
             type: 'object',
-            base: derivedConcept as any,
-        });
-        const payload = Payload.create({ items: [payloadItem] });
+            base: { name: 'SomeConcept', base: Entity.create({ name: 'EdgeDerivedBase' }) } as any,
+        })).toThrow(/expected an Entity or Relation instance/);
 
-        const interaction = Interaction.create({
-            name: 'testDerived',
-            action: Action.create({ name: 'create' }),
-            payload,
-        });
-
-        await expect(
-            checkPayload(guardControllerStub, interaction, {
-                user: { id: 'u1' },
-                payload: { item: { name: 'valid-data' } },
-            })
-        ).resolves.toBeUndefined();
-    });
-
-    test('checkPayload with ConceptAlias tries multiple concepts', async () => {
-        const Entity1 = Entity.create({ name: 'Alt1' });
-        const Entity2 = Entity.create({ name: 'Alt2' });
-
-        const conceptAlias = {
-            name: 'MultiType',
-            for: [Entity1, Entity2],
-        };
-
-        const payloadItem = PayloadItem.create({
+        expect(() => PayloadItem.create({
             name: 'multi',
             type: 'object',
-            base: conceptAlias as any,
-        });
-        const payload = Payload.create({ items: [payloadItem] });
-
-        const interaction = Interaction.create({
-            name: 'testAlias',
-            action: Action.create({ name: 'create' }),
-            payload,
-        });
-
-        await expect(
-            checkPayload(guardControllerStub, interaction, {
-                user: { id: 'u1' },
-                payload: { multi: { data: 'some-value' } },
-            })
-        ).resolves.toBeUndefined();
+            base: { name: 'MultiType', for: [] } as any,
+        })).toThrow(/expected an Entity or Relation instance/);
     });
 
-    test('checkPayload with ConceptAlias rejects when no concept matches', async () => {
-        const Entity1 = Entity.create({ name: 'NoMatch1' });
-
-        const conceptAlias = {
-            name: 'NoMatch',
-            for: [Entity1],
-        };
-
-        const payloadItem = PayloadItem.create({
-            name: 'noMatch',
-            type: 'object',
-            base: conceptAlias as any,
-        });
-        const payload = Payload.create({ items: [payloadItem] });
-
-        const interaction = Interaction.create({
-            name: 'testNoMatch',
-            action: Action.create({ name: 'create' }),
-            payload,
-        });
-
-        await expect(
-            checkPayload(guardControllerStub, interaction, {
-                user: { id: 'u1' },
-                payload: { noMatch: 42 },
-            })
-        ).rejects.toThrow(InteractionGuardError);
-    });
-
-    test('checkPayload with Attributive base passes validation', async () => {
-        const attr = Attributive.create({ content: () => true, name: 'check' });
-
-        const payloadItem = PayloadItem.create({
-            name: 'attrItem',
-            type: 'object',
-            base: attr as any,
-        });
-        const payload = Payload.create({ items: [payloadItem] });
-
-        const interaction = Interaction.create({
-            name: 'testAttrBase',
-            action: Action.create({ name: 'create' }),
-            payload,
-        });
-
-        await expect(
-            checkPayload(guardControllerStub, interaction, {
-                user: { id: 'u1' },
-                payload: { attrItem: { data: 'x' } },
-            })
-        ).resolves.toBeUndefined();
+    test('Relation base is accepted at declaration time', () => {
+        const S = Entity.create({ name: 'EdgeRelSource' });
+        const T = Entity.create({ name: 'EdgeRelTarget' });
+        const R = Relation.create({ source: S, sourceProperty: 't', target: T, targetProperty: 's', type: 'n:1' });
+        const item = PayloadItem.create({ name: 'rel', type: 'Relation', base: R, isRef: true });
+        expect(item.base).toBe(R);
     });
 });
 

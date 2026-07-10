@@ -14,7 +14,7 @@ This document guides how to systematically design frontend page architecture and
 ### 2. Reactive Data Display
 - **Reactive Computations**: All properties with `computation` should be displayed in real-time in the interface
 - **State-Aware**: Dynamically display different operation options based on entity state
-- **Permission Control**: Control interface element visibility based on Attributive definitions
+- **Permission Control**: Control interface element visibility based on Condition definitions
 
 ### 3. User Experience Consistency
 - **Operation Feedback**: Every interaction operation should have clear feedback
@@ -191,7 +191,7 @@ Operation History Area (Optional)
 ```
 
 #### 2.2 Design Points
-- **Permission Control**: Dynamically display action buttons based on Attributive
+- **Permission Control**: Dynamically display action buttons based on Condition
 - **State Awareness**: Display different operation options based on entity state
 - **Association Display**: Reasonably display associated entities, avoid information overload
 - **Operation Feedback**: Clear operation result notifications
@@ -340,7 +340,7 @@ For properties containing `computation`:
 - **Transition Hints**: Display possible state transition operations
 
 #### 2.2 Conditional Operation Display
-Based on permission control defined by Attributive:
+Based on permission control defined by Condition:
 - **Dynamic Buttons**: Dynamically display action buttons based on permissions
 - **Disabled States**: Show disabled operations when conditions aren't met
 - **Permission Hints**: Explain why certain operations are unavailable
