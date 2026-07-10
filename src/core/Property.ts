@@ -89,6 +89,13 @@ export class Property implements PropertyInstance {
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`Property name "${args.name}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
     }
+    // computed（storage 写路径上按同行字段求值）与 computation（反应式计算写回）是两条
+    // 互相竞争的写通道：同时声明时 computed 会在每次写入时静默覆盖 computation 的输出，
+    // computation 声明形同虚设——零告警的声明失效，必须 fail-fast。
+    // （defaultValue + computation 的并存已在 Scheduler setup 期拒绝，语义同族。）
+    if (args.computed && args.computation) {
+      throw new Error(`Property "${args.name}" declares both computed and computation. They are competing write channels for the same column (computed re-evaluates on every write and silently overwrites the computation's output) — keep exactly one.`);
+    }
 
     const instance = new Property(args, options);
     

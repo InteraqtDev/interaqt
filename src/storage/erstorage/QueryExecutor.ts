@@ -101,13 +101,18 @@ export class QueryExecutor {
             return result
         }
 
+        // CAUTION JSON 字符串值的归一化取决于驱动是否已解析 JSON 列：
+        //  - better-sqlite3 返回原始 JSON 文本，读到的 string 是"未解析的 JSON"，需要 JSON.parse；
+        //  - node-postgres/PGlite/mysql2 返回已解析的值，读到的 string 就是 JSON 值本身
+        //    （json 值恰好是字符串），再 parse 一次会把 'plain' 变成裸报错、把 '123' 静默变成数字 123。
+        const jsonAlreadyParsed = this.database.returnsParsedJSON === true
         return rawReturns.map(rawReturn => {
             const obj = {}
             Object.entries(rawReturn).forEach(([key, value]) => {
                 // CAUTION 注意这里去掉了最开始的 entityName
                 const attributePath = fieldAliasMap.getPath(key)!.slice(1, Infinity)
                 const valueType = resolveValueType(attributePath)
-                if (typeof value === 'string' && valueType === 'json') {
+                if (!jsonAlreadyParsed && typeof value === 'string' && valueType === 'json') {
                     try {
                         value = JSON.parse(value)
                     } catch (e) {

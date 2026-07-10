@@ -140,6 +140,16 @@ export class Entity implements EntityInstance {
     if (args.baseEntity && !args.matchExpression) {
       throw new Error(`Filtered entity "${args.name}" declares baseEntity but no matchExpression. A filtered entity is a predicate view over its base — declare matchExpression, or use the base entity directly.`);
     }
+    // matchExpression 只在 filtered entity（有 baseEntity）上有语义。孤立的 matchExpression
+    // 会被 setup 静默忽略（按普通实体建表，谓词从不生效）——零告警的声明失效，必须 fail-fast。
+    if (args.matchExpression && !args.baseEntity) {
+      throw new Error(`Entity "${args.name}" declares matchExpression without baseEntity. matchExpression only has meaning on a filtered entity — declare baseEntity as well, or remove matchExpression.`);
+    }
+    // filtered（baseEntity + matchExpression）与 merged（inputEntities）是互斥的声明模式：
+    // 同时声明时 merged 编译管线会静默吞掉 filtered 语义（谓词从不生效），必须 fail-fast。
+    if (args.baseEntity && args.inputEntities) {
+      throw new Error(`Entity "${args.name}" declares both baseEntity (filtered entity) and inputEntities (merged entity). These are mutually exclusive declaration modes — to filter a merged entity, declare the merged entity first and create a separate filtered entity on top of it.`);
+    }
 
     const instance = new Entity(args, options);
     

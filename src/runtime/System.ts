@@ -280,6 +280,11 @@ export type Database = {
     // 单条 SQL 允许的最大绑定参数数量（如 SQLite 的 SQLITE_MAX_VARIABLE_NUMBER、PG wire protocol 的 Int16 上限）。
     // 声明后，MatchExp 会在编译期对超限的 IN/NOT IN 列表抛出带指引的受控错误，而不是留给驱动抛裸错误。
     maxQueryParams?: number,
+    // 驱动是否把 JSON 列的值解析后返回（node-postgres/PGlite/mysql2 会，better-sqlite3 返回原始文本）。
+    // 读路径靠它区分「已解析的 JSON 字符串值」与「未解析的 JSON 文本」：不声明（默认 false）时
+    // 字符串一律按 JSON 文本解析——对返回已解析值的驱动，字符串类型的 JSON 值会被错误地二次
+    // JSON.parse 直接抛错。
+    returnsParsedJSON?: boolean,
     setupInternalComputationState?: () => Promise<void>,
     setupScopedSequenceState?: () => Promise<void>,
     atomicSequenceCapability?: AtomicSequenceCapability,

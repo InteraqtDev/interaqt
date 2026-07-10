@@ -635,7 +635,8 @@ export class Scheduler {
                     try {
                         await this.runComputation(source.computation, erRecordMutationEvent, record)
                     } catch (e) {
-                        // Log the error but continue with other records to avoid blocking the entire batch
+                        // CAUTION 单条记录的计算失败会中断整批并使事务回滚（fail-fast）。
+                        //  绝不能"跳过失败的记录继续"——那会留下部分计算结果的静默不一致。
                         const error = new ComputationError('Failed to run computation for dirty record', {
                             handleName: source.computation.constructor.name,
                             computationName: source.computation.args.constructor.displayName,
@@ -644,7 +645,6 @@ export class Scheduler {
                             context: { recordId: record?.id },
                             causedBy: e instanceof Error ? e : new Error(String(e))
                         })
-                        // For now, re-throw to maintain existing behavior, but in production you might want to log and continue
                         throw error
                     }
                 }

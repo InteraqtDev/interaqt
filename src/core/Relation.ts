@@ -77,7 +77,18 @@ export class Relation implements RelationInstance {
   constructor(args: RelationCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
-    
+
+    // filtered（baseRelation + matchExpression）与 merged（inputRelations）是互斥的声明模式：
+    // 同时声明时 merged 分支会静默吞掉 filtered 语义（谓词从不生效），必须 fail-fast。
+    if (args.inputRelations && args.baseRelation) {
+      throw new Error(`Relation${args.name ? ` "${args.name}"` : ''} declares both baseRelation (filtered relation) and inputRelations (merged relation). These are mutually exclusive declaration modes — to filter a merged relation, declare the merged relation first and create a separate filtered relation on top of it.`);
+    }
+    // matchExpression 只在 filtered relation（有 baseRelation）上有语义。孤立的 matchExpression
+    // 会被静默丢弃（实例上根本不会携带该字段）——零告警的声明失效，必须 fail-fast。
+    if (args.matchExpression && !args.baseRelation) {
+      throw new Error(`Relation${args.name ? ` "${args.name}"` : ''} declares matchExpression without baseRelation. matchExpression only has meaning on a filtered relation — declare baseRelation as well, or remove matchExpression.`);
+    }
+
     // For merged relation
     if (args.inputRelations) {
       // Validate inputRelations

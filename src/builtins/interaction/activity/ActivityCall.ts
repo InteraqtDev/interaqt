@@ -216,6 +216,12 @@ export class ActivityCall {
         const seq = {}
 
         for(let interaction of activity.interactions!) {
+            // fail-fast: 图节点按 interaction 实例/uuid 索引（uuidToNode/rawToNode），同一实例
+            //  在活动图中出现两次会静默覆盖先注册的节点——transfer 解析、状态推进、guard 都可能
+            //  绑到错误的节点上（症状从误导性的 "start node must one" 到静默的错误状态推进不等）。
+            if (this.uuidToNode.has(interaction.uuid)) {
+                throw new Error(`Interaction "${interaction.name}" appears more than once in activity "${this.activity.name}". Each graph node must be a distinct Interaction instance — create a separate Interaction (a new Interaction.create call) for each step.`)
+            }
             const node: InteractionNode = { content: interaction, next: null, uuid: interaction.uuid, parentGroup, parentSeq: seq as Seq, }
             this.uuidToNode.set(interaction.uuid, node)
             this.rawToNode.set(interaction, node)
@@ -227,6 +233,10 @@ export class ActivityCall {
             if (!InteractionState.GroupStateNodeType.has(group.type!)) {
                 const supported = Array.from(InteractionState.GroupStateNodeType.keys()).map(t => `'${t}'`).join(', ')
                 throw new Error(`ActivityGroup type "${group.type}" in activity "${activity.name}" is not supported. Supported types: ${supported}.`)
+            }
+            // fail-fast: 与 interaction 同理，group 实例复用同样会静默覆盖图节点。
+            if (this.uuidToNode.has(group.uuid)) {
+                throw new Error(`ActivityGroup (type '${group.type}') appears more than once in activity "${this.activity.name}". Each graph node must be a distinct ActivityGroup instance.`)
             }
             // fail-fast: a group with no child activities can never complete (group state
             // only advances via child-branch onChange callbacks, and an empty group has no

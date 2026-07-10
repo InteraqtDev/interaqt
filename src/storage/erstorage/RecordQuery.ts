@@ -89,9 +89,9 @@ export class RecordQuery {
         return new RecordQuery(
             this.recordName,
             this.map,
-matchExpression||this.matchExpression,
-attributeQuery||this.attributeQuery,
-     modifier||this.modifier,
+            matchExpression||this.matchExpression,
+            attributeQuery||this.attributeQuery,
+            modifier||this.modifier,
             this.contextRootEntity,
             this.parentRecord,
             this.attributeName,
@@ -99,7 +99,10 @@ attributeQuery||this.attributeQuery,
             this.allowNull,
             this.label,
             this.goto,
-            this.exit
+            this.exit,
+            // CAUTION alias（filtered relation 的对外名）必须随派生保留，
+            //  否则结果挂载会退回 base 属性名。
+            this.alias
         )
     }
 }

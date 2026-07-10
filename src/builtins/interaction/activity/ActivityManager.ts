@@ -110,10 +110,11 @@ export class ActivityManager {
                 const created = await activityCall.create(this)
                 args.activityId = created.activityId
             } else if (isHeadInteraction && args.activityId) {
+                // CAUTION 带 activityId 的 head（如 every/race 组里第二个分支的 head）已经有
+                //  activity refs 可用，必须与非 head 一样走 fullGuardWithUserRef——否则 isRef
+                //  userAttributives 会落到 standalone guard 的 "isRef outside activity" 拒绝分支。
                 await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
-                if (interaction.guard) {
-                    await interaction.guard.call(this, args)
-                }
+                await activityCall.fullGuardWithUserRef(this, interaction, args)
             } else {
                 if (!args.activityId) {
                     throw new Error('activityId must be provided for non-head interaction of an activity')
