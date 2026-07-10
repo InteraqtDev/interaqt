@@ -3308,6 +3308,13 @@ class MigrationScheduler {
 
     private async runIncrementalRecompute(computation: Computation, mutationEvents: RecordMutationEvent[]) {
         const events: RecordMutationEvent[] = [];
+        // CAUTION event-based property 计算的 handler 合约是「每宿主记录一次、以 record 为输入」
+        //  （见 runFullRecompute 的 property 分支）。链式事件驱动到这里时若以 record=undefined 调
+        //  writeComputationResult，retrieveLastValue/applyResult 的 property 分支会在 record!.id
+        //  处抛出与迁移无关的裸 TypeError，迁移直接失败且 resume 每次走进同一条死路。
+        //  event rebuild handler 本身就是全量语义（重算每条宿主记录的值、幂等），
+        //  这里对 property 上下文统一退回按宿主记录的全量重建，且整批事件只重建一次。
+        let propertyEventRebuildDone = false;
         for (const mutationEvent of mutationEvents) {
             const sourceMaps = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                 .filter(source => source.computation === computation);
@@ -3316,6 +3323,13 @@ class MigrationScheduler {
                     const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
                     if (!eventRebuildHandler) {
                         throw new UnrebuildableComputationError(`Event-based migration requires an approved event rebuild handler for ${dataContextPath(computation.dataContext)}`);
+                    }
+                    if (computation.dataContext.type === "property") {
+                        if (!propertyEventRebuildDone) {
+                            propertyEventRebuildDone = true;
+                            events.push(...await this.runFullRecompute(computation));
+                        }
+                        continue;
                     }
                     const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, mutationEvent });
                     const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);

@@ -1,6 +1,6 @@
 import { Average, AverageInstance } from "@core";
 import { Controller } from "../Controller.js";
-import { DataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
+import { DataContext, describeDataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
 import { GlobalRecordsAggregationHandle, parseAggregationFieldPath, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
 
 /**
@@ -26,7 +26,7 @@ export class GlobalAverageHandle extends GlobalRecordsAggregationHandle<number, 
 
     constructor(controller: Controller, args: AverageInstance, dataContext: DataContext) {
         super(controller, args, dataContext, { computationName: 'Average', requireAttributeQueryField: true })
-        this.avgFieldPath = parseAggregationFieldPath(this.args.attributeQuery!)
+        this.avgFieldPath = parseAggregationFieldPath(this.args.attributeQuery!, () => `Average computation of ${describeDataContext(dataContext)}`)
     }
 
     createState() {
@@ -75,7 +75,7 @@ export class PropertyAverageHandle extends PropertyRelationAggregationHandle<num
 
     constructor(controller: Controller, args: AverageInstance, dataContext: PropertyDataContext) {
         super(controller, args, dataContext, { computationName: 'Average', requireAttributeQueryField: true })
-        this.avgFieldPath = parseAggregationFieldPath(this.args.attributeQuery!)
+        this.avgFieldPath = parseAggregationFieldPath(this.args.attributeQuery!, () => `Average computation of ${describeDataContext(dataContext)}`)
     }
 
     createState() {

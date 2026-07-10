@@ -184,7 +184,7 @@ Summation.create(args: {
 }): SummationInstance
 ```
 
-Sums the field pointed to by the leftmost path in `attributeQuery`. Undefined/null/NaN/Infinity values are treated as 0.
+Sums exactly one field path declared in `attributeQuery` (a single field like `['score']`, or a single nested path like `[['team', {attributeQuery: ['budget']}]]`). Declaring multiple sibling fields is a declaration-time error — use WeightedSummation with a callback to aggregate a value derived from multiple fields. Undefined/null/NaN/Infinity values are treated as 0.
 
 ---
 

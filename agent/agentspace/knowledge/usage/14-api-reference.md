@@ -338,7 +338,7 @@ Summation.create(config: SummationConfig): KlassInstance<typeof Summation>
 
 **How it works**
 
-Summation sums the field pointed to by the leftmost path in `attributeQuery`. If any value in the path is `undefined`, `null`, `NaN`, or `Infinity`, that value will be treated as 0.
+Summation sums exactly one field path declared in `attributeQuery` (a single field like `['score']`, or a single nested path like `[['team', {attributeQuery: ['budget']}]]`). Declaring multiple sibling fields is a declaration-time error — use WeightedSummation with a callback to aggregate a value derived from multiple fields. If any value in the path is `undefined`, `null`, `NaN`, or `Infinity`, that value will be treated as 0.
 
 **Examples**
 ```typescript
