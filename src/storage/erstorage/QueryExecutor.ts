@@ -585,29 +585,64 @@ export class QueryExecutor {
         const data = (await this.findRecords(newSubQuery, `finding related record: ${relatedRecordQuery.parentRecord}.${relatedRecordQuery.attributeName}`, recordQueryRef, context))
         
         // 1.1 这里再反向处理一下关系数据。因为在上一步 withParentLinkData 查出来的时候是用的是反向的关系名字
-        const records = relatedRecordQuery.attributeQuery.parentLinkRecordQuery ? data.map(item => {
-            let itemWithParentLinkData: Record
-            if (!info.isLinkManyToManySymmetric()) {
-                itemWithParentLinkData = {
+        let records: Record[]
+        if (!relatedRecordQuery.attributeQuery.parentLinkRecordQuery) {
+            records = data
+        } else if (!info.isLinkManyToManySymmetric()) {
+            records = data.map(item => {
+                const itemWithParentLinkData: Record = {
                     ...item,
                     [LINK_SYMBOL]: item[reverseAttributeName][LINK_SYMBOL]
                 }
                 delete itemWithParentLinkData[reverseAttributeName]
-            } else {
-                // TODO 是不是有更优雅的判断？？？
-                // CAUTION 对称 n:n 关系，和父亲也只有一个方向是有的。
-                itemWithParentLinkData = {
+                return itemWithParentLinkData
+            })
+        } else {
+            // CAUTION 对称 n:n 关系的 link 数据按 :source/:target 两个方向变体查出。
+            //  同一行上两个变体可能同时有值（对端还有指向第三方的边时 SQL 交叉积 fan-out），
+            //  「优先取 source 变体」的盲选会把对端其他边的 link 数据错挂到父子边上
+            //  （r17 对称聚合矩阵的朴素预言机发现：C 查 friends 时 A 的 `&` 挂成了 A—B 边的数据）。
+            //  正确判据：只有「另一端 == 当前父记录、本端 == 当前关联记录」的变体才是父子边；
+            //  fan-out 产生的重复行按 (记录 id, link id) 去重。端点 id 由 AttributeQuery
+            //  对对称 link 查询强制附带（见其构造器），挂载后按用户是否声明剥除。
+            const linkItem = relatedRecordQuery.attributeQuery.data.find(
+                (item): item is [string, { attributeQuery?: AttributeQueryData }] => Array.isArray(item) && item[0] === LINK_SYMBOL
+            )
+            const userLinkAttrs = linkItem?.[1]?.attributeQuery || []
+            const userRequested = (endpoint: 'source' | 'target') => userLinkAttrs.some(attr =>
+                attr === endpoint || (Array.isArray(attr) && attr[0] === endpoint))
+            const keepSource = userRequested('source')
+            const keepTarget = userRequested('target')
+
+            const seenItemLinks = new Set<string>()
+            records = []
+            for (const item of data) {
+                const pickVariant = (link: Record | undefined, relatedIsSource: boolean): Record | undefined => {
+                    if (!link?.id) return undefined
+                    const selfEndId = relatedIsSource ? link.source?.id : link.target?.id
+                    const otherEndId = relatedIsSource ? link.target?.id : link.source?.id
+                    return String(otherEndId) === String(recordId) && String(selfEndId) === String(item.id) ? link : undefined
+                }
+                const picked = pickVariant(item[`${reverseAttributeName}:source`]?.[LINK_SYMBOL], true)
+                    ?? pickVariant(item[`${reverseAttributeName}:target`]?.[LINK_SYMBOL], false)
+                if (!picked) continue
+
+                const dedupeKey = `${item.id}::${picked.id}`
+                if (seenItemLinks.has(dedupeKey)) continue
+                seenItemLinks.add(dedupeKey)
+
+                const pickedLink = { ...picked }
+                if (!keepSource) delete pickedLink.source
+                if (!keepTarget) delete pickedLink.target
+                const itemWithParentLinkData: Record = {
                     ...item,
-                    [LINK_SYMBOL]: item[`${reverseAttributeName}:source`]?.[LINK_SYMBOL]?.id ?
-                        item[`${reverseAttributeName}:source`]?.[LINK_SYMBOL] :
-                        item[`${reverseAttributeName}:target`]?.[LINK_SYMBOL]
+                    [LINK_SYMBOL]: pickedLink
                 }
                 delete itemWithParentLinkData[`${reverseAttributeName}:source`]
                 delete itemWithParentLinkData[`${reverseAttributeName}:target`]
+                records.push(itemWithParentLinkData)
             }
-
-            return itemWithParentLinkData
-        }) : data
+        }
 
         const nextRecursiveContext = (newSubQuery.label && newSubQuery.label !== context.label) ? context.spawn(newSubQuery.label) : context
 

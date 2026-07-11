@@ -145,9 +145,34 @@ export class RecordQueryAgent implements RecordOperationAgent {
 
         // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
         // 开始 merge 数据，并记录 unLink 事件
+        const newRecordIsLink = this.map.getRecordInfo(newEntityData.recordName).isRelation && !!this.map.data.links[newEntityData.recordName]
         for (let recordWithCombined of recordsWithCombined) {
+            // CAUTION 正在创建的是 combined link record（如三表合一的 1:1 关系经 addLink 建立），
+            //  且被抢夺端点所在的行本身就是一条旧业务 link 行（行上有 link id）时：
+            //  端点数据被 flashOut 后旧业务 link 即告消失（列由 deleteRecordSameRowData 一并清除），
+            //  必须补发业务 link 的 delete 事件。下面 ref 循环里的既有事件块只覆盖
+            //  「创建实体时抢夺 combined 关联」的形态（linkName 是业务 link）；本形态下
+            //  ref 是 link 的 source/target，其 linkName 是虚拟 link，业务事件会漏发
+            //  （写路径拓扑矩阵的事件完备性预言机发现，r17 追加）。
+            if (newRecordIsLink && recordWithCombined.id) {
+                events?.push({
+                    type: 'delete',
+                    recordName: newEntityData.recordName,
+                    record: {
+                        ...Object.fromEntries(Object.entries(recordWithCombined).filter(([, v]) => v === null || typeof v !== 'object')),
+                        id: recordWithCombined.id,
+                        source: { id: recordWithCombined.source?.id },
+                        target: { id: recordWithCombined.target?.id },
+                    }
+                })
+            }
             for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
-                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
+                // CAUTION 行是按多个 ref 的 OR 匹配出来的，必须校验「本行该属性的值确实是当前 ref」：
+                //  例如三表合一的 link 抢夺（addLink(u2, p)，p 在 u1 行内）会同时匹配 u2 的行
+                //  （source.id=u2）与 u1 的行（target.id=p）——处理 u1 的行时 source 属性上是 u1
+                //  而不是 u2，若只判真值就会把无关的 u1 一并 flashOut，并在 result 上产生
+                //  同名属性冲突（"should not have same combined record" 内部断言崩溃，r17 拓扑矩阵首跑发现）。
+                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]?.id === combinedRecordIdRef.getRef().id) {
 
                     // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了
                     //1. 删掉 combined 原来的所有同行数据

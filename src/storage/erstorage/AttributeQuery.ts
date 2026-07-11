@@ -147,7 +147,21 @@ export class AttributeQuery {
             if (attributeName === LINK_SYMBOL) {
                 assert(!!(this.parentRecord && this.attributeName), `parent record and attribute name cannot be empty when query link data, you passed ${this.parentRecord} ${this.attributeName}`)
                 const info = this.map.getInfo(this.parentRecord!, this.attributeName!)
-                this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, subQueryData as RecordQueryData, undefined)
+                let linkSubQueryData = subQueryData as RecordQueryData
+                // CAUTION 对称 n:n 关系的 link 数据会按 :source/:target 两个方向变体查出（fan-out），
+                //  反向挂载时必须知道每条 link 的端点才能判定「哪条才是连接到当前父记录的边」——
+                //  否则对端的其他边会被错挂（r17 对称查询修复，见 QueryExecutor.findXToManyRelatedRecords）。
+                //  这里强制带上端点 id，挂载后再剥除（不属于用户声明的 `&` 数据形状）。
+                if (info.isLinkManyToManySymmetric()) {
+                    linkSubQueryData = {
+                        ...linkSubQueryData,
+                        attributeQuery: AttributeQuery.mergeAttributeQueryData(
+                            linkSubQueryData.attributeQuery || [],
+                            [['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]
+                        )
+                    }
+                }
+                this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, linkSubQueryData, undefined)
                 return
             }
 

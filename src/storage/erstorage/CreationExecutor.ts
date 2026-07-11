@@ -215,7 +215,8 @@ export class CreationExecutor {
         const updateRecord = { ...newData.getData() } as Record
         const updatedKeys: string[] = []
         updatedFieldValues.forEach(field => {
-            if (valueAttributeNames.has(field.name)) {
+            // id 是身份不是值变更：同 id ref（{id} 裸引用）不构成 update 事件（幂等重写必须静默）。
+            if (field.name !== 'id' && valueAttributeNames.has(field.name)) {
                 updateRecord[field.name] = field.value
                 updatedKeys.push(field.name)
             }

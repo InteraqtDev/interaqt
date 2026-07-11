@@ -270,3 +270,26 @@ test('should handle negative values correctly', async () => {
 6. 调用 `controller.setup(true)` 确保系统正确初始化
 
 7. 如果测试失败，检查计算逻辑、数据更新操作和查询参数
+
+## 维度登记册（r17 复盘引入，新增测试矩阵必须查阅）
+
+历史致命 bug（r5–r17）几乎全部落在「合法声明组合的空白格」上。为任何计算/写路径
+新增测试矩阵时，以下维度的**全部取值（含退化点）**必须显式决策——要么覆盖、
+要么在测试文件头注明为什么不适用。每轮审查发现的新维度必须回灌本清单。
+
+| 维度 | 取值（粗体为易漏的退化点） | 历史逃逸案例 |
+|------|---------------------------|--------------|
+| 关系类型 | 1:1 / n:1 / 1:n / n:n / **对称 n:n（source===target 且同名属性）** / **自引用** | r7 对称删除漏侧、r17 F-3 |
+| 物理拓扑 | **combined（三表合一）** / **merged（FK 并入端点行，x:1 默认）** / isolated（n:n 默认） | r6-F3、r17 F-1/F-2 |
+| 逐项状态 | 聚合**有无 callback**（注意 Summation/Average/Every/Any/WeightedSummation 无论有无 callback 都持有 link 行级状态） | r17 F-3 |
+| 载荷形态 | nested 新建 / **ref 引用既有** / ref+`&` / **同 id ref+`&`（原地更新）** / null 清除 / 数组 replace | r5-F-3、r17 F-2 |
+| 操作 | create / update-replace / **update 原地（同 id）** / **抢夺（引用已被占用的排他目标）** / delete 实体 / addRelation / removeRelation | r6-F3、r17 F-1 |
+| 路径跳数 | 1 跳 / **2 跳（含连续对称段）** / 3 跳 | r17 F-4 |
+| 观察面 | 查询面 / **事件面（用 tests/storage/helpers/eventCompleteness.ts 的预言机）** / 计算面（与朴素重算对照） / 不变量面（无悬挂端点、x:1 排他唯一） | r17 F-2 |
+
+配套设施：
+- `tests/storage/helpers/eventCompleteness.ts` — 事件完备性预言机（数据 diff ⟺ 事件流）、
+  INV-3 排他侧唯一、正反查询一致性断言；
+- `tests/storage/writePathTopologyMatrix.spec.ts` — 拓扑 × 操作矩阵样板；
+- `tests/runtime/symmetricAggregationMatrix.spec.ts` — 对称 × 全聚合、朴素重算预言机样板；
+- `tests/storage/symmetricPathMatrix.spec.ts` — 跳数 × 端点形态矩阵样板。
