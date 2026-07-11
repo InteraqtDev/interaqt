@@ -398,10 +398,15 @@ export async function checkPayload(controller: GuardController, interaction: Int
       const baseRecordName = (payloadDef.base as EntityInstance).name;
       const items = payloadDef.isCollection ? (payloadItem as unknown[]) : [payloadItem];
       for (const item of items) {
-        // Structural check: an entity/relation payload must be an object.
-        if (!item || typeof item !== 'object') {
+        // Structural check: an entity/relation payload item must be a plain object.
+        // CAUTION Array.isArray must be rejected explicitly — typeof [] === 'object' and [] is truthy,
+        //  so without this an array slips through as a single entity (isCollection:false) or as a
+        //  nested-array element (isCollection:true). Downstream consumers then read `.id`/spread the
+        //  value as one record and silently drift. Collection semantics must be declared via
+        //  isCollection:true, whose per-element check lands here (mirrors the type:'object' array guard).
+        if (!item || typeof item !== 'object' || Array.isArray(item)) {
           throw new InteractionGuardError(
-            `Payload validation failed for field '${payloadDef.name}': expected ${baseRecordName} data (object), got ${item === null ? 'null' : typeof item}`,
+            `Payload validation failed for field '${payloadDef.name}': expected ${baseRecordName} data (object), got ${item === null ? 'null' : Array.isArray(item) ? 'array' : typeof item}`,
             { type: `${payloadDef.name} check concept failed`, checkType: 'payload' }
           );
         }
