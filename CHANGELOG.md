@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.2](https://github.com/interaqtdev/interaqt/compare/v4.0.1...v4.0.2) (2026-07-11)
+
+### Bug Fixes
+
+* **core:** reject contradictory type/source/target on filtered/merged relations (r20 I-2) ([68d92fd](https://github.com/interaqtdev/interaqt/commit/68d92fdae193a6b26906a8b4c7f4c6893d622ba0))
+* **runtime:** StateMachine trigger.record matches merged current state on update events (r20 F-5) ([abb9143](https://github.com/interaqtdev/interaqt/commit/abb9143436df379723e2f43d2a1b42c9223cbd57))
+* **storage:** in-row link/combined writes emit filtered-view membership events; relation endpoints immutable through update; flashOut link create carries endpoints (r20 F-2, F-3, F-4) ([19990ab](https://github.com/interaqtdev/interaqt/commit/19990abf034fd72973e84d11c7062cb3d07fa6e6))
+* **storage:** unify isReferenceValue path collection (between refs join the JOIN tree) + split null out of IN/NOT IN lists (r20 F-1, I-1) ([adabd1d](https://github.com/interaqtdev/interaqt/commit/adabd1d0aac9f36530e71fc320ade991de9a284f))
+
 ## [4.0.1](https://github.com/interaqtdev/interaqt/compare/v4.0.0...v4.0.1) (2026-07-11)
 
 ### Bug Fixes
