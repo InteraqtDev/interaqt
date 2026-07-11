@@ -623,6 +623,75 @@ export class DBSetup {
                 }
             })
         })
+
+        // 值属性 vs 关系属性命名空间冲突：关系属性最终登记进端点 record 的属性表
+        // （populateRecordAttributes 无条件覆盖同名键）。若端点实体（或其 base 家族任一成员，
+        //  filtered 变体与 base 共享同一属性命名空间）已声明同名值属性，该值属性会被静默吞掉——
+        //  写入时标量值被当作关联记录展开（数据损坏），查询走关系语义，声明形同虚设。一律 fail-fast。
+        const familyValueProps = new Map<string, Map<string, string>>()
+        const registerValueProps = (item: EntityInstance | RelationInstance) => {
+            const rootName = this.resolveEndpointRootName(item)
+            let props = familyValueProps.get(rootName)
+            if (!props) familyValueProps.set(rootName, props = new Map())
+            for (const property of (item.properties || [])) {
+                if (!props.has(property.name)) props.set(property.name, item.name!)
+            }
+        }
+        this.entities.forEach(registerValueProps)
+        this.relations.forEach(registerValueProps)
+        const assertNoValuePropertyCollision = (endpoint: EntityInstance | RelationInstance, prop: string | undefined) => {
+            if (!prop) return
+            const declarer = familyValueProps.get(this.resolveEndpointRootName(endpoint))?.get(prop)
+            if (declarer) {
+                throw new Error(
+                    `Relation property name conflict: relation property '${prop}' on '${endpoint.name}' collides with the value property ` +
+                    `'${prop}' declared on '${declarer}'. Relation attributes and value properties share one attribute namespace per record — ` +
+                    `the relation would silently overwrite the value property (scalar writes get expanded as related-record payloads, corrupting data). ` +
+                    `Rename the relation's sourceProperty/targetProperty or the value property.`
+                )
+            }
+        }
+        this.relations.forEach(relation => {
+            assertNoValuePropertyCollision(relation.source, relation.sourceProperty)
+            assertNoValuePropertyCollision(relation.target, relation.targetProperty)
+        })
+    }
+
+    /**
+     * 保留属性名与重复属性名守卫。
+     *
+     * - ID_ATTR('id')/ROW_ID_ATTR('_rowId') 由框架管理：createRecord 会无条件写入框架主键，
+     *   用户声明的同名属性（含 defaultValue/computation）会被静默覆盖，声明形同虚设。
+     * - relation 的 'source'/'target' 是端点虚拟链接属性（populateRecordAttributes 写入），
+     *   用户值属性会被静默覆盖。
+     * - 重复属性名在 Object.fromEntries 中静默保留最后一个，先声明的属性（及其 computation）
+     *   从属性表消失，但仍会注册计算句柄——两个计算争用一列。
+     * 以上全部是零告警的 schema 损坏，必须在 setup 期 fail-fast。
+     */
+    private validatePropertyNames() {
+        const validate = (item: EntityInstance | RelationInstance, isRelation: boolean) => {
+            const reserved = new Set(isRelation ? [ID_ATTR, ROW_ID_ATTR, 'source', 'target'] : [ID_ATTR, ROW_ID_ATTR])
+            const seen = new Set<string>()
+            for (const property of (item.properties || [])) {
+                if (reserved.has(property.name)) {
+                    throw new Error(
+                        `Property name '${property.name}' on ${isRelation ? 'relation' : 'entity'} '${item.name}' is reserved: ` +
+                        (property.name === ID_ATTR || property.name === ROW_ID_ATTR
+                            ? `the framework manages the '${property.name}' column and would silently overwrite your declaration (including any defaultValue/computation on it). Use a different name, e.g. 'externalId'.`
+                            : `'source'/'target' are the relation's endpoint attributes. Use a different name for the relation property.`)
+                    )
+                }
+                if (seen.has(property.name)) {
+                    throw new Error(
+                        `Duplicate property name '${property.name}' on ${isRelation ? 'relation' : 'entity'} '${item.name}'. ` +
+                        `Property names must be unique per record — duplicates silently keep only the last declaration while all their computations stay registered against one column.`
+                    )
+                }
+                seen.add(property.name)
+            }
+        }
+        this.entities.forEach(entity => validate(entity, false))
+        this.relations.forEach(relation => validate(relation, true))
     }
 
     /**
@@ -827,6 +896,9 @@ export class DBSetup {
     buildMap() {
         // -1. 校验所有 entity/relation 的 name（name 会直接进入 SQL，必须先于一切处理）
         this.validateRecordNames();
+
+        // -0.5. 校验保留属性名（id/_rowId/source/target）与重复属性名
+        this.validatePropertyNames();
 
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();

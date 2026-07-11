@@ -345,11 +345,10 @@ export function createData() {
                 collection: false,
                 computation: resultStateMachine
             }),
-            Property.create({
-                name: 'message',
-                type: 'string',
-                collection: false,
-            }),
+            // r18 起值属性与关系属性共享命名空间的冲突会在声明期 fail-fast：
+            // 此前这里声明的标量 message(string) 被 messageToRequestRelation 的
+            // sourceProperty 'message' 静默覆盖（死声明），Transform 写入的
+            // payload.message 实际走关系语义创建 Message 记录。删除死声明，保留关系。
             Property.create({
                 name: 'activityId',
                 type: 'string',

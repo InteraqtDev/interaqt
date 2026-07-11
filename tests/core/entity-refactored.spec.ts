@@ -148,7 +148,7 @@ describe("Entity System Refactored - compatibility test", () => {
     });
 
     test("should clone entity", () => {
-      const prop = Property.create({ name: "id", type: PropertyTypes.Number });
+      const prop = Property.create({ name: "sku", type: PropertyTypes.Number });
       const original = Entity.create({
         name: "Product",
         properties: [prop]

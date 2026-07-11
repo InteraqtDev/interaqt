@@ -572,7 +572,10 @@ export class Controller {
             return this.system.storage.find(dataContext.id.name!, undefined, undefined, ['*'])
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
-            if (record![propertyDataContext.id.name]) return record![propertyDataContext.id.name]
+            // CAUTION 按"键是否存在"判断，不能按真值：0/false/'' 是合法的计算值，
+            //  真值判断会把它们误判为缺失而绕去查库——多数时候只是浪费一次查询，
+            //  但当 record 快照比库里更新时会拿到错误的 lastValue。
+            if (record![propertyDataContext.id.name] !== undefined) return record![propertyDataContext.id.name]
 
             const item = await this.system.storage.findOne(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), undefined, ['*'])
             return item[propertyDataContext.id.name]

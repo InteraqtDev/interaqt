@@ -14,8 +14,11 @@ import { matchesScopedSequenceRecord, scopedSequenceMatchAttributeQuery, scopedS
 export const MIGRATION_MANIFEST_CONCEPT = "_MigrationManifest_";
 export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
 // Generator "1" did not collect StateNode.computeValue / StateTransfer.computeTarget
-// into computation function signatures. Bump when signature collection semantics change.
-const MIGRATION_MANIFEST_GENERATOR_VERSION = "2";
+// into computation function signatures. Generator "2" did not collect plain-value args
+// (StateMachine trigger patterns/state-graph topology, Every.notEmpty, Transform eventDep
+// record patterns, ...) into structural signatures (argsSignature).
+// Bump when signature collection semantics change.
+const MIGRATION_MANIFEST_GENERATOR_VERSION = "3";
 const HARD_DELETION_PROPERTY_NAME = "_isDeleted_";
 
 export class MigrationError extends Error {
@@ -366,6 +369,7 @@ export type ComputationManifest = {
     outputSignature: string;
     stateSignature: string;
     structuralSignature: string;
+    argsSignature: string;
     functionSignature?: ComputationFunctionSignature;
     allocation?: {
         kind: "scoped-sequence";
@@ -799,6 +803,50 @@ function createFunctionSignature(args: Record<string, unknown>, includeText = fa
     };
 }
 
+// 实例级字段：逐进程随机（uuid）或纯注册用途，进签名会让未变更的模型被误判为变更。
+const INSTANCE_ONLY_ARG_FIELDS = new Set(["uuid", "_type", "_options"]);
+
+/**
+ * 计算语义的"普通值参数"规范化（argsSignature 的输入）。
+ *
+ * functionSignature 覆盖了回调函数体、deps/eventDeps 覆盖了数据/事件依赖的
+ * recordName/type/attributeQuery，但除此之外的普通值参数此前不进入任何签名：
+ * StateMachine 的 trigger.keys / trigger.record 模式与状态图拓扑（current/next）、
+ * Every 的 notEmpty、Transform eventDeps 的 record 模式、Count 的 direction 等。
+ * 改这些参数会改变存量数据的语义，而迁移零感知——静默放行是对「审阅即契约」的破坏。
+ *
+ * 规范化规则：
+ *  - 函数 → 位置标记 `[Function]`（不含文本哈希！函数文本由 functionSignature 单独覆盖，
+ *    进入 signature 而不进入 structuralSignature——函数文本变更必须走 "possibly-changed"/
+ *    state-only 分类，混入这里会把 createState 等状态函数的文本变化误判为结构变更）；
+ *  - 模型引用（Entity/Relation/Property/Dictionary）→ `[<type>:<name>]`：身份已由
+ *    deps/dataContext 覆盖，深入遍历会把整个模型图卷进来（含循环）；
+ *  - 其他 klass 实例（StateNode/StateTransfer/BoolExp 节点等）→ 遍历其自有语义字段；
+ *  - uuid/_type/_options 一律剔除（uuid 逐进程随机）；
+ *  - 对象键排序 + 循环守卫，保证跨进程稳定。
+ */
+function canonicalizeArgsForSignature(value: unknown, seen = new WeakSet<object>()): unknown {
+    if (typeof value === "function") return "[Function]";
+    if (value === null || typeof value !== "object") return value;
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
+    if (Array.isArray(value)) return value.map(item => canonicalizeArgsForSignature(item, seen));
+    const record = value as Record<string, unknown>;
+    if (typeof record._type === "string" && MODEL_REFERENCE_TYPES.includes(record._type)) {
+        return `[${record._type}:${(record as { name?: unknown }).name ?? ""}]`;
+    }
+    const output: Record<string, unknown> = {};
+    for (const key of Object.keys(record).sort()) {
+        if (INSTANCE_ONLY_ARG_FIELDS.has(key)) continue;
+        output[key] = canonicalizeArgsForSignature(record[key], seen);
+    }
+    return output;
+}
+
+function createArgsSignature(args: Record<string, unknown>): string {
+    return hash(canonicalizeArgsForSignature(args));
+}
+
 function createComputationManifest(computation: Computation, includeFunctionText = false): ComputationManifest {
     const args = computation.args as Record<string, unknown>;
     const deps = serializeDataDeps(computation as Partial<DataBasedComputation>);
@@ -811,6 +859,7 @@ function createComputationManifest(computation: Computation, includeFunctionText
     const type = computationSemanticType(computation);
     const identity = createIdentity("computation", id, computation.args.uuid);
     const functionSignature = createFunctionSignature(args, includeFunctionText);
+    const argsSignature = createArgsSignature(args);
     const { allocation, scopeSignature, allocationSignature } = createScopedSequenceSignatures(args);
     const outputSignature = hash({
         type,
@@ -831,6 +880,9 @@ function createComputationManifest(computation: Computation, includeFunctionText
         deps,
         eventDeps,
         allocationSignature,
+        // 普通值参数（trigger 模式、状态图拓扑、notEmpty、direction 等）的规范化签名，
+        // 见 canonicalizeArgsForSignature。缺失时改这些参数迁移零感知（存量数据静默陈旧）。
+        argsSignature,
         callbackPaths: functionSignature?.callbackPaths || [],
         hasFunction: functionSignature?.hasFunction === true,
         hasCompute: typeof (computation as DataBasedComputation).compute === "function",
@@ -862,6 +914,7 @@ function createComputationManifest(computation: Computation, includeFunctionText
         outputSignature,
         stateSignature,
         structuralSignature,
+        argsSignature,
         functionSignature,
         allocation,
         allocationSignature,

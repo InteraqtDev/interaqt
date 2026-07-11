@@ -1,7 +1,7 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { PropertyInstance, Property } from './Property.js';
-import { EntityInstance } from './Entity.js';
+import { EntityInstance, validatePropertyNamesOnCreate } from './Entity.js';
 import type { ComputationInstance } from './types.js';
 import type { ConstraintInstance } from './Constraint.js';
 
@@ -338,6 +338,8 @@ export class Relation implements RelationInstance {
     if (args.type !== undefined && !VALID_RELATION_TYPES.includes(args.type)) {
       throw new Error(`Relation type "${args.type}" is invalid. Valid types: ${VALID_RELATION_TYPES.map(t => `'${t}'`).join(', ')}.`);
     }
+    // 保留名（id/_rowId/source/target）与重复属性名：见 Entity.create 的同族守卫说明。
+    validatePropertyNamesOnCreate(args.name ?? `${args.source?.name}_${args.sourceProperty}_${args.targetProperty}_${args.target?.name}`, args.properties, 'Relation');
     const instance = new Relation(args, options);
     
     // 检查 uuid 是否重复

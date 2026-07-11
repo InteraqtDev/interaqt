@@ -56,6 +56,10 @@ export type DataBasedEntityEventsSourceMap = EntityCreateEventsSourceMap
 
 export type EventBasedEntityEventsSourceMap = EventDep & {
     computation: Computation,
+    // 与 EntityUpdateEventsSourceMap.filteredRecordName 同义：eventDep 监听 filtered
+    // entity/relation 名的 update 事件时，监听注册到物理 base 名上，此字段记录原 filtered 名，
+    // Scheduler 路由时做成员资格守卫并把事件名改写回 filtered 名。
+    filteredRecordName?: string
 }
 
 export type EntityEventSourceMap = DataBasedEntityEventsSourceMap | EventBasedEntityEventsSourceMap
@@ -109,20 +113,21 @@ export class ComputationSourceMapManager {
     /**
      * CAUTION filtered entity/relation 名下只有成员资格 create/delete 事件；
      *  字段 update 事件永远以物理 base 记录名发出。注册在 filtered 名上的 update
-     *  监听是死监听——成员字段更新会静默丢失（聚合值永久陈旧）。
+     *  监听是死监听——成员字段更新会静默丢失（数据驱动计算聚合值永久陈旧、
+     *  事件驱动计算的 StateMachine trigger / Transform eventDep 永不触发）。
      *  这里把 update 监听改挂到物理名上，并记录原 filtered 名，Scheduler 路由时
      *  按 filteredRecordName 做成员资格守卫并把事件名改写回 filtered 名。
+     *  数据驱动（dataDep）与事件驱动（eventDep）两条轨道必须同构处理。
      */
     private normalizeFilteredUpdateSourceMap(source: EntityEventSourceMap): EntityEventSourceMap {
-        if (source.type !== 'update' || !('dataDep' in source)) return source
-        const updateSource = source as EntityUpdateEventsSourceMap
-        const physicalName = this.filteredToPhysicalName.get(updateSource.recordName)
+        if (source.type !== 'update') return source
+        const physicalName = this.filteredToPhysicalName.get(source.recordName)
         if (!physicalName) return source
         return {
-            ...updateSource,
+            ...source,
             recordName: physicalName,
-            filteredRecordName: updateSource.recordName,
-        }
+            filteredRecordName: source.recordName,
+        } as EntityEventSourceMap
     }
 
     /**

@@ -8,7 +8,8 @@ describe('RefContainer', () => {
     return Entity.create({
       name,
       properties: [
-        Property.create({ name: 'id', type: 'string' }),
+        // 'id' 是保留属性名（框架主键，声明期 fail-fast），测试用 'code' 代替
+        Property.create({ name: 'code', type: 'string' }),
         Property.create({ name: 'value', type: 'string' })
       ]
     });
@@ -400,7 +401,7 @@ describe('RefContainer', () => {
       const entity1 = Entity.create({
         name: 'Entity1',
         properties: [
-          Property.create({ name: 'id', type: 'string' }),
+          Property.create({ name: 'code', type: 'string' }),
           Property.create({ name: 'name', type: 'string' }),
           Property.create({ name: 'value', type: 'number' })
         ]
@@ -411,7 +412,7 @@ describe('RefContainer', () => {
       const newEntity = Entity.create({
         name: 'NewEntity',
         properties: [
-          Property.create({ name: 'id', type: 'string' }),
+          Property.create({ name: 'code', type: 'string' }),
           Property.create({ name: 'title', type: 'string' })
         ]
       });
@@ -421,7 +422,7 @@ describe('RefContainer', () => {
       const result = container.getAll();
       
       expect(result.entities[0].properties).toHaveLength(2);
-      expect(result.entities[0].properties[0].name).toBe('id');
+      expect(result.entities[0].properties[0].name).toBe('code');
       expect(result.entities[0].properties[1].name).toBe('title');
     });
   });
