@@ -176,6 +176,22 @@ export class MatchExp {
                 }
             }
 
+            // CAUTION EXIST 子查询内部的 isReferenceValue 引用解析的是**外层根实体**的作用域
+            //  （parseFunctionMatchAtom 把 contextRootEntity 一路继承给所有嵌套 exist，见其
+            //  RecordQuery.create 的最后一个参数）。内层 MatchExp 因 contextRootEntity 存在而
+            //  跳过了引用路径的 JOIN 构建（上面的 !this.contextRootEntity 分支），所以解析所在的
+            //  这一层（根查询）必须把这些引用路径并入自己的 query tree——否则相关列（如
+            //  User_leader.salary）在外层 FROM 里没有对应的 JOIN，SQL 直接报
+            //  "missing FROM-clause entry for table"。只有根查询（!contextRootEntity）负责。
+            if (!this.contextRootEntity
+                && Array.isArray(matchData.data.value)
+                && typeof matchData.data.value[0] === 'string'
+                && (matchData.data.value[0] as string).toLowerCase() === 'exist'
+                && matchData.data.value[1]) {
+                this.collectExistReferencePaths(matchData.data.value[1] as MatchExpressionData)
+                    .forEach(referencePath => recordQueryTree.addField(referencePath))
+            }
+
             // 直接就是 value 的情况不用管，没有 query 其他的实体。
             //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
             if ((matchAttributePath.length === 1 && attributeInfo.isValue)) {
@@ -202,6 +218,32 @@ export class MatchExp {
         }
     }
 
+
+    // CAUTION 收集 exist 子查询（含嵌套 exist）里所有 isReferenceValue 的引用路径。这些引用都
+    //  解析自最外层根实体（contextRootEntity 逐层继承），因此必须由根查询统一并入 JOIN 树。
+    //  仅返回跨关联的多段路径（length>1）；单段的是根实体自己的列，无需额外 JOIN。
+    private collectExistReferencePaths(expression: MatchExpressionData): string[][] {
+        const paths: string[][] = []
+        const walk = (exp: MatchExpressionData) => {
+            if (exp.isExpression()) {
+                if (exp.left) walk(exp.left)
+                if (exp.right) walk(exp.right)
+                return
+            }
+            const atom = exp.data
+            if (!Array.isArray(atom.value)) return
+            if (atom.isReferenceValue && typeof atom.value[1] === 'string') {
+                const referencePath = (atom.value[1] as string).split('.')
+                if (referencePath.length > 1) paths.push(referencePath)
+            }
+            // 嵌套 exist 的引用同样解析自根实体，继续下钻收集。
+            if (typeof atom.value[0] === 'string' && (atom.value[0] as string).toLowerCase() === 'exist' && atom.value[1]) {
+                walk(atom.value[1] as MatchExpressionData)
+            }
+        }
+        walk(expression)
+        return paths
+    }
 
     getFinalFieldName(matchAttributePath: string[]): [string, string] {
         const namePath = [this.entityName].concat(matchAttributePath.slice(0, -1))
