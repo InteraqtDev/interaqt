@@ -5,6 +5,7 @@ import { Controller } from "./Controller.js";
 import { DICTIONARY_RECORD, RecordMutationEvent } from "./System.js";
 import { Scheduler } from "./Scheduler.js";
 import { ComputationProtocolError } from "./errors/index.js";
+import { mergedMutationEventView } from "./computations/TransitionFinder.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
@@ -361,13 +362,10 @@ export class ComputationSourceMapManager {
         
         // 如果 eventDep 中定义了 record 字段，需要深度匹配
         if (eventDep.record !== undefined) {
-            // 对于 update 操作，mutationEvent.record 可能只包含更新的字段
-            // 所以我们需要将 oldRecord 和 record 合并来获得完整的当前状态
-            let actualRecord = mutationEvent.record;
-            if (mutationEvent.type === 'update' && mutationEvent.oldRecord) {
-                // 合并 oldRecord 和 record 来获得完整的当前记录
-                actualRecord = { ...mutationEvent.oldRecord, ...mutationEvent.record };
-            }
+            // 对于 update 操作，mutationEvent.record 可能只包含更新的字段，record 模式按
+            // 合并后的当前状态匹配。与 StateMachine trigger（TransitionFinder）共用同一个
+            // 合并视图——同一声明面（RecordMutationEventPattern）的所有读者必须同构。
+            const actualRecord = (mergedMutationEventView(mutationEvent) as RecordMutationEvent).record
             
             if (!this.deepMatch(actualRecord, eventDep.record)) {
                 return false
