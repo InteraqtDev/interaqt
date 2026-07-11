@@ -34,8 +34,9 @@ export interface RecordOperationAgent {
     unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, reason?: string, events?: RecordMutationEvent[]): Promise<Record[]>
     deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp?: boolean): Promise<Record[]>
     addLinkFromRecord(entity: string, attribute: string, entityId: string, relatedEntityId: string, attributes?: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef>
+    unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record): Promise<void>
     preprocessSameRowData(newEntityData: NewRecordData, isUpdate?: boolean, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData>
-    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string): Promise<{ [k: string]: RawEntityData }>
+    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string, excludeAttributes?: Set<string>): Promise<{ [k: string]: RawEntityData }>
     relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, events?: RecordMutationEvent[]): Promise<Record[]>
 }
 
@@ -86,6 +87,11 @@ export class RecordQueryAgent implements RecordOperationAgent {
         return this.creationExecutor.createRecord(newEntityData, queryName, events)
     }
 
+    // 委托给 CreationExecutor（create/update 共用：1:1 排他目标的旧 owner 解除）
+    async unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record): Promise<void> {
+        return this.creationExecutor.unlinkOldOwnersOfExclusiveTargets(newEntityData, events, currentRecord)
+    }
+
     // 委托给 CreationExecutor。
     // CAUTION 创建/更新两个分支共用同一份实现（CreationExecutor.preprocessSameRowData），
     //  不要在这里再复制一份，两份实现必然随时间分叉。
@@ -102,16 +108,22 @@ export class RecordQueryAgent implements RecordOperationAgent {
      *  所以刻意不产生实体级 delete/create 事件（否则下游聚合会被虚假地减/加一次）。
      *  事件流只反映关系层面的事实：旧 link delete + 新 link create（见下方 events?.push）。
      */
-    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = ''): Promise<{ [k: string]: RawEntityData }> {
+    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = '', excludeAttributes?: Set<string>): Promise<{ [k: string]: RawEntityData }> {
         const result: { [k: string]: RawEntityData } = {}
+        // CAUTION update 时引用的 combined record 若与当前行上已有的是同一个（同 id 原地更新），
+        //  不存在"抢夺"：数据已在本行。此时绝不能走 flashOut——它会把本行旧数据读出再 merge 回
+        //  newEntityData（merge 方向是 flashOut 数据在后），用户的新值被旧值静默覆盖（r17 F-2 家族）。
+        const combinedRecordIdRefsToFlash = excludeAttributes?.size
+            ? newEntityData.combinedRecordIdRefs.filter(r => !excludeAttributes.has(r.info!.attributeName))
+            : newEntityData.combinedRecordIdRefs
         // CAUTION 没有需要抢夺的三表合一记录时必须直接返回。
         //  否则下面的 match 为 undefined，会生成 WHERE 1=1 的全表查询，导致每次 create/update 都全表扫描。
-        if (!newEntityData.combinedRecordIdRefs.length) return result
+        if (!combinedRecordIdRefsToFlash.length) return result
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
         let match: MatchExpressionData | undefined
         // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
         const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map, true, true, false, true)
-        for (let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
+        for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
             const attributeIdMatchAtom: MatchAtom = {
                 key: `${combinedRecordIdRef.info!.attributeName!}.id`,
                 value: ['=', combinedRecordIdRef.getRef().id]
@@ -134,7 +146,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
         // 开始 merge 数据，并记录 unLink 事件
         for (let recordWithCombined of recordsWithCombined) {
-            for (let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
+            for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
                 if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
 
                     // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了

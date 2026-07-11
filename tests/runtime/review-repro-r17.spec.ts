@@ -1,22 +1,20 @@
 /**
- * r17 deep-review reproductions — runtime layer
+ * r17 deep-review regressions — runtime layer
  * (agentspace/output/deep-review-2026-07-11-r17.md)
  *
- * Committed as failing-by-design (`test.fails`) reproductions, following the
- * repo convention (see review-repro-computations.spec.ts). Each test asserts
- * the CORRECT behavior and currently fails because of the bug it documents.
- * When a bug is fixed, flip its test from `test.fails` to `test`.
+ * Originally committed as failing-by-design (`test.fails`) reproductions;
+ * the bugs are fixed, so these now assert the correct behavior:
  *
- * - F-3 (runtime face): symmetric n:n relation + property-level aggregation
- *   WITH callback. A single link row carries BOTH endpoints' contributions,
- *   but the per-item RecordBoundState is keyed by the link row alone, so the
- *   two hosts' contributions collide: the second endpoint reads the first
- *   endpoint's item state. Symptom on create: one side counts 0; symptom on
- *   delete: "count became negative" ComputationError, transaction rolled back
- *   (the delete becomes impossible).
- * - F-4: '&' link-property change via same-id ref update emits no events
- *   (storage face in tests/storage/review-repro-r17.spec.ts), so aggregations
- *   over link properties go permanently stale.
+ * - F-3: symmetric n:n relation + property-level aggregation WITH callback.
+ *   A single link row carries BOTH endpoints' contributions, so per-link item
+ *   state cannot be attributed to one host — the aggregation template now
+ *   falls back to full recompute for symmetric relations (and skips writing
+ *   the per-item state). Both endpoints count correctly and edge deletion no
+ *   longer crashes with "count became negative".
+ * - F-2 (runtime face): '&' link-property change via same-id ref update now
+ *   emits a link update event (storage face in
+ *   tests/storage/review-repro-r17.spec.ts), so aggregations over link
+ *   properties propagate.
  */
 import { describe, expect, test } from "vitest";
 import { Entity, Property, Relation, Count, WeightedSummation, KlassByName, MonoSystem, Controller, MatchExp } from 'interaqt';
@@ -31,7 +29,7 @@ async function bootstrap(entities: any[], relations: any[]) {
 }
 
 describe('r17 F-3: symmetric relation + callback aggregation collides item state', () => {
-    test.fails('Count with callback on a symmetric relation must count on both endpoints and survive deletion', async () => {
+    test('Count with callback on a symmetric relation must count on both endpoints and survive deletion', async () => {
         const User = Entity.create({
             name: 'U',
             properties: [
@@ -60,13 +58,12 @@ describe('r17 F-3: symmetric relation + callback aggregation collides item state
 
         const a1 = await storage.findOne('U', MatchExp.atom({ key: 'id', value: ['=', a.id] }), undefined, ['*']);
         const b1 = await storage.findOne('U', MatchExp.atom({ key: 'id', value: ['=', b.id] }), undefined, ['*']);
-        // 现状：isItemMatchCount 以 link 行为 key，两个宿主共享一个状态槽——
-        // 第二个宿主的增量读到第一个宿主写入的 oldValue=true，delta=0，计数停在 0。
+        // 对称关系下同一条 link 行承载两端宿主的贡献，逐项状态无法归属单一宿主——
+        // 聚合模板对对称关系退回全量重算，两端都必须计入。
         expect(a1.activeFriendCount).toBe(1);
         expect(b1.activeFriendCount).toBe(1);
 
-        // 删边：现状下 A 侧状态被 B 侧提前复位/读走，increment(-1) 把 0 减成 -1，
-        // assertNonNegative 抛 ComputationError，整个删除事务回滚（删除操作不可用）。
+        // 删边：两端都归零，且不允许出现 "count became negative" 崩溃（事务回滚导致删除不可用）。
         const links = await storage.findRelationByName(friends.name!, undefined, undefined, ['id']);
         await storage.removeRelationByName(friends.name!, MatchExp.atom({ key: 'id', value: ['=', links[0].id] }));
 
@@ -78,7 +75,7 @@ describe('r17 F-3: symmetric relation + callback aggregation collides item state
 });
 
 describe('r17 F-4: & link-property change via same-id ref update must propagate', () => {
-    test.fails('WeightedSummation over link property must update when & data changes through entity update', async () => {
+    test('WeightedSummation over link property must update when & data changes through entity update', async () => {
         const Customer = Entity.create({
             name: 'Customer',
             properties: [Property.create({ name: 'name', type: 'string' })]
@@ -109,15 +106,14 @@ describe('r17 F-4: & link-property change via same-id ref update must propagate'
         const row1 = await storage.findOne('Customer', MatchExp.atom({ key: 'id', value: ['=', cust.id] }), undefined, ['*']);
         expect(row1.totalQuantity).toBe(2);
 
-        // 同 id ref + '&' 改成 5：数据写入了 link 列，但 storage 不发任何事件
-        // （preprocessSameRowData 只在 related id 变化时生成 link 事件）→ 计算保持 2。
-        // 对照组：直接 updateRelationByName 改 quantity 会正确传播到 5。
+        // 同 id ref + '&' 改成 5：数据面与事件面必须同步——
+        // preprocessSameRowData 对同 id 原地更新补发 link update 事件，聚合增量跟进。
         await storage.update('Customer', MatchExp.atom({ key: 'id', value: ['=', cust.id] }), { boughtProduct: { id: prod.id, '&': { quantity: 5 } } });
 
         const relRows = await storage.findRelationByName(purchase.name!, undefined, undefined, ['quantity']);
-        expect(relRows[0]?.quantity).toBe(5);  // 数据面已经是 5
+        expect(relRows[0]?.quantity).toBe(5);  // 数据面
 
         const row2 = await storage.findOne('Customer', MatchExp.atom({ key: 'id', value: ['=', cust.id] }), undefined, ['*']);
-        expect(row2.totalQuantity).toBe(5);    // 计算面必须跟上
+        expect(row2.totalQuantity).toBe(5);    // 计算面
     });
 });

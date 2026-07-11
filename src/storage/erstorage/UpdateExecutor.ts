@@ -143,6 +143,11 @@ export class UpdateExecutor {
             )
         }
 
+        // 1.5 1:1 排他目标的旧 owner 解除（r17 F-1）：上面的 unlink 只清除"我自己"的旧关系；
+        //  引用的目标若已被其他宿主占用（merged link 的 FK 在对方行上），必须显式解除，
+        //  否则两行 FK 同指一个目标——1:1 不变量被静默破坏。同 id 原地引用由 matchedEntity 判定跳过。
+        await this.agent.unlinkOldOwnersOfExclusiveTargets(newEntityDataWithDep, events, matchedEntity)
+
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
         const newEntityDataWithIdsWithFlashOutRecords = await this.agent.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
         const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue(matchedEntity)

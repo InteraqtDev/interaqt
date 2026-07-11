@@ -237,10 +237,12 @@ export class AttributeQuery {
                     ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(nextFieldPath, nextNameContext)
                 )
             } else {
-                queryFields.push(
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[0], nextSymmetricLinkNameContext![0]),
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[1], nextSymmetricLinkNameContext![1])
-                )
+                // parentLink 上只有紧邻的一段对称关系，恒展开为 source/target 两个变体。
+                symmetricLinkPaths.forEach((variantPath, i) => {
+                    queryFields.push(
+                        ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(variantPath, nextSymmetricLinkNameContext![i])
+                    )
+                })
             }
 
         }

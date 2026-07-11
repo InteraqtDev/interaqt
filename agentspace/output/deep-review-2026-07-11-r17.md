@@ -7,6 +7,15 @@
 - 方法：与 r1–r16 全部报告逐条去重（候选中约半数为既有遗留项或已修项，剔除；三项子探查结论被复现实验**证伪**，见第五节）。「已复现确认」才列为致命。
 - 复现固化：`tests/storage/review-repro-r17.spec.ts`（4 用例）+ `tests/runtime/review-repro-r17.spec.ts`（2 用例），全部按仓库惯例以 `test.fails` 形态提交（修复后翻转为常驻回归）。提交后全量 **1858 passed / 26 skipped**。
 
+> **维护说明（2026-07-11）**：本报告的四个致命项已在同分支（`cursor/deep-code-review-r17-99e4`）全部修复：
+> - **F-1**：`addLink` 对 isolated 1:1 双侧、merged 1:1 非 FK 侧显式解除旧 link（reliance 除外，保持业务级 fail-fast）；宿主路径（create/update）经 `unlinkOldOwnersOfExclusiveTargets` 解除已占用目标的旧 owner，同 id 原地引用跳过。
+> - **F-2**：`preprocessSameRowData` 对同 id + `&`/嵌套值的原地更新补发 link/combined 记录的 update 事件（keys + oldRecord，与宿主 update 事件同契约）；`NewRecordData.getSameRowFieldAndValue` 对同 id link 数据传入旧 link 快照（防默认值重置绑定状态列）；combined 拓扑下同 id 引用不再走 flashOut（旧值 merge 覆盖新值的数据面 bug，修复过程中新发现）。
+> - **F-3**：聚合模板对「对称关系 + 逐项状态（callback 型）」显式守卫退回全量重算，并停写无法归属宿主的逐项状态；无 callback 的存在性 delta 路径不受影响。
+> - **F-4**：`spawnManyToManySymmetricPath` 展开路径中**全部**对称段（笛卡尔积，含防二次展开守卫），MatchExp 值/记录两分支按变体 OR 组合；错误注释（"路径中只可能有一个对称关系"）删除。
+>
+> 修复回归：上述 6 个复现翻转为常驻回归 + 兄弟格扫描 6 用例（combined 同 id 数据面+事件面、combined/merged 抢夺对照、replace 对照、幂等对照、n:1 非排他对照）+ `spawnManyToManySymmetricPath` 多段展开单测（含防二次展开）。修复后 `npm run check` 通过，`npm test` 全量 **1863 passed / 26 skipped**（零既有用例回归；1 个既有用例 `review-fixes-2026-07-08-r2` 曾暴露 reliance 边界，已用 isTargetReliance 守卫收口）。
+> 为什么这些问题十七轮才被发现：见配套复盘 `agentspace/output/r17-test-blindness-retrospective.md`。
+
 ---
 
 ## 一、结论摘要
