@@ -222,9 +222,20 @@ export class MatchExp {
     // CAUTION 收集 exist 子查询（含嵌套 exist）里所有 isReferenceValue 的引用路径。这些引用都
     //  解析自最外层根实体（contextRootEntity 逐层继承），因此必须由根查询统一并入 JOIN 树。
     //  仅返回跨关联的多段路径（length>1）；单段的是根实体自己的列，无需额外 JOIN。
-    private collectExistReferencePaths(expression: MatchExpressionData): string[][] {
+    //  节点可能是 BoolExp、ExpressionData 或裸 MatchAtom（exist 的 value[1] 允许这几种形态），统一归一化。
+    private collectExistReferencePaths(expression: unknown): string[][] {
+        const toBoolExp = (node: unknown): MatchExpressionData | null => {
+            if (node instanceof BoolExp) return node as MatchExpressionData
+            if (BoolExp.isExpressionData(node)) return BoolExp.fromValue(node as ExpressionData<MatchAtom>)
+            if (node && typeof node === 'object' && 'key' in (node as object) && 'value' in (node as object)) {
+                return BoolExp.atom<MatchAtom>(node as MatchAtom)
+            }
+            return null
+        }
         const paths: string[][] = []
-        const walk = (exp: MatchExpressionData) => {
+        const walk = (node: unknown) => {
+            const exp = toBoolExp(node)
+            if (!exp) return
             if (exp.isExpression()) {
                 if (exp.left) walk(exp.left)
                 if (exp.right) walk(exp.right)
@@ -238,7 +249,7 @@ export class MatchExp {
             }
             // 嵌套 exist 的引用同样解析自根实体，继续下钻收集。
             if (typeof atom.value[0] === 'string' && (atom.value[0] as string).toLowerCase() === 'exist' && atom.value[1]) {
-                walk(atom.value[1] as MatchExpressionData)
+                walk(atom.value[1])
             }
         }
         walk(expression)
