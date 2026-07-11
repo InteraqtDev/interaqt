@@ -398,17 +398,21 @@ export class BoolExp<T> {
       return (result && !inverse || !result && inverse) ? true : error
     }
 
-    if (this.isOr()) {
-      const leftResult = this.left.evaluate(atomHandle, currentStack)
+    // CAUTION `inverse` 必须贯穿 and/or 子树（De Morgan），而不仅仅作用于 atom 与 not 的直接子节点。
+    //  历史实现里 and/or 分支丢弃 inverse、以原义求值 —— `NOT(A OR B)` 于是退化成 `A OR B`，
+    //  在 Interaction 守卫（Conditions 用 BoolExp 组合 + not）下是权限 fail-open：本应「A、B 皆不成立才放行」
+    //  却在 A 成立时静默放行。取反下算子按 De Morgan 翻转：NOT(A OR B) ≡ (NOT A) AND (NOT B)，
+    //  NOT(A AND B) ≡ (NOT A) OR (NOT B)。短路与错误透传语义保持不变。
+    if (this.isOr() || this.isAnd()) {
+      const evaluatesAsAnd = inverse ? this.isOr() : this.isAnd()
+      const right = this.requireRight(this.isAnd() ? 'and' : 'or')
+      const leftResult = this.left.evaluate(atomHandle, currentStack, inverse)
+      if (evaluatesAsAnd) {
+        if (leftResult !== true) return leftResult
+        return right.evaluate(atomHandle, currentStack, inverse)
+      }
       if (leftResult === true) return true
-      return this.requireRight('or').evaluate(atomHandle, currentStack)
-    }
-
-    if (this.isAnd()) {
-      const leftResult = this.left.evaluate(atomHandle, currentStack)
-      if (leftResult !== true) return leftResult
-
-      return this.requireRight('and').evaluate(atomHandle, currentStack)
+      return right.evaluate(atomHandle, currentStack, inverse)
     }
 
     if (this.isNot()) {
@@ -444,17 +448,18 @@ export class BoolExp<T> {
       return (result && !inverse || !result && inverse) ? true : error
     }
 
-    if (this.isOr()) {
-      const leftResult = await this.left.evaluateAsync(atomHandle, currentStack)
+    // CAUTION 与同步 evaluate 保持同一套 De Morgan 语义：inverse 必须贯穿 and/or 子树。
+    //  这是守卫链（evaluateAsync）实际走的路径，NOT 组合的权限判定正确性依赖于此。
+    if (this.isOr() || this.isAnd()) {
+      const evaluatesAsAnd = inverse ? this.isOr() : this.isAnd()
+      const right = this.requireRight(this.isAnd() ? 'and' : 'or')
+      const leftResult = await this.left.evaluateAsync(atomHandle, currentStack, inverse)
+      if (evaluatesAsAnd) {
+        if (leftResult !== true) return leftResult
+        return right.evaluateAsync(atomHandle, currentStack, inverse)
+      }
       if (leftResult === true) return true
-      return this.requireRight('or').evaluateAsync(atomHandle, currentStack)
-    }
-
-    if (this.isAnd()) {
-      const leftResult = await this.left.evaluateAsync(atomHandle, currentStack)
-      if (leftResult !== true) return leftResult
-
-      return this.requireRight('and').evaluateAsync(atomHandle, currentStack)
+      return right.evaluateAsync(atomHandle, currentStack, inverse)
     }
 
     if (this.isNot()) {
