@@ -2659,6 +2659,14 @@ const GetPostsPaginated = Interaction.create({
 > and can read **any** rows of the entity (conditions only decide *whether* the interaction may run,
 > not *which rows* are visible). Every `GetAction` interaction on non-public data MUST declare `dataPolicy.match`.
 
+> **⚠️ SECURITY: `dataPolicy.match` alone does NOT restrict columns — always pair it with `dataPolicy.attributeQuery`.**
+> Row-level and column-level authorization are independent switches. When the policy declares `attributeQuery`,
+> it wins and the caller cannot widen the projection. But when the policy **omits** `attributeQuery`, the caller
+> controls the projection entirely — including `['*']`, which returns every column of the matched rows
+> (`passwordHash`, internal flags, etc.). A `dataPolicy` that filters rows but not columns is a data-exposure
+> footgun (r17 R-2). Rule: **any interaction that declares `dataPolicy.match` on an entity with sensitive
+> columns MUST also declare `dataPolicy.attributeQuery`** listing exactly the exposable fields.
+
 **Usage Examples for Get Data Interactions**
 
 ```typescript

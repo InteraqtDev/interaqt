@@ -301,7 +301,15 @@ export class NewRecordData {
                 // CAUTION link 数据（`&`）里可能带有端点 ref（createRecordDependency 会补 source/target），
                 //  其 entityId 字段与上面刚写入的 linkField 是同一列——必须剔除，
                 //  否则 INSERT/UPDATE 出现重复列名直接崩溃。
-                result.push(...recordData.linkRecordData.getSameRowFieldAndValue()
+                // CAUTION 同 id 原地更新（引用的还是同一个关联记录）时必须把旧 link 数据作为 oldRecord 传入：
+                //  否则「未提供但有默认值」的 link 列（含计算的绑定状态列）会被重置为默认值——
+                //  数据静默丢失，聚合的增量基准也被抹掉（r17 F-2 的数据面）。
+                //  换了关联目标（replace）时 link 是新建的，未提供字段取默认值是正确语义，不传。
+                const attributeName = recordData.info?.attributeName!
+                const oldLinkRecord = oldRecord[attributeName]?.id === recordData.getRef().id
+                    ? oldRecord[attributeName]?.[LINK_SYMBOL]
+                    : undefined
+                result.push(...recordData.linkRecordData.getSameRowFieldAndValue(oldLinkRecord)
                     .filter(fieldAndValue => fieldAndValue.field !== recordData.info?.linkField))
             }
         })

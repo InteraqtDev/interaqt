@@ -245,12 +245,13 @@ describe("Entity System Refactored - compatibility test", () => {
     test("should handle all relation types", () => {
       const entity = Entity.create({ name: "Generic" });
       
+      // r17 起对称（同名属性）关系只允许 n:n；自引用 1:1 用不同属性名（有向语义）。
       const oneToOne = Relation.create({
         source: entity,
         target: entity,
         type: "1:1",
-        sourceProperty: "one",
-        targetProperty: "one"
+        sourceProperty: "oneOut",
+        targetProperty: "oneIn"
       });
 
       const oneToMany = Relation.create({

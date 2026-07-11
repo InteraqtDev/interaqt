@@ -382,33 +382,46 @@ export class EntityToTableMap {
             return [alias, field, table]
         }
     }
-    findManyToManySymmetricPath( namePath: string[]): string[]|undefined {
-        const result = [namePath[0]]
-        let found = false
-        // 注意是从 1 开始的。
-        for(let i = 1; i< namePath.length; i++) {
-            result.push(namePath[i])
-            const info = this.getInfoByPath(namePath.slice(0, i+1))
+    /**
+     * 找出路径中所有【尚未标注方向】的对称 n:n 段（返回段下标）。
+     * 已带 :source/:target 后缀的段已消歧，跳过——避免对展开产物二次展开。
+     */
+    private findManyToManySymmetricSegments(namePath: string[]): number[] {
+        const result: number[] = []
+        // 注意是从 1 开始的（0 是根实体名）。
+        for (let i = 1; i < namePath.length; i++) {
+            if (namePath[i].includes(':')) continue
+            const info = this.getInfoByPath(namePath.slice(0, i + 1))
             if (info?.isRecord && info.isLinkManyToManySymmetric()) {
-                found = true
-                break
+                result.push(i)
             }
         }
-
-        // 用 found 来判断，这样即使是最后一个也算找到了。
-        return found ? result: undefined
+        return result
     }
-    spawnManyToManySymmetricPath( namePath: string[] ): [string[], string[]] | undefined {
-        const foundPath = this.findManyToManySymmetricPath(namePath)
-        if (!foundPath) return undefined
-        const head = foundPath.slice(0, -1)
-        const splitPoint = foundPath.at(-1)
-        const rest = namePath.slice(foundPath.length, Infinity)
+    /**
+     * 把路径中的对称 n:n 段展开成 :source / :target 方向变体。
+     * CAUTION 必须展开【所有】对称段并做笛卡尔积：`friends.friends` 这类多段对称路径是完全
+     *  合法的声明（朋友的朋友），只展开第一段会静默丢掉经第二段另一侧可达的行——查询半结果、
+     *  Scheduler 脏宿主定位增删两侧不对称（r17 F-4）。2 段 → 4 条变体，段数按指数增长，
+     *  但业务路径中的对称段数实践中 ≤ 2。
+     */
+    spawnManyToManySymmetricPath( namePath: string[] ): string[][] | undefined {
+        const segments = this.findManyToManySymmetricSegments(namePath)
+        if (!segments.length) return undefined
 
-        return [
-            [...head, `${splitPoint}:source`, ...rest],
-            [...head, `${splitPoint}:target`, ...rest],
-        ]
+        let variants: string[][] = [namePath.slice()]
+        for (const segmentIndex of segments) {
+            const next: string[][] = []
+            for (const variant of variants) {
+                const sourceVariant = variant.slice()
+                sourceVariant[segmentIndex] = `${variant[segmentIndex]}:source`
+                const targetVariant = variant.slice()
+                targetVariant[segmentIndex] = `${variant[segmentIndex]}:target`
+                next.push(sourceVariant, targetVariant)
+            }
+            variants = next
+        }
+        return variants
     }
 
     getReverseAttribute(entityName: string, attribute: string) : string {

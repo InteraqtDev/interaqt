@@ -55,3 +55,6 @@ Combine conditions with `Conditions.create({ content: BoolExp.atom(a).and(b).or(
 - Guard callbacks must return an actual `boolean`; any non-boolean result fails the check (fail-closed).
 - Conditions run inside the dispatch transaction, before the event record is persisted.
 - For row-level data access control on queries, use `dataPolicy` (match/modifier/attributeQuery) on GetAction interactions.
+- Row filtering and column projection are independent: `dataPolicy.match` without `dataPolicy.attributeQuery`
+  leaves the projection caller-controlled (including `['*']` — every column of matched rows). Whenever
+  `dataPolicy.match` guards an entity with sensitive columns, declare `dataPolicy.attributeQuery` as well.

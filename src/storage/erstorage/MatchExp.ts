@@ -185,16 +185,15 @@ export class MatchExp {
             const manyToManySymmetricPaths = this.map.spawnManyToManySymmetricPath(namePath)
             if (attributeInfo.isRecord) {
                 if (manyToManySymmetricPaths) {
-                    recordQueryTree.addRecord(manyToManySymmetricPaths[0].slice(1, Infinity))
-                    recordQueryTree.addRecord(manyToManySymmetricPaths[1].slice(1, Infinity))
+                    // 所有方向变体（多段对称是笛卡尔积）都要加入查询树，缺一个就少 JOIN 一侧。
+                    manyToManySymmetricPaths.forEach(variantPath => recordQueryTree.addRecord(variantPath.slice(1, Infinity)))
                 } else {
                     recordQueryTree.addRecord(matchAttributePath)
                 }
 
             } else {
                 if (manyToManySymmetricPaths) {
-                    recordQueryTree.addField(manyToManySymmetricPaths[0].slice(1, Infinity))
-                    recordQueryTree.addField(manyToManySymmetricPaths[1].slice(1, Infinity))
+                    manyToManySymmetricPaths.forEach(variantPath => recordQueryTree.addField(variantPath.slice(1, Infinity)))
                 } else {
                     // 最后一个是 attribute，所以不在 recordQueryTree 上。
                     recordQueryTree.addField(matchAttributePath)
@@ -393,23 +392,17 @@ export class MatchExp {
             const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))!
 
             const namePath = [this.entityName].concat(matchAttributePath)
+            // CAUTION 路径中的每个对称 n:n 段都会被展开成 :source/:target 变体（多段是笛卡尔积），
+            //  变体之间以 OR 组合：任一方向可达即命中。只展开第一段会静默丢掉经后续对称段
+            //  另一侧可达的行（查询半结果，r17 F-4）。
             const symmetricPaths = this.map.spawnManyToManySymmetricPath(namePath)
-
-            let sourcePath, targetPath
-            if (symmetricPaths) {
-                // 要去除 头部 的 entity
-                sourcePath = symmetricPaths[0].slice(1, Infinity)
-                targetPath = symmetricPaths[1].slice(1, Infinity)
-            }
-
+            // 去除头部的 entity
+            const symmetricVariantPaths = symmetricPaths?.map(variant => variant.slice(1, Infinity))
 
             // 如果结尾是 value
             // 如果极为是 entity，那么后面匹配条件目前只能支持 EXIST。
             //  CAUTION 针对关联实体的属性匹配，到这里已经被拍平了，所以结尾是  entity 的情况必定都是函数匹配。
             if (attributeInfo.isValue) {
-                // CAUTION 路径中只可能有一个 n:n symmetric 关系。因为路径中有多个的在语义逻辑上就不正确。
-                //  有一个的情况还是用在 findRelatedRecords 的时候才有意义。因为它会通过 id 限定关系，而即使是 n:n 的关系，任意两个实体中只会有一个关系数据。所以这个时候能找到唯一的数据，是有意义的。
-
                 // CAUTION 'contains' 的语义是「collection 属性包含某元素」，各驱动都以 JSON 数组实现
                 //  （PG json_array_elements_text / SQLite json_each / MySQL JSON_CONTAINS）。
                 //  用在非 collection 属性（如 type:'object'）上会在执行期抛出与用户写法无关的裸数据库错误
@@ -424,10 +417,9 @@ export class MatchExp {
                     )
                 }
 
-                const fieldNamePath = this.getFinalFieldName(matchAttributePath)
-                const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
-
-                if (!symmetricPaths) {
+                if (!symmetricVariantPaths) {
+                    const fieldNamePath = this.getFinalFieldName(matchAttributePath)
+                    const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
                     return {
                         ...exp.data,
                         fieldName: fieldNamePath,
@@ -436,21 +428,20 @@ export class MatchExp {
                     }
                 }
 
-                // 这里一定要再生成一次，应为需要不同的 placeholder。
-                const [fieldValue2, fieldParams2] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
-
-                // CAUTION 注意这里 length -2 是因为  namePath 里面有 this.entityName
-                return BoolExp.atom<FieldMatchAtom>({
-                    ...exp.data,
-                    fieldName: this.getFinalFieldName(sourcePath!),
-                    fieldValue,
-                    fieldParams
-                }).or({
-                    ...exp.data,
-                    fieldName: this.getFinalFieldName(targetPath!),
-                    fieldValue: fieldValue2,
-                    fieldParams: fieldParams2
-                })
+                let combined: BoolExp<FieldMatchAtom> | undefined
+                for (const variantPath of symmetricVariantPaths) {
+                    const fieldNamePath = this.getFinalFieldName(variantPath)
+                    // 每个变体都要重新生成，因为需要不同的 placeholder。
+                    const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
+                    const atomData = {
+                        ...exp.data,
+                        fieldName: fieldNamePath,
+                        fieldValue,
+                        fieldParams
+                    }
+                    combined = combined ? combined.or(atomData) : BoolExp.atom<FieldMatchAtom>(atomData)
+                }
+                return combined!
 
             } else {
                 // CAUTION record 的情况只有可能 n:n 关系
@@ -458,7 +449,7 @@ export class MatchExp {
                 // CAUTION 函数匹配的情况不管了，因为可能未来涉及到使用 cursor 实现更强的功能，这就涉及到查询计划的修改了。统统扔到上层去做。
                 //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。
                 const handleFnMatch = fnMatchHandler || ((data: FieldMatchAtom) => data)
-                if (!symmetricPaths) {
+                if (!symmetricVariantPaths) {
                     return handleFnMatch({
                         ...exp.data,
                         namePath,
@@ -466,19 +457,18 @@ export class MatchExp {
                     })
                 }
 
-                const sourceNamePath = [this.entityName].concat(sourcePath!)
-                const targetNamePath = [this.entityName].concat(targetPath!)
-                assert(sourceNamePath!.length === namePath.length, `symmetric entity match can only be last, ${sourceNamePath} ${namePath}`)
-
-                return BoolExp.atom<FieldMatchAtom>(handleFnMatch({
-                    ...exp.data,
-                    namePath:sourceNamePath!,
-                    isFunctionMatch: true,
-                })).or(handleFnMatch({
-                    ...exp.data,
-                    namePath:targetNamePath!,
-                    isFunctionMatch: true,
-                }))
+                let combined: BoolExp<FieldMatchAtom> | undefined
+                for (const variantPath of symmetricVariantPaths) {
+                    const variantNamePath = [this.entityName].concat(variantPath)
+                    assert(variantNamePath.length === namePath.length, `symmetric path variant must preserve length, ${variantNamePath} ${namePath}`)
+                    const atomData = handleFnMatch({
+                        ...exp.data,
+                        namePath: variantNamePath,
+                        isFunctionMatch: true,
+                    })
+                    combined = combined ? combined.or(atomData) : BoolExp.atom<FieldMatchAtom>(atomData)
+                }
+                return combined!
 
             }
         })

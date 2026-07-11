@@ -209,24 +209,14 @@ describe("EntityToTableMap comprehensive tests", () => {
         });
     });
 
-    describe("findManyToManySymmetricPath and spawnManyToManySymmetricPath", () => {
-        test("findManyToManySymmetricPath should find symmetric relation in path", () => {
-            const result = entityToTableMap.findManyToManySymmetricPath(['User', 'friends']);
-            expect(result).toEqual(['User', 'friends']);
-        });
-
-        test("findManyToManySymmetricPath should find symmetric relation in nested path", () => {
-            const result = entityToTableMap.findManyToManySymmetricPath(['User', 'friends', 'profile']);
-            expect(result).toEqual(['User', 'friends']);
-        });
-
-        test("findManyToManySymmetricPath should return undefined for non-symmetric path", () => {
-            const result = entityToTableMap.findManyToManySymmetricPath(['User', 'profile']);
+    describe("spawnManyToManySymmetricPath", () => {
+        test("should return undefined for non-symmetric path", () => {
+            const result = entityToTableMap.spawnManyToManySymmetricPath(['User', 'profile']);
             expect(result).toBeUndefined();
         });
 
-        test("findManyToManySymmetricPath should return undefined for value attribute", () => {
-            const result = entityToTableMap.findManyToManySymmetricPath(['User', 'name']);
+        test("should return undefined for value attribute", () => {
+            const result = entityToTableMap.spawnManyToManySymmetricPath(['User', 'name']);
             expect(result).toBeUndefined();
         });
 
@@ -244,9 +234,23 @@ describe("EntityToTableMap comprehensive tests", () => {
             expect(result![1]).toEqual(['User', 'friends:target', 'profile']);
         });
 
-        test("spawnManyToManySymmetricPath should return undefined for non-symmetric path", () => {
-            const result = entityToTableMap.spawnManyToManySymmetricPath(['User', 'profile']);
-            expect(result).toBeUndefined();
+        // r17 F-4：路径中的每个对称段都必须展开（多段是笛卡尔积），只展开第一段会静默半结果。
+        test("spawnManyToManySymmetricPath should expand ALL symmetric segments (cartesian product)", () => {
+            const result = entityToTableMap.spawnManyToManySymmetricPath(['User', 'friends', 'friends']);
+            expect(result).toBeDefined();
+            expect(result!.length).toBe(4);
+            expect(result).toContainEqual(['User', 'friends:source', 'friends:source']);
+            expect(result).toContainEqual(['User', 'friends:source', 'friends:target']);
+            expect(result).toContainEqual(['User', 'friends:target', 'friends:source']);
+            expect(result).toContainEqual(['User', 'friends:target', 'friends:target']);
+        });
+
+        test("spawnManyToManySymmetricPath should not re-expand already-suffixed segments", () => {
+            const result = entityToTableMap.spawnManyToManySymmetricPath(['User', 'friends:source', 'friends']);
+            expect(result).toBeDefined();
+            expect(result!.length).toBe(2);
+            expect(result).toContainEqual(['User', 'friends:source', 'friends:source']);
+            expect(result).toContainEqual(['User', 'friends:source', 'friends:target']);
         });
     });
 

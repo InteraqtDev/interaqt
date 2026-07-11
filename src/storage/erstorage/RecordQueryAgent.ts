@@ -34,8 +34,9 @@ export interface RecordOperationAgent {
     unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, reason?: string, events?: RecordMutationEvent[]): Promise<Record[]>
     deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp?: boolean): Promise<Record[]>
     addLinkFromRecord(entity: string, attribute: string, entityId: string, relatedEntityId: string, attributes?: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef>
+    unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record): Promise<void>
     preprocessSameRowData(newEntityData: NewRecordData, isUpdate?: boolean, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData>
-    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string): Promise<{ [k: string]: RawEntityData }>
+    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string, excludeAttributes?: Set<string>): Promise<{ [k: string]: RawEntityData }>
     relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, events?: RecordMutationEvent[]): Promise<Record[]>
 }
 
@@ -86,6 +87,11 @@ export class RecordQueryAgent implements RecordOperationAgent {
         return this.creationExecutor.createRecord(newEntityData, queryName, events)
     }
 
+    // 委托给 CreationExecutor（create/update 共用：1:1 排他目标的旧 owner 解除）
+    async unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record): Promise<void> {
+        return this.creationExecutor.unlinkOldOwnersOfExclusiveTargets(newEntityData, events, currentRecord)
+    }
+
     // 委托给 CreationExecutor。
     // CAUTION 创建/更新两个分支共用同一份实现（CreationExecutor.preprocessSameRowData），
     //  不要在这里再复制一份，两份实现必然随时间分叉。
@@ -102,16 +108,22 @@ export class RecordQueryAgent implements RecordOperationAgent {
      *  所以刻意不产生实体级 delete/create 事件（否则下游聚合会被虚假地减/加一次）。
      *  事件流只反映关系层面的事实：旧 link delete + 新 link create（见下方 events?.push）。
      */
-    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = ''): Promise<{ [k: string]: RawEntityData }> {
+    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = '', excludeAttributes?: Set<string>): Promise<{ [k: string]: RawEntityData }> {
         const result: { [k: string]: RawEntityData } = {}
+        // CAUTION update 时引用的 combined record 若与当前行上已有的是同一个（同 id 原地更新），
+        //  不存在"抢夺"：数据已在本行。此时绝不能走 flashOut——它会把本行旧数据读出再 merge 回
+        //  newEntityData（merge 方向是 flashOut 数据在后），用户的新值被旧值静默覆盖（r17 F-2 家族）。
+        const combinedRecordIdRefsToFlash = excludeAttributes?.size
+            ? newEntityData.combinedRecordIdRefs.filter(r => !excludeAttributes.has(r.info!.attributeName))
+            : newEntityData.combinedRecordIdRefs
         // CAUTION 没有需要抢夺的三表合一记录时必须直接返回。
         //  否则下面的 match 为 undefined，会生成 WHERE 1=1 的全表查询，导致每次 create/update 都全表扫描。
-        if (!newEntityData.combinedRecordIdRefs.length) return result
+        if (!combinedRecordIdRefsToFlash.length) return result
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
         let match: MatchExpressionData | undefined
         // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
         const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map, true, true, false, true)
-        for (let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
+        for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
             const attributeIdMatchAtom: MatchAtom = {
                 key: `${combinedRecordIdRef.info!.attributeName!}.id`,
                 value: ['=', combinedRecordIdRef.getRef().id]
@@ -133,9 +145,34 @@ export class RecordQueryAgent implements RecordOperationAgent {
 
         // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
         // 开始 merge 数据，并记录 unLink 事件
+        const newRecordIsLink = this.map.getRecordInfo(newEntityData.recordName).isRelation && !!this.map.data.links[newEntityData.recordName]
         for (let recordWithCombined of recordsWithCombined) {
-            for (let combinedRecordIdRef of newEntityData.combinedRecordIdRefs) {
-                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]) {
+            // CAUTION 正在创建的是 combined link record（如三表合一的 1:1 关系经 addLink 建立），
+            //  且被抢夺端点所在的行本身就是一条旧业务 link 行（行上有 link id）时：
+            //  端点数据被 flashOut 后旧业务 link 即告消失（列由 deleteRecordSameRowData 一并清除），
+            //  必须补发业务 link 的 delete 事件。下面 ref 循环里的既有事件块只覆盖
+            //  「创建实体时抢夺 combined 关联」的形态（linkName 是业务 link）；本形态下
+            //  ref 是 link 的 source/target，其 linkName 是虚拟 link，业务事件会漏发
+            //  （写路径拓扑矩阵的事件完备性预言机发现，r17 追加）。
+            if (newRecordIsLink && recordWithCombined.id) {
+                events?.push({
+                    type: 'delete',
+                    recordName: newEntityData.recordName,
+                    record: {
+                        ...Object.fromEntries(Object.entries(recordWithCombined).filter(([, v]) => v === null || typeof v !== 'object')),
+                        id: recordWithCombined.id,
+                        source: { id: recordWithCombined.source?.id },
+                        target: { id: recordWithCombined.target?.id },
+                    }
+                })
+            }
+            for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
+                // CAUTION 行是按多个 ref 的 OR 匹配出来的，必须校验「本行该属性的值确实是当前 ref」：
+                //  例如三表合一的 link 抢夺（addLink(u2, p)，p 在 u1 行内）会同时匹配 u2 的行
+                //  （source.id=u2）与 u1 的行（target.id=p）——处理 u1 的行时 source 属性上是 u1
+                //  而不是 u2，若只判真值就会把无关的 u1 一并 flashOut，并在 result 上产生
+                //  同名属性冲突（"should not have same combined record" 内部断言崩溃，r17 拓扑矩阵首跑发现）。
+                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]?.id === combinedRecordIdRef.getRef().id) {
 
                     // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了
                     //1. 删掉 combined 原来的所有同行数据
@@ -186,7 +223,13 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     // 相当于新建了关系。如果不是虚拟link 就要记录。
                     // TODO 要给出一个明确的 虚拟 link  record 的差异
                     if (!combinedRecordIdRef.info!.isLinkSourceRelation()) {
+                        // CAUTION 用户在 ref 上携带的 `&` 关系属性必须落到新 link 上：
+                        //  flashOut 的返回值会整体覆盖 rawData 里的该属性（浅 merge），此前只放 id，
+                        //  用户的 `&` 数据在 combined 拓扑的 replace-by-ref 路径被静默丢弃
+                        //  （拓扑矩阵 step-3 强化断言发现，r17 追加）。被抢夺行的旧 link 属性
+                        //  刻意不带过来——replace 语义下新 link 的属性只来自本次声明。
                         result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
+                            ...(combinedRecordIdRef.linkRecordData?.getData() || {}),
                             id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
                         }
                         events?.push({

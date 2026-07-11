@@ -23,58 +23,10 @@ import type { RecordMutationEvent } from 'interaqt';
 
 describe('review fixes 2026-07-09 r7', () => {
 
-    // ============ F-1: symmetric n:n entity deletion (target side) ============
-    test('F-1: deleting an entity removes symmetric links where it is on the target side', async () => {
-        const User = Entity.create({ name: 'User', properties: [Property.create({ name: 'username', type: 'string' })] });
-        const friendRelation = Relation.create({
-            source: User, sourceProperty: 'friends', target: User, targetProperty: 'friends',
-            name: 'User_friends_friends_User', type: 'n:n'
-        });
-        User.properties.push(Property.create({ name: 'friendCount', type: 'number', computation: Count.create({ record: friendRelation }) }));
-        const system = new MonoSystem(new PGLiteDB());
-        const controller = new Controller({ system, entities: [User], relations: [friendRelation] });
-        await controller.setup(true);
-        const storage = system.storage;
-
-        const a = await storage.create('User', { username: 'A' });
-        const b = await storage.create('User', { username: 'B' });
-        const c = await storage.create('User', { username: 'C' });
-        await storage.addRelationByNameById('User_friends_friends_User', a.id, b.id, {});   // A source
-        await storage.addRelationByNameById('User_friends_friends_User', c.id, a.id, {});   // A target
-
-        const events: RecordMutationEvent[] = [];
-        await storage.delete('User', MatchExp.atom({ key: 'id', value: ['=', a.id] }), events);
-
-        const remaining = await storage.findRelationByName('User_friends_friends_User', undefined, undefined, ['*']);
-        expect(remaining.length).toBe(0);
-        // both link rows produced delete events
-        expect(events.filter(e => e.recordName === 'User_friends_friends_User' && e.type === 'delete').length).toBe(2);
-
-        const cAfter = await storage.findOne('User', MatchExp.atom({ key: 'id', value: ['=', c.id] }), undefined, ['*']);
-        expect(cAfter.friendCount).toBe(0);
-    });
-
-    // ============ F-2: symmetric n:n update replace (target side) ============
-    test('F-2: symmetric update replace unlinks old links regardless of endpoint side', async () => {
-        const User = Entity.create({ name: 'User2', properties: [Property.create({ name: 'username', type: 'string' })] });
-        const friendRelation = Relation.create({
-            source: User, sourceProperty: 'friends', target: User, targetProperty: 'friends',
-            name: 'User2_friends_friends_User2', type: 'n:n'
-        });
-        const system = new MonoSystem(new PGLiteDB());
-        const controller = new Controller({ system, entities: [User], relations: [friendRelation] });
-        await controller.setup(true);
-        const storage = system.storage;
-        const a = await storage.create('User2', { username: 'A' });
-        const b = await storage.create('User2', { username: 'B' });
-        const c = await storage.create('User2', { username: 'C' });
-        await storage.addRelationByNameById('User2_friends_friends_User2', c.id, a.id, {});   // A on target side
-
-        await storage.update('User2', MatchExp.atom({ key: 'id', value: ['=', a.id] }), { friends: [{ id: b.id }] });
-
-        const aAfter = await storage.findOne('User2', MatchExp.atom({ key: 'id', value: ['=', a.id] }), undefined, ['id', ['friends', { attributeQuery: ['username'] }]]);
-        expect((aAfter.friends || []).map((f: any) => f.username).sort()).toEqual(['B']);
-    });
+    // r7-F-1（对称删除漏 target 侧）与 r7-F-2（对称 update replace 漏侧）的点状回归已并入
+    // 系统性矩阵（r17 测试整并）：referentialIntegrityMatrix.spec.ts（同 fixture + INV-1/INV-2 +
+    // 事件完备性预言机，断言严格更强）与 symmetricAggregationMatrix.spec.ts（record-fallback
+    // Count 经实体删除的计算面）。此处只保留矩阵未覆盖的 F-3 / F-5。
 
     // ============ F-3: dataPolicy.modifier offset bypass ============
     test('F-3: caller cannot paginate around a dataPolicy.modifier limit via offset', async () => {

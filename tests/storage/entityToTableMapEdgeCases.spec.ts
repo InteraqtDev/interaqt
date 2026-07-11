@@ -141,12 +141,14 @@ describe("EntityToTableMap edge cases and stress tests", () => {
     describe("Many-to-many symmetric path handling", () => {
         test("should correctly identify symmetric relations at different depths", () => {
             // Direct symmetric relation
-            const path1 = entityToTableMap.findManyToManySymmetricPath(['User', 'friends']);
+            const path1 = entityToTableMap.spawnManyToManySymmetricPath(['User', 'friends']);
             expect(path1).toBeDefined();
-            
+
             // Symmetric relation in nested path
-            const path2 = entityToTableMap.findManyToManySymmetricPath(['User', 'leader', 'friends']);
-            expect(path2).toEqual(['User', 'leader', 'friends']);
+            const path2 = entityToTableMap.spawnManyToManySymmetricPath(['User', 'leader', 'friends']);
+            expect(path2).toBeDefined();
+            expect(path2![0]).toEqual(['User', 'leader', 'friends:source']);
+            expect(path2![1]).toEqual(['User', 'leader', 'friends:target']);
         });
 
         test("should spawn paths correctly for nested symmetric relations", () => {
@@ -157,10 +159,10 @@ describe("EntityToTableMap edge cases and stress tests", () => {
         });
 
         test("should not find symmetric path in asymmetric relations", () => {
-            const result1 = entityToTableMap.findManyToManySymmetricPath(['User', 'leader']);
+            const result1 = entityToTableMap.spawnManyToManySymmetricPath(['User', 'leader']);
             expect(result1).toBeUndefined();
-            
-            const result2 = entityToTableMap.findManyToManySymmetricPath(['File', 'owner']);
+
+            const result2 = entityToTableMap.spawnManyToManySymmetricPath(['File', 'owner']);
             expect(result2).toBeUndefined();
         });
     });

@@ -178,6 +178,31 @@ export class Relation implements RelationInstance {
     this.computation = args.computation;
     this.properties = args.properties || [];
     this.constraints = args.constraints;
+
+    // CAUTION 对称关系（source === target 且 sourceProperty === targetProperty，无向边语义）
+    //  只在 n:n 上有实现：存储层的方向变体展开（spawnManyToManySymmetricPath）与写路径的双侧
+    //  匹配都以 isLinkManyToManySymmetric 为前提。对称 1:1/n:1/1:n 声明此前被静默接受，
+    //  但读写只有单侧可见（spouse 建边后另一侧查不到）——静默错误结果（r17 假设审计 A-1/A-3）。
+    //  1:n/n:1 的"对称"在语义上也自相矛盾（同一属性名两端基数不同）。
+    if (this.source === this.target && this.sourceProperty === this.targetProperty && this.type !== 'n:n') {
+      throw new Error(
+        `Relation${this.name ? ` "${this.name}"` : ''} is symmetric (source === target and sourceProperty === targetProperty "${this.sourceProperty}") but has type '${this.type}'. ` +
+        `Symmetric (undirected) relations are only supported for type 'n:n'. ` +
+        `For a directed self-reference, use distinct property names (e.g. sourceProperty: 'mentor', targetProperty: 'mentees').`
+      );
+    }
+    // CAUTION reliance（isTargetReliance：target 的生命周期依附于 source）要求每个 target
+    //  恰好属于一个 source（relType[0] === '1'，即 1:1 / 1:n）。n:1/n:n 下同一 target 可被多个
+    //  source 共享，删除任何一个 source 都会级联删除仍被他人持有的 target——静默过删
+    //  （r17 假设审计 A-4/A-5；DeletionExecutor 的"reliance 只可能是 1:x"假设自此有声明期保证）。
+    if (this.isTargetReliance && this.type.split(':')[0] !== '1') {
+      throw new Error(
+        `Relation${this.name ? ` "${this.name}"` : ''} declares isTargetReliance with type '${this.type}'. ` +
+        `Reliance semantics (target's lifecycle depends on its source) require each target to belong to exactly one source, i.e. type '1:1' or '1:n'. ` +
+        `With '${this.type}', a shared target would be cascade-deleted while other sources still hold it. ` +
+        `Use a plain relation and model cleanup explicitly if sharing is intended.`
+      );
+    }
   }
   
   // 静态属性和方法

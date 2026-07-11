@@ -138,9 +138,17 @@ export class DeletionExecutor {
                 // 存在合表的1:1关系，且不是 reliance。当前 record 删了，其他数据仍然要留下。
                 if (hasSameRowData) {
                     // 存在同行 record，只能用 update
+                    // CAUTION 与本记录同行存储的 combined link 的字段（link id、关系属性列）必须一并清除：
+                    //  端点消失后 link 不能在逻辑面继续存在。recordInfo.sameRowFields 只含记录自身、
+                    //  往我合并的 link、以及同表 reliance 的字段——combined link 的字段归 link record
+                    //  管辖，漏清会留下「有 delete 事件、findRelationByName 却仍可见」的悬挂 link
+                    //  （写路径拓扑矩阵的事件完备性预言机首跑发现，r17 追加）。
+                    const combinedLinkFields = recordInfo.combinedRecords
+                        .filter(info => !(recordInfo.isRelation && (info.attributeName === 'source' || info.attributeName === 'target')))
+                        .flatMap(info => info.getLinkInfo().recordInfo.sameRowFields)
                     const [sql, params] = this.sqlBuilder.buildUpdateFieldsToNullSQL(
                         recordInfo.name,
-                        recordInfo.sameRowFields,
+                        [...new Set([...recordInfo.sameRowFields, ...combinedLinkFields])],
                         record
                     )
                     await this.database.update(sql, params, recordInfo.idField, `use update to delete ${recordName} because of sameRowData`)

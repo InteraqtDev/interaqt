@@ -106,6 +106,13 @@ export class CreationExecutor {
 
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
 
+        // CAUTION 1:1 关系两侧都是排他的。merged link（FK 列在宿主行上）引用一个已被其他宿主
+        //  占用的既有记录时，旧宿主行的 FK 不会被本次 INSERT 触碰——必须先显式解除旧 owner 的
+        //  link（清 FK 列 + delete 事件），否则两行同指一个目标，正反查询自相矛盾（r17 F-1）。
+        //  对照：combined（三表合一）的抢夺由 flashOut 处理；isolated x:1 在 handleCreationReliance
+        //  与 addLink 中处理。新建的关联记录不可能有旧 owner，只有 id ref 需要。
+        await this.unlinkOldOwnersOfExclusiveTargets(newEntityDataWithDep, events)
+
         // CAUTION 成员资格快照必须在物理变更之前采集（见 FilteredEntityManager 的无状态设计）。
         //  1) link record 的创建会改变两端实体在依赖该关系的 filtered entity 中的成员资格；
         //  2) 合并进本行的既有关联记录（merged link / combined 的 id ref）等价于对既有记录追加关系，
@@ -170,6 +177,63 @@ export class CreationExecutor {
     }
 
     /**
+     * 解除「排他侧被占用」的旧 link：1:1 关系两侧都是排他的。
+     * merged link（FK 列在宿主行上）通过 id ref 引用一个已被其他宿主占用的记录时，
+     * 旧宿主行的 FK 不在本次写入的行上，必须显式 unlink（清列 + delete 事件）。
+     * @param currentRecord update 场景传入当前宿主——同 id 原地引用（目标本来就是我的）绝不能解除。
+     */
+    async unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record) {
+        for (const record of newEntityData.mergedLinkTargetRecordIdRefs) {
+            const linkInfo = record.info!.getLinkInfo()
+            if (!linkInfo.isOneToOne) continue
+            // reliance 是生命周期依赖，unlink 是业务级 fail-fast（只能随 record 删除）；
+            // "抢夺" 语义不适用，保持既有行为。
+            if (linkInfo.isTargetReliance) continue
+            const attributeName = record.info!.attributeName
+            const refId = record.getRef().id
+            if (currentRecord && currentRecord[attributeName]?.id === refId) continue
+            // FK 侧（宿主自己的旧值）由写入自身替换/上层 unlink 处理；这里解除的是"目标记录的旧 owner"。
+            const otherSideAttr = record.info!.isRecordSource() ? 'target' : 'source'
+            await this.agent.unlink(
+                linkInfo.name,
+                MatchExp.atom({ key: `${otherSideAttr}.id`, value: ['=', refId] }),
+                false,
+                `unlink old owner of exclusive 1:1 target ${newEntityData.recordName}.${attributeName}`,
+                events
+            )
+        }
+    }
+
+    /**
+     * 构造同行数据的 update 事件（宿主记录 / combined 嵌套记录 / link 记录共用同一契约）：
+     * keys = 本次实际写入的属性名（含被联动重算的 computed 属性），record 带 id，oldRecord 为变更前快照。
+     */
+    private buildSameRowUpdateEvent(newData: NewRecordData, recordName: string, oldRecord: Record): RecordMutationEvent | null {
+        const updatedFieldValues = newData.getSameRowFieldAndValue(oldRecord)
+        const recordInfo = this.map.getRecordInfo(recordName)
+        const valueAttributeNames = new Set(recordInfo.valueAttributes.map(attr => attr.attributeName))
+        const updateRecord = { ...newData.getData() } as Record
+        const updatedKeys: string[] = []
+        updatedFieldValues.forEach(field => {
+            // id 是身份不是值变更：同 id ref（{id} 裸引用）不构成 update 事件（幂等重写必须静默）。
+            if (field.name !== 'id' && valueAttributeNames.has(field.name)) {
+                updateRecord[field.name] = field.value
+                updatedKeys.push(field.name)
+            }
+        })
+        if (!updatedKeys.length) return null
+        return {
+            type: 'update',
+            recordName,
+            // keys 是本次实际写入的属性名（含被联动重算的 computed 属性）。
+            //  StateTransfer.trigger.keys 等字段级匹配依赖它。
+            keys: updatedKeys,
+            record: { ...updateRecord, id: oldRecord.id },
+            oldRecord
+        }
+    }
+
+    /**
      * 预处理同行数据
      * CAUTION 因为这里分配了 id，并且所有的判断逻辑都在，所以事件也放在这里处理，而不是真实插入或者更新数据的时候。
      */
@@ -199,26 +263,29 @@ export class CreationExecutor {
         } else {
             // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
             if (newEntityData.valueAttributes.length) {
-                const updatedFieldValues = newEntityData.getSameRowFieldAndValue(oldRecord)
-                const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
-                const valueAttributeNames = new Set(recordInfo.valueAttributes.map(attr => attr.attributeName))
-                const updateRecord = { ...newEntityData.getData() } as Record
-                const updatedKeys: string[] = []
-                updatedFieldValues.forEach(field => {
-                    if (valueAttributeNames.has(field.name)) {
-                        updateRecord[field.name] = field.value
-                        updatedKeys.push(field.name)
-                    }
-                })
-                events?.push({
-                    type: 'update',
-                    recordName: newEntityData.recordName,
-                    // keys 是本次实际写入的属性名（含被联动重算的 computed 属性）。
-                    //  StateTransfer.trigger.keys 等字段级匹配依赖它。
-                    keys: updatedKeys,
-                    record: { ...updateRecord, id: oldRecord!.id },
-                    oldRecord: oldRecord
-                })
+                const updateEvent = this.buildSameRowUpdateEvent(newEntityData, newEntityData.recordName, oldRecord!)
+                if (updateEvent) events?.push(updateEvent)
+            }
+            // CAUTION 同 id 原地更新（related id 未变）时，下方的 link-id 分配循环按「id 是否变化」
+            //  判断，不会生成任何事件；但 getSameRowFieldAndValue 会把 `&` 关系属性与 combined 记录的
+            //  嵌套值无条件写入同行列——「数据面已写、事件面沉默」会让依赖这些属性的响应式计算
+            //  永久陈旧（r17 F-2）。这里对同 id 且携带新值的引用补发 update 事件，
+            //  契约与宿主 update 事件一致（keys = 实际写入的属性名，含 oldRecord）。
+            for (const record of newEntityData.mergedLinkTargetRecordIdRefs.concat(newEntityData.combinedRecordIdRefs)) {
+                const attributeName = record.info!.attributeName
+                const oldRelated = oldRecord?.[attributeName]
+                if (!oldRelated?.id || newRawDataWithNewIds[attributeName]?.id !== oldRelated.id) continue
+
+                // combined（三表合一）记录自身的嵌套值更新
+                if (record.info!.isMergedWithParent() && record.valueAttributes.length) {
+                    const nestedEvent = this.buildSameRowUpdateEvent(record, record.recordName, oldRelated)
+                    if (nestedEvent) events?.push(nestedEvent)
+                }
+                // `&` 关系属性的原地更新（merged link 与 combined 的 link 数据都写在同行）
+                if (record.linkRecordData?.valueAttributes.length && oldRelated[LINK_SYMBOL]?.id) {
+                    const linkEvent = this.buildSameRowUpdateEvent(record.linkRecordData, record.info!.linkName, oldRelated[LINK_SYMBOL])
+                    if (linkEvent) events?.push(linkEvent)
+                }
             }
         }
 
@@ -263,10 +330,22 @@ export class CreationExecutor {
 
         // 2. 处理需要 flashOut 的数据
         // TODO create 的情况下，有没可能不需要 flashout 已有的数据，直接更新到已有的 combined record 的行就行了。
+        // CAUTION update 中同 id 的 combined 引用是「原地更新」不是「抢夺」：数据已在本行，
+        //  绝不能 flashOut——flashOut 数据在 merge 时会覆盖用户的新值（旧值静默写回，r17 F-2 家族）。
+        const sameRowInPlaceAttributes = new Set<string>()
+        if (isUpdate && oldRecord) {
+            for (const record of newEntityData.combinedRecordIdRefs) {
+                const attributeName = record.info!.attributeName
+                if (oldRecord[attributeName]?.id !== undefined && oldRecord[attributeName].id === record.getRef().id) {
+                    sameRowInPlaceAttributes.add(attributeName)
+                }
+            }
+        }
         const flashOutRecordRasData: { [k: string]: RawEntityData } = await this.agent.flashOutCombinedRecordsAndMergedLinks(
             newEntityData,
             events,
-            `finding combined records for ${newEntityData.recordName} to flash out, for ${isUpdate ? 'updating' : 'creation'} with data ${JSON.stringify(newEntityDataWithIds.getData())}`
+            `finding combined records for ${newEntityData.recordName} to flash out, for ${isUpdate ? 'updating' : 'creation'} with data ${JSON.stringify(newEntityDataWithIds.getData())}`,
+            sameRowInPlaceAttributes
         )
 
         return newEntityDataWithIds.merge(flashOutRecordRasData)
@@ -447,16 +526,25 @@ export class CreationExecutor {
         assert(!existRecord, `cannot create ${linkName} for ${sourceId} ${targetId}, link already exist`)
 
         const linkInfo = this.map.getLinkInfoByName(linkName)
-        if (!linkInfo.isCombined() && !linkInfo.isMerged() && (linkInfo.isManyToOne || linkInfo.isOneToMany)) {
-            // n 方向要 unlink ?
-            const unlinkAttr = linkInfo.isManyToOne ? 'source.id' : 'target.id'
-            const unlinkId = linkInfo.isManyToOne ? sourceId : targetId
-            const match = MatchExp.atom({
-                key: unlinkAttr,
-                value: ['=', unlinkId]
-            })
-            // 这里需要调用 RecordQueryAgent 的 unlink 方法
-            await this.agent.unlink(linkName, match, false, 'unlink combined record for add new link', events)
+        // CAUTION x:1 关系的排他侧在建立新 link 前必须解除旧 link（r17 F-1）：
+        //  - isolated：n:1 源侧、1:n 目标侧、1:1 双侧排他，全部显式 unlink；
+        //  - merged（FK 列在某端行上）：FK 侧的替换由 flashOut 处理（含旧 link delete 事件），
+        //    但 1:1 的非 FK 侧（旧 owner 是另一行）flashOut 看不见，必须显式 unlink；
+        //  - combined：整行抢夺由 flashOut 处理。
+        // reliance（生命周期依赖）的 unlink 是业务级 fail-fast，抢夺语义不适用。
+        if (!linkInfo.isCombined() && !linkInfo.isTargetReliance) {
+            if (!linkInfo.isMerged()) {
+                if (linkInfo.isManyToOne || linkInfo.isOneToOne) {
+                    await this.agent.unlink(linkName, MatchExp.atom({ key: 'source.id', value: ['=', sourceId] }), false, 'unlink old link of exclusive source for add new link', events)
+                }
+                if (linkInfo.isOneToMany || linkInfo.isOneToOne) {
+                    await this.agent.unlink(linkName, MatchExp.atom({ key: 'target.id', value: ['=', targetId] }), false, 'unlink old link of exclusive target for add new link', events)
+                }
+            } else if (linkInfo.isOneToOne) {
+                const nonFkSide = linkInfo.isMergedToSource() ? 'target' : 'source'
+                const nonFkSideId = nonFkSide === 'target' ? targetId : sourceId
+                await this.agent.unlink(linkName, MatchExp.atom({ key: `${nonFkSide}.id`, value: ['=', nonFkSideId] }), false, 'unlink old owner of exclusive 1:1 target for add new link', events)
+            }
         }
 
         const newLinkData = new NewRecordData(this.map, linkInfo.name, {

@@ -26,6 +26,7 @@
 import { describe, expect, test } from "vitest";
 import { Entity, Property, Relation, KlassByName, MatchExp, MonoSystem, Controller } from 'interaqt';
 import { PGLiteDB } from '@drivers';
+import { withRuntimeEventCompleteness, EventCompletenessSchema } from "./helpers/eventCompleteness.js";
 
 type LinkRow = { id: string; source?: { id?: string }; target?: { id?: string } };
 
@@ -101,7 +102,11 @@ describe('referential-integrity oracle matrix', () => {
         await assertSymmetricBidirectional(storage, 'User', 'friends');
 
         // Delete A — it is source of two links and target of one. All three must vanish.
-        await storage.delete('User', MatchExp.atom({ key: 'id', value: ['=', a.id] }));
+        // r17：事件完备性预言机同步对账（三条 link 的 delete 事件 + A 的 delete 事件缺一不可）。
+        const schema: EventCompletenessSchema = { entities: ['User'], relations: ['User_friends_friends_User'] };
+        await withRuntimeEventCompleteness(storage, schema, 'symmetric delete A', async () => {
+            await storage.delete('User', MatchExp.atom({ key: 'id', value: ['=', a.id] }));
+        });
         await assertNoDanglingLinks(storage, ['User'], [friends]);
         await assertSymmetricBidirectional(storage, 'User', 'friends');
 
@@ -125,7 +130,12 @@ describe('referential-integrity oracle matrix', () => {
         const c = await storage.create('User2', { name: 'C' });
         await storage.addRelationByNameById('User2_friends_friends_User2', c.id, a.id, {});   // A on target side
 
-        await storage.update('User2', MatchExp.atom({ key: 'id', value: ['=', a.id] }), { friends: [{ id: b.id }] });
+        // r17：replace 语义的事件面（旧边 delete + 新边 create）由事件完备性预言机对账。
+        await withRuntimeEventCompleteness(storage,
+            { entities: ['User2'], relations: ['User2_friends_friends_User2'] },
+            'symmetric update-replace', async () => {
+                await storage.update('User2', MatchExp.atom({ key: 'id', value: ['=', a.id] }), { friends: [{ id: b.id }] });
+            });
 
         await assertNoDanglingLinks(storage, ['User2'], [friends]);
         await assertSymmetricBidirectional(storage, 'User2', 'friends');
@@ -143,7 +153,11 @@ describe('referential-integrity oracle matrix', () => {
         const t2 = await storage.create('T3', { tname: 't2', members: [{ id: u1.id }] });
 
         await assertNoDanglingLinks(storage, ['U3', 'T3'], [member]);
-        await storage.delete('U3', MatchExp.atom({ key: 'id', value: ['=', u1.id] }));
+        await withRuntimeEventCompleteness(storage,
+            { entities: ['U3', 'T3'], relations: ['U3_teams_members_T3'] },
+            'n:n delete u1', async () => {
+                await storage.delete('U3', MatchExp.atom({ key: 'id', value: ['=', u1.id] }));
+            });
         await assertNoDanglingLinks(storage, ['U3', 'T3'], [member]);
         const links = await storage.findRelationByName('U3_teams_members_T3', undefined, undefined, ['id']);
         expect(links.length).toBe(0);
@@ -159,7 +173,11 @@ describe('referential-integrity oracle matrix', () => {
 
         await assertNoDanglingLinks(storage, ['Node'], [parentChild]);
         // delete a child — its link to root must go, root stays.
-        await storage.delete('Node', MatchExp.atom({ key: 'id', value: ['=', c1.id] }));
+        await withRuntimeEventCompleteness(storage,
+            { entities: ['Node'], relations: ['Node_children_parent_Node'] },
+            'self-ref 1:n delete child', async () => {
+                await storage.delete('Node', MatchExp.atom({ key: 'id', value: ['=', c1.id] }));
+            });
         await assertNoDanglingLinks(storage, ['Node'], [parentChild]);
         const links = await storage.findRelationByName('Node_children_parent_Node', undefined, undefined, ['id']);
         expect(links.length).toBe(1);

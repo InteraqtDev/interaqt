@@ -26,22 +26,54 @@ export class AttributeQuery {
 
         const recordAttributes: AttributeQueryDataRecordItem[] = allAttributeQueryData.filter(item => typeof item !== 'string')
 
+        // CAUTION 重复关系键的合并只对 attributeQuery 有并集语义。matchExpression/modifier/label 等
+        //  子查询语义字段没有安全的自动合并规则——此前它们在合并时被**静默丢弃**（过滤条件消失
+        //  返回未过滤的关联记录，比少字段更隐蔽，r17 R-1）。规则：仅一方声明则保留；双方声明且
+        //  序列化不相等则 fail-fast（AND 还是 OR 由调用方显式决定，explicit control）。
+        const mergeSemanticFields = (attributeName: string, left: RecordQueryData, right: RecordQueryData): Omit<RecordQueryData, 'attributeQuery'> => {
+            const result: Record<string, unknown> = {}
+            const semanticKeys = ['matchExpression', 'modifier', 'label', 'goto', 'exit'] as const
+            for (const key of semanticKeys) {
+                const leftValue = (left as Record<string, unknown>)[key]
+                const rightValue = (right as Record<string, unknown>)[key]
+                if (leftValue === undefined && rightValue === undefined) continue
+                if (leftValue !== undefined && rightValue !== undefined
+                    && JSON.stringify(leftValue) !== JSON.stringify(rightValue)) {
+                    throw new Error(
+                        `cannot merge duplicate attributeQuery entries for "${attributeName}": both declare a different "${key}". ` +
+                        `Merging would have to silently pick one (dropping the other's ${key}), which returns wrong data with no warning. ` +
+                        `Combine them into a single entry explicitly.`
+                    )
+                }
+                result[key] = leftValue !== undefined ? leftValue : rightValue
+            }
+            return result as Omit<RecordQueryData, 'attributeQuery'>
+        }
+
         const recordAttributesByName = recordAttributes.reduce((acc, item) => {
-            const [attributeName, subQueryData] = item
-            if(acc[attributeName]) {
-                acc[attributeName] = { attributeQuery: AttributeQuery.mergeAttributeQueryData(acc[attributeName].attributeQuery!, subQueryData.attributeQuery!) }
+            const [attributeName, subQueryData, onlyRelationData] = item
+            const existing = acc[attributeName]
+            if (existing) {
+                acc[attributeName] = {
+                    subQueryData: {
+                        ...mergeSemanticFields(attributeName, existing.subQueryData, subQueryData),
+                        attributeQuery: AttributeQuery.mergeAttributeQueryData(existing.subQueryData.attributeQuery || [], subQueryData.attributeQuery || [])
+                    },
+                    // onlyRelationData 表示"只取关系数据不取实体数据"：任一方需要实体数据则取全量（false 更宽）。
+                    onlyRelationData: existing.onlyRelationData && !!onlyRelationData
+                }
             } else {
-                acc[attributeName] = subQueryData
+                acc[attributeName] = { subQueryData, onlyRelationData: !!onlyRelationData }
             }
             return acc
-        }, {} as Record<string, RecordQueryData>)
+        }, {} as Record<string, { subQueryData: RecordQueryData, onlyRelationData: boolean }>)
 
         return [
-            ...propertyAttributes, 
-            ...Object.entries(recordAttributesByName)
+            ...propertyAttributes,
+            ...Object.entries(recordAttributesByName).map(([attributeName, { subQueryData, onlyRelationData }]): AttributeQueryDataRecordItem =>
+                onlyRelationData ? [attributeName, subQueryData, true] : [attributeName, subQueryData]
+            )
         ]
-
-
     }
     public static getAttributeQueryDataForRecord(
         recordName:string, 
@@ -147,7 +179,21 @@ export class AttributeQuery {
             if (attributeName === LINK_SYMBOL) {
                 assert(!!(this.parentRecord && this.attributeName), `parent record and attribute name cannot be empty when query link data, you passed ${this.parentRecord} ${this.attributeName}`)
                 const info = this.map.getInfo(this.parentRecord!, this.attributeName!)
-                this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, subQueryData as RecordQueryData, undefined)
+                let linkSubQueryData = subQueryData as RecordQueryData
+                // CAUTION 对称 n:n 关系的 link 数据会按 :source/:target 两个方向变体查出（fan-out），
+                //  反向挂载时必须知道每条 link 的端点才能判定「哪条才是连接到当前父记录的边」——
+                //  否则对端的其他边会被错挂（r17 对称查询修复，见 QueryExecutor.findXToManyRelatedRecords）。
+                //  这里强制带上端点 id，挂载后再剥除（不属于用户声明的 `&` 数据形状）。
+                if (info.isLinkManyToManySymmetric()) {
+                    linkSubQueryData = {
+                        ...linkSubQueryData,
+                        attributeQuery: AttributeQuery.mergeAttributeQueryData(
+                            linkSubQueryData.attributeQuery || [],
+                            [['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]
+                        )
+                    }
+                }
+                this.parentLinkRecordQuery = RecordQuery.create(info.linkName, this.map, linkSubQueryData, undefined)
                 return
             }
 
@@ -237,10 +283,12 @@ export class AttributeQuery {
                     ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(nextFieldPath, nextNameContext)
                 )
             } else {
-                queryFields.push(
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[0], nextSymmetricLinkNameContext![0]),
-                    ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(symmetricLinkPaths[1], nextSymmetricLinkNameContext![1])
-                )
+                // parentLink 上只有紧邻的一段对称关系，恒展开为 source/target 两个变体。
+                symmetricLinkPaths.forEach((variantPath, i) => {
+                    queryFields.push(
+                        ...this.parentLinkRecordQuery!.attributeQuery!.getValueAndXToOneRecordFields(variantPath, nextSymmetricLinkNameContext![i])
+                    )
+                })
             }
 
         }
@@ -269,8 +317,19 @@ export class AttributeQuery {
         if (this.shouldQueryParentLinkData && this.parentLinkRecordQuery) {
             // link 也可能使用递归，所以也要排除掉。
             if(!this.parentLinkRecordQuery.goto) {
-                const reverseInfo = this.map.getInfo(this.parentRecord!, this.attributeName!).getReverseInfo()
-                result.addRecord([reverseInfo?.attributeName!, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+                const info = this.map.getInfo(this.parentRecord!, this.attributeName!)
+                const reverseInfo = info.getReverseInfo()
+                // CAUTION 对称 n:n 的 link 数据按 :source/:target 两个方向变体 SELECT
+                //  （getValueAndXToOneRecordFields 的 spawn 分支）。查询树负责 JOIN 的构建，
+                //  必须与 SELECT 同步展开变体——否则 link 上的嵌套 x:1 实体（如 `&` 内的
+                //  source/target 端点）SELECT 引用了带后缀的表别名而 JOIN 没建，
+                //  SQL 直接报 "no such column: REL_..._SOURCE_source.*"（r17 假设审计）。
+                if (info.isLinkManyToManySymmetric()) {
+                    result.addRecord([`${reverseInfo?.attributeName!}:source`, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+                    result.addRecord([`${reverseInfo?.attributeName!}:target`, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+                } else {
+                    result.addRecord([reverseInfo?.attributeName!, LINK_SYMBOL], this.parentLinkRecordQuery.attributeQuery!.xToOneQueryTree)
+                }
             }
         }
 

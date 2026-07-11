@@ -261,6 +261,8 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
     relatedAttributeQuery: AttributeQueryData
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     callback?: (this: Controller, item: any, dataDeps?: { [key: string]: unknown }) => any
+    /** 对称关系（source===target 且 sourceProperty===targetProperty，穿透 filtered 链） */
+    isSymmetricRelation: boolean
     protected readonly options: AggregationOptions
 
     constructor(public controller: Controller, public args: TArgs, public dataContext: PropertyDataContext, options: AggregationOptions) {
@@ -296,6 +298,13 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
         this.relatedRecordName = this.isSource ? this.relation.target.name! : this.relation.source.name!
         this.property = args.property || this.relationAttr
         this.reverseProperty = this.isSource ? this.relation.targetProperty : this.relation.sourceProperty
+
+        let physicalRelation = this.relation
+        while (physicalRelation.baseRelation) {
+            physicalRelation = physicalRelation.baseRelation
+        }
+        this.isSymmetricRelation = physicalRelation.source === physicalRelation.target
+            && physicalRelation.sourceProperty === physicalRelation.targetProperty
 
         const attributeQuery = args.attributeQuery || []
         this.relatedAttributeQuery = attributeQuery.filter(item => item && item[0] !== LINK_SYMBOL)
@@ -368,7 +377,11 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
         for (const relatedItem of relations) {
             const relationStateRecord = relatedItem[LINK_SYMBOL] || relatedItem
             const value = this.computeItemValue(relatedItem, dataDeps)
-            if (this.itemState) {
+            // CAUTION 对称关系下同一条 link 行同时承载两端宿主各自的贡献，逐项状态以 link 行为
+            //  key 会让两个宿主共享一个状态槽（后算者读到先算者的值，增量 delta 全错，
+            //  删边时甚至负数崩溃——r17 F-3）。对称关系不写逐项状态，增量路径也不读
+            //  （见 incrementalCompute 的对称守卫，一律退回全量重算）。
+            if (this.itemState && !this.isSymmetricRelation) {
                 await this.itemState.setInternal(relationStateRecord, value)
             }
             values.push(value)
@@ -398,6 +411,14 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
         const relatedMutationEvent = mutationEvent.relatedMutationEvent
         if (!relatedMutationEvent) {
             return ComputationResult.fullRecompute('No related mutation event')
+        }
+        // CAUTION 对称关系 + 逐项贡献状态（callback 型聚合）必须退回全量重算：
+        //  同一条 link 行同时承载两端宿主的贡献，而 RecordBoundState 以 link 行为 key——
+        //  两个宿主共享同一状态槽，后算者读到先算者写入的 oldValue（建边一端恒 0），
+        //  删边时先算者复位状态、后算者把 0 减成 -1 触发负数守卫，整个删除事务回滚（r17 F-3）。
+        //  无逐项状态的聚合（Count 无 callback）用存在性 delta，不受影响。
+        if (this.itemState && this.isSymmetricRelation) {
+            return ComputationResult.fullRecompute('symmetric relation contributions cannot use per-link item state')
         }
         const hostRecord = mutationEvent.record as Record<string, unknown>
 
