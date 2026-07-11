@@ -56,6 +56,10 @@ export type DataBasedEntityEventsSourceMap = EntityCreateEventsSourceMap
 
 export type EventBasedEntityEventsSourceMap = EventDep & {
     computation: Computation,
+    // 与 EntityUpdateEventsSourceMap.filteredRecordName 同义：eventDep 监听 filtered
+    // entity/relation 名的 update 事件时，监听注册到物理 base 名上，此字段记录原 filtered 名，
+    // Scheduler 路由时做成员资格守卫并把事件名改写回 filtered 名。
+    filteredRecordName?: string
 }
 
 export type EntityEventSourceMap = DataBasedEntityEventsSourceMap | EventBasedEntityEventsSourceMap
@@ -84,44 +88,110 @@ export type ComputationPhase = typeof PHASE_BEFORE_ALL|typeof PHASE_NORMAL|typeo
 export class ComputationSourceMapManager {
     private sourceMaps: EntityEventSourceMap[] = []
     private sourceMapTree: DataSourceMapTree = {}
-    // filtered entity/relation 名 -> 物理 base 记录名（穿透嵌套 filtered 链）
+    // 视图名（filtered entity/relation、merged input）-> 物理 base 记录名
     private filteredToPhysicalName: Map<string, string> = new Map()
+    // storage 可发射事件的全部记录名（事件的 recordName 恒 ∈ 此集合）
+    private knownRecordNames: Set<string> = new Set()
 
     constructor(public controller: Controller, public scheduler: Scheduler) {
         
     }
 
-    private buildFilteredToPhysicalNameMap(): void {
+    /**
+     * 事件命名空间以 storage 编译结果（storage.schema.records）为唯一事实源。
+     *
+     * CAUTION 不能用「沿 controller.entities 的 baseEntity/baseRelation 链行走」重建这张表：
+     *  merged input 视图（inputEntities/inputRelations 声明）是在 storage 编译期才被转换成
+     *  filtered 形态的，controller 侧的实例图上看不到这层关系——手工行走会把 input 视图
+     *  当成物理记录，其 update 监听（数据驱动与事件驱动两轨）全部注册成死监听（r18）。
+     *  storage 的 resolvedBaseRecordName 覆盖全部视图形态：filtered 链、嵌套 filtered、
+     *  merged input、filtered-over-merged-input。
+     */
+    private buildEventNamespace(): void {
+        const schemaRecords = this.controller.system.storage.schema?.records
+        if (!schemaRecords?.length) {
+            throw new ComputationProtocolError(
+                'ComputationSourceMapManager.initialize was called before storage setup populated the schema. ' +
+                'The mutation-event namespace (record names, view resolution) comes from the compiled storage schema — ' +
+                'initialize the system storage first.',
+                { computationPhase: 'source-map-initialization' }
+            )
+        }
         this.filteredToPhysicalName = new Map()
-        const all: any[] = [...this.controller.entities, ...this.controller.relations]
-        for (const item of all) {
-            if (!item?.name) continue
-            let cur: any = item
-            while (cur.baseEntity || cur.baseRelation) {
-                cur = cur.baseEntity || cur.baseRelation
-            }
-            if (cur !== item && cur?.name) {
-                this.filteredToPhysicalName.set(item.name, cur.name)
+        this.knownRecordNames = new Set()
+        for (const record of schemaRecords) {
+            this.knownRecordNames.add(record.recordName)
+            if (record.resolvedBaseRecordName && record.resolvedBaseRecordName !== record.recordName) {
+                this.filteredToPhysicalName.set(record.recordName, record.resolvedBaseRecordName)
             }
         }
     }
 
     /**
-     * CAUTION filtered entity/relation 名下只有成员资格 create/delete 事件；
-     *  字段 update 事件永远以物理 base 记录名发出。注册在 filtered 名上的 update
-     *  监听是死监听——成员字段更新会静默丢失（聚合值永久陈旧）。
-     *  这里把 update 监听改挂到物理名上，并记录原 filtered 名，Scheduler 路由时
-     *  按 filteredRecordName 做成员资格守卫并把事件名改写回 filtered 名。
+     * CAUTION 视图名（filtered entity/relation、merged input）下只有成员资格 create/delete
+     *  事件；字段 update 事件永远以物理 base 记录名发出。注册在视图名上的 update
+     *  监听是死监听——成员字段更新会静默丢失（数据驱动计算聚合值永久陈旧、
+     *  事件驱动计算的 StateMachine trigger / Transform eventDep 永不触发）。
+     *  这里把 update 监听改挂到物理名上，并记录原视图名，Scheduler 路由时
+     *  按 filteredRecordName 做成员资格守卫并把事件名改写回视图名。
+     *  数据驱动（dataDep）与事件驱动（eventDep）两条轨道必须同构处理。
      */
     private normalizeFilteredUpdateSourceMap(source: EntityEventSourceMap): EntityEventSourceMap {
-        if (source.type !== 'update' || !('dataDep' in source)) return source
-        const updateSource = source as EntityUpdateEventsSourceMap
-        const physicalName = this.filteredToPhysicalName.get(updateSource.recordName)
+        if (source.type !== 'update') return source
+        const physicalName = this.filteredToPhysicalName.get(source.recordName)
         if (!physicalName) return source
         return {
-            ...updateSource,
+            ...source,
             recordName: physicalName,
-            filteredRecordName: updateSource.recordName,
+            filteredRecordName: source.recordName,
+        } as EntityEventSourceMap
+    }
+
+    private describeComputation(computation: Computation): string {
+        const dataContext = computation.dataContext as { type: string, host?: { name?: string }, id: { name?: string } | string }
+        const idName = typeof dataContext.id === 'object' ? dataContext.id.name : String(dataContext.id)
+        const target = dataContext.type === 'property' ? `${dataContext.host?.name}.${idName}` : idName
+        return `${computation.args.constructor.displayName || computation.constructor.name} computation of ${dataContext.type} "${target}"`
+    }
+
+    /**
+     * 死监听不变量（订阅面守卫）：每一个注册进 source map 的监听都必须可被 storage
+     * 实际发射的事件命中。两条规则：
+     *  1. recordName 必须是 storage 已知的记录名——未知名（typo、把 global dict 名当
+     *     recordName、引用未注册进 Controller 的实体）意味着监听永远不会触发，计算
+     *     永久静默陈旧，声明期直接拒绝；
+     *  2. 归一化之后不允许任何 update 监听仍以视图名为键——normalize 是唯一合法入口，
+     *     该规则被违反说明有生产者绕过了归一化（框架内部缺陷，同样 fail-fast 而不是
+     *     留下静默死监听）。
+     * 这条不变量的存在理由见 r18 复盘：F-1（filtered update 死监听）的通用规则在 r5 就
+     * 被写进了注释，但只在数据驱动轨道上被执行——注释没有执行力，不变量有。
+     */
+    private assertListenerReachable(source: EntityEventSourceMap): void {
+        if (!this.knownRecordNames.has(source.recordName)) {
+            const dictHint = this.controller.dict.some(dictItem => dictItem.name === source.recordName)
+                ? ` "${source.recordName}" is a global dictionary: dictionary changes are emitted as events on the "${DICTIONARY_RECORD}" record — declare { recordName: '${DICTIONARY_RECORD}', type: 'update', record: { key: '${source.recordName}' } } instead.`
+                : ` Check for a typo, and make sure the entity/relation is registered on the Controller.`
+            throw new ComputationProtocolError(
+                `${this.describeComputation(source.computation)} listens to ${source.type} events of record "${source.recordName}", ` +
+                `but no such record exists in the storage schema — this listener can never fire and the computation would stay silently stale.` +
+                dictHint,
+                {
+                    handleName: source.computation.constructor.name,
+                    dataContext: source.computation.dataContext,
+                    computationPhase: 'source-map-initialization'
+                }
+            )
+        }
+        if (source.type === 'update' && this.filteredToPhysicalName.has(source.recordName)) {
+            throw new ComputationProtocolError(
+                `Internal invariant violated: an update listener of ${this.describeComputation(source.computation)} is still keyed under the view name "${source.recordName}" after normalization. ` +
+                `Views (filtered entities/relations, merged inputs) never emit field update events — every producer of source maps must route through normalizeFilteredUpdateSourceMap. This is a framework bug; please report it.`,
+                {
+                    handleName: source.computation.constructor.name,
+                    dataContext: source.computation.dataContext,
+                    computationPhase: 'source-map-initialization'
+                }
+            )
         }
     }
 
@@ -130,7 +200,7 @@ export class ComputationSourceMapManager {
      * @param sourceMaps EntityEventSourceMap 数组
      */
     initialize(computations: Set<Computation>): void {
-        this.buildFilteredToPhysicalNameMap()
+        this.buildEventNamespace()
         const sortedERMutationEventSources: EntityEventSourceMap[][] = [[], [], []]
 
         
@@ -217,27 +287,27 @@ export class ComputationSourceMapManager {
             }
         }
 
-        // const ERMutationEventSources: EntityEventSourceMap[]= sortedERMutationEventSources.flat()
-
         this.sourceMaps = sortedERMutationEventSources.flat().map(source => this.normalizeFilteredUpdateSourceMap(source))
+        this.sourceMaps.forEach(source => this.assertListenerReachable(source))
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
     }
     /**
-     * 添加新的 SourceMap
-     * @param sourceMap 要添加的 EntityEventSourceMap
+     * 添加新的 SourceMap。
+     * CAUTION 与 initialize 走同一条归一化 + 可达性校验管线：任何生产者都不允许绕过
+     *  normalizeFilteredUpdateSourceMap 直接入树（视图名 update 监听会成为静默死监听）。
      */
     addSourceMap(sourceMap: EntityEventSourceMap): void {
-        this.sourceMaps.push(sourceMap)
-        this.addToTree(sourceMap)
+        const normalized = this.normalizeFilteredUpdateSourceMap(sourceMap)
+        this.assertListenerReachable(normalized)
+        this.sourceMaps.push(normalized)
+        this.addToTree(normalized)
     }
 
     /**
-     * 批量添加 SourceMap
-     * @param sourceMaps 要添加的 EntityEventSourceMap 数组
+     * 批量添加 SourceMap（逐条走 addSourceMap 的归一化 + 校验管线）
      */
     addSourceMaps(sourceMaps: EntityEventSourceMap[]): void {
-        this.sourceMaps.push(...sourceMaps)
-        sourceMaps.forEach(sourceMap => this.addToTree(sourceMap))
+        sourceMaps.forEach(sourceMap => this.addSourceMap(sourceMap))
     }
 
     /**
@@ -556,23 +626,31 @@ export class ComputationSourceMapManager {
         if (context.at(-1) !== '&') {
             // 1. 先监听"关联实体关系"的 create/delete
             const realtionRecordName = this.controller.system.storage.getRelationName(baseRecordName, context.join('.'))
-            ERMutationEventsSource.push({
-                dataDep,
-                type: 'create',
-                recordName: realtionRecordName,
-                sourceRecordName: baseRecordName,
-                isRelation: true,
-                targetPath: context,
-                computation
-            }, {
-                dataDep,
-                type: 'delete',
-                recordName: realtionRecordName,
-                sourceRecordName: baseRecordName,
-                isRelation: true,
-                targetPath: context,
-                computation
-            })
+            // CAUTION 虚拟 link（relation 记录自身的 source/target 端点，isSourceRelation）
+            //  只存在于 map.links、不是 record，storage 从不以它的名字发射事件——注册在
+            //  虚拟 link 名上的 create/delete 是死监听。端点的建立/解除只能经由 relation
+            //  记录整体的 create/delete 表达，而那两个监听已由 records dataDep 在上层注册。
+            //  这里只为真实 relation record（可发射事件）注册监听；嵌套端点实体的字段
+            //  update 监听（下方步骤 2）不受影响。
+            if (this.knownRecordNames.has(realtionRecordName)) {
+                ERMutationEventsSource.push({
+                    dataDep,
+                    type: 'create',
+                    recordName: realtionRecordName,
+                    sourceRecordName: baseRecordName,
+                    isRelation: true,
+                    targetPath: context,
+                    computation
+                }, {
+                    dataDep,
+                    type: 'delete',
+                    recordName: realtionRecordName,
+                    sourceRecordName: baseRecordName,
+                    isRelation: true,
+                    targetPath: context,
+                    computation
+                })
+            }
         }
         // 2. 监听关联实体的属性 update
         if (subAttrs.length > 0) {

@@ -157,7 +157,9 @@ describe('Scheduler.resolveDataDeps edge cases', () => {
 });
 
 describe('Scheduler.runComputation error handling', () => {
-    test('wraps data dependency resolution error in ComputationDataDepError', async () => {
+    test('a records dataDep on an unregistered entity fails fast at setup (dead-listener invariant)', async () => {
+        // r18 结构层起：指向 storage 未知记录名的 dataDep 监听在 setup 期被死监听
+        // 不变量拒绝（此前是静默死监听——计算永不触发、无任何报错）。
         const TestEntity = Entity.create({
             name: 'DataDepErrEntity',
             properties: [
@@ -195,10 +197,7 @@ describe('Scheduler.runComputation error handling', () => {
             dict: [dict],
         });
 
-        await controller.setup(true);
-
-        await system.storage.create('DataDepErrEntity', { val: 1 });
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await expect(controller.setup(true)).rejects.toThrowError(/NonExistentEntity___.*can never fire/s);
 
         await system.destroy();
     });

@@ -286,6 +286,16 @@ test('should handle negative values correctly', async () => {
 | 操作 | create / update-replace / **update 原地（同 id）** / **抢夺（引用已被占用的排他目标）** / delete 实体 / addRelation / removeRelation | r6-F3、r17 F-1 |
 | 路径跳数 | 1 跳 / **2 跳（含连续对称段）** / 3 跳 | r17 F-4 |
 | 观察面 | 查询面 / **事件面（用 tests/storage/helpers/eventCompleteness.ts 的预言机）** / 计算面（与朴素重算对照） / 不变量面（无悬挂端点、x:1 排他唯一） | r17 F-2 |
+| 计算轨道（机制轴） | 数据驱动（dataDeps）/ **事件驱动（StateMachine trigger / Transform eventDeps）** / **migration 签名（第三个读者：同一声明在 manifest 里是否可见）** | r18 F-1、r18 F-2 |
+| 监听名形态（机制轴） | 物理 base 名 / **filtered entity/relation 名** / **merged input 视图名** / 嵌套 filtered 链 | r18 F-1、r18 merged-input 亲缘 bug |
+
+**机制轴说明（r18 复盘引入）**：前七根轴描述"声明的数据形状"，后两根描述"同一声明被哪个机制消费"。
+同一个声明面（如 trigger/eventDep 的 `recordName + type`）的**每一个读者都是一根轴**——bug 住在读者之间的
+差集里，按特性组织的测试与行覆盖率对此都失明。**路由/订阅类修复的强制清单**：修复某一读者的路由缺陷时，
+必须枚举同一声明面的全部读者（数据驱动轨、事件驱动轨、migration 签名、`addSourceMap` 等扩展点）并逐一验证；
+能在汇合点收口（共用同一条归一化/校验管线）的优先于逐读者修补。setup 期的死监听不变量
+（`ComputationSourceMapManager.assertListenerReachable`）是订阅面的结构性守卫——新增事件生产者/消费者时
+它会自动拒绝不可达监听，测试矩阵无需为"监听可达性"逐格铺点。
 
 配套设施：
 - `tests/storage/helpers/eventCompleteness.ts` — 事件完备性预言机（数据 diff ⟺ 事件流）、

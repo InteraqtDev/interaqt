@@ -55,15 +55,47 @@ import { InteractionEventEntity } from 'interaqt';
 ```javascript
 // ❌ WRONG: identifier property doesn't exist
 Property.create({ 
-  name: 'id', 
+  name: 'externalId', 
   type: 'string',
   identifier: true  // This doesn't exist!
 });
 
 // ✅ CORRECT: ID uniqueness is handled by storage layer
 Property.create({ 
-  name: 'id', 
+  name: 'externalId', 
   type: 'string'
+});
+```
+
+### ❌ Declaring Reserved Property Names
+
+```javascript
+// ❌ WRONG: 'id' is the framework-managed primary key — Entity.create rejects it.
+// The same applies to '_rowId', and to 'source'/'target' on relation properties.
+Property.create({ name: 'id', type: 'string' });
+
+// ✅ CORRECT: use an explicit business identifier name
+Property.create({ name: 'externalId', type: 'string' });
+```
+
+### ❌ Relation Property Name Colliding with a Value Property
+
+```javascript
+// ❌ WRONG: sourceProperty 'email' collides with the scalar property 'email' —
+// they share one attribute namespace per record; setup fails fast.
+const User = Entity.create({
+  name: 'User',
+  properties: [Property.create({ name: 'email', type: 'string' })]
+});
+Relation.create({
+  source: User, sourceProperty: 'email',  // collides!
+  target: Contact, targetProperty: 'owner', type: '1:n'
+});
+
+// ✅ CORRECT: pick distinct names for value properties and relation properties
+Relation.create({
+  source: User, sourceProperty: 'contacts',
+  target: Contact, targetProperty: 'owner', type: '1:n'
 });
 ```
 

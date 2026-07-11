@@ -399,11 +399,13 @@ describe('Relation.public constraint and computed functions', () => {
         });
         expect(Relation.public.properties.constraints.eachNameUnique(relUnique)).toBe(true);
 
-        const relDup = Relation.create({
+        // r18 起 Relation.create 在声明期直接拒绝重复属性名（此前仅 public.constraints 元数据
+        // 声明了约束但从未执行，重复名静默保留最后一个）。
+        expect(() => Relation.create({
             source: s, sourceProperty: 'cys2', target: t, targetProperty: 'cx2', type: '1:n',
             properties: [p1, p3],
-        });
-        expect(Relation.public.properties.constraints.eachNameUnique(relDup)).toBe(false);
+        })).toThrowError(/Duplicate property name "a"/);
+        expect(Relation.public.properties.constraints.eachNameUnique({ properties: [p1, p3] } as any)).toBe(false);
     });
 
     test('inputRelations.constraints.mergedRelationNoProperties rejects properties on merged', () => {

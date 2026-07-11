@@ -137,6 +137,8 @@ Rules:
 - Do not set a `defaultValue` on the same property. The allocator supplies the value after the create mutation and before commit.
 - Scope paths can only read stable primitive/ref values already present on the created record.
 - Missing or type-mismatched scope values are errors.
+- **Scope inputs are immutable after numbering.** Updating a scope value field, or removing/replacing a scope ref relation, on a record that already holds a sequence number fails fast — the number is allocated once per scope at creation, and re-scoping would silently duplicate numbers in the target scope (permanently violating the `UniqueConstraint` there). Delete and recreate the record in the new scope, or model the mutable dimension outside the sequence scope. Records the `match` predicate skipped (no number assigned) can move freely.
+- `match` predicate fields are also expected to be create-time stable: a record that starts non-matching and later mutates into the predicate does **not** get a number retroactively.
 - `allowManualValue: true` is for import/backfill and does not advance the counter.
 - Existing data migration should use `initializeFrom` to seed every scope with `MAX(serialNumber)`.
 - Keep the `UniqueConstraint`; the allocator prevents normal duplicates, and the constraint is the integrity backstop.

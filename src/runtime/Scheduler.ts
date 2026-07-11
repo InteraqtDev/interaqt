@@ -412,6 +412,104 @@ export class Scheduler {
     }
     erMutationEventSources: EntityEventSourceMap[] = []
     dataSourceMapTree: DataSourceMapTree = {}
+    // ScopedSequence 的 scope 输入不可变守卫（见 buildScopedSequenceScopeGuards）。
+    private scopedSequenceScopeGuards: Array<{
+        hostName: string,
+        propertyName: string,
+        sequenceName: string,
+        valueFields: string[],
+        // 关系属性名 -> 该关系的 record name（link delete 事件按此路由）
+        refRelations: Map<string, { relationName: string, hostIsSource: boolean }>
+    }> = []
+    /**
+     * ScopedSequence 的序号在创建时按 scope 一次性分配（getInitialValue），scope 是号码的
+     * 身份组成部分。事后修改 scope 输入字段（值字段更新 / scope 关系解除或替换）不会重新编号，
+     * 会静默产出「同一 scope 内重复号码」；配合文档推荐的 UniqueConstraint 时，目标 scope 的
+     * 后续 create 会永久撞唯一约束（计数器随事务回滚，无法自愈）。
+     * 声明式语义下 scope 输入是 create-time stable 字段——这里在 mutation 监听层 fail-fast，
+     * 把静默数据损坏转为受控错误。未编号记录（match 未命中，序号列为 null）不受限制。
+     */
+    private buildScopedSequenceScopeGuards() {
+        this.scopedSequenceScopeGuards = []
+        for (const computation of this.computationsHandles.values()) {
+            const args = computation.args as { scope?: Array<{ name: string, type: string, path: string }>, name?: string } & IInstance
+            if ((args as { _type?: string })._type !== 'ScopedSequence') continue
+            if (computation.dataContext.type !== 'property') continue
+            const dataContext = computation.dataContext as PropertyDataContext
+            const hostName = dataContext.host.name!
+            const valueFields: string[] = []
+            const refRelations = new Map<string, { relationName: string, hostIsSource: boolean }>()
+            for (const item of (args.scope || [])) {
+                const topField = item.path.split('.')[0]
+                if (item.type === 'ref') {
+                    const relation = this.controller.relations.find(r =>
+                        (r.source?.name === hostName && r.sourceProperty === topField) ||
+                        (r.target?.name === hostName && r.targetProperty === topField)
+                    )
+                    if (relation) {
+                        refRelations.set(topField, {
+                            relationName: relation.name!,
+                            hostIsSource: relation.source?.name === hostName && relation.sourceProperty === topField
+                        })
+                    } else {
+                        // ref scope 也可能以行内 id 值字段实现（如 type:'id' 的普通属性），按值字段守卫。
+                        valueFields.push(topField)
+                    }
+                } else {
+                    valueFields.push(topField)
+                }
+            }
+            this.scopedSequenceScopeGuards.push({
+                hostName,
+                propertyName: dataContext.id.name,
+                sequenceName: args.name!,
+                valueFields,
+                refRelations
+            })
+        }
+    }
+    private async assertScopedSequenceScopeUnchanged(mutationEvent: RecordMutationEvent) {
+        for (const guard of this.scopedSequenceScopeGuards) {
+            // 1. 值字段：宿主 update 事件中 scope 字段实际变化，且记录已编号 → 拒绝。
+            if (mutationEvent.type === 'update' && mutationEvent.recordName === guard.hostName) {
+                const changed = guard.valueFields.filter(field =>
+                    mutationEvent.record?.hasOwnProperty(field) &&
+                    mutationEvent.record[field] !== mutationEvent.oldRecord?.[field]
+                )
+                if (changed.length && mutationEvent.oldRecord?.[guard.propertyName] != null) {
+                    throw new ComputationProtocolError(
+                        `ScopedSequence "${guard.sequenceName}": scope field${changed.length > 1 ? 's' : ''} ${changed.map(f => `"${f}"`).join(', ')} of ${guard.hostName}.${guard.propertyName} cannot change after a sequence number is assigned. ` +
+                        `Sequence numbers are allocated once at creation per scope; moving a numbered record to another scope silently duplicates numbers there (and permanently violates a unique constraint over scope+number, if declared). ` +
+                        `Delete and recreate the record in the new scope, or model the mutable dimension outside the sequence scope.`,
+                        { handleName: 'ScopedSequence', computationPhase: 'scope-immutability-guard' }
+                    )
+                }
+            }
+            // 2. ref 字段：scope 关系的 delete 事件（解除或替换），宿主仍存在且已编号 → 拒绝。
+            //    宿主整体删除的级联 unlink 不受影响（届时宿主行已不存在）。
+            if (mutationEvent.type === 'delete') {
+                for (const [field, refInfo] of guard.refRelations) {
+                    if (mutationEvent.recordName !== refInfo.relationName) continue
+                    const hostId = (mutationEvent.record as { source?: { id?: unknown }, target?: { id?: unknown } } | undefined)?.[refInfo.hostIsSource ? 'source' : 'target']?.id
+                    if (hostId === undefined) continue
+                    const host = await this.controller.system.storage.findOne(
+                        guard.hostName,
+                        MatchExp.atom({ key: 'id', value: ['=', hostId] }),
+                        undefined,
+                        ['id', guard.propertyName]
+                    )
+                    if (host && host[guard.propertyName] != null) {
+                        throw new ComputationProtocolError(
+                            `ScopedSequence "${guard.sequenceName}": scope relation "${field}" of ${guard.hostName}.${guard.propertyName} cannot be removed or replaced after a sequence number is assigned. ` +
+                            `Sequence numbers are allocated once at creation per scope; re-scoping a numbered record silently duplicates numbers in the target scope (and permanently violates a unique constraint over scope+number, if declared). ` +
+                            `Delete and recreate the record in the new scope, or model the mutable dimension outside the sequence scope.`,
+                            { handleName: 'ScopedSequence', computationPhase: 'scope-immutability-guard' }
+                        )
+                    }
+                }
+            }
+        }
+    }
     // CAUTION 计算传播的重入守卫。计算的写回（applyResult/applyResultPatch）会在同一事务内
     //  立即重入 mutation listener，触发下游计算——这是反应式语义的主干。但循环依赖的声明
     //  （互相派生的 Transform、dataDeps 引用自身输出的 dict 等）会让这条链永不收敛：
@@ -424,6 +522,7 @@ export class Scheduler {
     private buildComputationMutationListener(): RecordMutationCallback {
         this.sourceMapManager.initialize(new Set(this.computationsHandles.values()))
         this.dataSourceMapTree = this.sourceMapManager.getSourceMapTree()
+        this.buildScopedSequenceScopeGuards()
 
         return (async (mutationEvents) => {
             const parent = this.propagationContext.getStore()
@@ -440,6 +539,7 @@ export class Scheduler {
             const trail = parent?.trail ?? []
             await this.propagationContext.run({ depth, trail }, async () => {
                 for(let mutationEvent of mutationEvents){
+                    await this.assertScopedSequenceScopeUnchanged(mutationEvent)
                     const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                     if (sources.length > 0) {
                         for(const source of sources) {
@@ -469,13 +569,16 @@ export class Scheduler {
      * filtered entity/relation 源上的 update 事件路由守卫。
      *
      * 背景：storage 的字段 update 事件只以物理 base 记录名发出；filtered 名下只有
-     * 成员资格 create/delete 事件。为了让「成员留在集合内的字段更新」也能触发聚合，
-     * source map 把 filtered 源的 update 监听注册到物理名上（携带 filteredRecordName）。
-     * 这里补上语义守卫，保证与成员资格事件不重复计算：
+     * 成员资格 create/delete 事件。为了让「成员留在集合内的字段更新」也能触发计算，
+     * source map 把 filtered 源的 update 监听注册到物理名上（携带 filteredRecordName）——
+     * 数据驱动（dataDep）与事件驱动（StateMachine trigger / Transform eventDep）两条轨道
+     * 都经过这一守卫。这里补上语义守卫，保证与成员资格事件不重复计算：
      *  1. 同一事件批次里已有该记录在该 filtered 源上的成员资格 create/delete
      *     （enter/exit 场景）→ 跳过，由成员资格事件驱动计算；
      *  2. 否则查询当前成员资格：仍是成员 → 以 filtered 名改写事件后放行（stay-in 更新）；
      *     不是成员 → 跳过（无关记录的字段更新）。
+     * 事件驱动计算收到的是改写后（filtered 名）的事件，与 trigger/eventDep 声明的
+     * recordName 一致，TransitionFinder / callback 的模式匹配才能命中。
      *
      * 带 targetPath 的（property/关联路径）监听不需要此守卫：computeDirtyDataDepRecords
      * 与各 handle 的增量分支都通过 filtered 路径查询定位记录，成员资格由查询本身保证。
@@ -488,10 +591,10 @@ export class Scheduler {
         mutationEvent: RecordMutationEvent,
         batchEvents: RecordMutationEvent[]
     ): Promise<RecordMutationEvent | null> {
-        if (!('dataDep' in source) || source.type !== 'update') return mutationEvent
-        const filteredRecordName = (source as EntityUpdateEventsSourceMap).filteredRecordName
+        if (source.type !== 'update') return mutationEvent
+        const filteredRecordName = (source as { filteredRecordName?: string }).filteredRecordName
         if (!filteredRecordName) return mutationEvent
-        if (source.targetPath?.length) return mutationEvent
+        if ('dataDep' in source && (source as EntityUpdateEventsSourceMap).targetPath?.length) return mutationEvent
 
         const recordId = mutationEvent.record?.id ?? mutationEvent.oldRecord?.id
         if (recordId === undefined) return null

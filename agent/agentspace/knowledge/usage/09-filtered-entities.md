@@ -523,6 +523,20 @@ const CategoryStats = Entity.create({
 
 ## Real-time Updates and Event Handling
 
+### Event Semantics on Filtered Entity Names
+
+A filtered entity name carries three event shapes, for both data-based computations (`dataDeps`) and event-based computations (`StateMachine` triggers, `Transform` `eventDeps`):
+
+- `create` — a record **entered** the filtered set (created as a member, or updated into the predicate);
+- `delete` — a record **left** the filtered set (deleted, or updated out of the predicate);
+- `update` — a member's fields changed **while staying in** the set. The framework routes the base record's physical update event to listeners declared on the filtered name and rewrites `event.recordName` to the filtered name; enter/exit updates are delivered as the membership `create`/`delete` above (never double-fired as `update`).
+
+So a `StateMachine` transfer like `trigger: { recordName: 'ActiveTicket', type: 'update', keys: ['title'] }` fires exactly for title changes of tickets that are and remain active.
+
+The same three-shape semantics apply to **merged input views** (`inputEntities`/`inputRelations` declarations) and to nested filtered chains — every view name resolves to its physical base through the compiled storage schema.
+
+Additionally, every declared listener is validated at setup: a `recordName` that no record in the storage schema carries (a typo, an entity not registered on the Controller, or a global dictionary name — dictionary changes are emitted on the `_Dictionary_` record with `record: { key: '<dictName>' }`) fails fast with a `ComputationProtocolError` instead of becoming a silent dead listener.
+
 ### Automatic Update Mechanism
 
 ```javascript

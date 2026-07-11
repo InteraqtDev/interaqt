@@ -1,6 +1,7 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { PropertyInstance } from './Property.js';
+import { validatePropertyNamesOnCreate } from './propertyNameGuards.js';
 import type { ComputationInstance } from './types.js';
 import type { RelationInstance } from './Relation.js';
 import type { ConstraintInstance } from './Constraint.js';
@@ -150,6 +151,8 @@ export class Entity implements EntityInstance {
     if (args.baseEntity && args.inputEntities) {
       throw new Error(`Entity "${args.name}" declares both baseEntity (filtered entity) and inputEntities (merged entity). These are mutually exclusive declaration modes — to filter a merged entity, declare the merged entity first and create a separate filtered entity on top of it.`);
     }
+    // 保留名（id/_rowId）与重复属性名守卫：见 propertyNameGuards.ts。
+    validatePropertyNamesOnCreate(args.name, args.properties, 'Entity');
 
     const instance = new Entity(args, options);
     
