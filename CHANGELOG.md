@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.0.1](https://github.com/interaqtdev/interaqt/compare/v4.0.0...v4.0.1) (2026-07-11)
+
+### Bug Fixes
+
+* **builtins:** reject arrays in entity/relation payload structural check ([7b0adce](https://github.com/interaqtdev/interaqt/commit/7b0adce479bc5a1b2c909cf0487b4e5618b50050))
+* **core:** BoolExp NOT propagates inverse through AND/OR (De Morgan) — guard fail-open ([b9a480f](https://github.com/interaqtdev/interaqt/commit/b9a480f1428b1ec7e41035a05c209a00ddb1b7ae))
+* **storage:** combined-topology steal re-evaluates old owner's filtered membership ([7508337](https://github.com/interaqtdev/interaqt/commit/750833794a9cf8bb72c0507864fb3cee4377f20e))
+* **storage:** hoist EXIST inner isReferenceValue paths into outer JOIN tree ([5b7c245](https://github.com/interaqtdev/interaqt/commit/5b7c24511f1b9bc2d7b2797d93eea0d0cadb3372))
+* **storage:** normalize EXIST payload node forms in collectExistReferencePaths ([fc3b411](https://github.com/interaqtdev/interaqt/commit/fc3b411c7d91544ffd64c78dfe66ab8cda01d66c))
+
 ## [4.0.0](https://github.com/interaqtdev/interaqt/compare/v3.1.0...v4.0.0) (2026-07-11)
 
 r18 deep review release. Full analysis: `agentspace/output/deep-review-2026-07-11-r18.md` and `agentspace/output/r18-test-blindness-retrospective.md` (PR [#34](https://github.com/InteraqtDev/interaqt/pull/34)).
