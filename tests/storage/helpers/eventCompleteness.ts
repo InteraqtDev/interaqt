@@ -24,12 +24,23 @@ export type LogicalSnapshot = Map<string, Map<string, LogicalRow>>
 export type EventCompletenessSchema = {
     entities: string[]
     relations: string[]
+    /**
+     * 额外忽略的字段判定（runtime 层需要：计算的绑定状态列如 `_Host_prop_bound_total`
+     * 由 atomic 原语直写、刻意不产生事件；计算结果属性本身有 update 事件，不在此列）。
+     */
+    ignoreField?: (fieldName: string) => boolean
 }
 
-function normalizeRow(row: LogicalRow): LogicalRow {
+/** runtime（带 Controller/计算）场景的默认忽略规则：绑定状态列 + 内部行号列。 */
+export function isComputationInternalField(fieldName: string): boolean {
+    return /^_.*_bound_/.test(fieldName) || fieldName === '_rowId'
+}
+
+function normalizeRow(row: LogicalRow, ignoreField?: (fieldName: string) => boolean): LogicalRow {
     const result: LogicalRow = {}
     for (const [key, value] of Object.entries(row)) {
         if (key === 'id') continue
+        if (ignoreField?.(key)) continue
         if (key === 'source' || key === 'target') {
             result[key] = (value as { id?: unknown })?.id
         } else if (value !== null && typeof value === 'object') {
@@ -42,16 +53,22 @@ function normalizeRow(row: LogicalRow): LogicalRow {
     return result
 }
 
-export async function snapshotLogicalState(handle: EntityQueryHandle, schema: EventCompletenessSchema): Promise<LogicalSnapshot> {
+/** 最小查询契约：EntityQueryHandle 与 MonoSystem storage 都满足。 */
+export type LogicalQuerySource = {
+    find(entityName: string, match?: unknown, modifier?: unknown, attributeQuery?: unknown): Promise<Record<string, unknown>[]>
+    findRelationByName(relationName: string, match?: unknown, modifier?: unknown, attributeQuery?: unknown): Promise<Record<string, unknown>[]>
+}
+
+export async function snapshotLogicalState(handle: LogicalQuerySource, schema: EventCompletenessSchema): Promise<LogicalSnapshot> {
     const snapshot: LogicalSnapshot = new Map()
     for (const entityName of schema.entities) {
         const rows = await handle.find(entityName, undefined, undefined, ['*'])
-        snapshot.set(entityName, new Map(rows.map(row => [String(row.id), normalizeRow(row)])))
+        snapshot.set(entityName, new Map(rows.map(row => [String(row.id), normalizeRow(row, schema.ignoreField)])))
     }
     for (const relationName of schema.relations) {
         const rows = await handle.findRelationByName(relationName, undefined, undefined,
             ['*', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]])
-        snapshot.set(relationName, new Map(rows.map(row => [String(row.id), normalizeRow(row)])))
+        snapshot.set(relationName, new Map(rows.map(row => [String(row.id), normalizeRow(row, schema.ignoreField)])))
     }
     return snapshot
 }
@@ -60,10 +77,12 @@ export function expectEventsToExplainDiff(
     before: LogicalSnapshot,
     after: LogicalSnapshot,
     events: RecordMutationEvent[],
-    label = ''
+    label = '',
+    options?: { ignoreField?: (fieldName: string) => boolean }
 ) {
     const trackedNames = new Set(before.keys())
     const relevantEvents = events.filter(e => trackedNames.has(e.recordName))
+    const ignoreField = options?.ignoreField
 
     for (const recordName of trackedNames) {
         const beforeRows = before.get(recordName)!
@@ -101,6 +120,7 @@ export function expectEventsToExplainDiff(
                 .filter(e => String(e.record?.id) === id)
                 .flatMap(e => (e.keys as string[] | undefined) ?? []))
             for (const field of changedFields) {
+                if (ignoreField?.(field)) continue
                 expect(coveredKeys.has(field),
                     `${label} [event-completeness] ${recordName}#${id} field "${field}" changed in storage (` +
                     `${JSON.stringify(beforeRows.get(id)![field] ?? null)} -> ${JSON.stringify(afterRows.get(id)![field] ?? null)}` +
@@ -137,7 +157,39 @@ export async function withEventCompleteness(
     const events: RecordMutationEvent[] = []
     await op(events)
     const after = await snapshotLogicalState(handle, schema)
-    expectEventsToExplainDiff(before, after, events, label)
+    expectEventsToExplainDiff(before, after, events, label, { ignoreField: schema.ignoreField })
+    return events
+}
+
+/**
+ * runtime（MonoSystem storage，带 Controller/计算）版本：事件经 storage.listen 采集，
+ * 绑定状态列（atomic 直写、无事件语义）默认忽略。计算结果属性有 update 事件，正常对账——
+ * 这使预言机同时守住「用户写入的事件面」与「计算传播的事件面」。
+ */
+export async function withRuntimeEventCompleteness(
+    storage: LogicalQuerySource & {
+        listen(callback: (events: RecordMutationEvent[]) => unknown): void
+        unlisten?(callback: (events: RecordMutationEvent[]) => unknown): void
+    },
+    schema: EventCompletenessSchema,
+    label: string,
+    op: () => Promise<unknown>
+): Promise<RecordMutationEvent[]> {
+    const effectiveSchema: EventCompletenessSchema = {
+        ...schema,
+        ignoreField: schema.ignoreField ?? isComputationInternalField
+    }
+    const before = await snapshotLogicalState(storage, effectiveSchema)
+    const events: RecordMutationEvent[] = []
+    const collector = (batch: RecordMutationEvent[]) => { events.push(...batch) }
+    storage.listen(collector)
+    try {
+        await op()
+    } finally {
+        storage.unlisten?.(collector)
+    }
+    const after = await snapshotLogicalState(storage, effectiveSchema)
+    expectEventsToExplainDiff(before, after, events, label, { ignoreField: effectiveSchema.ignoreField })
     return events
 }
 

@@ -81,12 +81,13 @@ describe("refactored types", () => {
     test('type checking with is() method', () => {
         const entity = Entity.create({ name: 'Test' });
         const property = Property.create({ name: 'prop', type: 'string' });
+        // r17 起对称（同名属性）关系只允许 n:n；本用例只关心 is() 类型判定，用无向 n:n 形态。
         const relation = Relation.create({
             source: entity,
             target: entity,
             sourceProperty: 'self',
             targetProperty: 'self',
-            type: '1:1'
+            type: 'n:n'
         });
         
         // Test is() methods

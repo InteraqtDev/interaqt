@@ -317,11 +317,16 @@ export async function checkCondition(controller: GuardController, interaction: I
 // Runtime checks for the primitive payload types a PayloadItem can declare.
 // Non-primitive declarations (e.g. 'Entity'/'Relation') are validated through
 // `base`/concept checks below instead.
+// CAUTION 弱校验矩阵（r7-I-14 家族，r17 R-3 收口两维）：
+//  - number 必须是有限数：NaN/±Infinity 的 typeof 也是 'number'，放行后进入 Summation/Average
+//    等聚合产出静默垃圾值（聚合侧按 0 计但事实数据已污染）；
+//  - object 必须排除数组：typeof [] === 'object'，isCollection: false 的 object 字段收到数组时
+//    下游按对象消费（属性访问/展开/入库映射）会静默走偏。集合语义应声明 isCollection: true。
 const payloadPrimitiveTypeChecks: Record<string, (value: unknown) => boolean> = {
   string: value => typeof value === 'string',
-  number: value => typeof value === 'number',
+  number: value => typeof value === 'number' && Number.isFinite(value),
   boolean: value => typeof value === 'boolean',
-  object: value => value !== null && typeof value === 'object',
+  object: value => value !== null && typeof value === 'object' && !Array.isArray(value),
 };
 
 export async function checkPayload(controller: GuardController, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {

@@ -15,6 +15,15 @@
 >
 > 修复回归：上述 6 个复现翻转为常驻回归 + 兄弟格扫描 6 用例（combined 同 id 数据面+事件面、combined/merged 抢夺对照、replace 对照、幂等对照、n:1 非排他对照）+ `spawnManyToManySymmetricPath` 多段展开单测（含防二次展开）。修复后 `npm run check` 通过，`npm test` 全量 **1863 passed / 26 skipped**（零既有用例回归；1 个既有用例 `review-fixes-2026-07-08-r2` 曾暴露 reliance 边界，已用 isTargetReliance 守卫收口）。
 > 为什么这些问题十七轮才被发现：见配套复盘 `agentspace/output/r17-test-blindness-retrospective.md`。
+>
+> **维护说明二（2026-07-11，结构层 + 收尾轮）**：复盘提出的结构性测试层已落地并用变异测试验证（回退 src 至修复前基线 → 16 个矩阵用例 9 个变红，精确命中全部四个家族）：事件完备性预言机（`tests/storage/helpers/eventCompleteness.ts`，storage 与 runtime 双形态）、写路径×拓扑矩阵、对称×全聚合矩阵、对称路径矩阵、维度登记册（`WritingComputationTests.md`）。结构层首跑即抓出三个既有 bug 并修复：对称 fan-out 下 `&` 数据错挂到对端其他边（`findXToManyRelatedRecords` 按端点匹配选变体）、combined 拓扑删端点实体留悬挂 link（`DeletionExecutor` 同行删除清 combined link 列）、combined link 经 addRelation 抢夺崩溃 + 业务 link delete 事件漏发（flashOut 行归属校验 + 补发事件）。
+> 收尾轮完成本报告第三节全部重要项与复盘遗留项：
+> - **R-1 已修**：`mergeAttributeQueryData` 重复键合并保留 matchExpression/modifier/label/goto/exit（单方声明保留、双方冲突 fail-fast）与 `onlyRelationData` 标志。
+> - **R-3 已修**：payload `number` 拒绝 NaN/±Infinity（`Number.isFinite`）、`object` 拒绝数组（`!Array.isArray`），回归见 `review-repro-guards.spec.ts`。
+> - **R-2 已按建议处置**：`generator/api-reference.md` 与 `usage/06` 增加「dataPolicy.match 必须搭配 attributeQuery」安全警告（与既有 R-4 文档强制同族）。
+> - **假设审计（盲区 4）产出两个声明期守卫（`Relation.create`）**：对称（同名属性）关系限定 n:n——对称 1:1/n:1 此前被静默接受但只有单侧可读写（A.spouse=B 而 B.spouse 为空）；`isTargetReliance` 限定 1:1/1:n——n:1/n:n reliance 此前被静默接受，共享 target 在任一 source 删除时被级联过删。回归见 `tests/core/relationDeclarationGuards.spec.ts`。
+> - **对称 `&` 内嵌套端点实体属性查询修复**：`buildXToOneQueryTree` 对对称 link 的 JOIN 树按 :source/:target 变体展开（此前 SELECT 有变体、JOIN 没有 → "no such column: REL_..._SOURCE_source.*" 裸 SQL 错误）。
+> - **runtime 层事件完备性预言机**：`withRuntimeEventCompleteness`（listen 采集 + 绑定状态列过滤），已接入 `referentialIntegrityMatrix` 全部四用例。
 
 ---
 

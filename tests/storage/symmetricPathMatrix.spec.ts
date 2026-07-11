@@ -105,14 +105,15 @@ describe('symmetric path query matrix', () => {
         expect(Object.fromEntries((bRow.friends || []).map((f: any) => [f.name, f['&']?.weight]))).toEqual({ A: 1, C: 2 })
     })
 
-    test('symmetric fan-out: user-declared source/target ids inside & are preserved, undeclared are stripped', async () => {
-        // 端点 id 是实现为挂载判据强制附带的，用户没要就要剥掉；用户显式要了必须保留。
-        // （注：& 内嵌套实体属性如 source.name 是既有查询编译缺口——基线即抛
-        //  "no such column: REL_..._SOURCE_source.*"，与挂载判据无关，见 r17 报告观察项。）
+    test('symmetric fan-out: user-declared source/target inside & are preserved (incl. nested entity attrs), undeclared are stripped', async () => {
+        // 端点数据是实现为挂载判据强制附带的，用户没要就要剥掉；用户显式要了必须保留，
+        // 包括端点实体的嵌套属性（link 上嵌套 x:1 的 JOIN 需与方向变体同步展开，r17 修复）。
         const aRow = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', ids.A] }), undefined,
-            ['name', ['friends', { attributeQuery: ['name', ['&', { attributeQuery: ['weight', ['source', { attributeQuery: ['id'] }]] }]] }]])
+            ['name', ['friends', { attributeQuery: ['name', ['&', { attributeQuery: ['weight', ['source', { attributeQuery: ['name'] }], ['target', { attributeQuery: ['name'] }]] }]] }]])
         const bFriend = (aRow.friends || []).find((f: any) => f.name === 'B')
-        expect(String(bFriend['&'].source?.id)).toBe(String(ids.A))
+        // A—B 边是 A→B 建立的：source=A、target=B
+        expect(bFriend['&'].source?.name).toBe('A')
+        expect(bFriend['&'].target?.name).toBe('B')
 
         const aRowNoEndpoint = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', ids.A] }), undefined,
             ['name', ['friends', { attributeQuery: ['name', ['&', { attributeQuery: ['weight'] }]] }]])

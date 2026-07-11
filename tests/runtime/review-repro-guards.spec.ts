@@ -152,6 +152,63 @@ describe('F5: guard chain is fail-closed', () => {
     });
 });
 
+describe('R-3 (r17): primitive payload checks reject NaN/Infinity and array-as-object', () => {
+    test('type number rejects NaN and Infinity, accepts finite numbers', async () => {
+        const interaction = Interaction.create({
+            name: 'r3Amount',
+            action: Action.create({ name: 'r3Amount' }),
+            payload: Payload.create({
+                items: [PayloadItem.create({ name: 'amount', type: 'number', required: true })],
+            }),
+        });
+        const { controller, system } = await buildController(interaction);
+
+        for (const bad of [NaN, Infinity, -Infinity]) {
+            const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { amount: bad } });
+            expect(res.error, `payload amount=${bad} must be rejected`).toBeTruthy();
+        }
+        const ok = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { amount: 12.5 } });
+        expect(ok.error).toBeUndefined();
+        await system.destroy();
+    });
+
+    test('type object (isCollection: false) rejects arrays, accepts plain objects', async () => {
+        const interaction = Interaction.create({
+            name: 'r3Meta',
+            action: Action.create({ name: 'r3Meta' }),
+            payload: Payload.create({
+                items: [PayloadItem.create({ name: 'metadata', type: 'object', required: true })],
+            }),
+        });
+        const { controller, system } = await buildController(interaction);
+
+        const res = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { metadata: [{ evil: true }] } });
+        expect(res.error, 'array must not pass an object field').toBeTruthy();
+
+        const ok = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { metadata: { k: 'v' } } });
+        expect(ok.error).toBeUndefined();
+        await system.destroy();
+    });
+
+    test('type object with isCollection: true still accepts an array of objects (items checked individually)', async () => {
+        const interaction = Interaction.create({
+            name: 'r3MetaList',
+            action: Action.create({ name: 'r3MetaList' }),
+            payload: Payload.create({
+                items: [PayloadItem.create({ name: 'entries', type: 'object', isCollection: true, required: true })],
+            }),
+        });
+        const { controller, system } = await buildController(interaction);
+
+        const ok = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { entries: [{ a: 1 }, { b: 2 }] } });
+        expect(ok.error).toBeUndefined();
+        // 集合内的元素若是数组同样拒绝
+        const bad = await controller.dispatch(interaction, { user: { id: 'u1' }, payload: { entries: [[1, 2]] } });
+        expect(bad.error).toBeTruthy();
+        await system.destroy();
+    });
+});
+
 describe('Legacy Attributive-era declarations fail fast', () => {
     test('userAttributives on Interaction is rejected at declaration time', () => {
         expect(() => Interaction.create({
