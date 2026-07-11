@@ -2,9 +2,35 @@
 
 ## [4.0.0](https://github.com/interaqtdev/interaqt/compare/v3.1.0...v4.0.0) (2026-07-11)
 
+r18 deep review release. Full analysis: `agentspace/output/deep-review-2026-07-11-r18.md` and `agentspace/output/r18-test-blindness-retrospective.md` (PR [#34](https://github.com/InteraqtDev/interaqt/pull/34)).
+
+### ⚠ BREAKING CHANGES
+
+* **runtime:** migration manifest generator version bumped **2 → 3** — computation signatures now include plain-value args (`argsSignature`: StateMachine `trigger.keys`/`trigger.record` patterns and state-graph topology, `Every.notEmpty`, Transform eventDep record patterns, ...). Previously changing any of these produced a **zero-diff migration** and stale data silently sailed through. Manifests written by generator 2 are rejected with guidance: **regenerate your migration baseline after upgrading** (same policy as the 1 → 2 bump).
+
+### ⚠ Behavior tightening (silently-broken declarations now fail fast)
+
+These were previously accepted but produced silent data corruption or permanently-dead reactive behavior; they now throw with guidance:
+
+* **storage+core:** a relation `sourceProperty`/`targetProperty` colliding with a **value property** on the endpoint family (base + filtered variants) fails fast — the relation silently swallowed the value property (scalar writes were expanded as related-record payloads, corrupting data).
+* **core:** reserved property names `id`/`_rowId` (plus `source`/`target` on relation properties) and duplicate property names per entity/relation are rejected at `Entity.create`/`Relation.create` (with a `DBSetup` safety net for post-create pushes) — the framework silently overwrote/last-one-won before.
+* **runtime:** dataDeps/eventDeps pointing at record names unknown to the storage schema (typos, entities not registered on the Controller, global dictionary names used as `recordName`) fail fast at setup with routing guidance — previously silent dead listeners (computations stayed stale forever with zero warning).
+* **runtime:** ScopedSequence scope inputs are immutable after a number is assigned — updating a value-scope field or removing/replacing a ref-scope relation on a numbered record fails fast. Previously the record silently carried its number into another scope (duplicate numbers there; with the documented `UniqueConstraint(scope+number)` the target scope's creates hit the constraint **permanently**, since the counter rolls back with each failed transaction).
+
 ### Bug Fixes
 
-* **runtime+storage+core:** r18 deep review — filtered update routing for event-based computations, migration argsSignature, property namespace guards, ScopedSequence scope immutability ([fdd3cbf](https://github.com/interaqtdev/interaqt/commit/fdd3cbf407b5d5a8b420ffaa454449675fa86d3b))
+* **runtime:** event-driven computations (StateMachine triggers, Transform `eventDeps`) declared with `type: 'update'` on a **filtered entity/relation name** were dead listeners — storage emits field updates under the physical base name only. Event-based update listeners are now normalized onto the physical name (like data-based ones) and routed back through the membership guard with the event's `recordName` rewritten to the view name; enter/exit remain driven by membership create/delete events (no double-firing). ([fdd3cbf](https://github.com/interaqtdev/interaqt/commit/fdd3cbf407b5d5a8b420ffaa454449675fa86d3b))
+* **runtime:** view-name → physical-name resolution now comes from the compiled storage schema (`resolvedBaseRecordName`) instead of hand-walking controller-side `baseEntity`/`baseRelation` chains — this killed a sibling bug where **merged input views** (`inputEntities`/`inputRelations`) had dead update listeners on BOTH computation tracks (e.g. a `Summation` over an input view never reacted to member field updates). ([7bfe249](https://github.com/interaqtdev/interaqt/commit/7bfe2492))
+* **runtime:** a setup-time **dead-listener invariant** (`assertListenerReachable`) now guards the whole subscription face; `addSourceMap`/`addSourceMaps` route through the same normalize+assert pipeline so no producer can bypass it. It also exposed and removed historically dead registrations on virtual endpoint links (`<relation>_source`/`_target` never emit events). ([7bfe249](https://github.com/interaqtdev/interaqt/commit/7bfe2492))
+* **runtime:** `retrieveLastValue` keys on presence (`!== undefined`) instead of truthiness — computed values `0`/`false`/`''` are no longer misread as missing. ([fdd3cbf](https://github.com/interaqtdev/interaqt/commit/fdd3cbf407b5d5a8b420ffaa454449675fa86d3b))
+* **tests:** the activity fixture itself carried the value/relation property collision (dead scalar `message` on `Request`) — cleaned up when the new guard caught it.
+
+### Tests & docs
+
+* regressions: `tests/runtime/review-fixes-2026-07-11-r18.spec.ts` (16 cases: F-1 routing incl. enter/no-double-fire, migration argsSignature visibility + cross-process stability, ScopedSequence immutability, merged-input routing, typo/dict-name fail-fast, addSourceMap no-bypass) + `tests/storage/review-fixes-2026-07-11-r18.spec.ts` (9 cases: namespace collisions, reserved/duplicate names)
+* dimension registry gains two **mechanism axes** (computation track, listened-name form) and the "enumerate all readers of a declaration surface when fixing routing bugs" checklist (`tests/runtime/WritingComputationTests.md`)
+* `AGENTS.md` + always-applied Cursor rule: mandatory systemic bug-fix checklist ("fix the class, not the instance")
+* knowledge base: view-name event semantics (usage/09), ScopedSequence scope immutability contract (usage/04), reserved-name and namespace-collision anti-patterns (usage/19)
 
 ## [3.1.0](https://github.com/interaqtdev/interaqt/compare/v3.0.2...v3.1.0) (2026-07-11)
 
