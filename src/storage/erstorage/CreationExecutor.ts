@@ -271,6 +271,8 @@ export class CreationExecutor {
             //  嵌套值无条件写入同行列——「数据面已写、事件面沉默」会让依赖这些属性的响应式计算
             //  永久陈旧（r17 F-2）。这里对同 id 且携带新值的引用补发 update 事件，
             //  契约与宿主 update 事件一致（keys = 实际写入的属性名，含 oldRecord）。
+            //  以这些 link/combined 记录为 base 的 filtered 视图成员资格随之变化：before 快照
+            //  此刻采集（行还活着），diff 在物理写入完成后统一结算（settlePostWriteChecks）。
             for (const record of newEntityData.mergedLinkTargetRecordIdRefs.concat(newEntityData.combinedRecordIdRefs)) {
                 const attributeName = record.info!.attributeName
                 const oldRelated = oldRecord?.[attributeName]
@@ -279,12 +281,18 @@ export class CreationExecutor {
                 // combined（三表合一）记录自身的嵌套值更新
                 if (record.info!.isMergedWithParent() && record.valueAttributes.length) {
                     const nestedEvent = this.buildSameRowUpdateEvent(record, record.recordName, oldRelated)
-                    if (nestedEvent) events?.push(nestedEvent)
+                    if (nestedEvent) {
+                        events?.push(nestedEvent)
+                        await this.filteredEntityManager.enqueuePostWriteUpdateCheck(events, record.recordName, oldRelated.id, nestedEvent.keys!)
+                    }
                 }
                 // `&` 关系属性的原地更新（merged link 与 combined 的 link 数据都写在同行）
                 if (record.linkRecordData?.valueAttributes.length && oldRelated[LINK_SYMBOL]?.id) {
                     const linkEvent = this.buildSameRowUpdateEvent(record.linkRecordData, record.info!.linkName, oldRelated[LINK_SYMBOL])
-                    if (linkEvent) events?.push(linkEvent)
+                    if (linkEvent) {
+                        events?.push(linkEvent)
+                        await this.filteredEntityManager.enqueuePostWriteUpdateCheck(events, record.info!.linkName, oldRelated[LINK_SYMBOL].id, linkEvent.keys!)
+                    }
                 }
             }
         }
@@ -300,6 +308,15 @@ export class CreationExecutor {
                 recordName: record.recordName,
                 record: newRawDataWithNewIds[record.info!.attributeName]
             })
+            // combined 记录不经过 createRecord（数据落在宿主行），其 filtered entity 视图的
+            // create 事件在物理写入完成后求值（payload 契约与 createRecord 的
+            // membershipEventPayload 一致：defaults + payload）。
+            this.filteredEntityManager.enqueuePostWriteCreationCheck(
+                events,
+                record.recordName,
+                newRawDataWithNewIds[record.info!.attributeName].id,
+                { ...record.defaultValues, ...newRawDataWithNewIds[record.info!.attributeName] }
+            )
         }
 
         // 2. 为我要新建 三表合一、或者我 mergedLink 的 的 关系 record 分配 id.
@@ -322,6 +339,14 @@ export class CreationExecutor {
                     recordName: record.info!.linkName,
                     record: linkRecord
                 })
+                // 行内（merged/combined）link 不经过 createRecord，其 filtered relation 视图的
+                // create 事件在物理写入完成后求值（settlePostWriteChecks）。
+                this.filteredEntityManager.enqueuePostWriteCreationCheck(
+                    events,
+                    record.info!.linkName,
+                    linkRecord.id,
+                    { ...(record.linkRecordData?.defaultValues || {}), ...linkRecord }
+                )
             }
         }
 
@@ -345,7 +370,8 @@ export class CreationExecutor {
             newEntityData,
             events,
             `finding combined records for ${newEntityData.recordName} to flash out, for ${isUpdate ? 'updating' : 'creation'} with data ${JSON.stringify(newEntityDataWithIds.getData())}`,
-            sameRowInPlaceAttributes
+            sameRowInPlaceAttributes,
+            newRawDataWithNewIds.id
         )
 
         return newEntityDataWithIds.merge(flashOutRecordRasData)
@@ -361,6 +387,10 @@ export class CreationExecutor {
         const sameRowNewFieldAndValue = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue()
         const [sql, params] = this.sqlBuilder.buildInsertSQL(newEntityData.recordName, sameRowNewFieldAndValue)
         const result = await this.database.insert(sql, params, queryName) as EntityIdRef
+
+        // 物理写入完成：结算 preprocess/flashOut 登记的行内视图成员资格任务
+        // （merged link / combined 记录的 filtered 视图 create/update 事件）。
+        await this.filteredEntityManager.settlePostWriteChecks(events)
 
         return Object.assign(result, newEntityDataWithIdsWithFlashOutRecords.getData())
     }

@@ -160,24 +160,32 @@ export class DeletionExecutor {
                 }
             }
             
+            // 行内 link 的 base delete 事件 push 之后，立刻结算其 filtered relation 视图的
+            // delete 事件（快照在 collectDeletionMemberships 里于行还活着时采集）。
+            const settleInRowLinkViews = (linkName: string, linkRecord: Record) => {
+                this.filteredEntityManager.settleDeletionMemberships(deletionSnapshot, linkName, [linkRecord], linkAndCascadeEvents, ledgerEvents)
+            }
+
             // 1. 一定先删除递归处理同表的 reliance tree
             for (let relianceInfo of recordInfo.sameTableReliance) {
                 // 只要真正存在这个数据才要删除
                 if (record[relianceInfo.attributeName]?.id) {
                     // 和 reliance 的 link record 的事件
+                    const relianceLinkRecord = {
+                        ...record[relianceInfo.attributeName][LINK_SYMBOL],
+                        [relianceInfo.isRecordSource() ? 'source' : 'target']: {
+                            id: record.id
+                        },
+                        [relianceInfo.isRecordSource() ? 'target' : 'source']: {
+                            id: record[relianceInfo.attributeName].id
+                        }
+                    }
                     linkAndCascadeEvents.push({
                         type: 'delete',
                         recordName: relianceInfo.linkName,
-                        record: {
-                            ...record[relianceInfo.attributeName][LINK_SYMBOL],
-                            [relianceInfo.isRecordSource() ? 'source' : 'target']: {
-                                id: record.id
-                            },
-                            [relianceInfo.isRecordSource() ? 'target' : 'source']: {
-                                id: record[relianceInfo.attributeName].id
-                            }
-                        },
+                        record: relianceLinkRecord,
                     })
+                    settleInRowLinkViews(relianceInfo.linkName, relianceLinkRecord)
 
                     // 同表 reliance 的行数据已随本行删除，成员资格快照来自删除前的递归采集。
                     const childSnapshot = deletionSnapshot?.children.find(child => child.recordName === relianceInfo.recordName)
@@ -189,32 +197,8 @@ export class DeletionExecutor {
             recordInfo.mergedRecordAttributes.forEach(attributeInfo => {
                 if (record[attributeInfo.attributeName]?.id) {
                     // 记录和自己合并的 link 事件
-                    linkAndCascadeEvents.push({
-                        type: 'delete',
-                        recordName: attributeInfo.linkName,
-                        // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
-                        record: {
-                            ...record[attributeInfo.attributeName][LINK_SYMBOL],
-                            [attributeInfo.isRecordSource() ? 'source' : 'target']: {
-                                id: record.id
-                            },
-                            [attributeInfo.isRecordSource() ? 'target' : 'source']: {
-                                id: record[attributeInfo.attributeName].id
-                            }
-                        },
-                    })
-                }
-            })
-
-            recordInfo.notRelianceCombined.forEach(attributeInfo => {
-                if (recordInfo.isRelation && (attributeInfo.attributeName === 'target' || attributeInfo.attributeName === 'source')) return
-                if (record[attributeInfo.attributeName]?.id === undefined) return
-                // 记录和自己合并的 link 事件
-                linkAndCascadeEvents.push({
-                    type: 'delete',
-                    recordName: attributeInfo.linkName,
                     // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
-                    record: {
+                    const linkRecord = {
                         ...record[attributeInfo.attributeName][LINK_SYMBOL],
                         [attributeInfo.isRecordSource() ? 'source' : 'target']: {
                             id: record.id
@@ -222,8 +206,36 @@ export class DeletionExecutor {
                         [attributeInfo.isRecordSource() ? 'target' : 'source']: {
                             id: record[attributeInfo.attributeName].id
                         }
+                    }
+                    linkAndCascadeEvents.push({
+                        type: 'delete',
+                        recordName: attributeInfo.linkName,
+                        record: linkRecord,
+                    })
+                    settleInRowLinkViews(attributeInfo.linkName, linkRecord)
+                }
+            })
+
+            recordInfo.notRelianceCombined.forEach(attributeInfo => {
+                if (recordInfo.isRelation && (attributeInfo.attributeName === 'target' || attributeInfo.attributeName === 'source')) return
+                if (record[attributeInfo.attributeName]?.id === undefined) return
+                // 记录和自己合并的 link 事件
+                // CAUTION 注意这里一定要增加 link 上对于原始 record 的引用。外部计算的时候可能需要，那时可能 record 也删了查询不到了。
+                const linkRecord = {
+                    ...record[attributeInfo.attributeName][LINK_SYMBOL],
+                    [attributeInfo.isRecordSource() ? 'source' : 'target']: {
+                        id: record.id
                     },
+                    [attributeInfo.isRecordSource() ? 'target' : 'source']: {
+                        id: record[attributeInfo.attributeName].id
+                    }
+                }
+                linkAndCascadeEvents.push({
+                    type: 'delete',
+                    recordName: attributeInfo.linkName,
+                    record: linkRecord,
                 })
+                settleInRowLinkViews(attributeInfo.linkName, linkRecord)
             })
         }
         

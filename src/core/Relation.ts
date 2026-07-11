@@ -125,6 +125,11 @@ export class Relation implements RelationInstance {
         throw new Error('All inputRelations must have the same isTargetReliance, or the merged relation must declare isTargetReliance explicitly');
       }
 
+      // type 一律继承自 inputRelations，显式矛盾值与 filtered relation 的守卫同族（见下）。
+      if (args.type !== undefined && args.type !== firstRelation.type) {
+        throw new Error(`Merged relation${args.name ? ` "${args.name}"` : ''} declares type "${args.type}" but its inputRelations are "${firstRelation.type}". A merged relation always inherits its input relations' type; remove the contradictory declaration.`);
+      }
+
       this.inputRelations = args.inputRelations;
       this.source = firstRelation.source;
       this.target = firstRelation.target;
@@ -145,6 +150,18 @@ export class Relation implements RelationInstance {
       // （查询重写拿不到谓词，运行期在深处抛裸 TypeError），必须在声明期 fail-fast。
       if (!args.matchExpression) {
         throw new Error(`Filtered relation${args.name ? ` "${args.name}"` : ''} declares baseRelation but no matchExpression. A filtered relation is a predicate view over its base — declare matchExpression, or use the base relation directly.`);
+      }
+      // CAUTION type/source/target 一律继承自 baseRelation。显式传入矛盾值此前被静默丢弃
+      // （通过了 create 校验、实例上却是另一个值）——声明形同虚设，必须 fail-fast。
+      // 与 base 一致的显式值放行（clone 会原样携带这些字段）。
+      if (args.type !== undefined && args.type !== args.baseRelation.type) {
+        throw new Error(`Filtered relation${args.name ? ` "${args.name}"` : ''} declares type "${args.type}" but its baseRelation is "${args.baseRelation.type}". A filtered relation is a predicate view — it always inherits the base relation's type; remove the contradictory declaration.`);
+      }
+      if (args.source !== undefined && args.source !== args.baseRelation.source) {
+        throw new Error(`Filtered relation${args.name ? ` "${args.name}"` : ''} declares a source different from its baseRelation's source. A filtered relation always inherits the base relation's endpoints; remove the contradictory declaration.`);
+      }
+      if (args.target !== undefined && args.target !== args.baseRelation.target) {
+        throw new Error(`Filtered relation${args.name ? ` "${args.name}"` : ''} declares a target different from its baseRelation's target. A filtered relation always inherits the base relation's endpoints; remove the contradictory declaration.`);
       }
       
       this.baseRelation = args.baseRelation;

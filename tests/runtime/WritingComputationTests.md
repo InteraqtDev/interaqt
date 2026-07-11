@@ -289,6 +289,9 @@ test('should handle negative values correctly', async () => {
 | 计算轨道（机制轴） | 数据驱动（dataDeps）/ **事件驱动（StateMachine trigger / Transform eventDeps）** / **migration 签名（第三个读者：同一声明在 manifest 里是否可见）** | r18 F-1、r18 F-2 |
 | 监听名形态（机制轴） | 物理 base 名 / **filtered entity/relation 名** / **merged input 视图名** / 嵌套 filtered 链 | r18 F-1、r18 merged-input 亲缘 bug |
 | 底层原语正确性（正交轴） | 被复用原语（`BoolExp.evaluate` / match 求值 / 算术求值）的**代数律/真值表**必须独立于"上层怎么用"断言；同一语义有多实现（SQL `NOT` / 内存 not）时须做**一致性对账**；权限面须有**对抗性断言**（构造应拒绝的组合守卫，断言其拒绝——fail-open 是否定形命题，正向用例测不到） | r19 F-1（NOT 不贯穿 AND/OR，且旧测试把 bug 写进断言） |
+| 视图 × 写形态（交叉格，r20 引入） | **filtered relation/entity over 行内记录（merged link、combined 记录）× 全部行内写法**：host-create-with-ref / 同 id `&` 原地翻转 / host-update-replace / host 删除 / 抢夺（flashOut）/ removeRelation（relocate）——行内记录的事件是手工 push 的，不经过 createRecord/updateRecord 的记录级钩子，视图事件必须经 FilteredEntityManager 的 post-write 队列 / 删除快照产生 | r20 F-2（七个行内写法格全部缺视图事件，Count over filtered relation 永久陈旧） |
+| 事件模式匹配语义 | update 事件的 `record` 模式按**合并后的当前状态**（`{...oldRecord, ...record}`）匹配——同一声明面（RecordMutationEventPattern）的全部读者（eventDep 匹配器 / StateMachine TransitionFinder）必须共用 `mergedMutationEventView`；「本次更新触及字段 X」用 `keys` 表达 | r20 F-5（TransitionFinder 按部分 record 匹配，与 eventDep 轨道分裂） |
+| 引用形态（isReferenceValue） | value[1] 为**单字符串**（简单操作符）/ **字符串对**（between）——引用路径入 JOIN 树的收集器（`collectAtomReferencePaths`）是唯一登记点，direct match 与 EXIST 载荷两个消费方共用 | r12 F-2、r19 F-2、r20 F-1（同一声明面第三次漏网） |
 
 **正交轴说明（r19 复盘引入）**：数据形态轴与机制轴都长在"响应式数据流"上（mutation → 事件 → 计算）。
 底层逻辑原语（`BoolExp.evaluate`、match 求值、算术求值）是数据流的**上游依赖**，不产生 mutation、不进事件流、

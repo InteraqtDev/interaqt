@@ -59,8 +59,27 @@ export class UpdateExecutor {
         const matchedEntities = await this.agent.findRecords(updateRecordQuery, `find record for updating ${entityName}`)
         // 注意下面使用的都是 updateRecordQuery 的 recordName，而不是 entityName，因为 RecordQuery 会根据 recordName 来判断是否是 filtered entity。
         const payloadFields = Object.keys(newEntityData.getData())
+        const isLinkRecord = !!this.map.data.links[newEntityData.recordName]
         const result: Record[] = []
         for (let matchedEntity of matchedEntities) {
+            // CAUTION 关系记录的 source/target 端点不允许经 update 重指（updateRelationByName 的
+            //  既有契约）。generic update 路径此前不设防：端点列被静默重写且**零事件**（旧 link 无
+            //  delete、新 link 无 create、连 update 事件都没有）——下游响应式计算与 ScopedSequence
+            //  的 scope 守卫全部失明。同一契约的所有入口必须同构。
+            //  同 id 的幂等端点引用放行：Transform 派生 relation 的 update patch 会原样携带端点。
+            if (isLinkRecord) {
+                for (const endpoint of ['source', 'target'] as const) {
+                    if (!Object.prototype.hasOwnProperty.call(newEntityData.rawData || {}, endpoint)) continue
+                    const newRef = newEntityData.rawData[endpoint] as { id?: string } | null
+                    if (!newRef?.id || matchedEntity[endpoint]?.id !== newRef.id) {
+                        throw new Error(
+                            `cannot change ${endpoint} of relation record "${entityName}" through update ` +
+                            `(current ${endpoint}.id: ${JSON.stringify(matchedEntity[endpoint]?.id)}, new: ${JSON.stringify(newRef?.id ?? newRef)}). ` +
+                            `Relation endpoints are immutable — remove the old relation and add a new one instead.`
+                        )
+                    }
+                }
+            }
             // CAUTION changedFields 必须是"实际写入集合"而不是 payload 键：
             //  computed 属性会随输入字段联动重算并落库（getSameRowFieldAndValue，与 update 事件的 keys 同源）。
             //  filtered entity 的谓词可能建立在 computed 列上——若这里只用 payload 键做依赖过滤，
@@ -163,6 +182,10 @@ export class UpdateExecutor {
 
         // 3. 真实处理数据，这里面没有记录事件，事件是上面处理的。
         await this.updateRecordDataById(entityName, matchedEntity, columnAndValue)
+
+        // 物理写入完成：结算 preprocess/flashOut 登记的行内视图成员资格任务
+        // （merged link / combined 记录的 filtered 视图 create/update 事件）。
+        await this.filteredEntityManager.settlePostWriteChecks(events)
         return newEntityDataWithIdsWithFlashOutRecords
     }
 

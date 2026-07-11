@@ -2,7 +2,7 @@ import { MatchExpressionData, MatchAtom, MatchExp } from "./MatchExp.js"
 import { BoolExp } from "@core"
 import { EntityToTableMap, MapData } from "./EntityToTableMap.js"
 import { RecordQueryAgent, Record } from "./RecordQueryAgent.js"
-import { RecordQuery } from "./RecordQuery.js"
+import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js"
 import { RecordMutationEvent } from "@runtime"
 
 export interface FilteredEntityDependency {
@@ -52,6 +52,28 @@ const dependenciesByMapData = new WeakMap<MapData, Map<string, FilteredEntityDep
 //  保证同一批 events 里不会出现重复或矛盾的成员资格事件（消费方按批增量计算，重复事件会导致重复计数）。
 //  没有 events 数组的调用不产生成员资格事件，也就完全不需要求值——天然跳过所有 membership 查询。
 const membershipLedgers = new WeakMap<RecordMutationEvent[], Map<string, boolean>>()
+
+/**
+ * 行内（in-row）写路径的"待结算视图成员资格任务"。
+ *
+ * CAUTION merged link / combined 记录的变更事件是 preprocessSameRowData / flashOut 手工 push 的，
+ *  不经过 createRecord/updateRecord 的记录级钩子（handleRecordCreation / collectMembershipChecks）——
+ *  数据落在宿主行上，但以这些 link/combined 记录为 base 的 filtered 视图（filtered relation、
+ *  combined 记录上的 filtered entity）此前完全收不到成员资格事件：查询面正确、事件面缺失，
+ *  下游对视图的响应式计算永久陈旧（r19 F-3 修了宿主侧 filtered entity，link/combined 记录自身
+ *  的视图是同一家族的平行漏网，r20 收口）。
+ *
+ *  谓词只能由 SQL 求值（架构原则：不在内存中模拟第二套判定引擎），而 preprocess 阶段行还没写入：
+ *  - create 形态：物理写入完成后按 handleRecordCreation 契约求值（before 恒为非成员）；
+ *  - update 形态：enqueue 时行还活着，立即采集 before 快照，物理写入后 settle diff。
+ *  任务挂在 events 数组上（与 ledger 同一作用域），由 insertSameRowData / updateSameRowData
+ *  的写入完成点统一 drain（settlePostWriteChecks）。
+ */
+type PostWriteViewCheck =
+    | { kind: 'creation', recordName: string, recordId: string, fullRecord: Record }
+    | { kind: 'update', checks: MembershipCheck[] }
+
+const postWriteChecksByEvents = new WeakMap<RecordMutationEvent[], PostWriteViewCheck[]>()
 
 function getLedger(events: RecordMutationEvent[]): Map<string, boolean> {
     let ledger = membershipLedgers.get(events)
@@ -503,6 +525,81 @@ export class FilteredEntityManager {
         }
     }
 
+    // ============ 行内写路径（merged link / combined 记录）的视图成员资格 ============
+
+    /**
+     * 登记一个"物理写入完成后需要求值"的行内记录创建（merged link / combined 记录）。
+     * 写入完成点（insertSameRowData / updateSameRowData）调用 settlePostWriteChecks 统一结算。
+     */
+    enqueuePostWriteCreationCheck(events: RecordMutationEvent[] | undefined, recordName: string, recordId: string, fullRecord: Record): void {
+        if (!events || !this.getFilteredEntitiesForBase(recordName).length) return
+        let queue = postWriteChecksByEvents.get(events)
+        if (!queue) {
+            queue = []
+            postWriteChecksByEvents.set(events, queue)
+        }
+        queue.push({ kind: 'creation', recordName, recordId, fullRecord })
+    }
+
+    /**
+     * 登记一个行内记录的原地更新（同 id `&` 关系属性 / combined 嵌套值）。
+     * before 快照立即采集（此刻行还活着且未被写入），diff 在写入完成点结算。
+     */
+    async enqueuePostWriteUpdateCheck(events: RecordMutationEvent[] | undefined, recordName: string, recordId: string, changedFields: string[]): Promise<void> {
+        if (!events) return
+        const checks = await this.collectMembershipChecks(recordName, [recordId], changedFields, events)
+        if (!checks.length) return
+        let queue = postWriteChecksByEvents.get(events)
+        if (!queue) {
+            queue = []
+            postWriteChecksByEvents.set(events, queue)
+        }
+        queue.push({ kind: 'update', checks })
+    }
+
+    /**
+     * 写入完成点：结算全部挂起的行内视图成员资格任务（顺序与登记顺序一致）。
+     */
+    async settlePostWriteChecks(events: RecordMutationEvent[] | undefined): Promise<void> {
+        if (!events) return
+        const queue = postWriteChecksByEvents.get(events)
+        if (!queue?.length) return
+        postWriteChecksByEvents.delete(events)
+        for (const task of queue) {
+            if (task.kind === 'creation') {
+                await this.handleRecordCreation(task.recordName, task.recordId, task.fullRecord, events)
+            } else {
+                await this.settleMembershipChecks(task.checks, events)
+            }
+        }
+    }
+
+    /**
+     * 行内 link/combined 记录即将被物理清列时的视图成员资格快照（非递归的轻量版
+     * collectDeletionMemberships）：行还活着时求值，之后由 settleDeletionMemberships
+     * 在 base 事件 push 之后生成视图 delete 事件。
+     * 无视图时返回 undefined（零开销）。
+     */
+    async collectInlineDeletionSnapshot(recordName: string, records: Record[], events?: RecordMutationEvent[]): Promise<DeletionMembershipSnapshot | undefined> {
+        if (!events || !records.length) return undefined
+        const filteredEntities = this.getFilteredEntitiesForBase(recordName)
+        if (!filteredEntities.length) return undefined
+        const snapshot: DeletionMembershipSnapshot = {
+            recordName,
+            membersByFilteredEntity: new Map(),
+            recordsById: new Map(records.map(record => [record.id, record])),
+            children: []
+        }
+        const ids = records.map(record => record.id)
+        for (const filteredEntity of filteredEntities) {
+            const memberIds = await this.checkRecordsMatchFilter(ids, recordName, filteredEntity.matchExpression)
+            if (memberIds.size) {
+                snapshot.membersByFilteredEntity.set(filteredEntity.name, memberIds)
+            }
+        }
+        return snapshot.membersByFilteredEntity.size ? snapshot : undefined
+    }
+
     /**
      * 删除前采集：待删除记录（含同表 reliance 树）当前所属的 filtered entity 集合。
      * 必须在任何物理删除发生之前调用（谓词求值需要行与关系仍然存在）。
@@ -543,6 +640,41 @@ export class FilteredEntityManager {
                 const child = await this.collectDeletionMemberships(relianceInfo.recordName, relianceRecords, events)
                 if (child) snapshot.children.push(child)
             }
+        }
+
+        // CAUTION 行内 link（merged 进本行的 link、combined 三表合一的 link、同表 reliance 的 link）
+        //  会随本行的删除/清列一起消失。它们的 delete 事件由 DeletionExecutor 在物理删除之后手工
+        //  push（deleteRecordSameRowDataGrouped 的事件段），而以这些 link 为 base 的 filtered
+        //  relation 视图的成员资格只能在行还活着时求值——这里一并快照，事件段 push 完 base link
+        //  delete 后用 settleDeletionMemberships 生成视图 delete 事件。
+        const inRowLinkAttrInfos = [
+            ...recordInfo.mergedRecordAttributes,
+            ...recordInfo.notRelianceCombined.filter(info => !(recordInfo.isRelation && (info.attributeName === 'source' || info.attributeName === 'target'))),
+            ...recordInfo.sameTableReliance,
+        ]
+        const linkRecordsByLinkName = new Map<string, Record[]>()
+        for (const record of records) {
+            for (const info of inRowLinkAttrInfos) {
+                const related = record[info.attributeName]
+                const linkData = related?.id !== undefined ? related[LINK_SYMBOL] : undefined
+                if (!linkData?.id) continue
+                // payload 与事件段 push 的 base link delete 事件同一契约（link 数据 + 两端 id 引用）。
+                const linkRecord: Record = {
+                    ...linkData,
+                    [info.isRecordSource() ? 'source' : 'target']: { id: record.id },
+                    [info.isRecordSource() ? 'target' : 'source']: { id: related.id },
+                }
+                let list = linkRecordsByLinkName.get(info.linkName)
+                if (!list) {
+                    list = []
+                    linkRecordsByLinkName.set(info.linkName, list)
+                }
+                list.push(linkRecord)
+            }
+        }
+        for (const [linkName, linkRecords] of linkRecordsByLinkName) {
+            const child = await this.collectInlineDeletionSnapshot(linkName, linkRecords, events)
+            if (child) snapshot.children.push(child)
         }
 
         return snapshot

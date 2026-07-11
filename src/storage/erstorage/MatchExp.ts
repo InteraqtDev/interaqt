@@ -167,13 +167,13 @@ export class MatchExp {
             //  列引用（getReferenceFieldValue），如果引用穿过关联实体而该关联没有出现在
             //  attributeQuery 或 match key 里，JOIN 不会被构建，SQL 直接报
             //  "missing FROM-clause entry"。这里把引用路径也加入 query tree。
+            //  引用形态由 collectAtomReferencePaths 统一识别（字符串单引用与 between 的引用对，
+            //  r19 F-2 修复只覆盖字符串形态、between 是同一声明面的漏网读者——r20 收口为单一收集器）。
             //  例外：exist 子查询里 contextRootEntity 指向外层查询的根，引用解析的是外层
             //  已在作用域内的别名，不能加进本层的 tree。
-            if (matchData.data.isReferenceValue && typeof matchData.data.value[1] === 'string' && !this.contextRootEntity) {
-                const referencePath = (matchData.data.value[1] as string).split('.')
-                if (referencePath.length > 1) {
-                    recordQueryTree.addField(referencePath)
-                }
+            if (matchData.data.isReferenceValue && !this.contextRootEntity) {
+                MatchExp.collectAtomReferencePaths(matchData.data)
+                    .forEach(referencePath => recordQueryTree.addField(referencePath))
             }
 
             // CAUTION EXIST 子查询内部的 isReferenceValue 引用解析的是**外层根实体**的作用域
@@ -219,9 +219,33 @@ export class MatchExp {
     }
 
 
+    // CAUTION 单个 isReferenceValue 原子的引用路径提取——所有消费方（外层 direct match 的
+    //  buildQueryTree、EXIST 载荷的 collectExistReferencePaths）共用这一个识别器，引用形态
+    //  只在这里登记一次（r19 F-2 修了字符串形态、between 的引用对是同族漏网读者——r20 收口）：
+    //  - 简单操作符（=/>/</like/...）：value[1] 是单个 'a.b' 字符串；
+    //  - between：value[1] 是 ['a.b', 'c.d'] 引用对（getFinalFieldValue 的 between 分支
+    //    对两个元素分别 getReferenceFieldValue）。
+    //  仅返回跨关联的多段路径（length>1）；单段的是根实体自己的列，无需额外 JOIN。
+    private static collectAtomReferencePaths(atom: MatchAtom): string[][] {
+        if (!atom.isReferenceValue || !Array.isArray(atom.value)) return []
+        const paths: string[][] = []
+        const pushIfCrossRelation = (ref: unknown) => {
+            if (typeof ref !== 'string') return
+            const referencePath = ref.split('.')
+            if (referencePath.length > 1) paths.push(referencePath)
+        }
+        const op = typeof atom.value[0] === 'string' ? (atom.value[0] as string).toLowerCase() : atom.value[0]
+        if (op === 'between' && Array.isArray(atom.value[1])) {
+            (atom.value[1] as unknown[]).forEach(pushIfCrossRelation)
+        } else {
+            pushIfCrossRelation(atom.value[1])
+        }
+        return paths
+    }
+
     // CAUTION 收集 exist 子查询（含嵌套 exist）里所有 isReferenceValue 的引用路径。这些引用都
     //  解析自最外层根实体（contextRootEntity 逐层继承），因此必须由根查询统一并入 JOIN 树。
-    //  仅返回跨关联的多段路径（length>1）；单段的是根实体自己的列，无需额外 JOIN。
+    //  引用形态识别统一走 collectAtomReferencePaths（与外层 direct match 同一收集器）。
     //  节点可能是 BoolExp、ExpressionData 或裸 MatchAtom（exist 的 value[1] 允许这几种形态），统一归一化。
     private collectExistReferencePaths(expression: unknown): string[][] {
         const toBoolExp = (node: unknown): MatchExpressionData | null => {
@@ -243,10 +267,7 @@ export class MatchExp {
             }
             const atom = exp.data
             if (!Array.isArray(atom.value)) return
-            if (atom.isReferenceValue && typeof atom.value[1] === 'string') {
-                const referencePath = (atom.value[1] as string).split('.')
-                if (referencePath.length > 1) paths.push(referencePath)
-            }
+            paths.push(...MatchExp.collectAtomReferencePaths(atom))
             // 嵌套 exist 的引用同样解析自根实体，继续下钻收集。
             if (typeof atom.value[0] === 'string' && (atom.value[0] as string).toLowerCase() === 'exist' && atom.value[1]) {
                 walk(atom.value[1])
@@ -346,6 +367,9 @@ export class MatchExp {
             if (!Array.isArray(value[1])) {
                 throw new Error(`match operator 'in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
+            // 含 null 的列表在 buildFieldMatchExpression 编译期已被拆分（splitNullInListValue），
+            // 这里断言不变量：null 到达此处说明有绕过拆分的新调用方。
+            assert(!value[1].some((item: unknown) => item === null), `'in' value list must have null split out before compilation (key "${key}")`)
             this.assertParamCountWithinDriverLimit(key, 'in', value[1].length, db)
             if (value[1].length === 0) {
                 // 空数组的 IN 语义上恒为 false（任何值都不在空集合中）。
@@ -377,6 +401,8 @@ export class MatchExp {
             if (!Array.isArray(value[1])) {
                 throw new Error(`match operator 'not in' requires an array value, got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
+            // 含 null 的列表在 buildFieldMatchExpression 编译期已被拆分（splitNullInListValue）。
+            assert(!value[1].some((item: unknown) => item === null), `'not in' value list must have null split out before compilation (key "${key}")`)
             this.assertParamCountWithinDriverLimit(key, 'not in', value[1].length, db)
             if (value[1].length === 0) {
                 // 空集合的 NOT IN 语义上恒为 true（任何值都不在空集合中）。
@@ -432,6 +458,25 @@ export class MatchExp {
         return [fieldValue, fieldParams!]
     }
 
+    // CAUTION SQL 三值逻辑下 `col IN (…, NULL)` 恒不匹配 NULL 行、`col NOT IN (…, NULL)` 对任意行
+    //  求值 UNKNOWN（静默过滤掉所有行）。含 null 的 in/not in 在编译期拆分成显式的 null 分支：
+    //  in → (IS NULL) OR (IN 非空集)；not in → (IS NOT NULL) AND (NOT IN 非空集)。
+    //  每个分支都作为独立原子走正常编译管线（列引用由 SQLBuilder 统一加前缀，EXIST 子查询安全），
+    //  与约束层（SchemaDialect.predicateSQLForOperator）的既有 null 拆分语义对齐。
+    private static splitNullInListValue(value: [string, unknown]): { parts: [string, unknown][], connector: 'or' | 'and' } | null {
+        const op = typeof value?.[0] === 'string' ? (value[0] as string).toLowerCase() : value?.[0]
+        if ((op !== 'in' && op !== 'not in') || !Array.isArray(value[1]) || !(value[1] as unknown[]).some(item => item === null)) return null
+        const nonNullValues = (value[1] as unknown[]).filter(item => item !== null)
+        if (op === 'in') {
+            const parts: [string, unknown][] = [['=', null]]
+            if (nonNullValues.length) parts.push([value[0] as string, nonNullValues])
+            return { parts, connector: 'or' }
+        }
+        const parts: [string, unknown][] = [['!=', null]]
+        if (nonNullValues.length) parts.push([value[0] as string, nonNullValues])
+        return { parts, connector: 'and' }
+    }
+
     // CAUTION fnMatchHandler 必须在遍历原子时"就地"处理函数匹配（EXIST 子查询）。
     //  因为对于 PostgreSQL 这类使用编号占位符（$1/$2...）的数据库，占位符的分配顺序必须和
     //  buildWhereClause 收集参数的树序完全一致。如果先给所有值原子分配编号、再回头给 EXIST
@@ -470,29 +515,49 @@ export class MatchExp {
                     )
                 }
 
-                if (!symmetricVariantPaths) {
-                    const fieldNamePath = this.getFinalFieldName(matchAttributePath)
-                    const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
-                    return {
-                        ...exp.data,
-                        fieldName: fieldNamePath,
-                        fieldValue,
-                        fieldParams
+                // 含 null 的 in/not in 先拆分为显式 null 分支（每个分支都是独立原子，
+                // 列引用由 SQLBuilder 统一加前缀，见 splitNullInListValue 的 CAUTION）。
+                const nullSplit = MatchExp.splitNullInListValue(exp.data.value)
+
+                const buildValueAtom = (fieldNamePath: [string, string]): BoolExp<FieldMatchAtom> | FieldMatchAtom => {
+                    if (!nullSplit) {
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
+                        return {
+                            ...exp.data,
+                            fieldName: fieldNamePath,
+                            fieldValue,
+                            fieldParams
+                        }
                     }
+                    let combinedParts: BoolExp<FieldMatchAtom> | undefined
+                    for (const partValue of nullSplit.parts) {
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
+                        const atomData = {
+                            ...exp.data,
+                            value: partValue,
+                            fieldName: fieldNamePath,
+                            fieldValue,
+                            fieldParams
+                        } as FieldMatchAtom
+                        combinedParts = combinedParts
+                            ? (nullSplit.connector === 'or' ? combinedParts.or(atomData) : combinedParts.and(atomData))
+                            : BoolExp.atom<FieldMatchAtom>(atomData)
+                    }
+                    return combinedParts!
+                }
+
+                const toBoolExpAtom = (built: BoolExp<FieldMatchAtom> | FieldMatchAtom): BoolExp<FieldMatchAtom> =>
+                    built instanceof BoolExp ? built : BoolExp.atom<FieldMatchAtom>(built)
+
+                if (!symmetricVariantPaths) {
+                    return buildValueAtom(this.getFinalFieldName(matchAttributePath))
                 }
 
                 let combined: BoolExp<FieldMatchAtom> | undefined
                 for (const variantPath of symmetricVariantPaths) {
-                    const fieldNamePath = this.getFinalFieldName(variantPath)
                     // 每个变体都要重新生成，因为需要不同的 placeholder。
-                    const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
-                    const atomData = {
-                        ...exp.data,
-                        fieldName: fieldNamePath,
-                        fieldValue,
-                        fieldParams
-                    }
-                    combined = combined ? combined.or(atomData) : BoolExp.atom<FieldMatchAtom>(atomData)
+                    const variantExp = toBoolExpAtom(buildValueAtom(this.getFinalFieldName(variantPath)))
+                    combined = combined ? combined.or(variantExp) : variantExp
                 }
                 return combined!
 
