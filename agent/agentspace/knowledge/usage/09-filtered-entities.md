@@ -533,6 +533,10 @@ A filtered entity name carries three event shapes, for both data-based computati
 
 So a `StateMachine` transfer like `trigger: { recordName: 'ActiveTicket', type: 'update', keys: ['title'] }` fires exactly for title changes of tickets that are and remain active.
 
+The same three-shape semantics apply to **merged input views** (`inputEntities`/`inputRelations` declarations) and to nested filtered chains — every view name resolves to its physical base through the compiled storage schema.
+
+Additionally, every declared listener is validated at setup: a `recordName` that no record in the storage schema carries (a typo, an entity not registered on the Controller, or a global dictionary name — dictionary changes are emitted on the `_Dictionary_` record with `record: { key: '<dictName>' }`) fails fast with a `ComputationProtocolError` instead of becoming a silent dead listener.
+
 ### Automatic Update Mechanism
 
 ```javascript

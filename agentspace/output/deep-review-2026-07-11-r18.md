@@ -7,6 +7,12 @@
 - 方法：与 r1–r17 全部报告逐条去重；每个候选先做代码路径二次追踪，再以运行时复现定谳（本轮 1 项候选被复现证伪、1 项被架构追踪证伪，见第四节）。「已复现确认」才列为致命。
 - 修复状态：**四个致命项 + 两个重要项已在本分支（`cursor/deep-code-review-r18-7a3e`）全部修复**，回归固化于 `tests/runtime/review-fixes-2026-07-11-r18.spec.ts`（11 用例）与 `tests/storage/review-fixes-2026-07-11-r18.spec.ts`（9 用例）。修复后 `npm run check` 通过，`npm test` 全量通过（含新增回归）。
 
+> **维护说明（2026-07-11，结构层轮）**：F-1 的复盘（`agentspace/output/r18-test-blindness-retrospective.md`——为什么 17 轮 + 结构层没测出死监听）产出三项结构层改造，已在同分支落地：
+> - **事件命名空间统一**：视图名→物理名解析改以 storage 编译结果（`storage.schema.records.resolvedBaseRecordName`）为唯一事实源，替换 controller 实例图手工行走。首跑即消灭一个同族亲缘 bug——**merged input 视图（inputEntities/inputRelations）的 update 监听在两条轨道上都是死监听**（storage 编译期才转换 filtered 形态，实例图上看不到；实测 `Summation over input view` 永久陈旧、input 名上的 update trigger 永不触发）。
+> - **死监听不变量（订阅面守卫）**：`assertListenerReachable`——归一化后每个监听的 recordName 必须 ∈ storage 已知记录名（typo/dict 名误用/未注册实体 → setup 期受控错误，dict 场景给出 `_Dictionary_` + `record:{key}` 正确写法）；update 监听不得以视图名为键（防绕过归一化的未来生产者）；`addSourceMap(s)` 并入同一管线。顺带暴露并清除了历史上一直静默注册的死监听：relation 嵌套端点的虚拟 link（`${relation}_source/_target`）create/delete 监听（storage 从不以虚拟 link 名发事件，实测确认）。
+> - **登记册本体升级**：`WritingComputationTests.md` 新增两根机制轴（计算轨道、监听名形态）+「路由类修复必须枚举同一声明面全部读者」清单义务。
+> - 行为收紧：指向未知记录名的 dataDep/eventDep 从静默死监听变为 setup 期报错（`schedulerEdgeCases.spec.ts` 相应用例已翻转为断言 fail-fast）。回归 +5（structural 组），全量通过。
+
 ---
 
 ## 一、结论摘要

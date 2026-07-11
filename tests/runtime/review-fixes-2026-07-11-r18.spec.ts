@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
     Controller, MonoSystem, Entity, Property, Relation, MatchExp,
-    StateMachine, StateNode, StateTransfer, Transform, Every, Dictionary,
+    StateMachine, StateNode, StateTransfer, Transform, Every, Count, Summation, Dictionary,
     ScopedSequence, UniqueConstraint, InteractionEventEntity
 } from 'interaqt';
 import { PGLiteDB } from '@drivers';
@@ -306,6 +306,177 @@ describe('r18 F-2: migration manifest captures plain-value args (argsSignature)'
         expect(c1.structuralSignature).toBe(c2.structuralSignature);
         expect(c1.functionSignature?.hash).not.toBe(c2.functionSignature?.hash);
         expect(c1.signature).not.toBe(c2.signature);
+    });
+});
+
+// r18 结构层（复盘产物，见 agentspace/output/r18-test-blindness-retrospective.md）：
+// - 事件命名空间统一：视图名→物理名的解析改以 storage 编译结果（storage.schema.records 的
+//   resolvedBaseRecordName）为唯一事实源。此前沿 controller 实例图行走 baseEntity/baseRelation
+//   链的实现看不到 merged input 视图（inputEntities 在 storage 编译期才转换为 filtered 形态），
+//   input 视图上的 update 监听（数据驱动与事件驱动两轨）全部是死监听——F-1 的同族亲缘 bug，
+//   由本轮结构层改造直接消灭。
+// - 死监听不变量（订阅面守卫）：每个注册进 source map 的监听的 recordName 必须是 storage
+//   已知记录名（typo/未注册实体/误把 dict 名当 recordName → setup 期 fail-fast 而不是永久
+//   静默陈旧）；归一化后不允许任何 update 监听仍以视图名为键（防未来生产者绕过归一化）。
+describe('r18 structural: unified event namespace + dead-listener invariant', () => {
+    test('data-based aggregation over a merged INPUT view reacts to member field updates', async () => {
+        const Car = Entity.create({
+            name: 'R18MICar',
+            properties: [Property.create({ name: 'speed', type: 'number' })],
+        });
+        const Truck = Entity.create({
+            name: 'R18MITruck',
+            properties: [Property.create({ name: 'load', type: 'number' })],
+        });
+        const Vehicle = Entity.create({ name: 'R18MIVehicle', inputEntities: [Car, Truck] });
+        const dict = [Dictionary.create({
+            name: 'r18MITotalSpeed',
+            type: 'number',
+            collection: false,
+            computation: Summation.create({ record: Car, attributeQuery: ['speed'] }),
+        })];
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Vehicle, Car, Truck], relations: [], eventSources: [], dict });
+        await controller.setup(true);
+
+        const car = await system.storage.create('R18MICar', { speed: 10 });
+        expect(await system.storage.dict.get('r18MITotalSpeed')).toBe(10);
+        await system.storage.update('R18MICar', MatchExp.atom({ key: 'id', value: ['=', car.id] }), { speed: 25 });
+        expect(await system.storage.dict.get('r18MITotalSpeed')).toBe(25);
+        await system.destroy();
+    });
+
+    test('StateMachine update trigger on a merged INPUT view name fires on member field update', async () => {
+        const idle = StateNode.create({ name: 'idle' });
+        const touched = StateNode.create({ name: 'touched' });
+        const sm = StateMachine.create({
+            states: [idle, touched],
+            initialState: idle,
+            transfers: [StateTransfer.create({
+                trigger: { recordName: 'R18MI2Car', type: 'update', keys: ['speed'] },
+                current: idle,
+                next: touched,
+                computeTarget: (e: any) => ({ id: e.record.id }),
+            })],
+        });
+        const Car = Entity.create({
+            name: 'R18MI2Car',
+            properties: [
+                Property.create({ name: 'speed', type: 'number' }),
+                Property.create({ name: 'phase', type: 'string', computation: sm }),
+            ],
+        });
+        const Truck = Entity.create({
+            name: 'R18MI2Truck',
+            properties: [Property.create({ name: 'load', type: 'number' })],
+        });
+        const Vehicle = Entity.create({ name: 'R18MI2Vehicle', inputEntities: [Car, Truck] });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Vehicle, Car, Truck], relations: [], eventSources: [] });
+        await controller.setup(true);
+
+        const car = await system.storage.create('R18MI2Car', { speed: 10 });
+        await system.storage.update('R18MI2Car', MatchExp.atom({ key: 'id', value: ['=', car.id] }), { speed: 25 });
+        const after = await system.storage.findOne('R18MI2Car', MatchExp.atom({ key: 'id', value: ['=', car.id] }), undefined, ['*']);
+        expect(after.phase).toBe('touched');
+        await system.destroy();
+    });
+
+    test('a typo in trigger.recordName fails fast at setup instead of staying a silent dead listener', async () => {
+        const open = StateNode.create({ name: 'open' });
+        const closed = StateNode.create({ name: 'closed' });
+        const sm = StateMachine.create({
+            states: [open, closed],
+            initialState: open,
+            transfers: [StateTransfer.create({
+                trigger: { recordName: 'R18TypoTickett', type: 'update' },   // typo!
+                current: open,
+                next: closed,
+                computeTarget: (e: any) => ({ id: e.record.id }),
+            })],
+        });
+        const Ticket = Entity.create({
+            name: 'R18TypoTicket',
+            properties: [
+                Property.create({ name: 'title', type: 'string' }),
+                Property.create({ name: 'status', type: 'string', computation: sm }),
+            ],
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Ticket], relations: [], eventSources: [] });
+        await expect(controller.setup(true)).rejects.toThrowError(/R18TypoTickett.*can never fire/s);
+        await system.destroy();
+    });
+
+    test('a global dictionary name used as trigger.recordName fails fast with routing guidance', async () => {
+        const Item = Entity.create({
+            name: 'R18DictItem',
+            properties: [Property.create({ name: 'ok', type: 'boolean' })],
+        });
+        const counter = Dictionary.create({
+            name: 'r18DictCounter',
+            type: 'number',
+            collection: false,
+            computation: Count.create({ record: Item }),
+        });
+        const open = StateNode.create({ name: 'open' });
+        const closed = StateNode.create({ name: 'closed' });
+        const sm = StateMachine.create({
+            states: [open, closed],
+            initialState: open,
+            transfers: [StateTransfer.create({
+                // dict 变更事件以 DICTIONARY_RECORD 发出（record.key = dict 名），
+                // 直接把 dict 名当 recordName 是死监听 → 必须 fail-fast 并给出正确写法。
+                trigger: { recordName: 'r18DictCounter', type: 'update' },
+                current: open,
+                next: closed,
+                computeTarget: (e: any) => ({ id: e.record.id }),
+            })],
+        });
+        const Watcher = Entity.create({
+            name: 'R18DictWatcher',
+            properties: [Property.create({ name: 'phase', type: 'string', computation: sm })],
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Item, Watcher], relations: [], eventSources: [], dict: [counter] });
+        await expect(controller.setup(true)).rejects.toThrowError(/is a global dictionary.*_Dictionary_/s);
+        await system.destroy();
+    });
+
+    test('addSourceMap (public producer API) routes through normalization — no bypass into the tree', async () => {
+        const Ticket = Entity.create({
+            name: 'R18NormTicket',
+            properties: [
+                Property.create({ name: 'title', type: 'string' }),
+                Property.create({ name: 'isActive', type: 'boolean' }),
+            ],
+        });
+        const ActiveTicket = Entity.create({
+            name: 'R18NormActiveTicket',
+            baseEntity: Ticket,
+            matchExpression: MatchExp.atom({ key: 'isActive', value: ['=', true] }),
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Ticket, ActiveTicket], relations: [], eventSources: [] });
+        await controller.setup(true);
+
+        const manager = (controller.scheduler as any).sourceMapManager;
+        const fakeComputation = {
+            args: { constructor: { displayName: 'Fake' } },
+            constructor: { name: 'FakeHandle' },
+            dataContext: { type: 'global', id: { name: 'fake' } },
+        };
+        manager.addSourceMap({
+            type: 'update',
+            recordName: 'R18NormActiveTicket',   // 视图名——必须被归一化到物理名
+            computation: fakeComputation,
+        });
+        const tree = manager.getSourceMapTree();
+        expect(tree['R18NormActiveTicket']?.['update']).toBeUndefined();
+        const normalized = (tree['R18NormTicket']?.['update'] || []).find((s: any) => s.computation === fakeComputation);
+        expect(normalized).toBeTruthy();
+        expect((normalized as any).filteredRecordName).toBe('R18NormActiveTicket');
+        await system.destroy();
     });
 });
 
