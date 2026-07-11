@@ -1,7 +1,8 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { PropertyInstance, Property } from './Property.js';
-import { EntityInstance, validatePropertyNamesOnCreate } from './Entity.js';
+import { EntityInstance } from './Entity.js';
+import { validatePropertyNamesOnCreate } from './propertyNameGuards.js';
 import type { ComputationInstance } from './types.js';
 import type { ConstraintInstance } from './Constraint.js';
 
