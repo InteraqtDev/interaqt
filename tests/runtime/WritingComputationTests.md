@@ -293,3 +293,11 @@ test('should handle negative values correctly', async () => {
 - `tests/storage/writePathTopologyMatrix.spec.ts` — 拓扑 × 操作矩阵样板；
 - `tests/runtime/symmetricAggregationMatrix.spec.ts` — 对称 × 全聚合、朴素重算预言机样板；
 - `tests/storage/symmetricPathMatrix.spec.ts` — 跳数 × 端点形态矩阵样板。
+
+### 整并原则（r17 第四轮补充）
+
+矩阵覆盖某格后，同格的点状旧用例应删除以降低重复维护面，判定标准：
+1. 旧用例断言集是矩阵断言的**真子集**（同一代码路径、同等或更弱强度）→ 删；
+2. 独有断言（独有声明形态 / 事件契约细节 / 独有格）→ 先迁入矩阵，再删；
+3. 删除后必须以变异测试复验（回退 src 至该 bug 修复前，确认矩阵仍变红）。
+历史 review-fixes 文件中矩阵未覆盖的缺陷回归（守卫链/Activity/migration 等）不属于重复面，保留。

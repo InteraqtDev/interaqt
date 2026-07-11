@@ -223,7 +223,13 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     // 相当于新建了关系。如果不是虚拟link 就要记录。
                     // TODO 要给出一个明确的 虚拟 link  record 的差异
                     if (!combinedRecordIdRef.info!.isLinkSourceRelation()) {
+                        // CAUTION 用户在 ref 上携带的 `&` 关系属性必须落到新 link 上：
+                        //  flashOut 的返回值会整体覆盖 rawData 里的该属性（浅 merge），此前只放 id，
+                        //  用户的 `&` 数据在 combined 拓扑的 replace-by-ref 路径被静默丢弃
+                        //  （拓扑矩阵 step-3 强化断言发现，r17 追加）。被抢夺行的旧 link 属性
+                        //  刻意不带过来——replace 语义下新 link 的属性只来自本次声明。
                         result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
+                            ...(combinedRecordIdRef.linkRecordData?.getData() || {}),
                             id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
                         }
                         events?.push({

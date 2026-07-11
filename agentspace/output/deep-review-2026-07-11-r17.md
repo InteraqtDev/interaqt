@@ -24,6 +24,13 @@
 > - **假设审计（盲区 4）产出两个声明期守卫（`Relation.create`）**：对称（同名属性）关系限定 n:n——对称 1:1/n:1 此前被静默接受但只有单侧可读写（A.spouse=B 而 B.spouse 为空）；`isTargetReliance` 限定 1:1/1:n——n:1/n:n reliance 此前被静默接受，共享 target 在任一 source 删除时被级联过删。回归见 `tests/core/relationDeclarationGuards.spec.ts`。
 > - **对称 `&` 内嵌套端点实体属性查询修复**：`buildXToOneQueryTree` 对对称 link 的 JOIN 树按 :source/:target 变体展开（此前 SELECT 有变体、JOIN 没有 → "no such column: REL_..._SOURCE_source.*" 裸 SQL 错误）。
 > - **runtime 层事件完备性预言机**：`withRuntimeEventCompleteness`（listen 采集 + 绑定状态列过滤），已接入 `referentialIntegrityMatrix` 全部四用例。
+>
+> **维护说明三（2026-07-11，测试整并轮）**：矩阵严格覆盖的点状旧用例已删除以降低重复维护面（判定标准：断言集是矩阵的真子集；每项独有断言先迁入矩阵再删）。
+> - 删除 `review-repro-r17.spec.ts`（storage/runtime 两个文件，本报告"复现固化"所指）：F-1/F-2/F-4 各面与兄弟格全部并入 `writePathTopologyMatrix`（补强 replace 零 update 事件断言、同 id `&` 事件 oldRecord/keys 契约断言、combined 嵌套值原地更新格、merged ref 忽略嵌套值的拓扑差异对照格）、`symmetricPathMatrix`、`symmetricAggregationMatrix`；F-2 runtime 传播面迁入 `weightedSummation.spec.ts`。
+> - 删除 `symmetricRelation.spec.ts`（record-fallback Count 独有覆盖以 `friendCountViaRecord` 属性并入聚合矩阵）与 `semmetricRelation.spec.ts`（`expect(true)` 占位文件）。
+> - 裁剪 `review-fixes-2026-07-09-r7.spec.ts` 的 F-1/F-2（与 `referentialIntegrityMatrix` 同 fixture 且断言更弱），保留矩阵未覆盖的 F-3/F-5。
+> - 整并中矩阵强化断言又发现一个既有 bug 并修复：combined 拓扑 replace-by-ref 时用户在 ref 上携带的 `&` 关系属性被静默丢弃（flashOut 只写新 link id），现透传 `linkRecordData`。
+> - 删除后变异测试复验（src 回退修复前基线）：四个致命家族 + F-2 数据面/传播面全部仍被矩阵检出（12 个用例变红），检出力不降反升。
 
 ---
 

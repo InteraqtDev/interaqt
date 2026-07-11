@@ -101,13 +101,19 @@ describe('write-path topology matrix', () => {
                 expect(p1Owners.map(o => o.name), `[${topology}] create-steal single owner`).toEqual(['u3'])
                 await assertOneToOneInvariants(handle, linkName, `[${topology}] after create steal`)
 
-                // 3. UPDATE 抢夺：u1 抢回 p1
-                await withEventCompleteness(handle, schema, `[${topology}] update steal`, async (events) => {
-                    await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', u1.id] }), { profile: { id: p1.id } }, events)
+                // 3. UPDATE 抢夺：u1 抢回 p1（replace 语义：delete+create，绝无 update 事件；& 属性写入新 link）
+                const stealEvents = await withEventCompleteness(handle, schema, `[${topology}] update steal`, async (events) => {
+                    await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', u1.id] }), { profile: { id: p1.id, '&': { viewed: 7 } } }, events)
                 })
                 const p1Owners2 = await handle.find('User', MatchExp.atom({ key: 'profile.id', value: ['=', p1.id] }), undefined, ['name'])
                 expect(p1Owners2.map(o => o.name), `[${topology}] update-steal single owner`).toEqual(['u1'])
                 await assertOneToOneInvariants(handle, linkName, `[${topology}] after update steal`)
+                expect(stealEvents.filter(e => e.recordName === linkName && e.type === 'update').length,
+                    `[${topology}] replace must not emit link update events`).toBe(0)
+                expect(stealEvents.filter(e => e.recordName === linkName && e.type === 'delete').length,
+                    `[${topology}] replace must emit the old link's delete event`).toBe(1)
+                const p1Link = await handle.findRelationByName(linkName, MatchExp.atom({ key: 'target.id', value: ['=', p1.id] }), undefined, ['viewed'])
+                expect(p1Link[0]?.viewed, `[${topology}] & data written on the new link`).toBe(7)
 
                 // 4. 同 id 幂等重写：零事件、link 数据保留
                 const idempotentEvents = await withEventCompleteness(handle, schema, `[${topology}] same-id idempotent`, async (events) => {
@@ -115,12 +121,17 @@ describe('write-path topology matrix', () => {
                 })
                 expect(idempotentEvents.length, `[${topology}] idempotent rewrite must be silent`).toBe(0)
 
-                // 5. 同 id + & 原地更新：数据面 + 事件面（预言机自动对账 keys 覆盖）
-                await withEventCompleteness(handle, schema, `[${topology}] same-id & update`, async (events) => {
+                // 5. 同 id + & 原地更新：数据面 + 事件面（预言机对账 keys 覆盖；事件契约与宿主 update 一致）
+                const inPlaceEvents = await withEventCompleteness(handle, schema, `[${topology}] same-id & update`, async (events) => {
                     await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', u2.id] }), { profile: { id: p2.id, '&': { viewed: 99 } } }, events)
                 })
                 const link2 = await handle.findRelationByName(linkName, MatchExp.atom({ key: 'target.id', value: ['=', p2.id] }), undefined, ['viewed'])
                 expect(link2[0]?.viewed, `[${topology}] & data persisted`).toBe(99)
+                const linkUpdateEvents = inPlaceEvents.filter(e => e.recordName === linkName && e.type === 'update')
+                expect(linkUpdateEvents.length, `[${topology}] same-id & update emits exactly one link update event`).toBe(1)
+                expect(linkUpdateEvents[0].keys, `[${topology}] update event keys`).toContain('viewed')
+                expect(linkUpdateEvents[0].oldRecord?.viewed, `[${topology}] update event carries old link snapshot`).toBe(2)
+                expect(linkUpdateEvents[0].record?.viewed, `[${topology}] update event carries new value`).toBe(99)
 
                 // 6. 从 attribute 侧（Profile.owner）抢夺
                 await withEventCompleteness(handle, schema, `[${topology}] steal from attribute side`, async (events) => {
@@ -161,6 +172,49 @@ describe('write-path topology matrix', () => {
                 const u1Row = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', u1.id] }), undefined, ['name', ['profile', { attributeQuery: ['id'] }]])
                 expect(u1Row.profile === undefined || u1Row.profile === null).toBe(true)
             })
+
+            if (mergeLinks) {
+                // combined（三表合一）独有格：嵌套值的原地递归更新（"只有三表合一允许递归更新"的声明契约）。
+                //  merged 拓扑下 ref 携带的嵌套值字段是刻意忽略的（ref 即引用语义，见下方对照断言）。
+                test('combined-only: same-id nested value + & update writes data and emits update events', async () => {
+                    const { handle, linkName, schema } = await bootstrapOneToOne(mergeLinks)
+                    const u = await handle.create('User', { name: 'u1', profile: { title: 'old', '&': { viewed: 1 } } })
+
+                    const events = await withEventCompleteness(handle, schema, '[combined] same-id nested value + & update', async (events) => {
+                        await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', u.id] }),
+                            { profile: { id: u.profile.id, title: 'new', '&': { viewed: 99 } } }, events)
+                    })
+
+                    // 数据面：嵌套值与 & 都写入（此前 flashOut 把旧行 merge 回来覆盖新值，r17 F-2 数据面）
+                    const after = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', u.id] }), undefined,
+                        ['name', ['profile', { attributeQuery: ['title'] }]])
+                    expect(after.profile?.title).toBe('new')
+                    const linkRows = await handle.findRelationByName(linkName, undefined, undefined, ['viewed'])
+                    expect(linkRows[0]?.viewed).toBe(99)
+
+                    // 事件面：combined 记录的嵌套值更新 + link 的 & 更新各一条
+                    const profileEvents = events.filter(e => e.recordName === 'Profile' && e.type === 'update')
+                    expect(profileEvents.length).toBe(1)
+                    expect(profileEvents[0].keys).toContain('title')
+                    const linkEvents = events.filter(e => e.recordName === linkName && e.type === 'update')
+                    expect(linkEvents.length).toBe(1)
+                    expect(linkEvents[0].keys).toContain('viewed')
+                })
+            } else {
+                // merged 拓扑对照：ref 携带嵌套值字段是引用语义，值字段刻意忽略（递归更新仅限 combined）。
+                //  固化该拓扑差异，防止未来无意改变任一侧语义（r17 观察项）。
+                test('merged-only: nested value fields on a same-id ref are ignored (ref semantics, no recursive update)', async () => {
+                    const { handle, schema } = await bootstrapOneToOne(mergeLinks)
+                    const p = await handle.create('Profile', { title: 'old' })
+                    const u = await handle.create('User', { name: 'u1', profile: { id: p.id } })
+
+                    await withEventCompleteness(handle, schema, '[merged] ref-with-value-fields update', async (events) => {
+                        await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', u.id] }), { profile: { id: p.id, title: 'new' } }, events)
+                    })
+                    const pRow = await handle.findOne('Profile', MatchExp.atom({ key: 'id', value: ['=', p.id] }), undefined, ['title'])
+                    expect(pRow.title, 'merged ref update must not recursively write value fields').toBe('old')
+                })
+            }
         })
     }
 

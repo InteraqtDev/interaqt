@@ -636,3 +636,55 @@ describe('WeightedSummation computed handle', () => {
     expect(storeData.totalInventoryValue).toBe(9992);
   });
 }); 
+/**
+ * r17 F-2 runtime 面回归（自 review-repro-r17.spec.ts 合并至此）：
+ * 同 id ref + `&` 关系属性经【宿主实体 update】原地变更时，storage 补发的 link update
+ * 事件必须驱动聚合传播——此前数据面写入、事件面沉默，聚合永久陈旧。
+ * （直接 updateRelationByName 的对照路径在上方用例中已覆盖。）
+ */
+describe('r17 F-2: & link-property change via same-id host update must propagate', () => {
+  test('WeightedSummation over link property updates when & data changes through entity update', async () => {
+    const customerEntity = Entity.create({
+      name: 'Customer',
+      properties: [Property.create({ name: 'name', type: 'string' })]
+    });
+    const productEntity = Entity.create({
+      name: 'Product',
+      properties: [Property.create({ name: 'title', type: 'string' })]
+    });
+    const purchaseRelation = Relation.create({
+      source: customerEntity, sourceProperty: 'boughtProduct', target: productEntity, targetProperty: 'buyers',
+      type: 'n:1',
+      properties: [Property.create({ name: 'quantity', type: 'number' })]
+    });
+    customerEntity.properties.push(Property.create({
+      name: 'totalQuantity',
+      type: 'number',
+      computation: WeightedSummation.create({
+        property: 'boughtProduct',
+        attributeQuery: [['&', { attributeQuery: ['quantity'] }]],
+        callback: (product: any) => ({ weight: 1, value: product?.['&']?.quantity ?? 0 })
+      }) as any
+    }));
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [customerEntity, productEntity], relations: [purchaseRelation] });
+    await controller.setup(true);
+    const storage = system.storage;
+
+    const prod = await storage.create('Product', { title: 'T' });
+    const cust = await storage.create('Customer', { name: 'C', boughtProduct: { id: prod.id, '&': { quantity: 2 } } });
+
+    const row1 = await storage.findOne('Customer', MatchExp.atom({ key: 'id', value: ['=', cust.id] }), undefined, ['*']);
+    expect(row1.totalQuantity).toBe(2);
+
+    await storage.update('Customer', MatchExp.atom({ key: 'id', value: ['=', cust.id] }), { boughtProduct: { id: prod.id, '&': { quantity: 5 } } });
+
+    const relRows = await storage.findRelationByName(purchaseRelation.name!, undefined, undefined, ['quantity']);
+    expect(relRows[0]?.quantity).toBe(5);  // 数据面
+
+    const row2 = await storage.findOne('Customer', MatchExp.atom({ key: 'id', value: ['=', cust.id] }), undefined, ['*']);
+    expect(row2.totalQuantity).toBe(5);    // 计算面
+  });
+});

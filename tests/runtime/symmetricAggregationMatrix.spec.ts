@@ -41,6 +41,12 @@ describe('symmetric relation x aggregation matrix', () => {
                 name: 'friendCount', type: 'number',
                 computation: Count.create({ property: 'friends' }) as any
             }),
+            // Count 的 record-fallback 声明形态（历史写法 Count.create({record: relation})，
+            //  走 allowRecordFallback 分支——原 symmetricRelation.spec.ts 的独有覆盖，合并至此）
+            Property.create({
+                name: 'friendCountViaRecord', type: 'number',
+                computation: Count.create({ record: friends }) as any
+            }),
             // Count 带 callback（r17 F-3 崩溃格）
             Property.create({
                 name: 'activeFriendCount', type: 'number',
@@ -99,12 +105,13 @@ describe('symmetric relation x aggregation matrix', () => {
         // 朴素预言机：从当前 DB 重查每个用户的朋友（含 & weight），用测试自身的 JS 重算全部聚合。
         async function assertAllUsersConsistent(label: string) {
             const users = await storage.find('U', undefined, undefined,
-                ['name', 'active', 'score', 'friendCount', 'activeFriendCount', 'friendScoreSum', 'friendScoreAvg', 'allFriendsActive', 'anyFriendActive', 'weightedFriendScore',
+                ['name', 'active', 'score', 'friendCount', 'friendCountViaRecord', 'activeFriendCount', 'friendScoreSum', 'friendScoreAvg', 'allFriendsActive', 'anyFriendActive', 'weightedFriendScore',
                     ['friends', { attributeQuery: ['name', 'active', 'score', ['&', { attributeQuery: ['weight'] }]] }]]);
             for (const user of users) {
                 const fs: any[] = user.friends || [];
                 const expected = {
                     friendCount: fs.length,
+                    friendCountViaRecord: fs.length,
                     activeFriendCount: fs.filter(f => !!f.active).length,
                     friendScoreSum: fs.reduce((acc, f) => acc + (Number.isFinite(f.score) ? f.score : 0), 0),
                     friendScoreAvg: fs.length ? fs.reduce((acc, f) => acc + (Number.isFinite(f.score) ? f.score : 0), 0) / fs.length : 0,
