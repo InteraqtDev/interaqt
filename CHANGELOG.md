@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.1.0](https://github.com/interaqtdev/interaqt/compare/v2.0.4...v3.1.0) (2026-07-11)
+
+### ⚠ BREAKING CHANGES
+
+* **builtins+core:** remove the Attributive concept — Condition is the single guard concept
+
+### Bug Fixes
+
+* **runtime+storage+builtins+drivers:** r13 review — guard boolean contract, undefined write-through, transform id collision ([60f7ab5](https://github.com/interaqtdev/interaqt/commit/60f7ab5c92288c19f0b55a6e8a4282ca148cc6f3))
+* **runtime+storage+builtins:** r15 deep review — statemachine computeValue contract, migration cross-process resume, ComputationResult envelope guard ([86d1bff](https://github.com/interaqtdev/interaqt/commit/86d1bff6732d5a5996d2a1320fed1852f6df1eae))
+* **runtime+storage+drivers:** resolve all r13 significant-improvement items (I-1..I-10) ([52e57fe](https://github.com/interaqtdev/interaqt/commit/52e57fe9bfad08ca471b406d8f4afc94d7b03dd5))
+* **runtime+storage:** r16 deep review — patch envelope guard, membership create event contract, single-field aggregation, migration chained event-rebuild ([182aa4e](https://github.com/interaqtdev/interaqt/commit/182aa4e5e24ce019e41848a56d13e3bae75c4e1b))
+* **storage+runtime:** r17 fatal fixes — exclusive 1:1 steal unlink, same-id '&' in-place update events, symmetric aggregation full-recompute guard, multi-segment symmetric path expansion ([0118d88](https://github.com/interaqtdev/interaqt/commit/0118d88606b00eaecfb346b0ce5b8575e8dc2311))
+
+### Code Refactoring
+
+* **builtins+core:** remove the Attributive concept — Condition is the single guard concept ([0c43aee](https://github.com/interaqtdev/interaqt/commit/0c43aee95104f467c61fac3eacbc1b172753b5ba))
+
 ## [3.0.2](https://github.com/interaqtdev/interaqt/compare/v3.0.1...v3.0.2) (2026-07-10)
 
 ### Bug Fixes
