@@ -6,7 +6,7 @@ import { AttributeQuery, AttributeQueryData } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 
-import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
+import { DeletionMembershipSnapshot, FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import { SQLBuilder, PlaceholderGen } from "./SQLBuilder.js";
 import { RecursiveContext, ROOT_LABEL } from "./util/RecursiveContext.js";
 import { QueryExecutor, RecordQueryRef } from "./QueryExecutor.js";
@@ -36,7 +36,7 @@ export interface RecordOperationAgent {
     addLinkFromRecord(entity: string, attribute: string, entityId: string, relatedEntityId: string, attributes?: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef>
     unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record): Promise<void>
     preprocessSameRowData(newEntityData: NewRecordData, isUpdate?: boolean, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData>
-    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string, excludeAttributes?: Set<string>): Promise<{ [k: string]: RawEntityData }>
+    flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason?: string, excludeAttributes?: Set<string>, newOwnerId?: string): Promise<{ [k: string]: RawEntityData }>
     relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, events?: RecordMutationEvent[]): Promise<Record[]>
 }
 
@@ -108,7 +108,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
      *  所以刻意不产生实体级 delete/create 事件（否则下游聚合会被虚假地减/加一次）。
      *  事件流只反映关系层面的事实：旧 link delete + 新 link create（见下方 events?.push）。
      */
-    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = '', excludeAttributes?: Set<string>): Promise<{ [k: string]: RawEntityData }> {
+    async flashOutCombinedRecordsAndMergedLinks(newEntityData: NewRecordData, events?: RecordMutationEvent[], reason = '', excludeAttributes?: Set<string>, newOwnerId?: string): Promise<{ [k: string]: RawEntityData }> {
         const result: { [k: string]: RawEntityData } = {}
         // CAUTION update 时引用的 combined record 若与当前行上已有的是同一个（同 id 原地更新），
         //  不存在"抢夺"：数据已在本行。此时绝不能走 flashOut——它会把本行旧数据读出再 merge 回
@@ -161,16 +161,22 @@ export class RecordQueryAgent implements RecordOperationAgent {
             //  ref 是 link 的 source/target，其 linkName 是虚拟 link，业务事件会漏发
             //  （写路径拓扑矩阵的事件完备性预言机发现，r17 追加）。
             if (newRecordIsLink && recordWithCombined.id) {
+                const oldBusinessLinkRecord = {
+                    ...Object.fromEntries(Object.entries(recordWithCombined).filter(([, v]) => v === null || typeof v !== 'object')),
+                    id: recordWithCombined.id,
+                    source: { id: recordWithCombined.source?.id },
+                    target: { id: recordWithCombined.target?.id },
+                }
+                // 视图（filtered relation）成员资格必须在物理清列之前求值（谓词只由 SQL 求值）。
+                const oldBusinessLinkViewSnapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(newEntityData.recordName, [oldBusinessLinkRecord], events)
                 events?.push({
                     type: 'delete',
                     recordName: newEntityData.recordName,
-                    record: {
-                        ...Object.fromEntries(Object.entries(recordWithCombined).filter(([, v]) => v === null || typeof v !== 'object')),
-                        id: recordWithCombined.id,
-                        source: { id: recordWithCombined.source?.id },
-                        target: { id: recordWithCombined.target?.id },
-                    }
+                    record: oldBusinessLinkRecord
                 })
+                if (events && oldBusinessLinkViewSnapshot) {
+                    this.filteredEntityManager.settleDeletionMemberships(oldBusinessLinkViewSnapshot, newEntityData.recordName, [oldBusinessLinkRecord], events, events)
+                }
             }
             for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
                 // CAUTION 行是按多个 ref 的 OR 匹配出来的，必须校验「本行该属性的值确实是当前 ref」：
@@ -191,6 +197,27 @@ export class RecordQueryAgent implements RecordOperationAgent {
                         ))
                     }
 
+                    // 即将随物理清列消失的旧 link（旧 combined link + 被替换的旧 merged link）的
+                    // filtered relation 视图成员资格：谓词只由 SQL 求值，必须在清列之前快照。
+                    const oldCombinedLinkRecord = recordWithCombined.id
+                        ? recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                        : undefined
+                    const oldCombinedLinkViewSnapshot = oldCombinedLinkRecord?.id
+                        ? await this.filteredEntityManager.collectInlineDeletionSnapshot(combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord], events)
+                        : undefined
+                    const oldMergedLinkViewSnapshots = new Map<string, DeletionMembershipSnapshot>()
+                    if (newRecordIsLink) {
+                        const stolenDataBeforeClear = recordWithCombined[combinedRecordIdRef.info?.attributeName!]
+                        const stolenRecordInfoBeforeClear = this.map.getRecordInfo(combinedRecordIdRef.recordName)
+                        for (const mergedAttrInfo of stolenRecordInfoBeforeClear.mergedRecordAttributes) {
+                            if (mergedAttrInfo.linkName !== newEntityData.recordName) continue
+                            const oldLink = stolenDataBeforeClear[mergedAttrInfo.attributeName]?.[LINK_SYMBOL]
+                            if (!oldLink?.id) continue
+                            const snapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(mergedAttrInfo.linkName, [oldLink], events)
+                            if (snapshot) oldMergedLinkViewSnapshots.set(mergedAttrInfo.attributeName, snapshot)
+                        }
+                    }
+
                     // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了
                     //1. 删掉 combined 原来的所有同行数据
                     await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
@@ -202,6 +229,9 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             recordName: combinedRecordIdRef.info!.linkName!,
                             record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
                         })
+                        if (events && oldCombinedLinkViewSnapshot) {
+                            this.filteredEntityManager.settleDeletionMemberships(oldCombinedLinkViewSnapshot, combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord!], events, events)
+                        }
                     }
 
                     //3. merge 数据并建立新的关系。
@@ -225,15 +255,20 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             const oldLink = oldRelated[LINK_SYMBOL]
                             const stolenIsSource = !this.map.getLinkInfoByName(newEntityData.recordName)
                                 .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
+                            const oldMergedLinkRecord = {
+                                ...(oldLink || {}),
+                                source: stolenIsSource ? { id: stolenData.id } : { id: oldRelated.id },
+                                target: stolenIsSource ? { id: oldRelated.id } : { id: stolenData.id },
+                            }
                             events?.push({
                                 type: 'delete',
                                 recordName: newEntityData.recordName,
-                                record: {
-                                    ...(oldLink || {}),
-                                    source: stolenIsSource ? { id: stolenData.id } : { id: oldRelated.id },
-                                    target: stolenIsSource ? { id: oldRelated.id } : { id: stolenData.id },
-                                }
+                                record: oldMergedLinkRecord
                             })
+                            const oldMergedLinkViewSnapshot = oldMergedLinkViewSnapshots.get(mergedAttrInfo.attributeName)
+                            if (events && oldMergedLinkViewSnapshot) {
+                                this.filteredEntityManager.settleDeletionMemberships(oldMergedLinkViewSnapshot, newEntityData.recordName, [oldMergedLinkRecord], events, events)
+                            }
                             delete stolenData[mergedAttrInfo.attributeName]
                         }
                     }
@@ -245,15 +280,32 @@ export class RecordQueryAgent implements RecordOperationAgent {
                         //  用户的 `&` 数据在 combined 拓扑的 replace-by-ref 路径被静默丢弃
                         //  （拓扑矩阵 step-3 强化断言发现，r17 追加）。被抢夺行的旧 link 属性
                         //  刻意不带过来——replace 语义下新 link 的属性只来自本次声明。
+                        // CAUTION 事件 payload 必须携带 source/target 端点（与 preprocessSameRowData
+                        //  的 link create 事件同一契约）：按端点模式匹配的下游（StateMachine trigger、
+                        //  Transform eventDeps）此前对 flashOut 产生的 link create "查询可见、事件不可见"。
+                        const stolenRelatedRef = { id: combinedRecordIdRef.getRef().id }
+                        const newOwnerRef = { id: newOwnerId ?? newEntityData.getData().id }
                         result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
                             ...(combinedRecordIdRef.linkRecordData?.getData() || {}),
                             id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
                         }
+                        const newLinkRecord = {
+                            ...result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
+                            [combinedRecordIdRef.info!.isRecordSource() ? 'source' : 'target']: newOwnerRef,
+                            [combinedRecordIdRef.info!.isRecordSource() ? 'target' : 'source']: stolenRelatedRef,
+                        }
                         events?.push({
                             type: 'create',
                             recordName: combinedRecordIdRef.info!.linkName,
-                            record: result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                            record: newLinkRecord
                         })
+                        // 新 link 的 filtered relation 视图成员资格在物理写入完成后求值（settlePostWriteChecks）。
+                        this.filteredEntityManager.enqueuePostWriteCreationCheck(
+                            events,
+                            combinedRecordIdRef.info!.linkName!,
+                            newLinkRecord.id,
+                            newLinkRecord
+                        )
                     }
                 }
             }
@@ -289,6 +341,8 @@ export class RecordQueryAgent implements RecordOperationAgent {
             sourceIds: records.map(r => r.source?.id),
             targetIds: records.map(r => r.target?.id)
         }, events)
+        // link 自身的 filtered relation 视图成员资格也要在行还活着时快照（下面先物理搬迁再 push 事件）。
+        const linkViewSnapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(linkName, records, events)
 
         const toMoveRecordInfo = this.map.getLinkInfoByName(linkName)[moveSource ? 'sourceRecordInfo' : 'targetRecordInfo']
 
@@ -300,12 +354,15 @@ export class RecordQueryAgent implements RecordOperationAgent {
             const toMoveRecordData = new NewRecordData(this.map, toMoveRecordInfo.name, record[moveAttribute])
             await this.creationExecutor.insertSameRowData(toMoveRecordData, undefined)
 
-            // 3. 增加 delete 关系的事件
+            // 3. 增加 delete 关系的事件（base link 之后紧跟其 filtered relation 视图的 delete）
             events?.push({
                 type: 'delete',
                 recordName: linkName,
                 record: record
             })
+            if (events && linkViewSnapshot) {
+                this.filteredEntityManager.settleDeletionMemberships(linkViewSnapshot, linkName, [record], events, events)
+            }
         }
 
         // 4. 关系解除后的成员资格结算
