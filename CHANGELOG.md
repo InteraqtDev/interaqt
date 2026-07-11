@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.0.0](https://github.com/interaqtdev/interaqt/compare/v3.1.0...v4.0.0) (2026-07-11)
+
+### Bug Fixes
+
+* **runtime+storage+core:** r18 deep review — filtered update routing for event-based computations, migration argsSignature, property namespace guards, ScopedSequence scope immutability ([fdd3cbf](https://github.com/interaqtdev/interaqt/commit/fdd3cbf407b5d5a8b420ffaa454449675fa86d3b))
+
 ## [3.1.0](https://github.com/interaqtdev/interaqt/compare/v3.0.2...v3.1.0) (2026-07-11)
 
 r17 deep review release. Full analysis: `agentspace/output/deep-review-2026-07-11-r17.md` and `agentspace/output/r17-test-blindness-retrospective.md` (PR [#33](https://github.com/InteraqtDev/interaqt/pull/33)).
