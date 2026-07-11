@@ -48,6 +48,14 @@ All core concepts use a consistent pattern:
 ## Explicit Control Principle
 This project follows "explicit control" — never add implicit behavior, auto-completion, or magic defaults. All behavior must be explicitly declared by the user.
 
+## Bug Fixing: Fix the Class, Not the Instance
+When fixing any bug (mandatory checklist — see `AGENTS.md` § "Bug fixing" for details):
+1. **Enumerate all readers** of the affected declaration surface / event namespace / code path (data-based track, event-based track, migration signature, public producer APIs) — verify each, not just the one the repro walked.
+2. **Prefer convergence-point fixes** (one shared pipeline / choke point / source of truth) over per-branch patches.
+3. **Promote universal rules to checked invariants** — a "this never happens" that only lives in a comment must become a declaration-time guard or setup-time fail-fast.
+4. **Scan sibling cells and backfill the dimension registry** (`tests/runtime/WritingComputationTests.md`) with any new dimension the bug reveals.
+5. **Fatal bugs that escaped tests need an escape analysis** in `agentspace/output/` whose lesson lands as a mechanism (axis / oracle / invariant), not prose.
+
 ## Knowledge Base
 - `agentspace/knowledge/` — Technical docs on filtered entities, cascade, storage, etc.
 - `agent/agentspace/knowledge/usage/` — Usage guides (00–19)

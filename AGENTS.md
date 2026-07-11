@@ -208,6 +208,17 @@ Core types use: interface → CreateArgs → `Entity.create(args)` → static re
 - File naming: `*.spec.ts`
 - Do not manually set entity IDs — let the framework generate them
 - Always `await controller.setup(true)` before dispatching
+- When adding a test **matrix**, consult the dimension registry in `tests/runtime/WritingComputationTests.md` — every dimension (including degenerate values and the mechanism axes) must be explicitly decided
+
+### Bug fixing: fix the class, not the instance
+
+Eighteen review rounds show the dominant failure mode is a **point fix for a reproduced instance while the bug's family lives on** (same rule, different topology / consumer track / view form). When you find and fix a bug, this is the mandatory checklist:
+
+1. **Enumerate all readers of the declaration surface.** If the bug is in how a declaration (`recordName`, trigger, dataDep, payload shape, ...) is consumed, list every consumer of that surface — data-based track, event-based track, migration signature, public producer APIs (`addSourceMap`, ...) — and verify each one. The fix that motivated the repro covers exactly one reader by construction; the siblings are where the next fatal bug lives.
+2. **Prefer convergence-point fixes over per-branch patches.** Route all consumers through one shared pipeline (normalization, guard, choke point) instead of patching the branch the repro walked. One source of truth; duplicated resolution logic *will* drift (e.g. hand-walking the entity graph vs the compiled storage schema).
+3. **Promote known rules to checked invariants.** If the fix relies on a universal statement ("update events never fire under view names", "reliance is always 1:x"), assert it — declaration-time guard or setup-time invariant with a clear error. Comments have no enforcement power; a fail-fast protects users who hit the case before any test does.
+4. **Scan the neighborhood and backfill the registry.** Fix regressions must cover sibling cells (adjacent topology / operation / track values), and any new dimension the bug reveals must be added to the dimension registry in `tests/runtime/WritingComputationTests.md`.
+5. **For fatal bugs that escaped existing tests, record the escape analysis.** Write *why the test system missed it* (retrospective in `agentspace/output/`), and turn the lesson into a mechanism — a new axis, an oracle, an invariant — not prose. See `agentspace/output/r17-test-blindness-retrospective.md` and `r18-test-blindness-retrospective.md` for the method and precedents.
 
 ## Common patterns
 
@@ -360,6 +371,8 @@ npm run build               # vite library build → dist/
 | `agentspace/knowledge/` | Technical deep-dives (filtered entities, cascade, storage) |
 | `src/storage/USAGE_GUIDE.md` | Storage layer usage |
 | `src/storage/IMPLEMENTATION_DETAILS.md` | Storage internals |
+| `tests/runtime/WritingComputationTests.md` | Computation test guide + **dimension registry** (mandatory for new test matrices and bug-fix regressions) |
+| `agentspace/output/r17-test-blindness-retrospective.md`, `.../r18-test-blindness-retrospective.md` | Why fatal bugs escaped the test system — structural blind spots and the systemic-fix method |
 
 Start with:
 
