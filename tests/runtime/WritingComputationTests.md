@@ -288,6 +288,14 @@ test('should handle negative values correctly', async () => {
 | 观察面 | 查询面 / **事件面（用 tests/storage/helpers/eventCompleteness.ts 的预言机）** / 计算面（与朴素重算对照） / 不变量面（无悬挂端点、x:1 排他唯一） | r17 F-2 |
 | 计算轨道（机制轴） | 数据驱动（dataDeps）/ **事件驱动（StateMachine trigger / Transform eventDeps）** / **migration 签名（第三个读者：同一声明在 manifest 里是否可见）** | r18 F-1、r18 F-2 |
 | 监听名形态（机制轴） | 物理 base 名 / **filtered entity/relation 名** / **merged input 视图名** / 嵌套 filtered 链 | r18 F-1、r18 merged-input 亲缘 bug |
+| 底层原语正确性（正交轴） | 被复用原语（`BoolExp.evaluate` / match 求值 / 算术求值）的**代数律/真值表**必须独立于"上层怎么用"断言；同一语义有多实现（SQL `NOT` / 内存 not）时须做**一致性对账**；权限面须有**对抗性断言**（构造应拒绝的组合守卫，断言其拒绝——fail-open 是否定形命题，正向用例测不到） | r19 F-1（NOT 不贯穿 AND/OR，且旧测试把 bug 写进断言） |
+
+**正交轴说明（r19 复盘引入）**：数据形态轴与机制轴都长在"响应式数据流"上（mutation → 事件 → 计算）。
+底层逻辑原语（`BoolExp.evaluate`、match 求值、算术求值）是数据流的**上游依赖**，不产生 mutation、不进事件流、
+不注册监听——所有数据流预言机对它失明。它的正确性契约是**数学事实**（真值表 / 代数律），绝不能由"当前实现怎么跑"
+定义。r19 F-1 的教训尤其尖锐：`boolexp.spec.ts` 两处旧测试的注释写明了"实现不传播 inverse"，却把这个错误行为
+`expect(...).not.toBe(true)` 固化成绿灯——**测试不是漏写，是替 bug 挡住了所有想修它的人**。写原语测试时必须问：
+断言的是语义应该是什么，还是实现现在是什么？
 
 **机制轴说明（r18 复盘引入）**：前七根轴描述"声明的数据形状"，后两根描述"同一声明被哪个机制消费"。
 同一个声明面（如 trigger/eventDep 的 `recordName + type`）的**每一个读者都是一根轴**——bug 住在读者之间的

@@ -6,7 +6,7 @@ import { AttributeQuery, AttributeQueryData } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 
-import { FilteredEntityManager } from "./FilteredEntityManager.js";
+import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import { SQLBuilder, PlaceholderGen } from "./SQLBuilder.js";
 import { RecursiveContext, ROOT_LABEL } from "./util/RecursiveContext.js";
 import { QueryExecutor, RecordQueryRef } from "./QueryExecutor.js";
@@ -146,6 +146,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
         // 开始 merge 数据，并记录 unLink 事件
         const newRecordIsLink = this.map.getRecordInfo(newEntityData.recordName).isRelation && !!this.map.data.links[newEntityData.recordName]
+        // CAUTION 被抢夺的旧 owner 会失去 combined 关联端点（deleteRecordSameRowData 物理清列），
+        //  其 filtered entity 成员资格必须重算——否则「查询面已退出、事件面无 delete」，下游对该
+        //  filtered 视图的响应式计算永久陈旧（combined × filtered 交叉格，r18 复盘已标注为空白）。
+        //  merged 拓扑经 unlinkOldOwnersOfExclusiveTargets → unlink → deleteRecord 已走成员资格机制，
+        //  combined 的 flashOut 是平行漏网。before 快照必须在物理清列之前采集，settle 在之后统一结算。
+        const oldOwnerMembershipChecks: MembershipCheck[] = []
         for (let recordWithCombined of recordsWithCombined) {
             // CAUTION 正在创建的是 combined link record（如三表合一的 1:1 关系经 addLink 建立），
             //  且被抢夺端点所在的行本身就是一条旧业务 link 行（行上有 link id）时：
@@ -173,6 +179,17 @@ export class RecordQueryAgent implements RecordOperationAgent {
                 //  而不是 u2，若只判真值就会把无关的 u1 一并 flashOut，并在 result 上产生
                 //  同名属性冲突（"should not have same combined record" 内部断言崩溃，r17 拓扑矩阵首跑发现）。
                 if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]?.id === combinedRecordIdRef.getRef().id) {
+
+                    // 抢夺既有 owner（recordWithCombined.id 存在）且被抢的是业务关系端点（非虚拟 link 的
+                    // source/target）时，先快照该 owner 在依赖此关系属性的 filtered entity 上的成员资格。
+                    if (recordWithCombined.id && !combinedRecordIdRef.info!.isLinkSourceRelation()) {
+                        oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectMembershipChecks(
+                            newEntityData.recordName,
+                            [recordWithCombined.id],
+                            [combinedRecordIdRef.info!.attributeName!],
+                            events
+                        ))
+                    }
 
                     // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了
                     //1. 删掉 combined 原来的所有同行数据
@@ -241,6 +258,9 @@ export class RecordQueryAgent implements RecordOperationAgent {
                 }
             }
         }
+
+        // 物理清列完成后统一结算旧 owner 的成员资格：退出 filtered 视图的 owner 产生 delete 事件。
+        await this.filteredEntityManager.settleMembershipChecks(oldOwnerMembershipChecks, events)
 
         return result
     }

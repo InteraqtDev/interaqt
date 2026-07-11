@@ -755,17 +755,13 @@ describe("BoolExp Complete Test Suite", () => {
       expect(result).toBe(true);
     });
 
-    test("should evaluate complex expression with NOT", () => {
-      // NOT(10 > 5 AND 3 > 5)
-      // Note: Current implementation doesn't propagate inverse through AND/OR
-      // So this will return error because the AND fails (3 > 5 = false)
+    test("should evaluate complex expression with NOT (De Morgan)", () => {
+      // NOT(10 > 5 AND 3 > 5) = NOT(true AND false) = NOT(false) = true.
+      // inverse propagates through AND/OR per De Morgan: NOT(A AND B) ≡ (NOT A) OR (NOT B).
       const expr = BoolExp.atom(10).and(BoolExp.atom(3)).not();
       const result = expr.evaluate((data) => data > 5);
-      
-      // The AND expression returns error (because right side fails)
-      // NOT doesn't convert error to true in current implementation
-      expect(result).not.toBe(true);
-      expect((result as EvaluateError<number>).data).toBe(3);
+
+      expect(result).toBe(true);
     });
 
     test("should track evaluation stack", () => {
@@ -775,6 +771,51 @@ describe("BoolExp Complete Test Suite", () => {
       expect(result).not.toBe(true);
       expect((result as EvaluateError<number>).stack).toBeDefined();
       expect((result as EvaluateError<number>).stack.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("evaluate — NOT propagation through AND/OR (De Morgan, r19 F-1 regression)", () => {
+    // Atom data IS the boolean; handle returns it directly.
+    const handle = (d: boolean) => d;
+    const T = () => BoolExp.atom(true);
+    const F = () => BoolExp.atom(false);
+    const passes = (expr: BoolExp<boolean>) => expr.evaluate(handle) === true;
+
+    test("NOT(A OR B) is fail-closed when either operand holds", () => {
+      // The historic bug: NOT(A OR B) degraded to (A OR B), a permission fail-open.
+      expect(passes(T().or(F()).not())).toBe(false); // NOT(T OR F) = F
+      expect(passes(F().or(T()).not())).toBe(false); // NOT(F OR T) = F
+      expect(passes(T().or(T()).not())).toBe(false); // NOT(T OR T) = F
+      expect(passes(F().or(F()).not())).toBe(true); // NOT(F OR F) = T
+    });
+
+    test("NOT(A AND B) follows De Morgan", () => {
+      expect(passes(T().and(T()).not())).toBe(false); // NOT(T AND T) = F
+      expect(passes(T().and(F()).not())).toBe(true); // NOT(T AND F) = T
+      expect(passes(F().and(F()).not())).toBe(true); // NOT(F AND F) = T
+    });
+
+    test("double negation and nesting", () => {
+      expect(passes(T().not().not())).toBe(true);
+      expect(passes(F().not().not())).toBe(false);
+      // NOT(T OR F) AND T = F AND T = F
+      expect(passes(T().or(F()).not().and(T()))).toBe(false);
+      // T AND NOT(T AND T) = T AND F = F
+      expect(passes(T().and(T().and(T()).not()))).toBe(false);
+      // NOT((A AND B) OR C): NOT((T AND F) OR F) = NOT(F) = T
+      expect(passes(T().and(F()).or(F()).not())).toBe(true);
+      // NOT((A AND B) OR C): NOT((T AND T) OR F) = NOT(T) = F
+      expect(passes(T().and(T()).or(F()).not())).toBe(false);
+    });
+
+    test("async path matches sync path", async () => {
+      const asyncHandle = async (d: boolean) => d;
+      const passesAsync = async (expr: BoolExp<boolean>) => (await expr.evaluateAsync(asyncHandle)) === true;
+      expect(await passesAsync(T().or(F()).not())).toBe(false);
+      expect(await passesAsync(F().or(F()).not())).toBe(true);
+      expect(await passesAsync(T().and(F()).not())).toBe(true);
+      expect(await passesAsync(T().and(T()).not())).toBe(false);
+      expect(await passesAsync(F().not().not())).toBe(false);
     });
   });
 
@@ -890,21 +931,20 @@ describe("BoolExp Complete Test Suite", () => {
       expect(expr.right!.right!.isNot()).toBe(true);
     });
 
-    test("should evaluate NOT with AND - understanding current behavior", () => {
+    test("should evaluate NOT with AND - De Morgan semantics", () => {
       const A = BoolExp.atom(10);
       const B = BoolExp.atom(3);
-      
-      // NOT(A AND B)
+
+      // NOT(A AND B) with A = true (10 > 5), B = false (3 > 5):
+      // NOT(true AND false) = NOT(false) = true.
       const expr1 = A.and(B).not();
       const result1 = expr1.evaluate((data) => data > 5);
-      
-      // For the data (10, 3):
-      // A = true (10 > 5), B = false (3 > 5)
-      // A AND B evaluates left (true), then right (false), returns error
-      // NOT receives error and passes it through
-      // This is current implementation behavior
-      expect(result1).not.toBe(true);
-      expect((result1 as EvaluateError<number>).data).toBe(3);
+      expect(result1).toBe(true);
+
+      // NOT(A AND A') where both hold → NOT(true) = false (reject).
+      const expr2 = A.and(BoolExp.atom(20)).not();
+      const result2 = expr2.evaluate((data) => data > 5);
+      expect(result2).not.toBe(true);
     });
 
     test("should maintain immutability", () => {
