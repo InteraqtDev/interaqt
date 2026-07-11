@@ -1,22 +1,38 @@
 # Changelog
 
-## [3.1.0](https://github.com/interaqtdev/interaqt/compare/v2.0.4...v3.1.0) (2026-07-11)
+## [3.1.0](https://github.com/interaqtdev/interaqt/compare/v3.0.2...v3.1.0) (2026-07-11)
 
-### ⚠ BREAKING CHANGES
+r17 deep review release. Full analysis: `agentspace/output/deep-review-2026-07-11-r17.md` and `agentspace/output/r17-test-blindness-retrospective.md` (PR [#33](https://github.com/InteraqtDev/interaqt/pull/33)).
 
-* **builtins+core:** remove the Attributive concept — Condition is the single guard concept
+### ⚠ Behavior tightening (silently-broken declarations now fail fast)
+
+These declarations/inputs were previously accepted but produced silent data corruption; they now throw with guidance:
+
+* **core:** symmetric relations (source === target with the same property name) now require `type: 'n:n'` — symmetric 1:1/n:1 only ever wrote one readable side (`A.spouse = B` while `B.spouse` stayed empty). Use distinct property names for directed self-references.
+* **core:** `isTargetReliance` now requires `type: '1:1'` or `'1:n'` — with n:1/n:n a shared target was cascade-deleted while other sources still held it.
+* **builtins:** payload `type: 'number'` rejects `NaN`/`±Infinity`; `type: 'object'` (non-collection) rejects arrays.
+* **storage:** merging duplicate `attributeQuery` keys with conflicting `matchExpression`/`modifier` fails fast (previously the filter was silently dropped, returning unfiltered related records).
+* New mutation events (previously incorrectly missing): link `update` events for same-id `&` in-place changes; business-link `delete` events on combined-topology steals. Listeners on these relation events (StateMachine triggers, Transform eventDeps) will now fire where they previously did not.
 
 ### Bug Fixes
 
-* **runtime+storage+builtins+drivers:** r13 review — guard boolean contract, undefined write-through, transform id collision ([60f7ab5](https://github.com/interaqtdev/interaqt/commit/60f7ab5c92288c19f0b55a6e8a4282ca148cc6f3))
-* **runtime+storage+builtins:** r15 deep review — statemachine computeValue contract, migration cross-process resume, ComputationResult envelope guard ([86d1bff](https://github.com/interaqtdev/interaqt/commit/86d1bff6732d5a5996d2a1320fed1852f6df1eae))
-* **runtime+storage+drivers:** resolve all r13 significant-improvement items (I-1..I-10) ([52e57fe](https://github.com/interaqtdev/interaqt/commit/52e57fe9bfad08ca471b406d8f4afc94d7b03dd5))
-* **runtime+storage:** r16 deep review — patch envelope guard, membership create event contract, single-field aggregation, migration chained event-rebuild ([182aa4e](https://github.com/interaqtdev/interaqt/commit/182aa4e5e24ce019e41848a56d13e3bae75c4e1b))
-* **storage+runtime:** r17 fatal fixes — exclusive 1:1 steal unlink, same-id '&' in-place update events, symmetric aggregation full-recompute guard, multi-segment symmetric path expansion ([0118d88](https://github.com/interaqtdev/interaqt/commit/0118d88606b00eaecfb346b0ce5b8575e8dc2311))
+* **storage+runtime:** r17 fatal fixes ([0118d88](https://github.com/interaqtdev/interaqt/commit/0118d88606b00eaecfb346b0ce5b8575e8dc2311))
+  * exclusive 1:1 steal — assigning an already-owned 1:1 target by ref now unlinks the previous owner (create/update/addRelation, merged & isolated topologies; forward/reverse queries no longer contradict)
+  * same-id `&` in-place updates emit link update events (reactive computations over link properties no longer go stale); combined topology no longer lets flashOut overwrite the new values with old row data
+  * symmetric n:n + per-link item-state aggregations fall back to full recompute (both endpoints count correctly; edge deletion no longer crashes with "count became negative")
+  * match paths with multiple consecutive symmetric segments expand ALL segments (cartesian variants) instead of silently returning half results
+* **storage:** first-run catches by the new structural test layers ([6510ea6](https://github.com/interaqtdev/interaqt/commit/6510ea6e), [9d1f1f3](https://github.com/interaqtdev/interaqt/commit/9d1f1f32))
+  * symmetric fan-out no longer mis-attaches `&` link data to a sibling edge of the far endpoint
+  * combined-topology entity delete clears combined-link columns (no more dangling links that were event-deleted but still queryable)
+  * combined-link steal via addRelation no longer crashes on OR-matched unrelated rows and emits the business-link delete event
+  * combined replace-by-ref no longer drops `&` attributes carried on the ref
+* **storage:** symmetric `&` nested endpoint entity attributes (e.g. `friends.&.source.name`) no longer throw raw SQL errors — the JOIN tree now expands direction variants in sync with the SELECT ([ffe0d42](https://github.com/interaqtdev/interaqt/commit/ffe0d428))
 
-### Code Refactoring
+### Tests & docs
 
-* **builtins+core:** remove the Attributive concept — Condition is the single guard concept ([0c43aee](https://github.com/interaqtdev/interaqt/commit/0c43aee95104f467c61fac3eacbc1b172753b5ba))
+* structural test layers: event-completeness oracle (storage + runtime variants), write-path × physical-topology matrix, symmetric × all-six-aggregations matrix (naive-recompute oracle), symmetric path matrix, dimension registry with consolidation policy (`tests/runtime/WritingComputationTests.md`)
+* point regressions strictly covered by the matrices were consolidated (unique assertions migrated first; detection power re-verified by mutation testing: 12 matrix cases turn red against the pre-fix baseline)
+* security docs: `dataPolicy.match` must be paired with `dataPolicy.attributeQuery` (column projection is otherwise caller-controlled)
 
 ## [3.0.2](https://github.com/interaqtdev/interaqt/compare/v3.0.1...v3.0.2) (2026-07-10)
 
