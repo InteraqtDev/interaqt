@@ -576,7 +576,7 @@ describe('StateMachineRunner', () => {
                         base: Message
                     }),
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'string',
                         name: 'newContent'
                     })
                 ]
@@ -959,7 +959,7 @@ describe('StateMachineRunner', () => {
                         base: Project
                     }),
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'string',
                         name: 'role',
                     })
                 ]
@@ -1267,11 +1267,11 @@ describe('StateMachineRunner', () => {
             payload: Payload.create({
                 items: [
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'string',
                         name: 'title',
                     }),
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'string',
                         name: 'description',
                     })
                 ]
@@ -1307,7 +1307,7 @@ describe('StateMachineRunner', () => {
                         base: Task
                     }),
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'string',
                         name: 'newStatus',
                     })
                 ]
@@ -1842,11 +1842,11 @@ describe('StateMachineRunner', () => {
                         base: User
                     }),
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'string',
                         name: 'orderNumber',
                     }),
                     PayloadItem.create({
-                        type: 'Entity',
+                        type: 'number',
                         name: 'totalAmount',
                     })
                 ]
