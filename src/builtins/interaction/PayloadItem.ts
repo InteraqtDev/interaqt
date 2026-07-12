@@ -75,11 +75,32 @@ export class PayloadItem implements PayloadItemInstance {
     }
   };
   
+  // 运行期只有这些 type 值有对应的校验语义：四个 primitive 走 payloadPrimitiveTypeChecks，
+  // 'Entity'/'Relation' 是「base 声明的概念校验」的常规标注。任何其他字符串（'json'、
+  // 'timestamp'、大小写笔误……）此前被静默接受且零校验——用户声明了一个不存在的检查，
+  // 声明形同虚设（silently-broken declaration 家族，与 Property.type 白名单同类）。
+  static allowedTypes = ['string', 'number', 'boolean', 'object', 'Entity', 'Relation'] as const;
+
   static create(args: PayloadItemCreateArgs, options?: { uuid?: string }): PayloadItemInstance {
     // CAUTION isRef 必须携带 base：guard 的存在性校验依赖 base 确定查询哪个 entity/relation。
     //  没有 base 时校验退化成"有 .id 字段就通过"，任何伪造的 {id} 都能穿过 guard。
     if (args.isRef && !args.base) {
       throw new Error(`PayloadItem '${args.name}' has isRef: true but no base. Declare base (the referenced Entity/Relation) so the guard can verify the referenced record exists.`);
+    }
+    if (args.type !== undefined && !PayloadItem.allowedTypes.includes(args.type as typeof PayloadItem.allowedTypes[number])) {
+      throw new Error(
+        `PayloadItem '${args.name}' declares unsupported type "${args.type}". ` +
+        `Runtime validation exists only for: ${PayloadItem.allowedTypes.join(', ')}. ` +
+        `An unknown type is silently unvalidated — declare one of the supported types, or omit type and validate the content with a Condition on the interaction.`
+      );
+    }
+    // type: 'Entity'/'Relation' 表达的是概念校验，没有 base 时整段校验被跳过（声明了一个
+    // 不存在的检查）。要求与 base 成对出现。
+    if ((args.type === 'Entity' || args.type === 'Relation') && !args.base) {
+      throw new Error(
+        `PayloadItem '${args.name}' declares type: '${args.type}' but no base. ` +
+        `Concept validation needs the Entity/Relation instance — declare base, or use a primitive type ('string'/'number'/'boolean'/'object') for plain data.`
+      );
     }
     // base 只能是 Entity/Relation。Attributive 概念已废弃：payload 级校验用 Interaction 的
     //  conditions 表达（条件回调可以读取 payload 并做任意检查）。

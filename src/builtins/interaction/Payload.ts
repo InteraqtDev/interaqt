@@ -36,6 +36,16 @@ export class Payload implements PayloadInstance {
   };
   
   static create(args: PayloadCreateArgs, options?: { uuid?: string }): PayloadInstance {
+    // 同名 item 是矛盾声明：checkPayload 按 name 查找定义并逐定义校验同一个值，
+    //  重复声明中只有一份真正生效（后写的校验以同一 payload 值重复执行），静默保留双份声明
+    //  会让作者以为两份都在工作。声明期 fail-fast（与 Entity/Relation 的重复属性名守卫同族）。
+    const seenNames = new Set<string>();
+    for (const item of args.items || []) {
+      if (seenNames.has(item.name)) {
+        throw new Error(`Payload declares duplicate item name "${item.name}". Each payload item name must be unique.`);
+      }
+      seenNames.add(item.name);
+    }
     const instance = new Payload(args, options);
     
     // 检查 uuid 是否重复
