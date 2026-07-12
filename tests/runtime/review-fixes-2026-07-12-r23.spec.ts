@@ -17,8 +17,8 @@
  */
 import { describe, expect, test } from "vitest";
 import {
-    Controller, Count, Dictionary, Entity, KlassByName, MatchExp,
-    MonoSystem, Property, Relation,
+    Controller, Entity, KlassByName, MatchExp,
+    MonoSystem, Property, Relation, Dictionary,
 } from "interaqt";
 import { PGLiteDB } from "@drivers";
 import type { RecordMutationEvent } from "@runtime";
@@ -159,19 +159,6 @@ describe('r23 I-1 — runInTransaction rollback must not leave phantom events', 
 });
 
 describe('r23 I-2/I-3/I-4 — declaration guards', () => {
-    test('Dictionary rejects defaultValue + computation', () => {
-        const Item = Entity.create({
-            name: 'R23DictItem',
-            properties: [Property.create({ name: 'n', type: 'number' })],
-        });
-        expect(() => Dictionary.create({
-            name: 'bothChannels',
-            type: 'number',
-            defaultValue: () => 42,
-            computation: Count.create({ record: Item }),
-        })).toThrow(/both defaultValue and computation/);
-    });
-
     test('Entity rejects empty inputEntities', () => {
         expect(() => Entity.create({ name: 'EmptyMerged', inputEntities: [] as any }))
             .toThrow(/empty array/);
@@ -184,6 +171,7 @@ describe('r23 I-2/I-3/I-4 — declaration guards', () => {
             .toThrow(/unsupported type "String"/);
         expect(() => Property.create({ name: 'ok', type: 'object' })).not.toThrow();
         expect(() => Property.create({ name: 'okJson', type: 'json' })).not.toThrow();
+        expect(() => Property.create({ name: 'okId', type: 'id' })).not.toThrow();
     });
 
     test('Dictionary rejects unknown type strings', () => {

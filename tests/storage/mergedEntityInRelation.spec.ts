@@ -399,11 +399,9 @@ describe('merged entity in relation test', () => {
         }
     });
 
-    test('merged entity with empty inputEntities and commonProperties - should handle attributeQuery', async () => {
-        // 测试场景：merged entity 没有指定任何 input entity (inputEntities 为空)，
-        // 只指定了 commonProperties，通过 relation 查询并指定 attributeQuery 应该不报错
-        
-        // 1. 创建一个普通 entity
+    test('merged entity with empty inputEntities is rejected at declaration time (r23)', () => {
+        // 空 inputEntities 此前会进入 merged 编译路径并产出零成员联合体；
+        // r23 与 Relation.inputRelations 对齐，在 Entity.create 期 fail-fast。
         const orderEntity = Entity.create({
             name: 'Order',
             properties: [
@@ -412,65 +410,17 @@ describe('merged entity in relation test', () => {
             ]
         });
 
-        // 2. 创建 merged entity：inputEntities 为空数组，但定义了 commonProperties
-        const contactEntity = Entity.create({
+        expect(() => Entity.create({
             name: 'Contact',
-            inputEntities: [], // 空数组
+            inputEntities: [],
             commonProperties: [
                 Property.create({ name: 'name', type: 'string' }),
                 Property.create({ name: 'email', type: 'string' })
             ]
-        });
+        })).toThrow(/empty array/);
 
-        // 3. 创建 relation (使用 merged entity 作为 target)
-        const orderContactRelation = Relation.create({
-            name: 'OrderContactRelation',
-            source: orderEntity,
-            sourceProperty: 'contact',
-            target: contactEntity,
-            targetProperty: 'orders',
-            type: 'n:1'
-        });
-
-        const entities = [orderEntity, contactEntity];
-        const relations = [orderContactRelation];
-
-        const db = new PGLiteDB(undefined, {logger});
-        await db.open();
-
-        try {
-            const setup = new DBSetup(entities, relations, db);
-            await setup.createTables();
-            const entityQueryHandle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
-
-            // 4. 创建一个 Order（没有关联 contact）
-            const order1 = await entityQueryHandle.create('Order', {
-                orderNumber: 'ORD-001',
-                amount: 100
-            });
-
-            // 5. 通过 relation 查询并指定 attributeQuery 查询 common properties
-            // 这个查询应该会触发 bug
-            const orderWithContact = await entityQueryHandle.findOne('Order',
-                MatchExp.atom({ key: 'id', value: ['=', order1.id] }),
-                undefined,
-                [
-                    'id', 
-                    'orderNumber', 
-                    ['contact', { attributeQuery: ['id', 'name', 'email'] }]
-                ]
-            );
-
-            // 验证查询结果
-            expect(orderWithContact).toBeTruthy();
-            expect(orderWithContact!.id).toBe(order1.id);
-            expect(orderWithContact!.orderNumber).toBe('ORD-001');
-            // contact 应该为 null 或空（因为没有关联任何 contact）
-            expect(orderWithContact!.contact).toBeFalsy();
-
-        } finally {
-            await db.close();
-        }
+        // orderEntity 仅用于保持本文件其它 fixture 风格；避免未使用告警。
+        expect(orderEntity.name).toBe('Order');
     });
 });
 

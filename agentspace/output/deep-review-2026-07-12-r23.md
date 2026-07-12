@@ -5,7 +5,7 @@
 - 基线健康度:`npm run check` 通过;`npm test` 全量通过(含 r22 回归)
 - 范围:五路并行深度探查(runtime 调度与计算句柄 / storage 写路径与 Setup / storage 查询编译 / core+builtins)+ 对全部致命候选**亲自编写最小复现实际运行定谳**(PGLiteDB)
 - 方法:与 r1–r22 全部报告逐条去重;每个候选先做代码路径二次追踪,再以运行时复现定谳(本轮多项高置信候选被代码追踪或复现证伪,见第四节)。「已复现确认」才列为致命/重要。
-- 修复状态:**一个致命项 + 五个重要项已在本分支(`cursor/deep-code-review-r23-35c9`)全部修复**,回归固化于 `tests/runtime/review-fixes-2026-07-12-r23.spec.ts`(9 用例)。修复后 `npm run check` 通过,`npm test` 全量通过(含新增回归)。
+- 修复状态:**一个致命项 + 四个重要项已在本分支(`cursor/deep-code-review-r23-35c9`)全部修复**,回归固化于 `tests/runtime/review-fixes-2026-07-12-r23.spec.ts`(8 用例)。修复后 `npm run check` 通过,`npm test` 全量 **1977 passed / 26 skipped**。
 
 ---
 
@@ -19,7 +19,7 @@ r22 之后,filtered 端点事件与事务重试幻影事件等高危面进一步
 | 级别 | 数量 | 主题 |
 |------|------|------|
 | 致命(已复现,已修复) | 1 | 双同 target 1:1 isTargetReliance 合表假成功 → INSERT 列重复 |
-| 重要(已复现/代码确认,已修复) | 5 | in-txn 回滚幻影事件、Dictionary defaultValue∥computation、Entity.inputEntities:[ ]、Property/Dictionary type 白名单、Entity.clone 忽略 deep |
+| 重要(已复现/代码确认,已修复) | 4 | in-txn 回滚幻影事件、Entity.inputEntities:[ ]、Property/Dictionary type 白名单、Entity.clone 忽略 deep |
 | 重要(记录,本轮不修) | 若干 | 见第三节 |
 | 证伪/降级 | 若干 | 见第四节 |
 
@@ -58,10 +58,9 @@ storage.create('User', {
 ### 已修复(本轮)
 
 - **I-1 runInTransaction 回滚幻影事件**:r22 F-2 修复了事务外 `withAtomicTransaction` 重试路径的 attempt 隔离;事务内 `callWithEvents` 仍直接 `events.push` 于 COMMIT 之前。`runInTransaction` abort → DB 回滚、调用方数组不回滚。修复:`StorageTransactionContext.eventArrayBaselines` 在首次 push 前记录数组基线长度,最外层 rollback 时 `events.length = baseline`。回归 2 用例(空基线 abort + 事务外 seed 后部分批次 abort)。
-- **I-2 Dictionary `defaultValue` ∥ `computation`**:Property 已有对称守卫(两通道竞争写);Dictionary 此前静默接受。修复:声明期 fail-fast(`both defaultValue and computation`)。回归 1 用例。
-- **I-3 `Entity.inputEntities: []`**:Relation 已拒空 `inputRelations`;Entity 空数组合并体是静默损坏声明(无输入、无属性的空壳)。修复:与 Relation 同规则——空数组 fail-fast。回归 1 用例。
-- **I-4 Property/Dictionary `type` 白名单**:允许 `string|number|boolean|timestamp|object|json`;未知串(含 `String`/`Number` 构造器名)此前静默落到非法 SQL 类型。修复:声明期白名单校验。顺带修正 `tests/storage/data/common.ts` 中 `String`/`Number` 写法。回归 2 用例。
-- **I-5 `Entity.clone` 忽略 `deep`**:`MergedItemProcessor` 调用 `clone(e, true)` 期望深拷贝 Property 实例;Entity.clone 此前忽略第二参,与 `Relation.clone` 不对齐 → 声明图共享 Property 引用。修复:深拷贝时 clone properties 数组与各 Property 实例。回归 1 用例。
+- **I-2 `Entity.inputEntities: []`**:Relation 已拒空 `inputRelations`;Entity 空数组合并体是静默损坏声明(无输入的空壳,仍进 merged 编译路径)。修复:与 Relation 同规则——空数组 fail-fast。回归 1 用例(+ `mergedEntityInRelation.spec.ts` 原「空 inputEntities 应可查询」用例改为断言拒绝)。
+- **I-3 Property/Dictionary `type` 白名单**:允许 `string|number|boolean|timestamp|object|id|json`;未知串(含 `String`/`Number`/`array`/`float`/`strng`)此前静默落到非法 SQL 类型。修复:声明期白名单校验。顺带修正 `tests/storage/data/common.ts` 的 `String`/`Number`、`defaultValue.spec.ts` 的 `array`/`float`。回归 2 用例。
+- **I-4 `Entity.clone` 忽略 `deep`**:`MergedItemProcessor` 调用 `clone(e, true)` 期望深拷贝 Property 实例;Entity.clone 此前忽略第二参,与 `Relation.clone` 不对齐 → 声明图共享 Property 引用。修复:深拷贝时 clone properties 数组与各 Property 实例。回归 1 用例。
 
 ### 记录,本轮不修(按影响排序,均有代码证据;含 r22 §三 仍成立项 + 本轮新见)
 
@@ -87,8 +86,8 @@ storage.create('User', {
 | 候选 | 结论 |
 |------|------|
 | 「双**不同类型** reliance(Profile+Address)删除快照 `child.find(recordName)` 碰撞 → 第二份视图 delete 丢失」(storage 探查候选,初判高置信) | 复现证伪:两份视图 delete 均正确发出;不同 `recordName` 下 `find` 各找各的。原候选把「同类型双 reliance」与「不同类型双 reliance」混为一谈——同类型案是 setup 合表假成功(F-1),不是快照查找 bug |
+| 「Dictionary `defaultValue` ∥ `computation` 是静默竞争写通道」(core 探查候选) | **降级/证伪为产品契约**:大量既有测试与 `getInitialValue` 路径刻意并用两者(dict seed + computation 初值);Property 侧拒绝的是 `computed`∥`computation` 与 Scheduler 对 **property** `defaultValue`∥`computation` 的 assert,不能机械搬到 Dictionary。本轮初修后全量红,已撤回该守卫 |
 | 「UPDATE 前置查询裁剪 oldRecord × 顶层 plain match → 错误 skip」(r22 已证伪) | 本轮再次核对:值属性不被裁剪,维持证伪 |
-| 其他低置信「事件/匹配」候选 | 代码追踪或既有 r21/r22 契约覆盖,不立项 |
 
 ---
 
@@ -109,29 +108,28 @@ storage.create('User', {
 
 ## 六、修复优先级与后续建议
 
-本轮一个致命项 + 五个重要项已全部修复。后续轮次建议:
+本轮一个致命项 + 四个重要项已全部修复。后续轮次建议:
 
 1. **atomic / record-target 布尔归一化**(第三节 #1)——与 `QueryExecutor` 对齐,单点修复面,r22 建议 2 的延续。
 2. **settlePostWriteChecks × 写失败 drain**(第三节 #2)——与 r22 F-2 / r23 I-1 同族收口到「提交边界」清单。
 3. **filtered targetPath 事件名改写 + 同批去重**(第三节 #3,多轮复确)。
 4. **`canonicalizeArgsForSignature` 剔除 undefined / 规范化 NaN**(第三节 #4)。
-5. **createClass 统一声明期校验**(r16 建议 4,六轮复确)——本轮 Dictionary/Entity/Property type 又添手写守卫,积压持续增长。
+5. **createClass 统一声明期校验**(r16 建议 4,六轮复确)——本轮 Entity/Property type 又添手写守卫,积压持续增长。
 
 ### 升级注意(behavior-tightening,供 CHANGELOG 参考)
 
-- **新增声明期/setup 期 fail-fast**:同一 source 上多条 1:1 `isTargetReliance` 指向同一 target 实体类型(此前 setup 成功、create 时报 SQL 列重复);Dictionary 同时声明 `defaultValue` 与 `computation`;`Entity.inputEntities: []`;Property/Dictionary `type` 不在白名单。
+- **新增声明期/setup 期 fail-fast**:同一 source 上多条 1:1 `isTargetReliance` 指向同一 target 实体类型(此前 setup 成功、create 时报 SQL 列重复);`Entity.inputEntities: []`;Property/Dictionary `type` 不在白名单(`string|number|boolean|timestamp|object|id|json`)。
 - **行为修正(无 API 变化)**:`runInTransaction` 回滚后调用方 `events` 数组截断回事务前基线(此前残留幻影);`Entity.clone(entity, true)` 深拷贝 Property 实例(此前忽略 deep)。
-- **合法对照组不变**:单条 1:1 isTargetReliance 合表与 create/delete 语义不变;同 source 指向**不同** target 类型的多条 reliance 仍合法。
+- **合法对照组不变**:单条 1:1 isTargetReliance 合表与 create/delete 语义不变;同 source 指向**不同** target 类型的多条 reliance 仍合法;Dictionary 同时声明 `defaultValue` 与 `computation` 仍合法(见第四节证伪)。
 
 ---
 
 ## 附录:复现要点(验证用)
 
-全部固化在 `tests/runtime/review-fixes-2026-07-12-r23.spec.ts`(9 用例):
+全部固化在 `tests/runtime/review-fixes-2026-07-12-r23.spec.ts`(8 用例):
 
 - F-1:User→Profile 双 1:1 isTargetReliance 在 setup 期被拒绝(报错含 combine / Profile);单条 reliance setup + 嵌套 create 仍成功。
 - I-1:`runInTransaction` 内 create 后 throw → DB 0 行且 `events.length === 0`;事务外 seed 后再 abort → 数组回到 seed 基线、DB 仅 seed 行。
-- I-2:Dictionary 同时给 defaultValue + computation → 声明期拒绝。
-- I-3:Entity `inputEntities: []` → 声明期拒绝。
-- I-4:Property/Dictionary `type: 'strng'` / `'String'` → 拒绝;`object`/`json` 放行。
-- I-5:Entity.clone(original, true) 不共享 Property 实例;改 clone 的 name 不泄漏到原声明。
+- I-2:Entity `inputEntities: []` → 声明期拒绝。
+- I-3:Property/Dictionary `type: 'strng'` / `'String'` → 拒绝;`object`/`json`/`id` 放行。
+- I-4:Entity.clone(original, true) 不共享 Property 实例;改 clone 的 name 不泄漏到原声明。

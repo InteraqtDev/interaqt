@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { PropertyTypes, ALLOWED_PROPERTY_TYPES } from './RealDictionary.js';
+import { ALLOWED_PROPERTY_TYPES } from './RealDictionary.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { ComputationInstance } from './types.js';
 

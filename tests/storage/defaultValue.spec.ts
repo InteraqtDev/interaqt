@@ -190,7 +190,7 @@ describe('Default Value - Program Control', () => {
                 }),
                 Property.create({ 
                     name: 'tags', 
-                    type: 'array',
+                    type: 'string',
                     collection: true,
                     defaultValue: () => ['untagged']
                 })
@@ -251,7 +251,7 @@ describe('Default Value - Program Control', () => {
             properties: [
                 Property.create({ 
                     name: 'royaltyRate', 
-                    type: 'float',
+                    type: 'number',
                     defaultValue: () => 0.1
                 })
             ]
