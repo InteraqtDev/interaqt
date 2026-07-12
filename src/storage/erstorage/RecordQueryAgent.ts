@@ -167,6 +167,18 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     source: { id: recordWithCombined.source?.id },
                     target: { id: recordWithCombined.target?.id },
                 }
+                // 旧业务 link 消失 ⇒ 两端实体在依赖该关系的 filtered entity 中的成员资格必须重算
+                // （与 deleteRecord 对 link 删除的处理同构，r21 F-2）：此前 addLink 抢夺形态下
+                //  旧 owner 只在 create/update 抢夺（业务属性 ref）分支被覆盖，link 形态的抢夺
+                //  （combinedRecordIdRefs 是虚拟端点 ref）绕过了下方 L191 的守卫——旧 owner 退出
+                //  视图零 delete 事件，下游计算永久陈旧。快照必须在物理清列之前采集；
+                //  被抢夺端点此刻处于行迁移中，settle 时查不到行会安全跳过（由 createRecord 级
+                //  的 collectCreationLinkChecks 在写入完成后覆盖）。
+                oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
+                    newEntityData.recordName,
+                    { sourceIds: [recordWithCombined.source?.id], targetIds: [recordWithCombined.target?.id] },
+                    events
+                ))
                 // 视图（filtered relation）成员资格必须在物理清列之前求值（谓词只由 SQL 求值）。
                 const oldBusinessLinkViewSnapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(newEntityData.recordName, [oldBusinessLinkRecord], events)
                 events?.push({
@@ -211,10 +223,22 @@ export class RecordQueryAgent implements RecordOperationAgent {
                         const stolenRecordInfoBeforeClear = this.map.getRecordInfo(combinedRecordIdRef.recordName)
                         for (const mergedAttrInfo of stolenRecordInfoBeforeClear.mergedRecordAttributes) {
                             if (mergedAttrInfo.linkName !== newEntityData.recordName) continue
-                            const oldLink = stolenDataBeforeClear[mergedAttrInfo.attributeName]?.[LINK_SYMBOL]
+                            const oldRelatedBeforeClear = stolenDataBeforeClear[mergedAttrInfo.attributeName]
+                            const oldLink = oldRelatedBeforeClear?.[LINK_SYMBOL]
                             if (!oldLink?.id) continue
                             const snapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(mergedAttrInfo.linkName, [oldLink], events)
                             if (snapshot) oldMergedLinkViewSnapshots.set(mergedAttrInfo.attributeName, snapshot)
+                            // 被替换的旧 merged link 消失 ⇒ 两端实体的成员资格快照（同 r21 F-2，
+                            //  与上方旧业务 link 的处理同构；须在物理清列之前采集）。
+                            const stolenIsSourceBeforeClear = !this.map.getLinkInfoByName(newEntityData.recordName)
+                                .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
+                            oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
+                                mergedAttrInfo.linkName,
+                                stolenIsSourceBeforeClear
+                                    ? { sourceIds: [stolenDataBeforeClear.id], targetIds: [oldRelatedBeforeClear.id] }
+                                    : { sourceIds: [oldRelatedBeforeClear.id], targetIds: [stolenDataBeforeClear.id] },
+                                events
+                            ))
                         }
                     }
 
@@ -223,7 +247,11 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
 
                     //2. 如果是抢夺，要记录一下事件。
-                    if (recordWithCombined.id) {
+                    // CAUTION 只对业务关系端点（非虚拟 link 的 source/target）发 delete 事件：
+                    //  正在创建的是 link record 时，ref 的 linkName 是虚拟 link（`<relation>_source/_target`）——
+                    //  storage 从不以虚拟 link 名发事件（r18 死监听不变量的对偶面），旧业务 link 的
+                    //  delete 事件已由上方 newRecordIsLink 分支按业务名发出。
+                    if (recordWithCombined.id && !combinedRecordIdRef.info!.isLinkSourceRelation()) {
                         events?.push({
                             type: 'delete',
                             recordName: combinedRecordIdRef.info!.linkName!,

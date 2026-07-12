@@ -427,6 +427,15 @@ export class MatchExp {
             if (!Array.isArray(value[1]) || value[1].length !== 2) {
                 throw new Error(`match operator 'between' requires a two-element array value [min, max], got: ${JSON.stringify(value[1])} for key "${key}"`)
             }
+            // CAUTION SQL 里 `col BETWEEN NULL AND x`（任一边界为 NULL）恒为 UNKNOWN——静默匹配零行。
+            //  与 =/!=/in/not in 的 null 治理一致（fail-fast / 显式拆分），null/undefined 边界是
+            //  矛盾声明：单边界区间请用 ['>=', min] / ['<=', max] 显式表达（explicit control）。
+            if (!isReferenceValue && (value[1][0] === null || value[1][0] === undefined || value[1][1] === null || value[1][1] === undefined)) {
+                throw new Error(
+                    `match operator 'between' does not support null/undefined bounds (got: ${JSON.stringify(value[1])} for key "${key}"). ` +
+                    `SQL evaluates BETWEEN with a NULL bound as UNKNOWN and silently matches no rows. Use ['>=', min] or ['<=', max] for a single-bounded range.`
+                )
+            }
             if (isReferenceValue) {
                 // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL
                 const ref1 = this.getReferenceFieldValue(value[1][0])
