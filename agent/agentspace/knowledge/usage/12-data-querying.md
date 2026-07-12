@@ -124,6 +124,9 @@ const betweenMatch = MatchExp.atom({
   key: 'createdAt', 
   value: ['between', ['2023-01-01', '2023-12-31']] 
 });
+// Both bounds must be non-null. A null/undefined bound is rejected at compile time
+// (SQL would evaluate `BETWEEN NULL AND x` as UNKNOWN and silently match no rows);
+// use ['>=', min] or ['<=', max] for single-bounded ranges.
 
 // IN query
 const inMatch = MatchExp.atom({ 
@@ -203,6 +206,11 @@ const usersWithTags = await system.storage.find(
   {},
   ['id', 'username', ['tags', { attributeQuery: ['name', 'category'] }]]
 );
+// NOTE: the top-level match filters which PARENT rows are returned; the nested
+// attributeQuery is a preload and returns ALL related records of each matched
+// parent (here: every tag of every premium-tagged user, not just the premium tag).
+// To filter the preloaded children too, declare a nested matchExpression on the
+// attributeQuery item (see 11.5.1).
 ```
 
 ### 11.2.4 Nested Conditions

@@ -27,13 +27,19 @@ const CreatePost = Interaction.create({
 ```javascript
 PayloadItem.create({
   name: 'itemName',           // Parameter name (required)
-  type: 'string',             // Primitive type check (optional)
+  type: 'string',             // Runtime type check (optional)
   base: Entity,               // Reference to Entity/Relation (optional)
   isRef: true,                // Whether it's a reference with id (default: false)
   required: true,             // Whether this parameter is required (default: false)
   isCollection: true          // Whether it's an array (default: false)
 })
 ```
+
+`type` accepts exactly: `'string' | 'number' | 'boolean' | 'object'` (primitive
+checks) or `'Entity' | 'Relation'` (conventional markers for concept validation —
+these require `base`). Any other string is rejected at declaration time: an unknown
+type has no runtime validation attached, so accepting it would silently skip all
+checks for that field. Item names must be unique within one `Payload`.
 
 To validate payload **contents** (e.g. "only published posts can be shared"), write the check as a `Condition` on the Interaction — see [Payload Validation with Conditions](#payload-validation-with-conditions) below.
 
