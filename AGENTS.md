@@ -205,6 +205,7 @@ Core types use: interface → CreateArgs → `Entity.create(args)` → static re
 - Every Interaction and every computed property should have tests
 - Always specify **attributeQuery** in `storage.find` / `findOne` (use `['*']` for all fields)
 - Use **PGLiteDB** for tests when possible
+- **Real-PostgreSQL suites are mandatory**: `tests/runtime/postgresql*.spec.ts` require a live PostgreSQL server and silently **skip** without `INTERAQT_POSTGRES_DATABASE` — a plain `npm test` run does NOT cover them. PGLite is not a substitute (different id allocation, connection model, and concurrency semantics; the r24 fatal `getAutoId` id-type split lived only on real PG). Run them before considering driver/storage/migration/concurrency changes verified — see "Build and test commands" for setup
 - File naming: `*.spec.ts`
 - Do not manually set entity IDs — let the framework generate them
 - Always `await controller.setup(true)` before dispatching
@@ -322,13 +323,43 @@ expect(user.followerCount).toBe(expectedCount);
 
 ```bash
 npm install
-npm test                    # all tests
+npm test                    # all tests (PGLite/SQLite; postgresql* suites SKIP without env)
 npm run test:runtime        # runtime layer
 npm run test:storage        # storage layer
 npm run test:core           # core layer
 npm run check               # tsc --noEmit
 npm run build               # vite library build → dist/
 ```
+
+### Real-PostgreSQL test suites (required)
+
+`tests/runtime/postgresql*.spec.ts` (concurrency, migration, scoped sequence, data
+constraints, lock semantics, id consistency) only run against a real PostgreSQL
+server. They are gated on `INTERAQT_POSTGRES_DATABASE` and skip silently when it
+is unset, so always run them explicitly when touching drivers, storage write
+paths, migration, transactions, or locking:
+
+```bash
+# one-time setup (Ubuntu; any PostgreSQL >= 14 works)
+sudo apt-get update && sudo apt-get install -y postgresql
+sudo pg_ctlcluster 16 main start
+sudo -u postgres psql -c "CREATE USER interaqt WITH PASSWORD 'interaqt' SUPERUSER;"
+sudo -u postgres psql -c "CREATE DATABASE interaqt OWNER interaqt;"       # default landing DB for the admin connection
+sudo -u postgres psql -c "CREATE DATABASE interaqt_test OWNER interaqt;"
+
+# run all real-PG suites
+INTERAQT_POSTGRES_DATABASE=interaqt_test PGHOST=127.0.0.1 PGUSER=interaqt PGPASSWORD=interaqt \
+  npx vitest run tests/runtime/postgresqlConcurrency.spec.ts \
+                 tests/runtime/postgresqlMigration.spec.ts \
+                 tests/runtime/postgresqlScopedSequence.spec.ts \
+                 tests/runtime/postgresqlDataConstraints.spec.ts \
+                 tests/runtime/postgresqlLockRecord.spec.ts \
+                 tests/runtime/postgresqlIdConsistency.spec.ts
+```
+
+Each spec derives its own exclusive database name from `INTERAQT_POSTGRES_DATABASE`
+(suffixes like `_concurrency`) because `setup(true)` drops and recreates the
+database with FORCE — never point it at a database you care about.
 
 ## Guidelines and pitfalls
 

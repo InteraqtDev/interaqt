@@ -65,6 +65,12 @@ function JSONParse(value: string) {
 type StorageTransactionContext = {
     depth: number
     isolation: TransactionIsolation
+    /**
+     * r23 I-1：事务内 callWithEvents 会把事件 push 进调用方数组（COMMIT 之前）。
+     * 外层事务回滚时 DB 撤销，数组不撤销 → 幻影事件。记录每个被写入数组的基线长度，
+     * 最外层回滚时截断回基线（与 r22 F-2 的「attempt 隔离」同族，覆盖 in-txn / 非重试路径）。
+     */
+    eventArrayBaselines?: Map<RecordMutationEvent[], number>
 }
 
 class MonoStorage implements Storage{
@@ -177,11 +183,24 @@ class MonoStorage implements Storage{
             }
         }
 
-        const context: StorageTransactionContext = { depth: 1, isolation }
+        const context: StorageTransactionContext = { depth: 1, isolation, eventArrayBaselines: new Map() }
         const run = async () => this.transactionContext.run(context, fn)
+        const rollbackCallerEvents = () => {
+            const baselines = context.eventArrayBaselines
+            if (!baselines?.size) return
+            for (const [events, baseline] of baselines) {
+                events.length = baseline
+            }
+            baselines.clear()
+        }
         const startTransaction = async (): Promise<T> => {
             if (this.db.runInTransaction) {
-                return this.db.runInTransaction({ name: options.name, isolation }, run)
+                try {
+                    return await this.db.runInTransaction({ name: options.name, isolation }, run)
+                } catch (error) {
+                    rollbackCallerEvents()
+                    throw error
+                }
             }
 
             await this.db.scheme('BEGIN', options.name)
@@ -191,6 +210,7 @@ class MonoStorage implements Storage{
                 return result
             } catch (error) {
                 await this.db.scheme('ROLLBACK', options.name)
+                rollbackCallerEvents()
                 throw error
             }
         }
@@ -764,7 +784,26 @@ class MonoStorage implements Storage{
         const resolvedRecordName = inputRecordInfo.resolvedBaseRecordName || target.recordName
         const recordInfo = map.getRecordInfo(resolvedRecordName)
         const [, fieldName, tableName] = map.getTableAliasAndFieldName([resolvedRecordName], target.field, true)
-        return { tableName, idField: recordInfo.idField, fieldName }
+        // r24：记录 valueType，读路径归一化（boolean 0/1、JSON 文本）与 QueryExecutor.structureRawReturns 对齐。
+        const attrData = map.getAttributeData(resolvedRecordName, target.field) as { type?: string, collection?: boolean } | undefined
+        const valueType = attrData
+            ? ((attrData.collection || attrData.type === 'object' || attrData.type === 'json') ? 'json' : attrData.type)
+            : undefined
+        return { tableName, idField: recordInfo.idField, fieldName, valueType }
+    }
+
+    /**
+     * record-target atomic 读值归一化（r24）：与 QueryExecutor.structureRawReturns 同一契约。
+     * SQLite/MySQL 的 boolean 列以 0/1 存储、JSON 列返回原始文本；PG/PGLite 原生类型无需处理。
+     * 此前 atomic.get/replace 原样返回驱动值——同一字段 find 返回 true、atomic 返回 1 的跨路径类型分裂。
+     */
+    private parseRecordFieldValue<T>(value: unknown, valueType: string | undefined): T | null {
+        if (value === undefined || value === null) return null
+        if (valueType === 'boolean' && typeof value === 'number') return (value !== 0) as T
+        if (valueType === 'json' && typeof value === 'string' && this.db.returnsParsedJSON !== true) {
+            return JSON.parse(value) as T
+        }
+        return value as T
     }
 
     private resolveRecordTable(recordName: string) {
@@ -773,6 +812,43 @@ class MonoStorage implements Storage{
         const resolvedRecordName = inputRecordInfo.resolvedBaseRecordName || recordName
         const recordInfo = map.getRecordInfo(resolvedRecordName)
         return { tableName: recordInfo.table, idField: recordInfo.idField, resolvedRecordName }
+    }
+
+    /**
+     * 收集 lockRecord 结果快照里已加载的全部关联行（r24）：递归遍历关联记录（x:1 对象 /
+     * x:n 数组），解析各自的物理表与 idField。lockKey = `record\0id` 用于跨轮次去重。
+     * 同物理行的合表记录（combined/reliance）重复加锁是无害 no-op（同事务重入）。
+     */
+    private collectLoadedRelatedRows(recordName: string, record: Record<string, unknown>): Array<{ tableName: string, idField: string, id: unknown, lockKey: string }> {
+        const map = this.queryHandle!.map
+        const rows: Array<{ tableName: string, idField: string, id: unknown, lockKey: string }> = []
+        const seen = new Set<string>()
+        const rootLockKey = `${this.resolveRecordTable(recordName).resolvedRecordName}\0${String(record.id)}`
+        const walk = (currentRecordName: string, current: Record<string, unknown>) => {
+            const resolvedName = map.getRecordInfo(currentRecordName).resolvedBaseRecordName || currentRecordName
+            for (const [key, value] of Object.entries(current)) {
+                if (value === null || typeof value !== 'object') continue
+                const attrData = map.getAttributeData(resolvedName, key) as { isRecord?: boolean, recordName?: string } | undefined
+                if (!attrData?.isRecord || !attrData.recordName) continue
+                const relatedName = attrData.recordName
+                const relatedItems = (Array.isArray(value) ? value : [value]) as Array<Record<string, unknown>>
+                for (const item of relatedItems) {
+                    if (!item || item.id === undefined || item.id === null) continue
+                    const { tableName, idField, resolvedRecordName } = this.resolveRecordTable(relatedName)
+                    const lockKey = `${resolvedRecordName}\0${String(item.id)}`
+                    if (!seen.has(lockKey)) {
+                        seen.add(lockKey)
+                        // root 行本身已被 FOR UPDATE 锁住，跳过（环回到 root 的情形）。
+                        if (lockKey !== rootLockKey && idField) {
+                            rows.push({ tableName, idField, id: item.id, lockKey })
+                        }
+                        walk(relatedName, item)
+                    }
+                }
+            }
+        }
+        walk(recordName, record)
+        return rows
     }
 
     private resolveGlobalColumn(target: AtomicGlobalTarget, value?: unknown) {
@@ -793,6 +869,8 @@ class MonoStorage implements Storage{
     private parseGlobalValue<T>(value: unknown, column: string): T | null {
         if (value === undefined || value === null) return null
         if (column === 'numberValue') return Number(value) as T
+        // r24：SQLite/MySQL 的 BOOLEAN 列以 0/1 数字返回，与 find 路径（structureRawReturns）对齐归一化。
+        if (column === 'booleanValue' && typeof value === 'number') return (value !== 0) as T
         if (column === 'jsonValue' && typeof value === 'string') return JSON.parse(value) as T
         return value as T
     }
@@ -833,13 +911,13 @@ class MonoStorage implements Storage{
             get: async <T>(target: AtomicTarget): Promise<T | null> => {
                 const p = this.getPlaceholder()
                 if (this.isRecordTarget(target)) {
-                    const { tableName, idField, fieldName } = this.resolveRecordTarget(target)
+                    const { tableName, idField, fieldName, valueType } = this.resolveRecordTarget(target)
                     const rows = await this.db.query<Record<string, unknown>>(
                         `SELECT "${fieldName}" AS value FROM "${tableName}" WHERE "${idField}" = ${p()}`,
                         [target.id],
                         `atomic get ${target.recordName}.${target.field}`
                     )
-                    return (rows[0]?.value ?? null) as T | null
+                    return this.parseRecordFieldValue<T>(rows[0]?.value, valueType)
                 }
 
                 const column = this.resolveGlobalColumn(target)
@@ -882,7 +960,7 @@ RETURNING "numberValue" AS value`,
                 async () => {
                 const p = this.getPlaceholder()
                 if (this.isRecordTarget(target)) {
-                    const { tableName, idField, fieldName } = this.resolveRecordTarget(target)
+                    const { tableName, idField, fieldName, valueType } = this.resolveRecordTarget(target)
                     const lockIdPlaceholder = p()
                     const oldRows = await this.db.query<Record<string, unknown>>(
                         `SELECT "${fieldName}" AS value FROM "${tableName}" WHERE "${idField}" = ${lockIdPlaceholder}${this.supportsForUpdate() ? ' FOR UPDATE' : ''}`,
@@ -898,7 +976,10 @@ RETURNING "numberValue" AS value`,
                         [value, target.id],
                         `atomic replace ${target.recordName}.${target.field}`
                     )
-                    return { oldValue: (oldRows[0].value ?? null) as T | null, newValue: (newRows[0]?.value ?? value) as T }
+                    return {
+                        oldValue: this.parseRecordFieldValue<T>(oldRows[0].value, valueType),
+                        newValue: (this.parseRecordFieldValue<T>(newRows[0]?.value, valueType) ?? value) as T
+                    }
                 }
 
                 const column = this.resolveGlobalColumn(target, value)
@@ -1081,7 +1162,43 @@ RETURNING "lastValue" AS value`,
                     `atomic lockRecord ${recordName}`
                 )
                 if (!rows.length) return undefined
-                return this.queryHandle!.findOne(recordName, MatchExp.atom({ key: 'id', value: ['=', id] }), undefined, attributeQuery)
+                const readRecord = () => this.queryHandle!.findOne(recordName, MatchExp.atom({ key: 'id', value: ['=', id] }), undefined, attributeQuery)
+                // CAUTION（r24）此前只锁 root 行：attributeQuery 里的关联记录经 LEFT JOIN 读出但
+                //  不加锁——并发事务改写关联行不会被阻塞，调用方（Transform update 等）基于快照
+                //  的派生写入建立在已漂移的关联数据上（READ COMMITTED 下的 lost-update 形态）。
+                //  修复：锁 root 后按返回快照收集全部已加载的关联行，逐表加锁并重读，直到关联行集
+                //  稳定（与 lockRows 的有界稳定化同构）。锁序 = root 先、关联按 (table, id) 排序，
+                //  跨事务顺序一致以降低死锁概率；真死锁由驱动报 40P01，dispatch 的重试机制接管。
+                //  单连接驱动（无 FOR UPDATE 能力）事务本就串行，跳过图锁。
+                let record = await readRecord()
+                if (!record || !this.supportsForUpdate()) return record ?? undefined
+                const MAX_STABILIZE_ROUNDS = 5
+                const locked = new Set<string>()
+                for (let round = 0; round < MAX_STABILIZE_ROUNDS; round++) {
+                    const relatedRows = this.collectLoadedRelatedRows(recordName, record)
+                        .filter(row => !locked.has(row.lockKey))
+                    if (!relatedRows.length) return record
+                    const byTable = new Map<string, { idField: string, ids: unknown[] }>()
+                    for (const row of relatedRows.sort((a, b) => a.lockKey < b.lockKey ? -1 : 1)) {
+                        let group = byTable.get(row.tableName)
+                        if (!group) byTable.set(row.tableName, group = { idField: row.idField, ids: [] })
+                        group.ids.push(row.id)
+                        locked.add(row.lockKey)
+                    }
+                    for (const [relatedTable, group] of byTable) {
+                        const lockP = this.getPlaceholder()
+                        const placeholders = group.ids.map(() => lockP()).join(',')
+                        await this.db.query(
+                            `SELECT "${group.idField}" AS id FROM "${relatedTable}" WHERE "${group.idField}" IN (${placeholders}) FOR UPDATE`,
+                            group.ids,
+                            `atomic lockRecord ${recordName} related ${relatedTable} (round ${round + 1})`
+                        )
+                    }
+                    // 加锁与上一次读取之间关联图可能已漂移：重读，直到快照里没有未锁的关联行。
+                    record = await readRecord()
+                    if (!record) return undefined
+                }
+                return record
             },
             lockRows: async (recordName: string, match: MatchExpressionData, attributeQuery = ['*']) => {
                 this.requireTransaction(`atomic lockRows ${recordName}`)
@@ -1226,6 +1343,11 @@ RETURNING "lastValue" AS value`,
             const dispatchableEvents = shouldDispatch ? methodEvents.filter(shouldDispatch) : methodEvents
             // CAUTION 特别注意这里会空充 events
             const  newEvents = await this.dispatch(dispatchableEvents)
+            // r23 I-1：记录 push 前基线，外层事务回滚时截断（见 runInTransaction）。
+            const txn = this.getActiveTransactionContext()
+            if (txn?.eventArrayBaselines && !txn.eventArrayBaselines.has(events)) {
+                txn.eventArrayBaselines.set(events, events.length)
+            }
             events.push(...methodEvents, ...newEvents)
             
             // Also add to async context if available

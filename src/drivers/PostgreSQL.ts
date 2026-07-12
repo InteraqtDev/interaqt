@@ -90,7 +90,13 @@ class IDSystem {
             [this.quoteIdentifier(sequenceName)],
             `next id for ${recordName}`
         )
-        return rows[0]!.id as unknown as string
+        // CAUTION（r24 F-1）node-pg 把 bigint（nextval 返回值）序列化为字符串，而 INT id 列
+        //  读回是 JS number——同一个 id 在「分配侧」与「读回侧」类型分裂。storage 写路径大量
+        //  依赖 id 的严格相等（flashOut 的抢夺判定、原地引用判定等）："1" !== 1 时 merged link
+        //  的行合并静默不发生，addRelationByNameById 会把 link 写成独立的第二行（同一逻辑 id
+        //  两行、实体列 NULL）——关系查询返回破损实体。归一化为 number，与读回侧一致
+        //  （SQLite 驱动运行时同样返回 number；id 列是 INT4，Number() 无精度风险）。
+        return Number(rows[0]!.id) as unknown as string
     }
 }
 

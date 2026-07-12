@@ -16,9 +16,13 @@ export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
 // Generator "1" did not collect StateNode.computeValue / StateTransfer.computeTarget
 // into computation function signatures. Generator "2" did not collect plain-value args
 // (StateMachine trigger patterns/state-graph topology, Every.notEmpty, Transform eventDep
-// record patterns, ...) into structural signatures (argsSignature).
+// record patterns, ...) into structural signatures (argsSignature). Generator "3"
+// serialized explicit-undefined keys as invalid JSON fragments and collapsed NaN/Infinity
+// to null in stableStringify/canonicalizeArgsForSignature (undefined-vs-absent keys signed
+// differently; NaN collided with null; manifest objects with undefined-valued fields made
+// modelHash depend on that accident).
 // Bump when signature collection semantics change.
-const MIGRATION_MANIFEST_GENERATOR_VERSION = "3";
+const MIGRATION_MANIFEST_GENERATOR_VERSION = "4";
 const HARD_DELETION_PROPERTY_NAME = "_isDeleted_";
 
 export class MigrationError extends Error {
@@ -546,13 +550,21 @@ export function hashMigrationDiff(diff: MigrationDiffFile) {
 function stableStringify(value: unknown): string {
     if (value === null || typeof value !== "object") {
         if (typeof value === "function") return "[Function]";
+        // r24：JSON.stringify(undefined) 返回 undefined（非字符串），模板拼接成非法片段
+        //  `"key":undefined`；NaN/±Infinity 全部坍缩为 "null"（与真 null 碰撞签名）。
+        //  undefined 在对象分支已按「键缺席」跳过（见下），这里兜底独立出现的场景；
+        //  非有限数字用带标签的字符串保持可区分。
+        if (value === undefined) return '"[undefined]"';
+        if (typeof value === "number" && !Number.isFinite(value)) return `"[${String(value)}]"`;
         return JSON.stringify(value);
     }
     if (Array.isArray(value)) {
         return `[${value.map(stableStringify).join(",")}]`;
     }
     const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
+    // 显式 undefined 键与键缺席按 JSON 语义等价（JSON.stringify({a:undefined}) === '{}'）；
+    //  否则同一声明的两种自然书写（`match: maybeUndefined` vs 不写 match）产生不同签名。
+    return `{${Object.keys(record).sort().filter(key => record[key] !== undefined).map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
 }
 
 function identityKey(identity: MigrationIdentity) {
@@ -827,7 +839,12 @@ const INSTANCE_ONLY_ARG_FIELDS = new Set(["uuid", "_type", "_options"]);
  */
 function canonicalizeArgsForSignature(value: unknown, seen = new WeakSet<object>()): unknown {
     if (typeof value === "function") return "[Function]";
-    if (value === null || typeof value !== "object") return value;
+    if (value === null || typeof value !== "object") {
+        // r24：非有限数字此前经 stableStringify 坍缩为 "null"（NaN 与 null 同签名）；
+        //  规范化为带标签字符串保持可区分。undefined 键在对象分支按「缺席」跳过。
+        if (typeof value === "number" && !Number.isFinite(value)) return `[${String(value)}]`;
+        return value;
+    }
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
     if (Array.isArray(value)) return value.map(item => canonicalizeArgsForSignature(item, seen));
@@ -838,6 +855,9 @@ function canonicalizeArgsForSignature(value: unknown, seen = new WeakSet<object>
     const output: Record<string, unknown> = {};
     for (const key of Object.keys(record).sort()) {
         if (INSTANCE_ONLY_ARG_FIELDS.has(key)) continue;
+        // 显式 undefined 与键缺席等价（`match: maybeUndefined` 是最常见的意外形态）：
+        //  两者必须产生同一签名，否则同一语义的声明会被判为计算变更。
+        if (record[key] === undefined) continue;
         output[key] = canonicalizeArgsForSignature(record[key], seen);
     }
     return output;
