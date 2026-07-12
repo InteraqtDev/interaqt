@@ -75,35 +75,47 @@ export class MysqlDB implements Database{
         this.logger = this.options?.logger || dbConsoleLogger
     }
     async open(forceDrop = false) {
-        // 第一条连接不带默认库，仅用于检查/创建目标库；用完必须关闭（否则每次 open 泄漏一条连接）。
-        const bootstrapConnection = await mysql.createConnection({
-            ...this.options,
-        })
-        await bootstrapConnection.connect()
-        try {
-            // CAUTION 库名不能字符串拼接进 SQL：LIKE 走参数绑定，标识符用反引号转义
-            //  （bootstrap 连接尚未 SET ANSI_QUOTES，双引号不可用）。
-            const quotedDatabase = `\`${this.database.replace(/`/g, '``')}\``
-            const [rows] = await bootstrapConnection.query(`SHOW DATABASES LIKE ?`, [this.database])
-            if ((rows as RowDataPacket[]).length === 0) {
-                await bootstrapConnection.query(`CREATE DATABASE ${quotedDatabase}`)
-            } else if (forceDrop) {
-                await bootstrapConnection.query(`DROP DATABASE ${quotedDatabase}`)
-                await bootstrapConnection.query(`CREATE DATABASE ${quotedDatabase}`)
+        // CAUTION open() 必须可以在 openForSchemaRead()（或再次 open）之后被调用而不泄漏连接
+        //  （r22 I-5 SQLite / PG pool 的同族守卫，MySQL 是四驱动中最后一个漏网的）：
+        //  Controller.setup(false) 会先经 prepareMigrationSchema 打开只读连接做 manifest 校验，
+        //  再走 system.setup 调用 open(false)。此前无条件 createConnection 会把旧工作连接孤儿化，
+        //  悬挂到服务端 wait_timeout。forceDrop 需要重建库，先关旧连接再走完整建库路径。
+        if (this.db && forceDrop) {
+            await this.db.end()
+            this.db = undefined as unknown as Connection
+        }
+        if (!this.db) {
+            // 第一条连接不带默认库，仅用于检查/创建目标库；用完必须关闭（否则每次 open 泄漏一条连接）。
+            const bootstrapConnection = await mysql.createConnection({
+                ...this.options,
+            })
+            await bootstrapConnection.connect()
+            try {
+                // CAUTION 库名不能字符串拼接进 SQL：LIKE 走参数绑定，标识符用反引号转义
+                //  （bootstrap 连接尚未 SET ANSI_QUOTES，双引号不可用）。
+                const quotedDatabase = `\`${this.database.replace(/`/g, '``')}\``
+                const [rows] = await bootstrapConnection.query(`SHOW DATABASES LIKE ?`, [this.database])
+                if ((rows as RowDataPacket[]).length === 0) {
+                    await bootstrapConnection.query(`CREATE DATABASE ${quotedDatabase}`)
+                } else if (forceDrop) {
+                    await bootstrapConnection.query(`DROP DATABASE ${quotedDatabase}`)
+                    await bootstrapConnection.query(`CREATE DATABASE ${quotedDatabase}`)
+                }
+            } finally {
+                await bootstrapConnection.end()
             }
-        } finally {
-            await bootstrapConnection.end()
+
+            // CAUTION 无论目标库是已有还是刚创建，工作连接都必须显式带上 database，
+            //  否则后续 scheme/query 跑在没有默认库的连接上，首次建库启动即失败。
+            this.db = await mysql.createConnection({
+                ...this.options,
+                database: this.database
+            })
+            await this.db.connect()
+            await this.db.query(`SET sql_mode='ANSI_QUOTES'`)
         }
 
-        // CAUTION 无论目标库是已有还是刚创建，工作连接都必须显式带上 database，
-        //  否则后续 scheme/query 跑在没有默认库的连接上，首次建库启动即失败。
-        this.db = await mysql.createConnection({
-            ...this.options,
-            database: this.database
-        })
-        await this.db.connect()
-        await this.db.query(`SET sql_mode='ANSI_QUOTES'`)
-
+        // 复用 openForSchemaRead 的连接时框架表可能尚未初始化，setup 自身是幂等的 CREATE IF NOT EXISTS。
         await this.idSystem.setup()
 
     }
@@ -195,7 +207,9 @@ export class MysqlDB implements Database{
         return this.idSystem.getAutoId(recordName)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
-        if (fieldType === 'JSON') {
+        // CAUTION 方言必须识别自己 mapToDBFieldType 产出的全部 json fieldType 形态（r25 I-1）：
+        //  Property type:'json' 产出小写 'json'。按小写归一，与 PGLite/MatchExp 判定一致。
+        if (fieldType.toLowerCase() === 'json') {
             if (value[0].toLowerCase() === 'contains') {
                 const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
                 // CAUTION 匹配值必须走参数绑定，不能字符串拼接进 SQL（否则存在 SQL 注入）。

@@ -188,7 +188,10 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         return this.idSystem.getAutoId(recordName)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
-        if (fieldType === 'JSON') {
+        // CAUTION 方言必须识别自己 mapToDBFieldType 产出的全部 json fieldType 形态（r25 I-1）：
+        //  本驱动把 type:'json' 映射为大写 'JSON'，但按小写归一比较与其余驱动/MatchExp 保持同构，
+        //  防止未来映射面扩展时再次分裂。
+        if (fieldType.toLowerCase() === 'json') {
             if (value[0].toLowerCase() === 'contains') {
                 return {
                     fieldValue: `NOT NULL AND EXISTS (

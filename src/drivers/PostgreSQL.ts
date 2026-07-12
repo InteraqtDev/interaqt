@@ -356,7 +356,11 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         return this.idSystem.setupSequences(records)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
-        if (fieldType === 'JSON') {
+        // CAUTION 方言必须识别自己 mapToDBFieldType 产出的全部 json fieldType 形态（r25 I-1）：
+        //  Property type:'json' 走 `else { return type }` 产出小写 'json'（object/collection 产出
+        //  大写 'JSON'）。此前大小写敏感比较漏掉 'json' → 回退文本比较 → PG 报
+        //  "operator does not exist: json = unknown"。与 PGLite/MatchExp 的判定一致按小写归一。
+        if (fieldType.toLowerCase() === 'json') {
             if (value[0].toLowerCase() === 'contains') {
                 const fieldNameWithQuotes = fieldName.split('.').map(x => `"${x}"`).join('.')
                 return {
