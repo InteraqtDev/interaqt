@@ -1,4 +1,4 @@
-name: PostgreSQL Concurrency
+name: PostgreSQL Suites
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  postgres-concurrency:
+  postgres-suites:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -37,5 +37,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run test:postgres-concurrency
-      - run: npm run test:postgres-scoped-sequence
+      # r24 复盘教训：env-gated 的沉睡套件提供的置信度为零（F-1 存活 22 轮）。
+      # CI 必须覆盖全部真实 PG 套件，而不只是 concurrency/scoped-sequence 两个。
+      - run: npm run test:postgres
