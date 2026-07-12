@@ -824,45 +824,112 @@ export class Scheduler {
         const modifier = dataDep.modifier as Record<string, unknown>
         return modifier.limit !== undefined || modifier.offset !== undefined || modifier.orderBy !== undefined
     }
-    private readMatchPath(record: Record<string, unknown> | undefined, path: string) {
-        if (!record) return undefined
-        let current: any = record
+    /**
+     * 从 match key 路径读取事件快照上的值。
+     * CAUTION 「键缺席」与「值为 null」必须区分（r21 F-1）：事件快照只携带写入时的字段——
+     *  computed 列、未涉及的关系属性都可能缺席但在库里有值。把缺席当 undefined 参与比较
+     *  会让本地判定与 SQL 判定分裂（`=` 误判 false → 错误 skip → 计算静默陈旧；
+     *  `!=` 误判 true → 幻影 entered → 计算多计）。
+     *  中段值为 null（快照如实携带的空关系）按 LEFT JOIN 语义解析为终端 NULL——
+     *  与 SQL 的三值逻辑照常比较。
+     */
+    private readMatchPath(record: Record<string, unknown>, path: string): { resolved: true, value: unknown } | { resolved: false } {
+        let current: unknown = record
         for (const part of path.split('.')) {
-            if (current === null || current === undefined || typeof current !== 'object') return undefined
-            current = current[part]
+            if (current === null) return { resolved: true, value: null }
+            if (current === undefined || typeof current !== 'object' || Array.isArray(current)) return { resolved: false }
+            if (!Object.prototype.hasOwnProperty.call(current, part)) return { resolved: false }
+            current = (current as Record<string, unknown>)[part]
         }
-        return current
+        return { resolved: true, value: current === undefined ? null : current }
     }
-    private compareMatchValue(value: unknown, operator: string, operand: unknown): boolean | undefined {
-        switch (operator.toLowerCase()) {
+    /**
+     * 本地比较必须与 SQL 谓词求值（MatchExp 编译结果 + 三值逻辑）语义一致，
+     * 不可判定时返回 undefined（上层走保守的 full recompute）。
+     * - `=`/`!=` 对 null 操作数按 IS NULL / IS NOT NULL（与 MatchExp 编译一致）；
+     *   NULL 行对非 null 操作数的任何比较都是 UNKNOWN（不匹配）。
+     * - in/not in 按 r20 编译期 null 拆分后的语义（in 含 null → IS NULL OR IN(非空集)；
+     *   not in 无论列表是否含 null，NULL 行都不匹配）。
+     * - like 的大小写敏感性因驱动而异（PG 敏感 / SQLite ASCII 不敏感）且 `_` 通配未实现——不可判定。
+     * - 对象/数组值（json 列、ref 对象、Date）无法在本地忠实模拟 SQL 比较——不可判定。
+     */
+    private compareMatchValue(value: unknown, operator: unknown, operand: unknown): boolean | undefined {
+        const op = typeof operator === 'string' ? operator.toLowerCase() : operator
+        const isComparableScalar = (v: unknown) => typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
+        switch (op) {
             case '=':
             case '==':
+                if (operand === null) return value === null
+                if (value === null) return false
+                if (!isComparableScalar(value) || !isComparableScalar(operand)) return undefined
                 return value === operand
             case '!=':
             case '<>':
+                if (operand === null) return value !== null
+                if (value === null) return false
+                if (!isComparableScalar(value) || !isComparableScalar(operand)) return undefined
                 return value !== operand
+            case 'not':
+                // MatchExp 的 'not' 只支持 null（IS NOT NULL），其余形态编译期报错——本地不可判定。
+                return operand === null ? value !== null : undefined
+            case 'is null':
+                return value === null
+            case 'is not null':
+                return value !== null
             case '>':
+                if (value === null || operand === null) return false
                 return typeof value === 'number' && typeof operand === 'number' ? value > operand : undefined
             case '>=':
+                if (value === null || operand === null) return false
                 return typeof value === 'number' && typeof operand === 'number' ? value >= operand : undefined
             case '<':
+                if (value === null || operand === null) return false
                 return typeof value === 'number' && typeof operand === 'number' ? value < operand : undefined
             case '<=':
+                if (value === null || operand === null) return false
                 return typeof value === 'number' && typeof operand === 'number' ? value <= operand : undefined
             case 'in':
-                return Array.isArray(operand) ? operand.includes(value) : undefined
+                if (!Array.isArray(operand)) return undefined
+                if (value === null) return operand.includes(null)
+                if (!isComparableScalar(value)) return undefined
+                return operand.includes(value)
             case 'not in':
-                return Array.isArray(operand) ? !operand.includes(value) : undefined
-            case 'not':
-                return value !== operand
-            case 'like':
-                if (typeof value !== 'string' || typeof operand !== 'string') return undefined
-                return new RegExp(`^${operand.split('%').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`).test(value)
+                if (!Array.isArray(operand)) return undefined
+                if (value === null) return false
+                if (!isComparableScalar(value)) return undefined
+                return !operand.includes(value)
             default:
                 return undefined
         }
     }
-    private evaluateRecordsMatch(match: MatchExpressionData | undefined, record: Record<string, unknown> | undefined): boolean | undefined {
+    // 「records match 的本地求值可把缺席键判定为 NULL」的字段集合缓存：
+    //  事件快照对声明的普通值属性是完整的（create = defaults+payload；update 的 oldRecord 保留全部值属性），
+    //  所以这些字段缺席 ⟺ 库里为 NULL。computed / computation 属性由写路径联动求值，
+    //  事件快照不保证携带，缺席时必须视为不可判定。
+    private plainValuePropertyNamesBySource = new WeakMap<object, Set<string>>()
+    private getPlainValuePropertyNames(source: object): Set<string> {
+        const cached = this.plainValuePropertyNamesBySource.get(source)
+        if (cached) return cached
+        const names = new Set<string>()
+        const visited = new Set<object>()
+        const visit = (node: unknown) => {
+            if (!node || typeof node !== 'object' || visited.has(node)) return
+            visited.add(node)
+            const record = node as { properties?: Array<{ name?: string, computed?: unknown, computation?: unknown }>, baseEntity?: unknown, baseRelation?: unknown, inputEntities?: unknown[], inputRelations?: unknown[] }
+            for (const prop of record.properties || []) {
+                if (!prop?.name || prop.computed || prop.computation) continue
+                names.add(prop.name)
+            }
+            visit(record.baseEntity)
+            visit(record.baseRelation)
+            for (const input of record.inputEntities || []) visit(input)
+            for (const input of record.inputRelations || []) visit(input)
+        }
+        visit(source)
+        this.plainValuePropertyNamesBySource.set(source, names)
+        return names
+    }
+    private evaluateRecordsMatch(match: MatchExpressionData | undefined, record: Record<string, unknown> | undefined, plainNullableKeys: Set<string>): boolean | undefined {
         if (!match) return true
         if (!record) return undefined
         const node = match as any
@@ -870,13 +937,33 @@ export class Scheduler {
         if (raw.type === 'atom') {
             const atom = raw.data
             if (!atom || typeof atom.key !== 'string' || !Array.isArray(atom.value)) return undefined
-            return this.compareMatchValue(this.readMatchPath(record, atom.key), atom.value[0], atom.value[1])
+            // isReferenceValue 的操作数是另一列的引用，本地快照无从取值。
+            if (atom.isReferenceValue) return undefined
+            const read = this.readMatchPath(record, atom.key)
+            let value: unknown
+            if (read.resolved) {
+                value = read.value
+            } else if (!atom.key.includes('.') && plainNullableKeys.has(atom.key)) {
+                value = null
+            } else {
+                return undefined
+            }
+            return this.compareMatchValue(value, atom.value[0], atom.value[1])
         }
         if (raw.type === 'expression') {
-            const left = this.evaluateRecordsMatch(raw.left, record)
-            const right = raw.right ? this.evaluateRecordsMatch(raw.right, record) : undefined
-            if (raw.operator === 'and') return left === undefined || right === undefined ? undefined : left && right
-            if (raw.operator === 'or') return left === undefined || right === undefined ? undefined : left || right
+            // Kleene 三值逻辑：单侧确定即可短路（false AND unknown = false、true OR unknown = true）。
+            const left = this.evaluateRecordsMatch(raw.left, record, plainNullableKeys)
+            const right = raw.right ? this.evaluateRecordsMatch(raw.right, record, plainNullableKeys) : undefined
+            if (raw.operator === 'and') {
+                if (left === false || right === false) return false
+                if (left === undefined || right === undefined) return undefined
+                return true
+            }
+            if (raw.operator === 'or') {
+                if (left === true || right === true) return true
+                if (left === undefined || right === undefined) return undefined
+                return false
+            }
             if (raw.operator === 'not') return left === undefined ? undefined : !left
             return undefined
         }
@@ -892,12 +979,13 @@ export class Scheduler {
             }
         }
 
+        const plainNullableKeys = this.getPlainValuePropertyNames(dataDep.source as unknown as object)
         const oldRecord = event.oldRecord as Record<string, unknown> | undefined
         const currentRecord = event.type === 'update'
             ? { ...(event.oldRecord || {}), ...(event.record || {}) } as Record<string, unknown>
             : event.record as Record<string, unknown> | undefined
-        const oldMatches = event.type === 'create' ? false : this.evaluateRecordsMatch(dataDep.match, oldRecord)
-        const newMatches = event.type === 'delete' ? false : this.evaluateRecordsMatch(dataDep.match, currentRecord)
+        const oldMatches = event.type === 'create' ? false : this.evaluateRecordsMatch(dataDep.match, oldRecord, plainNullableKeys)
+        const newMatches = event.type === 'delete' ? false : this.evaluateRecordsMatch(dataDep.match, currentRecord, plainNullableKeys)
         if (oldMatches === undefined || newMatches === undefined) {
             return {
                 membershipChange: 'unknown',
