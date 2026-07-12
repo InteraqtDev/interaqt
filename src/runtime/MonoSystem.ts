@@ -65,6 +65,12 @@ function JSONParse(value: string) {
 type StorageTransactionContext = {
     depth: number
     isolation: TransactionIsolation
+    /**
+     * r23 I-1：事务内 callWithEvents 会把事件 push 进调用方数组（COMMIT 之前）。
+     * 外层事务回滚时 DB 撤销，数组不撤销 → 幻影事件。记录每个被写入数组的基线长度，
+     * 最外层回滚时截断回基线（与 r22 F-2 的「attempt 隔离」同族，覆盖 in-txn / 非重试路径）。
+     */
+    eventArrayBaselines?: Map<RecordMutationEvent[], number>
 }
 
 class MonoStorage implements Storage{
@@ -177,11 +183,24 @@ class MonoStorage implements Storage{
             }
         }
 
-        const context: StorageTransactionContext = { depth: 1, isolation }
+        const context: StorageTransactionContext = { depth: 1, isolation, eventArrayBaselines: new Map() }
         const run = async () => this.transactionContext.run(context, fn)
+        const rollbackCallerEvents = () => {
+            const baselines = context.eventArrayBaselines
+            if (!baselines?.size) return
+            for (const [events, baseline] of baselines) {
+                events.length = baseline
+            }
+            baselines.clear()
+        }
         const startTransaction = async (): Promise<T> => {
             if (this.db.runInTransaction) {
-                return this.db.runInTransaction({ name: options.name, isolation }, run)
+                try {
+                    return await this.db.runInTransaction({ name: options.name, isolation }, run)
+                } catch (error) {
+                    rollbackCallerEvents()
+                    throw error
+                }
             }
 
             await this.db.scheme('BEGIN', options.name)
@@ -191,6 +210,7 @@ class MonoStorage implements Storage{
                 return result
             } catch (error) {
                 await this.db.scheme('ROLLBACK', options.name)
+                rollbackCallerEvents()
                 throw error
             }
         }
@@ -1226,6 +1246,11 @@ RETURNING "lastValue" AS value`,
             const dispatchableEvents = shouldDispatch ? methodEvents.filter(shouldDispatch) : methodEvents
             // CAUTION 特别注意这里会空充 events
             const  newEvents = await this.dispatch(dispatchableEvents)
+            // r23 I-1：记录 push 前基线，外层事务回滚时截断（见 runInTransaction）。
+            const txn = this.getActiveTransactionContext()
+            if (txn?.eventArrayBaselines && !txn.eventArrayBaselines.has(events)) {
+                txn.eventArrayBaselines.set(events, events.length)
+            }
             events.push(...methodEvents, ...newEvents)
             
             // Also add to async context if available

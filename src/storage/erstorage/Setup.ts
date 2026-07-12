@@ -1040,6 +1040,13 @@ export class DBSetup {
 
 
         // 2. reliance 三表合一。这里有一个不能有链的检测。
+        // CAUTION 同一 source 上多条 1:1 isTargetReliance 指向同一 target 实体类型时，
+        //  第一条合表成功后第二条会因「target 已在 source 表」被 joinTables 早退当成成功，
+        //  两条 link 都标 mergedTo=combined，但 target 列只分配了一份——create 时 INSERT
+        //  把两份嵌套数据写进同一组列名 → SQL「column specified more than once」。
+        //  目标实体一张表只能承载一份合表实例，必须在合表前 fail-fast（r23 F-1）。
+        const relianceCombineKey = (source: string, target: string) => `${source}\0${target}`
+        const relianceCombineClaimed = new Set<string>()
         Object.values(oneToOneRelianceLinks).forEach(linkData => {
             if(linkData.isFilteredRelation) return
             const { sourceRecord, targetRecord, recordName: linkRecord} = linkData
@@ -1054,11 +1061,22 @@ export class DBSetup {
                 }
                 return
             }
+            const claimKey = relianceCombineKey(sourceRecord, targetRecord)
+            if (relianceCombineClaimed.has(claimKey)) {
+                throw new Error(
+                    `Cannot combine multiple 1:1 isTargetReliance relations from "${sourceRecord}" to "${targetRecord}" ` +
+                    `(second relation: "${linkRecord}"). A target entity can only be table-combined once into its source; ` +
+                    `duplicate reliance would alias the same columns under two attributes and produce invalid INSERT SQL. ` +
+                    `Keep a single 1:1 isTargetReliance to "${targetRecord}", or drop isTargetReliance on the extras ` +
+                    `(non-reliance 1:1 keeps the target in its own table).`
+                )
+            }
             // 只是尝试。有冲突就不会处理
             const conflicts = this.combineRecordTable(sourceRecord, targetRecord, linkRecord!)
             if (!conflicts) {
                 linkData.mergedTo = 'combined'
                 mergedLinks.push(linkData)
+                relianceCombineClaimed.add(claimKey)
             } else {
                 // 改为 尝试 merge link
                 const linkToRecordLinkName = (this.map.records[linkRecord!].attributes.source! as RecordAttribute).linkName

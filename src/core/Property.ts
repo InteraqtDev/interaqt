@@ -1,5 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { PropertyTypes } from './RealDictionary.js';
+import { PropertyTypes, ALLOWED_PROPERTY_TYPES } from './RealDictionary.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { ComputationInstance } from './types.js';
 
@@ -63,7 +63,7 @@ export class Property implements PropertyInstance {
     type: {
       type: 'string' as const,
       required: true as const,
-      options: () => Object.values(PropertyTypes)
+      options: () => [...ALLOWED_PROPERTY_TYPES]
     },
     collection: {
       type: 'boolean' as const,
@@ -95,6 +95,14 @@ export class Property implements PropertyInstance {
     // （defaultValue + computation 的并存已在 Scheduler setup 期拒绝，语义同族。）
     if (args.computed && args.computation) {
       throw new Error(`Property "${args.name}" declares both computed and computation. They are competing write channels for the same column (computed re-evaluates on every write and silently overwrites the computation's output) — keep exactly one.`);
+    }
+    // type 白名单（r23）：未知字符串此前静默落到 mapToDBFieldType 的 fallback（原样当 SQL 类型），
+    //  SQLite 亲和放过、PG/MySQL 在 setup 才炸——声明形同虚设。与 PayloadItem.type / Dictionary.type 同族。
+    if (args.type !== undefined && !(ALLOWED_PROPERTY_TYPES as readonly string[]).includes(args.type)) {
+      throw new Error(
+        `Property "${args.name}" has unsupported type "${args.type}". ` +
+        `Allowed types: ${ALLOWED_PROPERTY_TYPES.join(', ')}.`
+      );
     }
 
     const instance = new Property(args, options);

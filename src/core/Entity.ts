@@ -1,6 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
-import { PropertyInstance } from './Property.js';
+import { Property, PropertyInstance } from './Property.js';
 import { validatePropertyNamesOnCreate } from './propertyNameGuards.js';
 import type { ComputationInstance } from './types.js';
 import type { RelationInstance } from './Relation.js';
@@ -151,6 +151,12 @@ export class Entity implements EntityInstance {
     if (args.baseEntity && args.inputEntities) {
       throw new Error(`Entity "${args.name}" declares both baseEntity (filtered entity) and inputEntities (merged entity). These are mutually exclusive declaration modes — to filter a merged entity, declare the merged entity first and create a separate filtered entity on top of it.`);
     }
+    // Merged entity with an empty inputEntities array is a silently-broken declaration:
+    // truthy [] still enters the merged compile path, producing a union with zero members.
+    // Relation already rejects empty inputRelations — keep Entity symmetric (r23).
+    if (args.inputEntities && args.inputEntities.length === 0) {
+      throw new Error(`Entity "${args.name}" declares inputEntities as an empty array. A merged entity must have at least one inputEntity (same rule as Relation.inputRelations).`);
+    }
     // 保留名（id/_rowId）与重复属性名守卫：见 propertyNameGuards.ts。
     validatePropertyNamesOnCreate(args.name, args.properties, 'Entity');
 
@@ -173,16 +179,24 @@ export class Entity implements EntityInstance {
   // CAUTION clone 不注册进全局 registry（Entity.instances）：clone 是运行时图手术
   //  （RefContainer / Setup）用的工作副本，注册会污染 stringifyAllInstances 输出并跨测试泄漏。
   //  Relation.clone / Property.clone 遵循同样的语义。
+  //  deep=true：属性深拷贝，避免 MergedItemProcessor.rebaseAsFilteredItem 等调用方
+  //  拿到的副本与声明图共享 Property 实例（r23：此前 deep 参数被忽略）。
   static clone(instance: EntityInstance, deep: boolean): EntityInstance {
     const args: EntityCreateArgs = {
       name: instance.name,
-      properties: [...instance.properties],
+      properties: deep
+        ? instance.properties.map(p => Property.clone(p, deep))
+        : [...instance.properties],
       computation: instance.computation,
       baseEntity: instance.baseEntity,
       matchExpression: instance.matchExpression,
       inputEntities: instance.inputEntities,
-      commonProperties: instance.commonProperties,
-      constraints: instance.constraints
+      commonProperties: deep && instance.commonProperties
+        ? instance.commonProperties.map(p => Property.clone(p, deep))
+        : instance.commonProperties,
+      constraints: deep && instance.constraints
+        ? [...instance.constraints]
+        : instance.constraints
     };
     
     return new Entity(args);

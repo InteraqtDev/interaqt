@@ -6,20 +6,20 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
     const userEntity: EntityInstance = Entity.create({
         name: 'User',
         properties: [
-            Property.create({ name: 'name', type: 'String' }),
-            Property.create({ name: 'age', type: 'Number' }),
+            Property.create({ name: 'name', type: 'string' }),
+            Property.create({ name: 'age', type: 'number' }),
             Property.create({name:'gender', type:'string', defaultValue: () => 'male'})
         ]
     })
 
     const profileEntity: EntityInstance = Entity.create({
         name: 'Profile',
-        properties: [Property.create({ name: 'title', type: 'String' })]
+        properties: [Property.create({ name: 'title', type: 'string' })]
     })
 
     const fileEntity: EntityInstance = Entity.create({
         name: 'File',
-        properties: [Property.create({ name: 'fileName', type: 'String' })]
+        properties: [Property.create({ name: 'fileName', type: 'string' })]
     });
 
     const fileOwnerRelation: RelationInstance = Relation.create({
@@ -29,7 +29,7 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
         targetProperty: 'file',
         type: 'n:1',
         properties: [
-            Property.create({ name: 'viewed', type: 'Number' })
+            Property.create({ name: 'viewed', type: 'number' })
         ]
     });
 
@@ -40,7 +40,7 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
         targetProperty: 'profile',
         type: '1:1',
         properties: [
-            Property.create({ name: 'viewed', type: 'Number' })
+            Property.create({ name: 'viewed', type: 'number' })
         ]
     });
 
@@ -60,13 +60,13 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
         targetProperty: 'friends',
         type: 'n:n',
         properties: [
-            Property.create({ name: 'level', type: 'Number' })
+            Property.create({ name: 'level', type: 'number' })
         ]
     });
 
     const itemEntity: EntityInstance = Entity.create({
         name: 'Item',
-        properties: [Property.create({ name: 'itemName', type: 'String' })]
+        properties: [Property.create({ name: 'itemName', type: 'string' })]
     });
 
     const itemOwnerRelation: RelationInstance = Relation.create({
@@ -81,20 +81,20 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
 
     const teamEntity: EntityInstance = Entity.create({
         name: 'Team',
-        properties: [Property.create({ name: 'name', type: 'String' })]
+        properties: [Property.create({ name: 'name', type: 'string' })]
     });
 
     const locEntity: EntityInstance = Entity.create({
         name: 'Location',
         properties: [
-            Property.create({ name: 'name', type: 'String' })
+            Property.create({ name: 'name', type: 'string' })
         ]
     });
 
     const matchEntity: EntityInstance = Entity.create({
         name: 'Match',
         properties: [
-            Property.create({ name: 'name', type: 'String' })
+            Property.create({ name: 'name', type: 'string' })
         ]
     });
 
@@ -105,7 +105,7 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
         targetProperty: 'members',
         type: 'n:n',
         properties: [
-            Property.create({ name: 'role', type: 'String' })
+            Property.create({ name: 'role', type: 'string' })
         ]
     });
 
@@ -139,7 +139,7 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
     const powerEntity: EntityInstance = Entity.create({
         name: 'Power',
         properties: [
-            Property.create({ name: 'powerName', type: 'String' })
+            Property.create({ name: 'powerName', type: 'string' })
         ]
     });
 
@@ -156,7 +156,7 @@ export function createCommonData(): { entities: EntityInstance[], relations: Rel
     const departmentEntity: EntityInstance = Entity.create({
         name: 'Department',
         properties: [
-            Property.create({ name: 'name', type: 'String' })
+            Property.create({ name: 'name', type: 'string' })
         ]
     });
 

@@ -7,7 +7,22 @@ export enum PropertyTypes {
   Number = 'number',
   Boolean = 'boolean',
   Timestamp = 'timestamp',
+  /** Structured JSON payload (maps to JSON/JSONB column). */
+  Object = 'object',
 }
+
+/** Property / Dictionary `type` values accepted by create() and mapped by drivers. */
+export const ALLOWED_PROPERTY_TYPES = [
+  PropertyTypes.String,
+  PropertyTypes.Number,
+  PropertyTypes.Boolean,
+  PropertyTypes.Timestamp,
+  PropertyTypes.Object,
+  // Framework internals (async task tables) and some apps use 'json' as an alias of object.
+  'json',
+] as const
+
+export type AllowedPropertyType = (typeof ALLOWED_PROPERTY_TYPES)[number]
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -71,7 +86,7 @@ export class Dictionary implements DictionaryInstance {
       type: 'string' as const,
       required: true as const,
       collection: false as const,
-      options: Array.from(Object.values(PropertyTypes)),
+      options: Array.from(ALLOWED_PROPERTY_TYPES),
     },
     collection: {
       type: 'boolean' as const,
@@ -100,6 +115,20 @@ export class Dictionary implements DictionaryInstance {
     // 强制执行 format 约束：dictionary 名会被用作全局状态记录键，必须严格校验。
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`Dictionary name "${args.name}" is invalid. Dictionary names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
+    }
+    if (args.type !== undefined && !(ALLOWED_PROPERTY_TYPES as readonly string[]).includes(args.type)) {
+      throw new Error(
+        `Dictionary "${args.name}" has unsupported type "${args.type}". ` +
+        `Allowed types: ${ALLOWED_PROPERTY_TYPES.join(', ')}.`
+      );
+    }
+    // defaultValue（install 期 seed / 读回退）与 computation（反应式写回）是两条竞争写通道：
+    //  同时声明时两边都会跑，作者以为只有一个生效——与 Property.computed∥computation 同族，必须 fail-fast。
+    if (args.defaultValue && args.computation) {
+      throw new Error(
+        `Dictionary "${args.name}" declares both defaultValue and computation. ` +
+        `They are competing write channels for the same global key — keep exactly one.`
+      );
     }
 
     const instance = new Dictionary(args, options);

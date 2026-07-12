@@ -13,7 +13,7 @@ describe('stringify and parse', () => {
         const FuncAndRef = Entity.create({
             name: 'FuncAndRef',
             properties: [
-                Property.create({ name: 'funcProp', type: 'function', defaultValue: () => function() { return 1; } }),
+                Property.create({ name: 'funcProp', type: 'object', defaultValue: () => function() { return 1; } }),
                 Property.create({ name: 'refProp', type: 'object' })
             ]
         });
