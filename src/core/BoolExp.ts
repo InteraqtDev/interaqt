@@ -393,6 +393,13 @@ export class BoolExp<T> {
       if (typeof resultOrErrorMessage === 'string') {
         return { data, inverse, stack, error: resultOrErrorMessage }
       }
+      // fail-closed: atom handler 的契约是显式返回 boolean（或错误字符串）。按 truthiness 求值
+      //  会让类型错误的返回值静默决定判定方向——falsy 的 null/0/'' 在 not(...) 下被取反成"通过"
+      //  （与 r19 F-1 同族的 fail-open 形态，只是发生在 handler 协议层）。协议违规按错误处理，
+      //  无论处于什么极性下都判失败。
+      if (typeof resultOrErrorMessage !== 'boolean') {
+        return { data, inverse, stack, error: `atom handler returned ${resultOrErrorMessage === undefined ? 'undefined' : JSON.stringify(resultOrErrorMessage)} (${typeof resultOrErrorMessage}); it must explicitly return a boolean or an error string (did you forget a return statement, or a !! coercion?)` }
+      }
       const result = resultOrErrorMessage
       const error: EvaluateError<T> = { data, inverse, stack, error: 'atom evaluate error' }
       return (result && !inverse || !result && inverse) ? true : error
@@ -441,6 +448,11 @@ export class BoolExp<T> {
       // If atomHandle returns a string, treat it as an error message
       if (typeof resultOrErrorMessage === 'string') {
         return { data, inverse, stack, error: resultOrErrorMessage }
+      }
+      // fail-closed：与同步 evaluate 同一契约（handler 必须显式返回 boolean），
+      //  防止 falsy 的协议违规值在 not(...) 下被取反成"通过"。
+      if (typeof resultOrErrorMessage !== 'boolean') {
+        return { data, inverse, stack, error: `atom handler returned ${resultOrErrorMessage === undefined ? 'undefined' : JSON.stringify(resultOrErrorMessage)} (${typeof resultOrErrorMessage}); it must explicitly return a boolean or an error string (did you forget a return statement, or a !! coercion?)` }
       }
       
       const result = resultOrErrorMessage

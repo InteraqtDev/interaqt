@@ -819,6 +819,41 @@ describe("BoolExp Complete Test Suite", () => {
     });
   });
 
+  describe("evaluate — non-boolean atom results are fail-closed (r21 F-5 regression)", () => {
+    // atom handler 的契约是显式返回 boolean（或错误字符串）。旧实现按 truthiness 求值，
+    // falsy 的协议违规值（null / 0 / ''）在 not(...) 下被取反成"通过"——与 r19 F-1 同族的
+    // fail-open 形态，只是发生在 handler 协议层。协议违规必须在任何极性下都判失败。
+    test("falsy non-boolean under NOT does not pass (sync)", () => {
+      const nullHandle = (_d: unknown) => null as unknown as boolean;
+      expect(BoolExp.atom(1).not().evaluate(nullHandle)).not.toBe(true);
+      const zeroHandle = (_d: unknown) => 0 as unknown as boolean;
+      expect(BoolExp.atom(1).not().evaluate(zeroHandle)).not.toBe(true);
+    });
+
+    test("truthy non-boolean does not pass either (sync)", () => {
+      const objHandle = (_d: unknown) => ({ role: "admin" }) as unknown as boolean;
+      const result = BoolExp.atom(1).evaluate(objHandle);
+      expect(result).not.toBe(true);
+      expect((result as { error: string }).error).toMatch(/must explicitly return a boolean/);
+    });
+
+    test("async path is symmetric", async () => {
+      const nullHandle = async (_d: unknown) => null as unknown as boolean;
+      expect(await BoolExp.atom(1).not().evaluateAsync(nullHandle)).not.toBe(true);
+      const undefinedHandle = async (_d: unknown) => undefined as unknown as boolean;
+      const result = await BoolExp.atom(1).evaluateAsync(undefinedHandle);
+      expect(result).not.toBe(true);
+      expect((result as { error: string }).error).toMatch(/must explicitly return a boolean/);
+    });
+
+    test("boolean results keep working in every polarity", () => {
+      const handle = (d: boolean) => d;
+      expect(BoolExp.atom(true).evaluate(handle)).toBe(true);
+      expect(BoolExp.atom(false).not().evaluate(handle)).toBe(true);
+      expect(BoolExp.atom(true).not().evaluate(handle)).not.toBe(true);
+    });
+  });
+
   describe("evaluateAsync", () => {
     test("should evaluate simple atom async (true)", async () => {
       const atom = BoolExp.atom(10);
