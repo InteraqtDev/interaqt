@@ -980,11 +980,16 @@ export class Scheduler {
         }
 
         const plainNullableKeys = this.getPlainValuePropertyNames(dataDep.source as unknown as object)
-        const oldRecord = event.oldRecord as Record<string, unknown> | undefined
+        // CAUTION 旧态快照的字段来源按事件类型分裂（r22 I-3）：delete 事件没有 oldRecord，
+        //  删除前的完整快照就在 event.record 上（DeletionExecutor 的前置查询结果）。
+        //  用 oldRecord（undefined）求旧态会让**每一个** delete 事件都判为不可判定 →
+        //  强制 full recompute + SERIALIZABLE 升级重试——不匹配的 delete 本应 skip，
+        //  只声明增量路径（无 compute()）的计算则直接 fail-loud。
+        const oldSnapshot = (event.type === 'delete' ? event.record : event.oldRecord) as Record<string, unknown> | undefined
         const currentRecord = event.type === 'update'
             ? { ...(event.oldRecord || {}), ...(event.record || {}) } as Record<string, unknown>
             : event.record as Record<string, unknown> | undefined
-        const oldMatches = event.type === 'create' ? false : this.evaluateRecordsMatch(dataDep.match, oldRecord, plainNullableKeys)
+        const oldMatches = event.type === 'create' ? false : this.evaluateRecordsMatch(dataDep.match, oldSnapshot, plainNullableKeys)
         const newMatches = event.type === 'delete' ? false : this.evaluateRecordsMatch(dataDep.match, currentRecord, plainNullableKeys)
         if (oldMatches === undefined || newMatches === undefined) {
             return {
