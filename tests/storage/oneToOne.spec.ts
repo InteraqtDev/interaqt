@@ -362,12 +362,12 @@ describe('one to one', () => {
             {
                 "type": "create",
                 "recordName": "Profile",
+                // r25 F-1：combined create 事件 payload 是 push 时刻的不可变快照
+                //（defaults + 同行 payload + id）。link id 此前经共享引用的后置突变泄漏进来
+                //（"&" 键），现在不再出现——关联语义看紧随其后的 link create 事件。
                 "record": {
                     "title": "f2",
                     "id": 2,
-                    "&": {
-                        "id": 2
-                    }
                 }
             },
             {

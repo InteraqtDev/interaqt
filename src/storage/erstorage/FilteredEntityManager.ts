@@ -558,20 +558,17 @@ export class FilteredEntityManager {
      *  createRecord 的 membershipEventPayload 同构，r16 R-1）。行内记录的产生点（preprocess
      *  的 combined/merged link、flashOut 的抢夺新 link）拼 payload 时只有用户显式给出 `&`
      *  数据才带 defaults——「谓词/匹配字段仅有默认值」的形态下所有产生点都会漏（r22 I-4）。
-     *  这里是行内视图 creation 检查的唯一入口，统一用 NewRecordData 的 defaults 规则补齐
-     *  （只补缺失键；物理写入本身已按同一规则落列，这里只是让事件 payload 与行一致）。
+     *  补齐实现统一收口在 NewRecordData.completeEventPayloadWithDefaults（r25 F-1 起
+     *  base 名事件与视图事件共用同一实现）；产生点已补齐时这里的再补齐是幂等 no-op。
      */
     enqueuePostWriteCreationCheck(events: RecordMutationEvent[] | undefined, recordName: string, recordId: string, fullRecord: Record): void {
         if (!events || !this.getFilteredEntitiesForBase(recordName).length) return
-        // 顶层的 `&`（link 数据）键不属于本记录的属性面，且脱离父 info 无法解析——剥掉后再取 defaults。
-        const { [LINK_SYMBOL]: _linkData, ...plainRecord } = fullRecord as RawEntityData
-        const defaults = new NewRecordData(this.map, recordName, plainRecord).defaultValues
         let queue = postWriteChecksByEvents.get(events)
         if (!queue) {
             queue = []
             postWriteChecksByEvents.set(events, queue)
         }
-        queue.push({ kind: 'creation', recordName, recordId, fullRecord: { ...defaults, ...fullRecord } })
+        queue.push({ kind: 'creation', recordName, recordId, fullRecord: NewRecordData.completeEventPayloadWithDefaults(this.map, recordName, fullRecord) })
     }
 
     /**

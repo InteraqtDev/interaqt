@@ -303,19 +303,27 @@ export class CreationExecutor {
                 ...newRawDataWithNewIds[record.info!.attributeName],
                 id: await this.database.getAutoId(record.info!.recordName!),
             }
+            // CAUTION create 事件 payload 契约 = defaults + payload（r16 R-1）——base 名事件与
+            //  filtered 视图事件是同一契约的两个消费方，统一走 completeEventPayloadWithDefaults
+            //  补齐 default-only 字段。此前 base 事件裸用 payload：records match 的本地求值把
+            //  缺席的普通值属性按 NULL 解读（快照完备性契约，r21 F-1）、StateMachine trigger /
+            //  Transform eventDeps 深度匹配失明——「谓词/匹配字段仅有默认值」形态下游静默
+            //  少计/不触发（r25 F-1）。
+            const combinedCreatePayload = NewRecordData.completeEventPayloadWithDefaults(
+                this.map, record.recordName, newRawDataWithNewIds[record.info!.attributeName]
+            )
             events?.push({
                 type: 'create',
                 recordName: record.recordName,
-                record: newRawDataWithNewIds[record.info!.attributeName]
+                record: combinedCreatePayload
             })
             // combined 记录不经过 createRecord（数据落在宿主行），其 filtered entity 视图的
-            // create 事件在物理写入完成后求值（payload 契约与 createRecord 的
-            // membershipEventPayload 一致：defaults + payload）。
+            // create 事件在物理写入完成后求值（payload 契约与 base 事件一致）。
             this.filteredEntityManager.enqueuePostWriteCreationCheck(
                 events,
                 record.recordName,
                 newRawDataWithNewIds[record.info!.attributeName].id,
-                { ...record.defaultValues, ...newRawDataWithNewIds[record.info!.attributeName] }
+                combinedCreatePayload
             )
         }
 
@@ -333,11 +341,16 @@ export class CreationExecutor {
                 delete linkRecord.target[LINK_SYMBOL]
                 delete linkRecord.source[LINK_SYMBOL]
 
-
+                // CAUTION base link create 事件必须补齐 default-only 字段（r25 F-1，契约同上方
+                //  combined 记录）：用户不给 `&` 时 linkRecordData 不存在，此前 payload 只有端点
+                //  与显式 link 数据——按 default-only link 属性做匹配的下游全部失明。
+                const linkCreatePayload = NewRecordData.completeEventPayloadWithDefaults(
+                    this.map, record.info!.linkName, linkRecord
+                )
                 events?.push({
                     type: 'create',
                     recordName: record.info!.linkName,
-                    record: linkRecord
+                    record: linkCreatePayload
                 })
                 // 行内（merged/combined）link 不经过 createRecord，其 filtered relation 视图的
                 // create 事件在物理写入完成后求值（settlePostWriteChecks）。
@@ -345,7 +358,7 @@ export class CreationExecutor {
                     events,
                     record.info!.linkName,
                     linkRecord.id,
-                    { ...(record.linkRecordData?.defaultValues || {}), ...linkRecord }
+                    linkCreatePayload
                 )
             }
         }

@@ -147,6 +147,24 @@ export class NewRecordData {
         return {id: this.rawData.id}
     }
 
+    /**
+     * create 事件 payload 契约（r16 R-1）：defaults + payload——的唯一补齐实现。
+     *
+     * CAUTION 行内产生点（preprocessSameRowData 的 combined 记录 / merged link、flashOut 的
+     *  抢夺新 link）拼事件 payload 时手头往往没有对应的 NewRecordData（用户不给 `&` 时
+     *  linkRecordData 不存在）——r22 I-4 只对 filtered 视图事件补了 defaults，base 名事件是
+     *  同一契约的兄弟消费方（r25 F-1：records match 的本地求值、StateMachine trigger /
+     *  Transform eventDeps 的深度匹配都按「缺席的普通值属性 ⟺ 库里 NULL」解读快照，
+     *  漏掉 default-only 字段会让下游静默 skip/失明）。所有 create 事件产生点与视图检查
+     *  统一经这里补齐（只补缺失键；物理写入本身已按同一规则落列）。
+     */
+    static completeEventPayloadWithDefaults(map: EntityToTableMap, recordName: string, payload: Record): Record {
+        // 顶层的 `&`（link 数据）键不属于本记录的属性面，且脱离父 info 无法解析——剥掉后再取 defaults。
+        const { [LINK_SYMBOL]: _linkData, ...plainRecord } = payload as RawEntityData
+        const defaults = new NewRecordData(map, recordName, plainRecord).defaultValues
+        return { ...defaults, ...payload }
+    }
+
 
     // CAUTION xToMany 关系数组里的重复引用（同一个 {id} 出现两次）在声明式语义下表达的是同一个终态，
     //  必须幂等去重：否则 create/update 都会崩在 addLink 的「link already exist」内部断言上，

@@ -317,18 +317,21 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             ...(combinedRecordIdRef.linkRecordData?.getData() || {}),
                             id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
                         }
-                        const newLinkRecord = {
+                        // CAUTION base link create 事件必须补齐 default-only 字段
+                        //  （r25 F-1，与 preprocessSameRowData 的行内产生点同一契约）：
+                        //  按 default-only link 属性做匹配的下游（records match / trigger）
+                        //  此前对 flashOut 产生的 link create 失明。
+                        const newLinkRecord = NewRecordData.completeEventPayloadWithDefaults(this.map, combinedRecordIdRef.info!.linkName!, {
                             ...result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
                             [combinedRecordIdRef.info!.isRecordSource() ? 'source' : 'target']: newOwnerRef,
                             [combinedRecordIdRef.info!.isRecordSource() ? 'target' : 'source']: stolenRelatedRef,
-                        }
+                        })
                         events?.push({
                             type: 'create',
                             recordName: combinedRecordIdRef.info!.linkName,
                             record: newLinkRecord
                         })
                         // 新 link 的 filtered relation 视图成员资格在物理写入完成后求值（settlePostWriteChecks）。
-                        // 视图 create 事件 payload 的 defaults 由 enqueuePostWriteCreationCheck 统一补齐。
                         this.filteredEntityManager.enqueuePostWriteCreationCheck(
                             events,
                             combinedRecordIdRef.info!.linkName!,
