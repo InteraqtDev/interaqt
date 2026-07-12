@@ -150,7 +150,7 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     const doublePrice = new Custom({
       name: "PgMigrationDoublePrice",
       dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
-      compute: async (_deps: any, record: any) => record.price * 2,
+      compute: async (deps: any) => deps.current.price * 2,
     }, { uuid: "pg-migration-double-price-computation" });
     const ProductV2 = new Entity({
       name: "PgMigrationProduct",
@@ -217,7 +217,9 @@ describeIfPostgres("PostgreSQL migration integration", () => {
           computation: new Custom({
             name: "PgMatrixDoublePrice",
             dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
-            compute: async (_deps: any, record: any) => record.price * 2,
+            // CAUTION 数据必须取自声明的 dataDeps：链式重建/增量路径传入的 record 只是
+            //  dirty-record 骨架（可能只有 id），record.price 在这些路径下是 undefined。
+            compute: async (deps: any) => deps.current.price * 2,
           }, { uuid: "pg-matrix-double-price-computation" }),
         }, { uuid: "pg-matrix-product-double-price" }),
         new Property({
@@ -242,6 +244,7 @@ describeIfPostgres("PostgreSQL migration integration", () => {
                 trigger: { recordName: "PgMatrixProduct", type: "update" },
                 current: new StateNode({ name: "new" }, { uuid: "pg-matrix-state-new" }),
                 next: new StateNode({ name: "seen" }, { uuid: "pg-matrix-state-seen" }),
+                computeTarget: (event: any) => ({ id: event.record.id }),
               }, { uuid: "pg-matrix-state-transfer" }),
             ],
             initialState: new StateNode({ name: "new" }, { uuid: "pg-matrix-state-new" }),
@@ -450,6 +453,7 @@ describeIfPostgres("PostgreSQL migration integration", () => {
                 trigger: { recordName: "PgSafetySource", type: "update" },
                 current: new StateNode({ name: "open" }, { uuid: "pg-safety-open" }),
                 next: new StateNode({ name: "closed" }, { uuid: "pg-safety-closed" }),
+                computeTarget: (event: any) => ({ id: event.record.id }),
               }, { uuid: "pg-safety-transfer" }),
             ],
             initialState: new StateNode({ name: "open" }, { uuid: "pg-safety-open" }),
