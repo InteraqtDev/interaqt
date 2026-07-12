@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.5](https://github.com/interaqtdev/interaqt/compare/v4.0.4...v4.0.5) (2026-07-12)
+
+### Bug Fixes
+
+* **drivers:** PostgreSQL getAutoId returns number — id type split broke merged-link row merging (r24 F-1) ([631a9ac](https://github.com/interaqtdev/interaqt/commit/631a9ac62564aa86c29d60277fc53101cde40f73))
+* r23 dual same-target reliance fail-fast; txn rollback phantom events; declaration guards ([e53ef8c](https://github.com/interaqtdev/interaqt/commit/e53ef8c77cd11ad46459a3df372af943576d2dba))
+* r23 follow-up — allow id type, drop Dictionary defaultValue guard, update fixtures/docs ([2233f29](https://github.com/interaqtdev/interaqt/commit/2233f298f4fbb791050a77212fd10afe157f1142))
+* r24 — atomic read normalization, lockRecord graph lock, migration signature stability ([9677879](https://github.com/interaqtdev/interaqt/commit/96778796349dc17d62d818f0ec09097a55befcdc))
+
 ## [4.0.4](https://github.com/interaqtdev/interaqt/compare/v4.0.3...v4.0.4) (2026-07-12)
 
 ### Bug Fixes
