@@ -40,7 +40,7 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { createUniqueIndexSQL, getSchemaDialect, quoteIdentifier } from "@storage";
+import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, quoteIdentifier } from "@storage";
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
@@ -806,6 +806,19 @@ class MonoStorage implements Storage{
         return value as T
     }
 
+    /**
+     * record-target atomic 写参归一化（r25，r24 读路径归一化的对称面）：与 storage 写路径
+     * （SQLBuilder.prepareFieldValue）同一契约——json 字段一律写入规范序列化文本。
+     * 此前 replace/compareAndSet 把 JS 对象裸传给 db.query：better-sqlite3 无法绑定对象直接
+     * 崩溃，且键序不定的存储文本会让规范化比较失效。boolean 由各驱动的 query() 统一转换。
+     */
+    private normalizeRecordFieldParam(value: unknown, valueType: string | undefined): unknown {
+        if (valueType === 'json' && value !== null && value !== undefined && typeof value !== 'string') {
+            return canonicalJSONStringify(value)
+        }
+        return value
+    }
+
     private resolveRecordTable(recordName: string) {
         const map = this.queryHandle!.map
         const inputRecordInfo = map.getRecordInfo(recordName)
@@ -973,7 +986,7 @@ RETURNING "numberValue" AS value`,
                     const idPlaceholder = updateP()
                     const newRows = await this.db.query<Record<string, unknown>>(
                         `UPDATE "${tableName}" SET "${fieldName}" = ${valuePlaceholder} WHERE "${idField}" = ${idPlaceholder} RETURNING "${fieldName}" AS value`,
-                        [value, target.id],
+                        [this.normalizeRecordFieldParam(value, valueType), target.id],
                         `atomic replace ${target.recordName}.${target.field}`
                     )
                     return {
@@ -1008,7 +1021,35 @@ RETURNING "numberValue" AS value`,
                 const p = this.getPlaceholder()
                 const defaultValue = options?.defaultValue
                 if (this.isRecordTarget(target)) {
-                    const { tableName, idField, fieldName } = this.resolveRecordTarget(target)
+                    const { tableName, idField, fieldName, valueType } = this.resolveRecordTarget(target)
+                    // CAUTION json 字段不能用单语句 `COALESCE(col, ?) = ?` 做比较（r25，r24 归一化家族）：
+                    //  PG 系的 json 类型没有等值操作符（"operator does not exist: json = unknown"），
+                    //  文本比较又对键序敏感。改走「锁定读 → 规范形比较 → 条件写」的事务路径
+                    //  （与 replace 同一事务原语；FOR UPDATE 不可用的单连接驱动本就串行执行）。
+                    if (valueType === 'json') {
+                        return this.withAtomicTransaction(`atomic compareAndSet ${target.recordName}.${target.field}`, async () => {
+                            const lockP = this.getPlaceholder()
+                            const rows = await this.db.query<Record<string, unknown>>(
+                                `SELECT "${fieldName}" AS value FROM "${tableName}" WHERE "${idField}" = ${lockP()}${this.supportsForUpdate() ? ' FOR UPDATE' : ''}`,
+                                [target.id],
+                                `atomic compareAndSet lock ${target.recordName}.${target.field}`
+                            )
+                            if (!rows.length) return false
+                            const current = this.parseRecordFieldValue<T>(rows[0].value, valueType)
+                            const currentForCompare = current === null ? (defaultValue ?? null) : current
+                            if (canonicalJSONStringify(currentForCompare) !== canonicalJSONStringify(expected ?? null)) return false
+                            const updateP = this.getPlaceholder()
+                            const valuePlaceholder = updateP()
+                            const idPlaceholder = updateP()
+                            await this.db.update(
+                                `UPDATE "${tableName}" SET "${fieldName}" = ${valuePlaceholder} WHERE "${idField}" = ${idPlaceholder}`,
+                                [this.normalizeRecordFieldParam(next, valueType), target.id],
+                                undefined,
+                                `atomic compareAndSet ${target.recordName}.${target.field}`
+                            )
+                            return true
+                        })
+                    }
                     const nextPlaceholder = p()
                     const idPlaceholder = p()
                     const defaultPlaceholder = p()
