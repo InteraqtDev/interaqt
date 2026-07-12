@@ -328,6 +328,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             record: newLinkRecord
                         })
                         // 新 link 的 filtered relation 视图成员资格在物理写入完成后求值（settlePostWriteChecks）。
+                        // 视图 create 事件 payload 的 defaults 由 enqueuePostWriteCreationCheck 统一补齐。
                         this.filteredEntityManager.enqueuePostWriteCreationCheck(
                             events,
                             combinedRecordIdRef.info!.linkName!,

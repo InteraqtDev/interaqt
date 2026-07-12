@@ -64,10 +64,16 @@ export class SQLiteDB implements Database{
         this.logger = this.options?.logger || dbConsoleLogger
     }
     async open(forceDrop = false) {
-        this.db = new SQLite(this.file, this.options)
-        // CAUTION forceDrop 必须真正清空已有表。忽略它的话 :memory: 库碰巧没问题（每次
-        //  new 都是新库），但文件库上 setup(true) 会在 CREATE TABLE 处报 "table already
-        //  exists"——与 PG/PGLite 的 forceDrop 语义（重建）不一致。
+        // CAUTION open/openForSchemaRead 必须幂等复用已有连接（与 PG 的 `if (this.pool)` /
+        //  MySQL 的 `if (this.db) return` 同构）：better-sqlite3 的每个 `new SQLite(':memory:')`
+        //  都是独立的空库。setup(true) 之后的 manifest 校验 / 迁移路径（setup(false)、
+        //  generateMigrationDiff → openForSchemaRead / open(false)）若无条件 new，会把
+        //  this.db 替换成全新空库——已建的表、数据、manifest 全部"消失"（旧连接成孤儿），
+        //  文件库则泄漏连接句柄。
+        if (!this.db || !this.db.open) {
+            this.db = new SQLite(this.file, this.options)
+        }
+        // CAUTION forceDrop 必须真正清空已有表：与 PG/PGLite 的 forceDrop 语义（重建）一致。
         if (forceDrop) {
             const tables = this.db.prepare(
                 `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
@@ -79,6 +85,7 @@ export class SQLiteDB implements Database{
         await this.idSystem.setup()
     }
     async openForSchemaRead() {
+        if (this.db && this.db.open) return
         this.db = new SQLite(this.file, this.options)
     }
     async setupInternalComputationState() {

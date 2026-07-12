@@ -1199,7 +1199,20 @@ RETURNING "lastValue" AS value`,
     }
     async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = [], shouldDispatch?: (event: RecordMutationEvent) => boolean): Promise<unknown> {
         if (!this.isInTransaction()) {
-            return this.withAtomicTransaction('storage mutation with events', async () => this.callWithEvents(method, args, events, shouldDispatch))
+            // CAUTION 幻影事件隔离（r22 F-2）：withAtomicTransaction 的重试会整体重跑本方法，
+            //  而 events.push 发生在事务函数内部（COMMIT 之前）。attempt 成功执行到 push、
+            //  却在 COMMIT 时失败（PG SERIALIZABLE 的 first-committer-wins 冲突正是在 COMMIT
+            //  时报 40001）并重试时，调用方数组里会残留已回滚 attempt 的事件——事件数与
+            //  实际提交行数分裂，消费方（手工派发、测试断言）会看到指向不存在记录的幻影事件。
+            //  每次 attempt 用全新数组（ledger / post-write 队列按数组实例区分作用域，跨
+            //  attempt 复用同一数组还会串批），提交成功后一次性搬运给调用方。
+            let attemptEvents: RecordMutationEvent[] = []
+            const result = await this.withAtomicTransaction('storage mutation with events', async () => {
+                attemptEvents = []
+                return this.callWithEvents(method, args, attemptEvents, shouldDispatch)
+            })
+            events.push(...attemptEvents)
+            return result
         }
         try {
             const methodEvents:RecordMutationEvent[] = []

@@ -202,11 +202,24 @@ export class Controller {
             this.eventSourcesByUUID.set(es.uuid, es)
         }
 
-        const registeredRecordNames = new Set(this.entities.map(e => e.name))
+        const entitiesByName = new Map(this.entities.map(e => [e.name, e]))
         for (const es of this.eventSources) {
-            if (es.entity && es.entity.name && !registeredRecordNames.has(es.entity.name)) {
+            if (!es.entity || !es.entity.name) continue
+            const existing = entitiesByName.get(es.entity.name)
+            // CAUTION fail fast：用户实体与 eventSource 的事件实体同名时，此前静默跳过注入——
+            //  事件仍按系统字段（interactionName/payload/...）写入，但 schema 是用户声明的列集，
+            //  未声明字段被写路径静默丢弃。监听该记录的 StateMachine trigger / Transform eventDeps
+            //  按 record.interactionName 匹配永不命中，整个响应式管线对交互失明且零告警。
+            if (existing && existing !== es.entity) {
+                throw new Error(
+                    `Entity name "${es.entity.name}" conflicts with the event entity of eventSource "${es.name || es.uuid}". ` +
+                    `Event records are written with the event source's own schema; shadowing it with a user entity silently drops event fields. ` +
+                    `Rename the user entity (names starting with "_" are reserved for system records).`
+                )
+            }
+            if (!existing) {
                 this.entities.push(es.entity)
-                registeredRecordNames.add(es.entity.name)
+                entitiesByName.set(es.entity.name, es.entity)
             }
         }
 

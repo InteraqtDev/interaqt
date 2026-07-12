@@ -168,6 +168,22 @@ export class ComputationSourceMapManager {
      * 被写进了注释，但只在数据驱动轨道上被执行——注释没有执行力，不变量有。
      */
     private assertListenerReachable(source: EntityEventSourceMap): void {
+        // CAUTION 事件类型是监听声明面的第二根轴（第一根是 recordName，r18 收口）：
+        //  storage 只发 create/update/delete 三种事件，监听树按 (recordName, type) 二维索引。
+        //  typo（'creat'、'updated'、大小写错误）会注册一个永不命中的死监听——计算永久静默
+        //  陈旧，与 recordName typo 完全同构。所有生产者（StateMachine trigger、Transform
+        //  eventDeps、dataDep 转换、addSourceMap 扩展点）都经本方法收口。
+        if (source.type !== 'create' && source.type !== 'update' && source.type !== 'delete') {
+            throw new ComputationProtocolError(
+                `${this.describeComputation(source.computation)} listens to "${source.type}" events of record "${source.recordName}", ` +
+                `but mutation events only have type 'create' | 'update' | 'delete' — this listener can never fire and the computation would stay silently stale. Check the trigger/eventDep type for a typo.`,
+                {
+                    handleName: source.computation.constructor.name,
+                    dataContext: source.computation.dataContext,
+                    computationPhase: 'source-map-initialization'
+                }
+            )
+        }
         if (!this.knownRecordNames.has(source.recordName)) {
             const dictHint = this.controller.dict.some(dictItem => dictItem.name === source.recordName)
                 ? ` "${source.recordName}" is a global dictionary: dictionary changes are emitted as events on the "${DICTIONARY_RECORD}" record — declare { recordName: '${DICTIONARY_RECORD}', type: 'update', record: { key: '${source.recordName}' } } instead.`
