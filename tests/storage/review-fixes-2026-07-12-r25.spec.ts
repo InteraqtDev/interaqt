@@ -76,6 +76,11 @@ describe("r25 F-1 — in-row base create events carry default-only fields", () =
     const linkCreate = events.find(e => e.recordName === 'UserProfile' && e.type === 'create');
     expect(profileCreate?.record?.score).toBe(42);
     expect(linkCreate?.record?.isActive).toBe(true);
+    // r25 F-1 端点子格（事件完备性预言机升级首跑抓出）：combined 嵌套新建的 id 在
+    // preprocess 步骤 1 分配给替换后的容器，link 事件端点此前取的是替换前的原始
+    // rawData——端点缺 id，按端点定位的下游（computeTarget 等）拿到 undefined。
+    // 本 fixture 中 User 是 relation source，Profile（combined 嵌套新建）在 target 端。
+    expect(linkCreate?.record?.target?.id).toBe(profile.id);
     await db.close();
   });
 

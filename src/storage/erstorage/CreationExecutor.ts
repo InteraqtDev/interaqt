@@ -336,7 +336,11 @@ export class CreationExecutor {
                 }
 
                 const linkRecord = {...newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]}
-                linkRecord[record.info!.isRecordSource() ? 'target' : 'source'] = record.getData()
+                // CAUTION 端点必须取 newRawDataWithNewIds 上的容器对象（r25 F-1 端点子格）：
+                //  combined 嵌套新建的 id 在步骤 1 分配给了**替换后的容器**，record.getData()
+                //  返回的是替换前的原始 rawData——端点缺 id，按端点定位的下游
+                //  （computeTarget(event.record.target.id) 等）拿到 undefined。
+                linkRecord[record.info!.isRecordSource() ? 'target' : 'source'] = {...newRawDataWithNewIds[record.info!.attributeName]}
                 linkRecord[record.info!.isRecordSource() ? 'source' : 'target'] = {...newRawDataWithNewIds}
                 delete linkRecord.target[LINK_SYMBOL]
                 delete linkRecord.source[LINK_SYMBOL]

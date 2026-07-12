@@ -1,5 +1,5 @@
 /**
- * 事件完备性预言机（r17 复盘落地项，盲区 2）。
+ * 事件完备性预言机（r17 复盘落地项，盲区 2；r25 扩展 payload 完备性）。
  *
  * 契约：storage 写操作的「逻辑数据面 diff」必须与「事件面」互相解释——
  *  1. 每个新出现的记录必须有对应的 create 事件（缺失 = 下游计算漏加）；
@@ -8,11 +8,12 @@
  *     （缺失 = r17 F-2 类「数据面写了、事件面沉默」的静默陈旧）；
  *  4. 反向：create/delete 事件必须对应真实出现/消失的记录（幻影事件 = 下游虚加/虚减）。
  *     update 事件允许幂等（重写同值也发事件是既定语义），只要求 id 真实存在。
- *
- * 快照取自 ER 查询层（实体按 ['*']，关系带 source/target id），即用户可见的逻辑面——
- * flash-out/relocate 的物理行搬迁（刻意不发实体事件，见 combinedRecordEvents.spec.ts）
- * 在逻辑面上无 diff，天然不会误报。事件流中不属于声明面（虚拟 link、内部记录）的
- * 事件名不参与对账。
+ *  5. create 事件 payload 完备性（r25 F-1 落地）：快照完备性契约要求「缺席的普通值
+ *     属性 ⟺ 库里 NULL」（r21 F-1 的本地 match 求值、trigger/eventDep 深度匹配都建立
+ *     在这条契约上）。行内产生点手工拼 payload 时 default-only 字段曾整族缺席——
+ *     所以 create 事件 payload 必须覆盖行上全部非 NULL 的普通值字段且值一致。
+ *     computed / computation 属性是契约的显式例外（create 事件不保证携带），
+ *     经 schema.createPayloadExemptField 声明。
  */
 import { expect } from "vitest";
 import { EntityQueryHandle, MatchExp } from "@storage";
@@ -29,6 +30,12 @@ export type EventCompletenessSchema = {
      * 由 atomic 原语直写、刻意不产生事件；计算结果属性本身有 update 事件，不在此列）。
      */
     ignoreField?: (fieldName: string) => boolean
+    /**
+     * create 事件 payload 完备性检查（第 5 条）的豁免字段：computed / computation 属性
+     * 由写路径联动求值，create 事件不保证携带（r21 F-1 对它们走保守 full recompute）。
+     * 按 (recordName, fieldName) 判定；未提供时不豁免任何字段。
+     */
+    createPayloadExemptField?: (recordName: string, fieldName: string) => boolean
 }
 
 /** runtime（带 Controller/计算）场景的默认忽略规则：绑定状态列 + 内部行号列。 */
@@ -78,11 +85,12 @@ export function expectEventsToExplainDiff(
     after: LogicalSnapshot,
     events: RecordMutationEvent[],
     label = '',
-    options?: { ignoreField?: (fieldName: string) => boolean }
+    options?: { ignoreField?: (fieldName: string) => boolean, createPayloadExemptField?: (recordName: string, fieldName: string) => boolean }
 ) {
     const trackedNames = new Set(before.keys())
     const relevantEvents = events.filter(e => trackedNames.has(e.recordName))
     const ignoreField = options?.ignoreField
+    const createPayloadExemptField = options?.createPayloadExemptField
 
     for (const recordName of trackedNames) {
         const beforeRows = before.get(recordName)!
@@ -109,6 +117,28 @@ export function expectEventsToExplainDiff(
         for (const id of createdIds) {
             expect(createEventIds.has(id),
                 `${label} [event-completeness] ${recordName}#${id} appeared in storage but has NO create event`).toBe(true)
+        }
+        // 5. create 事件 payload 完备性：行上全部非 NULL 普通值字段必须出现在 payload 且值一致
+        //    （快照完备性契约——r21 F-1 的本地求值把缺席键解读为 NULL；r25 F-1 的逃逸面）。
+        const createEventsById = new Map(relevantEvents
+            .filter(e => e.recordName === recordName && e.type === 'create')
+            .map(e => [String(e.record?.id), e]))
+        for (const id of createdIds) {
+            const createEvent = createEventsById.get(id)
+            if (!createEvent?.record) continue
+            const row = afterRows.get(id)!
+            for (const [field, value] of Object.entries(row)) {
+                if (value === null || value === undefined) continue
+                if (ignoreField?.(field)) continue
+                if (createPayloadExemptField?.(recordName, field)) continue
+                const payloadValue = field === 'source' || field === 'target'
+                    ? (createEvent.record[field] as { id?: unknown } | undefined)?.id
+                    : createEvent.record[field]
+                expect(JSON.stringify(payloadValue ?? null) === JSON.stringify(value),
+                    `${label} [event-completeness] ${recordName}#${id} create event payload misses/diverges on field "${field}" ` +
+                    `(row: ${JSON.stringify(value)}, payload: ${JSON.stringify(payloadValue ?? null)}) — ` +
+                    `create event contract is defaults + payload; absent plain value keys are read as NULL by downstream local evaluation`).toBe(true)
+            }
         }
         for (const id of deletedIds) {
             expect(deleteEventIds.has(id),
@@ -157,7 +187,7 @@ export async function withEventCompleteness(
     const events: RecordMutationEvent[] = []
     await op(events)
     const after = await snapshotLogicalState(handle, schema)
-    expectEventsToExplainDiff(before, after, events, label, { ignoreField: schema.ignoreField })
+    expectEventsToExplainDiff(before, after, events, label, { ignoreField: schema.ignoreField, createPayloadExemptField: schema.createPayloadExemptField })
     return events
 }
 
@@ -189,7 +219,7 @@ export async function withRuntimeEventCompleteness(
         storage.unlisten?.(collector)
     }
     const after = await snapshotLogicalState(storage, effectiveSchema)
-    expectEventsToExplainDiff(before, after, events, label, { ignoreField: effectiveSchema.ignoreField })
+    expectEventsToExplainDiff(before, after, events, label, { ignoreField: effectiveSchema.ignoreField, createPayloadExemptField: effectiveSchema.createPayloadExemptField })
     return events
 }
 
