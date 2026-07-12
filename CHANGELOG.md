@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.3](https://github.com/interaqtdev/interaqt/compare/v4.0.2...v4.0.3) (2026-07-12)
+
+### Bug Fixes
+
+* **builtins:** PayloadItem.type whitelist + Entity/Relation requires base; Payload rejects duplicate item names (r21 I-2) ([f740ef8](https://github.com/interaqtdev/interaqt/commit/f740ef856e633c72cb434a652c35b9916e579dd0)), closes [#4](https://github.com/interaqtdev/interaqt/issues/4)
+* **core:** BoolExp atom handlers must return booleans - fail-closed (r21 I-3) ([0abe114](https://github.com/interaqtdev/interaqt/commit/0abe11407c7d98458679b25b6145ac96c0c36a8f))
+* **runtime:** records-match local evaluation mirrors SQL semantics (r21 F-1) ([9e5c56b](https://github.com/interaqtdev/interaqt/commit/9e5c56b576bedca29b749e6604ceb6ff6e11618b))
+* **storage:** combined addRelation-steal emits old-owner membership events; between rejects null bounds (r21 F-2, I-1) ([4ebf32a](https://github.com/interaqtdev/interaqt/commit/4ebf32a990940bb0b968e3adf798152cd3a7daca))
+
 ## [4.0.2](https://github.com/interaqtdev/interaqt/compare/v4.0.1...v4.0.2) (2026-07-11)
 
 ### Bug Fixes
