@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.0.4](https://github.com/interaqtdev/interaqt/compare/v4.0.3...v4.0.4) (2026-07-12)
+
+### Bug Fixes
+
+* **drivers:** SQLite open/openForSchemaRead reuse existing connection (r22 I-5) ([5af1c72](https://github.com/interaqtdev/interaqt/commit/5af1c72f859cea50b863971eaf8ae4b2a11e6d66))
+* **runtime,core:** fail fast on event-entity shadowing, unknown listener type, StateMachine graph violations (r22 I-1, I-2) ([e2a7f57](https://github.com/interaqtdev/interaqt/commit/e2a7f576457b2dc12695a6546a903c4fe0a2da62))
+* **runtime:** isolate per-attempt events in transaction retry; delete events use event.record as old-state match snapshot (r22 F-2, I-3) ([40b5358](https://github.com/interaqtdev/interaqt/commit/40b5358654d97c6a523f9373765f6cdde7d07165))
+* **storage:** resolve filtered-endpoint names in membership hooks; unify inline-link view event defaults (r22 F-1, I-4) ([caa0056](https://github.com/interaqtdev/interaqt/commit/caa005697863e1d5149ea9e0f9689dd341e763ea))
+
 ## [4.0.3](https://github.com/interaqtdev/interaqt/compare/v4.0.2...v4.0.3) (2026-07-12)
 
 ### Bug Fixes
