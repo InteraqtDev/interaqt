@@ -3,6 +3,7 @@ import { BoolExp } from "@core"
 import { EntityToTableMap, MapData } from "./EntityToTableMap.js"
 import { RecordQueryAgent, Record } from "./RecordQueryAgent.js"
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js"
+import { NewRecordData, RawEntityData } from "./NewRecordData.js"
 import { RecordMutationEvent } from "@runtime"
 
 export interface FilteredEntityDependency {
@@ -143,12 +144,30 @@ export class FilteredEntityManager {
     // ============ 依赖管理功能 ============
     
     /**
+     * 实体名 → 物理 base 名的统一归一化。
+     * CAUTION 名字空间收口（r22 F-1）：同一条物理记录可以有多个声明名——filtered entity/
+     *  relation 的视图名、以 filtered entity 为端点的 relation 存下的 link.sourceRecord/
+     *  targetRecord（Setup 原样保存声明名）。依赖表按物理 base 名注册（initializeDependencies
+     *  用 resolvedBaseRecordName），任何以声明名查询依赖的读者（collectLinkMembershipChecks
+     *  经 link 端点名进来）都会拿到空集——查询面正确、成员资格事件整族缺失。
+     *  所有「实体名 → 依赖/视图」的入口一律先经这里归一化，不允许第二套解析。
+     */
+    private resolveBaseRecordName(entityName: string): string {
+        return this.map.data.records[entityName]?.resolvedBaseRecordName || entityName
+    }
+
+    /**
      * 分析 filtered entity 的过滤条件，提取所有依赖的实体和路径
      */
     analyzeDependencies(filteredEntityName: string, baseEntityName: string, matchExpression: MatchExpressionData): FilteredEntityDependency {
         const dependencies: FilteredEntityDependency['dependencies'] = []
         this.extractDependenciesFromExpression(baseEntityName, matchExpression, dependencies)
-        
+        // 依赖项的 entityName 统一归一化为物理 base 名（路径中段解析出的 info.recordName
+        // 在端点为 filtered entity 的 relation 上会是声明名）。
+        for (const dep of dependencies) {
+            dep.entityName = this.resolveBaseRecordName(dep.entityName)
+        }
+
         const dependency: FilteredEntityDependency = {
             filteredEntityName,
             baseEntityName,
@@ -162,7 +181,7 @@ export class FilteredEntityManager {
         //  如果这里再无条件注册一次，update 时会对同一条记录做双倍的 membership 查询（结果幂等但白做）。
         const entityNamesToRegister = new Set<string>(dependencies.map(dep => dep.entityName))
         // 源实体自身也要注册（即使谓词没有直接引用它的属性）
-        entityNamesToRegister.add(baseEntityName)
+        entityNamesToRegister.add(this.resolveBaseRecordName(baseEntityName))
         for (const entityName of entityNamesToRegister) {
             if (!this.dependencies.has(entityName)) {
                 this.dependencies.set(entityName, [])
@@ -251,9 +270,10 @@ export class FilteredEntityManager {
     
     /**
      * 获取某个实体变更时影响的所有 filtered entity
+     * （入口名可以是声明名——filtered 视图名、filtered 端点 relation 存下的端点名——统一归一化）
      */
     getAffectedFilteredEntities(entityName: string): FilteredEntityDependency[] {
-        return this.dependencies.get(entityName) || []
+        return this.dependencies.get(this.resolveBaseRecordName(entityName)) || []
     }
     
     /**
@@ -368,7 +388,8 @@ export class FilteredEntityManager {
             }
         };
         
-        collectFiltered(baseEntityName);
+        // filteredBy 挂在物理 base record 上；入口名可能是声明名，统一归一化。
+        collectFiltered(this.resolveBaseRecordName(baseEntityName));
         return result;
     }
 
@@ -391,13 +412,15 @@ export class FilteredEntityManager {
         // 没有 events 数组就不需要成员资格事件，跳过全部求值。
         if (!events || !recordIds.length) return []
 
-        const dependencies = this.getAffectedFilteredEntities(entityName)
+        // 依赖表按物理 base 名注册；入口名统一归一化（见 resolveBaseRecordName）。
+        const resolvedEntityName = this.resolveBaseRecordName(entityName)
+        const dependencies = this.getAffectedFilteredEntities(resolvedEntityName)
         if (!dependencies.length) return []
 
         const checks: MembershipCheck[] = []
         for (const dependency of dependencies) {
             // 同一实体可能以多条路径出现在同一个依赖中，逐条处理。
-            const depInfos = dependency.dependencies.filter(d => d.entityName === entityName)
+            const depInfos = dependency.dependencies.filter(d => d.entityName === resolvedEntityName)
             const affectedIdSet = new Set<string>()
             for (const depInfo of depInfos) {
                 if (changedFields) {
@@ -530,15 +553,25 @@ export class FilteredEntityManager {
     /**
      * 登记一个"物理写入完成后需要求值"的行内记录创建（merged link / combined 记录）。
      * 写入完成点（insertSameRowData / updateSameRowData）调用 settlePostWriteChecks 统一结算。
+     *
+     * CAUTION 视图 create 事件的 payload 契约是 defaults + payload（与 base create 事件、
+     *  createRecord 的 membershipEventPayload 同构，r16 R-1）。行内记录的产生点（preprocess
+     *  的 combined/merged link、flashOut 的抢夺新 link）拼 payload 时只有用户显式给出 `&`
+     *  数据才带 defaults——「谓词/匹配字段仅有默认值」的形态下所有产生点都会漏（r22 I-4）。
+     *  这里是行内视图 creation 检查的唯一入口，统一用 NewRecordData 的 defaults 规则补齐
+     *  （只补缺失键；物理写入本身已按同一规则落列，这里只是让事件 payload 与行一致）。
      */
     enqueuePostWriteCreationCheck(events: RecordMutationEvent[] | undefined, recordName: string, recordId: string, fullRecord: Record): void {
         if (!events || !this.getFilteredEntitiesForBase(recordName).length) return
+        // 顶层的 `&`（link 数据）键不属于本记录的属性面，且脱离父 info 无法解析——剥掉后再取 defaults。
+        const { [LINK_SYMBOL]: _linkData, ...plainRecord } = fullRecord as RawEntityData
+        const defaults = new NewRecordData(this.map, recordName, plainRecord).defaultValues
         let queue = postWriteChecksByEvents.get(events)
         if (!queue) {
             queue = []
             postWriteChecksByEvents.set(events, queue)
         }
-        queue.push({ kind: 'creation', recordName, recordId, fullRecord })
+        queue.push({ kind: 'creation', recordName, recordId, fullRecord: { ...defaults, ...fullRecord } })
     }
 
     /**
