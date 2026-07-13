@@ -104,6 +104,15 @@ export class UniqueConstraint implements UniqueConstraintInstance {
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`UniqueConstraint name "${args.name}" is invalid. Constraint names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
     }
+    // static.public.properties.constraints 此前从未接线（r26 I-2 / r16#4 家族）：
+    //  空 properties / 重名被声明期静默接受，直到 setup 深处才以驱动错误或 ConstraintSetupError 暴露。
+    if (!Array.isArray(args.properties) || args.properties.length === 0) {
+      throw new Error(`UniqueConstraint "${args.name}" requires a non-empty properties array.`);
+    }
+    const uniqueNames = new Set(args.properties);
+    if (uniqueNames.size !== args.properties.length) {
+      throw new Error(`UniqueConstraint "${args.name}" properties must be unique; got [${args.properties.join(', ')}].`);
+    }
 
     const instance = new UniqueConstraint(args, options);
     const existing = this.instances.find(i => i.uuid === instance.uuid);

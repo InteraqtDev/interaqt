@@ -197,8 +197,16 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
             throw error
         }
     }
-    close() {
-        return this.db.close()
+    private closed = false
+    async close() {
+        // CAUTION close 必须幂等（r26 I-4）：二次 close 不得抛错。
+        if (this.closed || !this.db) return
+        this.closed = true
+        try {
+            await this.db.close()
+        } catch {
+            // already closed
+        }
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)

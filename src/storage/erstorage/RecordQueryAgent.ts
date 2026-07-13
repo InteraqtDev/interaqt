@@ -211,8 +211,24 @@ export class RecordQueryAgent implements RecordOperationAgent {
 
                     // 即将随物理清列消失的旧 link（旧 combined link + 被替换的旧 merged link）的
                     // filtered relation 视图成员资格：谓词只由 SQL 求值，必须在清列之前快照。
+                    // CAUTION delete 事件 payload 必须携带 source/target 端点（与 DeletionExecutor /
+                    //  同函数内 merged-link replace delete / create 事件同一契约，r26 F-1）：
+                    //  按端点定位的下游（StateMachine computeTarget、Transform eventDeps）
+                    //  此前对 flashOut create-steal 产生的 link delete 失明。视图 settle 复用同一
+                    //  快照，否则 filtered relation 名上的 delete 事件同样缺端点。
                     const oldCombinedLinkRecord = recordWithCombined.id
-                        ? recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                        ? (() => {
+                            const attrInfo = combinedRecordIdRef.info!
+                            const linkPayload = recordWithCombined[attrInfo.attributeName!][LINK_SYMBOL]
+                            if (!linkPayload) return undefined
+                            const oldOwnerRef = { id: recordWithCombined.id }
+                            const oldRelatedRef = { id: recordWithCombined[attrInfo.attributeName!].id }
+                            return {
+                                ...linkPayload,
+                                [attrInfo.isRecordSource() ? 'source' : 'target']: oldOwnerRef,
+                                [attrInfo.isRecordSource() ? 'target' : 'source']: oldRelatedRef,
+                            }
+                        })()
                         : undefined
                     const oldCombinedLinkViewSnapshot = oldCombinedLinkRecord?.id
                         ? await this.filteredEntityManager.collectInlineDeletionSnapshot(combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord], events)
@@ -255,7 +271,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
                         events?.push({
                             type: 'delete',
                             recordName: combinedRecordIdRef.info!.linkName!,
-                            record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
+                            record: oldCombinedLinkRecord!,
                         })
                         if (events && oldCombinedLinkViewSnapshot) {
                             this.filteredEntityManager.settleDeletionMemberships(oldCombinedLinkViewSnapshot, combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord!], events, events)

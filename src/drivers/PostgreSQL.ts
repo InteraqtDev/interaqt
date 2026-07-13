@@ -147,6 +147,7 @@ export class PostgreSQLDB implements Database{
         //  再走 system.setup 调用 open(false)。如果这里无条件 new Pool，旧池会被孤儿化：
         //  close() 只会关掉最新的池，残留的空闲连接之后被 DROP DATABASE ... WITH (FORCE)
         //  之类的管理命令杀死时，会在进程里产生无人处理的 'error' 事件。
+        this.closed = false
         if (this.pool && forceDrop) {
             // forceDrop 会摧毁当前数据库，先优雅关闭已有的池，避免它的空闲连接被强杀。
             await this.pool.end()
@@ -346,8 +347,25 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         })
         return  await this.getQueryable().query(sql)
     }
-    close() {
-        return this.pool ? this.pool.end() : this.db.end()
+    private closed = false
+    async close() {
+        // CAUTION close 必须幂等（r26 I-4 / r22–r25 open 幂等家族的对称面）：
+        //  二次 close 或 teardown 路径重复调用不得抛错。
+        if (this.closed) return
+        this.closed = true
+        if (this.pool) {
+            await this.pool.end()
+            this.pool = undefined
+            return
+        }
+        // open() 前仅构造了未 connect 的 Client；无池时可跳过。
+        if (this.db && typeof (this.db as { end?: () => Promise<void> }).end === 'function') {
+            try {
+                await this.db.end()
+            } catch {
+                // already closed / never connected
+            }
+        }
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)

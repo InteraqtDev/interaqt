@@ -80,6 +80,7 @@ export class MysqlDB implements Database{
         //  Controller.setup(false) 会先经 prepareMigrationSchema 打开只读连接做 manifest 校验，
         //  再走 system.setup 调用 open(false)。此前无条件 createConnection 会把旧工作连接孤儿化，
         //  悬挂到服务端 wait_timeout。forceDrop 需要重建库，先关旧连接再走完整建库路径。
+        this.closed = false
         if (this.db && forceDrop) {
             await this.db.end()
             this.db = undefined as unknown as Connection
@@ -200,8 +201,16 @@ export class MysqlDB implements Database{
         })
         return  await this.db.query(sql)
     }
-    close() {
-        return this.db.end()
+    private closed = false
+    async close() {
+        // CAUTION close 必须幂等（r26 I-4）：二次 close 不得抛错。
+        if (this.closed || !this.db) return
+        this.closed = true
+        try {
+            await this.db.end()
+        } catch {
+            // already closed
+        }
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
