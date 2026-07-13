@@ -102,6 +102,16 @@ r22–r25 反复命名该形状，防御却仍是**修复时刻的人肉清单**
 4. **登记册升格**：delete 端点 = 多产生点声明面；驱动差异轴补 close 幂等。
 5. **回归双轨**：storage 形状断言 + runtime 事件轨消费（StateMachine）。
 
+### 同族收口 sweep（follow-up 轮，「delete 端点」契约在全部兄弟格上执行）
+
+按 fix-the-class 清单枚举「事件端点契约」的全部产生点/消费轨后，又收口三个同族缺口，全部有红-绿证据：
+
+6. **预言机第 7 条（update 对称面）**：relation update 事件必须经 merged 视图（`{...oldRecord, ...record}`）读出端点且与变更前快照一致。首跑抓出**行内同 id `&` 原地更新**的 link update 事件 oldRecord 手工拼自 `LINK_SYMBOL` 数据——无端点（canonical `updateRelationByName` 路径带端点，行内路径是它的第二产生点）。修复：行内路径 oldRecord 显式补端点。
+7. **视图轨端点**：`settleDeletionMemberships` 的 payload 来源快照（`recordsById`）此前在 merged-replace 分支存的是裸 `oldLink`——**filtered relation 名上的 delete 事件缺端点**（base 轨修了、视图轨漏，恰是 r25 F-1「两条消费轨」的 delete 版本）。修复：快照构造期即带端点。
+8. **close 幂等的真实服务器验证**：`driverCloseIdempotency.spec.ts`（env-gated）在真实 PG 16 / MySQL 8 上验证 double-close——SQLite/PGLite 格在 r26 回归里，四驱动格全部有运行时证据（r25 复盘规则 #1「sweep 必须有运行时探针」）。
+
+sweep 后全域绿：全量 `npm test` 2022 passed；`npm run test:postgres` @ 真实 PG 16 全部 7 套件 32 passed；MySQL 幂等套件 @ 真实 MySQL 8 passed。
+
 ---
 
 ## 五、仍然开放的结构性缺口

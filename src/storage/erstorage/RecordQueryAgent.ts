@@ -254,12 +254,20 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             const oldRelatedBeforeClear = stolenDataBeforeClear[mergedAttrInfo.attributeName]
                             const oldLink = oldRelatedBeforeClear?.[LINK_SYMBOL]
                             if (!oldLink?.id) continue
-                            const snapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(mergedAttrInfo.linkName, [oldLink], events)
+                            const stolenIsSourceBeforeClear = this.map.getLinkInfoByName(newEntityData.recordName)
+                                .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
+                            // CAUTION 视图快照的 recordsById 是 filtered relation delete 事件的
+                            //  payload 来源（settleDeletionMemberships 优先读它）——必须携带端点，
+                            //  否则视图名 delete 事件缺 source/target（r26 预言机第 6 条的视图轨兄弟格）。
+                            const oldLinkWithEndpoints = {
+                                ...oldLink,
+                                source: stolenIsSourceBeforeClear ? { id: stolenDataBeforeClear.id } : { id: oldRelatedBeforeClear.id },
+                                target: stolenIsSourceBeforeClear ? { id: oldRelatedBeforeClear.id } : { id: stolenDataBeforeClear.id },
+                            }
+                            const snapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(mergedAttrInfo.linkName, [oldLinkWithEndpoints], events)
                             if (snapshot) oldMergedLinkViewSnapshots.set(mergedAttrInfo.attributeName, snapshot)
                             // 被替换的旧 merged link 消失 ⇒ 两端实体的成员资格快照（同 r21 F-2，
                             //  与上方旧业务 link 的处理同构；须在物理清列之前采集）。
-                            const stolenIsSourceBeforeClear = this.map.getLinkInfoByName(newEntityData.recordName)
-                                .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
                             oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
                                 mergedAttrInfo.linkName,
                                 stolenIsSourceBeforeClear

@@ -19,6 +19,12 @@
  *     下游（StateMachine computeTarget、Transform eventDeps、Scheduler 脏集查询）把缺席
  *     端点读成 undefined → transfer/增量永不触发。存在性规则（#2）拦不住「有 delete
  *     但缺端点」——flashOut create-steal 曾在同函数兄弟分支已正确补端点的情况下漏网。
+ *  7. relation update 事件端点完备性（r26 对称面扫描落地）：merged 事件视图契约
+ *     （mergedMutationEventView = {...oldRecord, ...record}，r20 F-5）下，update 的端点
+ *     必须可从 record 或 oldRecord 读出且与变更前快照一致。canonical 路径靠
+ *     matchedEntity（含 managedRecordAttributes）带出端点；行内 `&` 原地更新路径
+ *     手工拼 oldRecord（LINK_SYMBOL 数据无端点），是 create(#5)/delete(#6) 的
+ *     update 同构兄弟格。
  */
 import { expect } from "vitest";
 import { EntityQueryHandle, MatchExp } from "@storage";
@@ -201,6 +207,34 @@ export function expectEventsToExplainDiff(
                     `${label} [event-completeness] ${recordName}#${id} field "${field}" changed in storage (` +
                     `${JSON.stringify(beforeRows.get(id)![field] ?? null)} -> ${JSON.stringify(afterRows.get(id)![field] ?? null)}` +
                     `) but no update event covers it (covered keys: ${JSON.stringify([...coveredKeys])})`).toBe(true)
+            }
+        }
+        // 7. relation update 事件端点完备性：merged 视图（{...oldRecord, ...record}）必须能读出
+        //    source.id / target.id，且与变更前快照一致（update 不改端点——改端点是 delete+create）。
+        if (isRelation) {
+            for (const event of updateEvents) {
+                const id = String(event.record?.id)
+                const beforeRow = beforeRows.get(id)
+                if (!beforeRow) continue
+                const mergedSourceId = (event.record?.source as { id?: unknown } | undefined)?.id
+                    ?? (event.oldRecord?.source as { id?: unknown } | undefined)?.id
+                const mergedTargetId = (event.record?.target as { id?: unknown } | undefined)?.id
+                    ?? (event.oldRecord?.target as { id?: unknown } | undefined)?.id
+                expect(mergedSourceId !== undefined && mergedSourceId !== null,
+                    `${label} [event-completeness] ${recordName}#${id} update event exposes no source.id via record/oldRecord — ` +
+                    `merged mutation view contract; computeTarget/pattern-match on relation updates stays blind without it`).toBe(true)
+                expect(mergedTargetId !== undefined && mergedTargetId !== null,
+                    `${label} [event-completeness] ${recordName}#${id} update event exposes no target.id via record/oldRecord`).toBe(true)
+                if (beforeRow.source !== undefined && beforeRow.source !== null) {
+                    expect(JSON.stringify(mergedSourceId) === JSON.stringify(beforeRow.source),
+                        `${label} [event-completeness] ${recordName}#${id} update event source.id diverges from pre-update snapshot ` +
+                        `(snapshot: ${JSON.stringify(beforeRow.source)}, merged view: ${JSON.stringify(mergedSourceId)})`).toBe(true)
+                }
+                if (beforeRow.target !== undefined && beforeRow.target !== null) {
+                    expect(JSON.stringify(mergedTargetId) === JSON.stringify(beforeRow.target),
+                        `${label} [event-completeness] ${recordName}#${id} update event target.id diverges from pre-update snapshot ` +
+                        `(snapshot: ${JSON.stringify(beforeRow.target)}, merged view: ${JSON.stringify(mergedTargetId)})`).toBe(true)
+                }
             }
         }
         // 4. 反向：无幻影 create/delete；update 的 id 必须真实

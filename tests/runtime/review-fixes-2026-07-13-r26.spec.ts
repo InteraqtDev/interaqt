@@ -232,6 +232,75 @@ describe('r26 I-3 — BoolExpressionData operator whitelist', () => {
   })
 })
 
+describe('r26 F-1 siblings — endpoint completeness across event types and view track', () => {
+  test('filtered relation view delete on create-steal carries endpoints', async () => {
+    const db = new PGLiteDB()
+    await db.open()
+    const User = Entity.create({ name: 'User', properties: [Property.create({ name: 'name', type: 'string' })] })
+    const Profile = Entity.create({ name: 'Profile', properties: [Property.create({ name: 'nickname', type: 'string' })] })
+    const OwnProfile = Relation.create({
+      source: User, sourceProperty: 'profile', target: Profile, targetProperty: 'owner',
+      type: '1:1', isTargetReliance: true,
+      properties: [Property.create({ name: 'isActive', type: 'boolean', defaultValue: () => true })],
+    })
+    const ActiveOwn = Relation.create({
+      name: 'ActiveOwnProfile',
+      baseRelation: OwnProfile,
+      sourceProperty: 'activeProfile',
+      targetProperty: 'activeOwner',
+      matchExpression: MatchExp.atom({ key: 'isActive', value: ['=', true] }),
+    })
+    const setup = new DBSetup([User, Profile], [OwnProfile, ActiveOwn], db)
+    await setup.createTables()
+    const handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+
+    const a = await handle.create('User', { name: 'A', profile: { nickname: 'p1' } })
+    const aRow = await handle.findOne('User', MatchExp.atom({ key: 'id', value: ['=', a.id] }), undefined,
+      ['id', ['profile', { attributeQuery: ['id'] }]])
+    const events: RecordMutationEvent[] = []
+    await handle.create('User', { name: 'B', profile: { id: aRow.profile.id } }, events)
+
+    const viewDeletes = events.filter(e => e.type === 'delete' && e.recordName === 'ActiveOwnProfile')
+    expect(viewDeletes.length).toBe(1)
+    expect(viewDeletes[0]!.record!.source?.id).toBe(a.id)
+    expect(viewDeletes[0]!.record!.target?.id).toBe(aRow.profile.id)
+    // base delete alongside, also with endpoints (rule 6 canonical)
+    const baseDeletes = events.filter(e => e.type === 'delete' && e.recordName === OwnProfile.name)
+    expect(baseDeletes[0]!.record!.source?.id).toBe(a.id)
+    await db.close()
+  })
+
+  test('in-place & link update event exposes endpoints (rule 7)', async () => {
+    const db = new PGLiteDB()
+    await db.open()
+    const User = Entity.create({ name: 'User', properties: [Property.create({ name: 'name', type: 'string' })] })
+    const Team = Entity.create({ name: 'Team', properties: [Property.create({ name: 'title', type: 'string' })] })
+    const Membership = Relation.create({
+      source: User, sourceProperty: 'team', target: Team, targetProperty: 'members', type: 'n:1',
+      properties: [Property.create({ name: 'role', type: 'string' })],
+    })
+    const setup = new DBSetup([User, Team], [Membership], db)
+    await setup.createTables()
+    const handle = new EntityQueryHandle(new EntityToTableMap(setup.map), db)
+
+    const team = await handle.create('Team', { title: 't1' })
+    const user = await handle.create('User', { name: 'u1', team: { id: team.id, '&': { role: 'member' } } })
+
+    const events: RecordMutationEvent[] = []
+    // same-id in-place '&' update — the in-row branch that previously emitted endpoint-less oldRecord
+    await handle.update('User', MatchExp.atom({ key: 'id', value: ['=', user.id] }),
+      { team: { id: team.id, '&': { role: 'admin' } } }, events)
+
+    const linkUpdates = events.filter(e => e.type === 'update' && e.recordName === Membership.name)
+    expect(linkUpdates.length).toBe(1)
+    const merged = { ...linkUpdates[0]!.oldRecord, ...linkUpdates[0]!.record }
+    expect((merged.source as any)?.id).toBe(user.id)
+    expect((merged.target as any)?.id).toBe(team.id)
+    expect(linkUpdates[0]!.keys).toContain('role')
+    await db.close()
+  })
+})
+
 describe('r26 I-4 — driver close() idempotency', () => {
   test('SQLite/PGLite close() can be called twice', async () => {
     const sqlite = new SQLiteDB()
