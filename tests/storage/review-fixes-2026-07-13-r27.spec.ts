@@ -122,9 +122,14 @@ describe('r27 F-1 — combined child nested structures fail fast instead of sile
         const profiles = await handle.find('Profile', undefined, undefined, ['title'])
         expect(profiles[0].title).toBe('p1-renamed')
 
-        // 4. 同 id 幂等嵌套 ref（快照 round-trip）：company 先经独立 addRelation 建立，再整快照回写
+        // 4. 同 id 幂等嵌套 ref（快照 round-trip）：company 先经 update 轨建立（combined 行上
+        //    追加 merged FK 的正确轨道——addRelation 的 link-endpoint 认领会触发整行搬迁，
+        //    r27 F-5 守卫对跨关系同住行 fail-fast），再整快照回写
         const company = await handle.create('Company', { companyName: 'acme' })
-        await handle.addRelationByNameById('Profile_company_profiles_Company', u1.profile.id, company.id)
+        await handle.update('Profile', MatchExp.atom({ key: 'id', value: ['=', u1.profile.id] }), { company: { id: company.id } } as any)
+        // 同住 User link 完好（此前 addRelation 轨在这里静默销毁 owns link 而断言未察觉——F-5 的价值面）
+        const ownersAfterAssign = await handle.find('User', MatchExp.atom({ key: 'profile.id', value: ['=', u1.profile.id] }), undefined, ['name'])
+        expect(ownersAfterAssign.map(o => o.name)).toEqual(['u2'])
         const fullSnapshot = await handle.findOne('Profile', MatchExp.atom({ key: 'id', value: ['=', u1.profile.id] }), undefined,
             ['title', ['company', { attributeQuery: ['companyName'] }]])
         expect(fullSnapshot.company?.id).toBeTruthy()

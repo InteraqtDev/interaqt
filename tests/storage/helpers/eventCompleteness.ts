@@ -149,10 +149,18 @@ export function expectEventsToExplainDiff(
                 if (value === null || value === undefined) continue
                 if (ignoreField?.(field)) continue
                 if (createPayloadExemptField?.(recordName, field)) continue
-                const payloadValue = field === 'source' || field === 'target'
+                const isEndpoint = field === 'source' || field === 'target'
+                const payloadValue = isEndpoint
                     ? (createEvent.record[field] as { id?: unknown } | undefined)?.id
                     : createEvent.record[field]
-                expect(JSON.stringify(payloadValue ?? null) === JSON.stringify(value),
+                // 端点字段按记录**身份**比较（String 归一）：公开 API 面把 id 声明为 string，
+                //  调用方传字符串形态合法；「事件 payload 的 id JS 形态必须与读回侧严格同型」
+                //  是记录中的开放契约决策（r27 F-3 数据面已由 sameRecordId 修复；形态面
+                //  与 r25→r26 的 timestamp 归一化同一处理节奏——先记录决策再全面收口）。
+                const matches = isEndpoint
+                    ? String(payloadValue) === String(value)
+                    : JSON.stringify(payloadValue ?? null) === JSON.stringify(value)
+                expect(matches,
                     `${label} [event-completeness] ${recordName}#${id} create event payload misses/diverges on field "${field}" ` +
                     `(row: ${JSON.stringify(value)}, payload: ${JSON.stringify(payloadValue ?? null)}) — ` +
                     `create event contract is defaults + payload; absent plain value keys are read as NULL by downstream local evaluation`).toBe(true)

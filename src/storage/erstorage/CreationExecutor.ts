@@ -4,7 +4,7 @@ import { MatchExp, MatchExpressionData, MatchAtom } from "./MatchExp.js";
 import { AttributeQuery, AttributeQueryData } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
-import { assert } from "../utils.js";
+import { assert, sameRecordId } from "../utils.js";
 import { SQLBuilder } from "./SQLBuilder.js";
 import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
@@ -191,7 +191,7 @@ export class CreationExecutor {
             if (linkInfo.isTargetReliance) continue
             const attributeName = record.info!.attributeName
             const refId = record.getRef().id
-            if (currentRecord && currentRecord[attributeName]?.id === refId) continue
+            if (currentRecord && sameRecordId(currentRecord[attributeName]?.id, refId)) continue
             // FK 侧（宿主自己的旧值）由写入自身替换/上层 unlink 处理；这里解除的是"目标记录的旧 owner"。
             const otherSideAttr = record.info!.isRecordSource() ? 'target' : 'source'
             await this.agent.unlink(
@@ -291,7 +291,7 @@ export class CreationExecutor {
                 // 同 id 幂等 ref（含快照残留）放行：写回同值无害，且 Transform patch 依赖该形态。
                 if (nested.item.isRef() && !nested.item.isNull()
                     && oldChild?.[nestedAttr!]?.id !== undefined
-                    && oldChild[nestedAttr!].id === nested.item.getRef().id) continue
+                    && sameRecordId(oldChild[nestedAttr!].id, nested.item.getRef().id)) continue
                 throw new Error(
                     `in-place update of combined (same-row) record "${newEntityData.recordName}.${child.info!.attributeName}" ` +
                     `carries nested ${nested.kind} attribute "${nestedAttr}" that is not an idempotent same-id reference. ` +
@@ -346,7 +346,7 @@ export class CreationExecutor {
             for (const record of newEntityData.mergedLinkTargetRecordIdRefs.concat(newEntityData.combinedRecordIdRefs)) {
                 const attributeName = record.info!.attributeName
                 const oldRelated = oldRecord?.[attributeName]
-                if (!oldRelated?.id || newRawDataWithNewIds[attributeName]?.id !== oldRelated.id) continue
+                if (!oldRelated?.id || !sameRecordId(newRawDataWithNewIds[attributeName]?.id, oldRelated.id)) continue
 
                 // combined（三表合一）记录自身的嵌套值更新
                 if (record.info!.isMergedWithParent() && record.valueAttributes.length) {
@@ -414,7 +414,10 @@ export class CreationExecutor {
 
         // 2. 为我要新建 三表合一、或者我 mergedLink 的 的 关系 record 分配 id.
         for (let record of newEntityData.mergedLinkTargetNewRecords.concat(newEntityData.mergedLinkTargetRecordIdRefs, newEntityData.combinedNewRecords)) {
-            if (newRawDataWithNewIds[record.info!.attributeName].id !== oldRecord?.[record.info!.attributeName]?.id) {
+            // id 变化判定须对 JS 类型不敏感（sameRecordId）；两侧同为缺席（===）保持"未变化"原语义。
+            const newRelatedId = newRawDataWithNewIds[record.info!.attributeName].id
+            const oldRelatedId = oldRecord?.[record.info!.attributeName]?.id
+            if (!(newRelatedId === oldRelatedId || sameRecordId(newRelatedId, oldRelatedId))) {
                 newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] = {
                     ...(newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] || {}),
                     id: await this.database.getAutoId(record.info!.linkName!),
@@ -463,7 +466,7 @@ export class CreationExecutor {
         if (isUpdate && oldRecord) {
             for (const record of newEntityData.combinedRecordIdRefs) {
                 const attributeName = record.info!.attributeName
-                if (oldRecord[attributeName]?.id !== undefined && oldRecord[attributeName].id === record.getRef().id) {
+                if (oldRecord[attributeName]?.id !== undefined && sameRecordId(oldRecord[attributeName].id, record.getRef().id)) {
                     sameRowInPlaceAttributes.add(attributeName)
                 }
             }

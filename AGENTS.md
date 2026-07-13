@@ -210,6 +210,7 @@ Core types use: interface → CreateArgs → `Entity.create(args)` → static re
 - Do not manually set entity IDs — let the framework generate them
 - Always `await controller.setup(true)` before dispatching
 - When adding a test **matrix**, consult the dimension registry in `tests/runtime/WritingComputationTests.md` — every dimension (including degenerate values and the mechanism axes) must be explicitly decided
+- **Structural fuzzing**: `tests/storage/writePathStructuralFuzz.spec.ts` generates random schemas (all physical topologies emerge from declarations) × random nested write sequences, judged by the event-completeness oracle + structural invariants. When touching the storage write path, run it with an extended seed pool (`FUZZ_SEED_START=100 FUZZ_SEED_COUNT=100 FUZZ_OPS=40 npx vitest run tests/storage/writePathStructuralFuzz.spec.ts`); a failing seed prints its schema and full op log for deterministic reproduction (`FUZZ_SEED_START=<seed> FUZZ_SEED_COUNT=1 FUZZ_VERBOSE=1`). Known open finding families are tracked in `agentspace/output/quality-foundation-plan-r27.md` §1.4
 
 ### Bug fixing: fix the class, not the instance
 
@@ -220,6 +221,8 @@ Eighteen review rounds show the dominant failure mode is a **point fix for a rep
 3. **Promote known rules to checked invariants.** If the fix relies on a universal statement ("update events never fire under view names", "reliance is always 1:x"), assert it — declaration-time guard or setup-time invariant with a clear error. Comments have no enforcement power; a fail-fast protects users who hit the case before any test does.
 4. **Scan the neighborhood and backfill the registry.** Fix regressions must cover sibling cells (adjacent topology / operation / track values), and any new dimension the bug reveals must be added to the dimension registry in `tests/runtime/WritingComputationTests.md`.
 5. **For fatal bugs that escaped existing tests, record the escape analysis.** Write *why the test system missed it* (retrospective in `agentspace/output/`), and turn the lesson into a mechanism — a new axis, an oracle, an invariant — not prose. See `agentspace/output/r17-test-blindness-retrospective.md` and `r18-test-blindness-retrospective.md` for the method and precedents.
+6. **Contract decisions are fixes too.** Declaring a shape legal (or deprecated) changes the contract surface exactly like a bug fix does — enumerate every evaluation/compilation reader of that shape before landing the decision (r27 I-1: a shape declared legal at create time crashed all four evaluators).
+7. **Dialect/driver-branch fixes need dialect-matched probes.** A green test that exercises the sibling branch certifies nothing — the probe must run on the driver/path the fix claims to change (r27 I-3: the MySQL surrogate-key "fix" was dead code for a full round while its test passed on PGLite, where hashing is bypassed by design).
 
 ## Common patterns
 

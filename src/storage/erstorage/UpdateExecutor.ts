@@ -5,6 +5,7 @@ import { AttributeQuery } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
 import { NewRecordData, RawEntityData } from "./NewRecordData.js";
 import { SQLBuilder } from "./SQLBuilder.js";
+import { sameRecordId } from "../utils.js";
 import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 
@@ -71,7 +72,7 @@ export class UpdateExecutor {
                 for (const endpoint of ['source', 'target'] as const) {
                     if (!Object.prototype.hasOwnProperty.call(newEntityData.rawData || {}, endpoint)) continue
                     const newRef = newEntityData.rawData[endpoint] as { id?: string } | null
-                    if (!newRef?.id || matchedEntity[endpoint]?.id !== newRef.id) {
+                    if (!newRef?.id || !sameRecordId(matchedEntity[endpoint]?.id, newRef.id)) {
                         throw new Error(
                             `cannot change ${endpoint} of relation record "${entityName}" through update ` +
                             `(current ${endpoint}.id: ${JSON.stringify(matchedEntity[endpoint]?.id)}, new: ${JSON.stringify(newRef?.id ?? newRef)}). ` +
@@ -145,7 +146,7 @@ export class UpdateExecutor {
         for (let newRelatedEntityData of sameRowEntityNullOrRefOrNewData) {
             const linkInfo = newRelatedEntityData.info!.getLinkInfo()
             const updatedEntityLinkAttr = linkInfo.isRelationSource(entityName, newRelatedEntityData.info!.attributeName) ? 'source' : 'target'
-            if ((newRelatedEntityData.isRef() && matchedEntity[newRelatedEntityData.info?.attributeName!]?.id === newRelatedEntityData.getData().id)) {
+            if ((newRelatedEntityData.isRef() && sameRecordId(matchedEntity[newRelatedEntityData.info?.attributeName!]?.id, newRelatedEntityData.getData().id))) {
                 // 放过原来就是同样 related entity 的场景。可能是编程中为了方便没做检查，把原本的写了进来。
                 continue
             }
