@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.0.6](https://github.com/interaqtdev/interaqt/compare/v4.0.5...v4.0.6) (2026-07-13)
+
+### Bug Fixes
+
+* **core:** r25 I-4 wire merged no-properties constraints into create; commonProperties go through name guards ([4a2cd0f](https://github.com/interaqtdev/interaqt/commit/4a2cd0fa1708679b16de786754eef11de11b3f06))
+* **drivers:** r25 I-1 dialect entry recognizes type:'json' fieldType case-insensitively ([543d1e5](https://github.com/interaqtdev/interaqt/commit/543d1e5ff7439898f8060aeaa4be389ca94a8e5a))
+* **drivers:** r25 I-2 MySQL open() is idempotent - reuse working connection, no leak ([08e270d](https://github.com/interaqtdev/interaqt/commit/08e270de00a26820b2295ec64892b0bb16661aab))
+* **runtime:** r25 I-3 record-target atomic write path normalizes json fields ([df45bfe](https://github.com/interaqtdev/interaqt/commit/df45bfe88983fbd2fb5f54b15845b18a6d254562))
+* **storage:** r25 F-1 in-row base create events carry default-only fields; F-2 filtered-relation EXIST folds predicate into subquery ([5433cf7](https://github.com/interaqtdev/interaqt/commit/5433cf754161cf623ed42d1170369dbfad900665))
+
 ## [4.0.5](https://github.com/interaqtdev/interaqt/compare/v4.0.4...v4.0.5) (2026-07-12)
 
 ### Bug Fixes
