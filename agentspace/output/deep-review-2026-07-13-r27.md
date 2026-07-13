@@ -22,6 +22,8 @@
 | 致命（已复现，已修复） | 2 | combined 子记录嵌套结构静默丢失/损坏家族、多 property dep 单事件双跑 |
 | 重要（已复现，已修复） | 5 | 单边 BoolExp 求值崩溃、聚合 record+property 静默偏好、MySQL 迁移 operationKey 代理键未接线、StateTransfer.clone(deep) 共享 trigger、onlyRelationData 静默丢数据 + 文档错误 |
 | 文档修正 | 2 | RealTime「自动时间调度」不实承诺、storage-layer.mdc 第三元组误档为 "is collection" |
+| **致命（r27b 追加：结构化 fuzzer 首跑抓获，已修复）** | 3 | 字符串 id 身份分裂（F-3）、reliance 置换静默销毁（F-4）、跨关系同住 link 静默消失（F-5）——详见 `quality-foundation-plan-r27.md` |
+| 开放家族（fuzzer 扩展池，带种子待收口） | ≥4 | G-1–G-5，见 `quality-foundation-plan-r27.md` §1.4 |
 | 记录，本轮不修 | 若干 | 见第四节 |
 
 ---
