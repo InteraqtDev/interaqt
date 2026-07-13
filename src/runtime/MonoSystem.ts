@@ -455,13 +455,24 @@ class MonoStorage implements Storage{
         return this.isMigrationOperationComplete(migrationId, legacyKey)
     }
 
+    // MySQL 键列是定长 VARCHAR(191)（TEXT 不能做主键）；operationKey 携带完整 DDL 文本可能超长，
+    //  且驱动 SET sql_mode='ANSI_QUOTES' 后 STRICT 模式被替换掉——超长值会被**静默截断**，
+    //  不同操作截到同一前缀即键碰撞：已完成的操作被误判/未完成的被跳过（DDL 静默缺失）。
+    //  在 MySQL 上以 sha256 代理键存储；读写两侧必须经同一归一化（这里是唯一的读写汇合点，
+    //  applyMigrationOperations / verifyMigrationPlan / Controller 的 manifest key 全部经过）。
+    //  PG/PGLite/SQLite 保持原文键（可读、测试可 LIKE 前缀断言）。
+    private migrationOperationKeyForStorage(operationKey: string) {
+        if (getSchemaDialect(this.db).name !== 'mysql') return operationKey
+        return createHash('sha256').update(operationKey).digest('hex')
+    }
+
     async isMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
         if (!migrationId) return false
         const dialect = getSchemaDialect(this.db).name
         const [p1, p2] = migrationSQLPlaceholders(dialect, 2)
         const rows = await this.db.query<{ status: string }>(
             `SELECT "status" FROM "__interaqt_migration_operation_log" WHERE "migrationId" = ${p1} AND "operationKey" = ${p2} LIMIT 1`,
-            [migrationId, operationKey],
+            [migrationId, this.migrationOperationKeyForStorage(operationKey)],
             'read migration operation log'
         )
         return rows[0]?.status === 'succeeded'
@@ -476,7 +487,7 @@ class MonoStorage implements Storage{
             : `ON CONFLICT ("migrationId", "operationKey") DO UPDATE SET "status" = EXCLUDED."status"`
         await this.db.update(
             `INSERT INTO "__interaqt_migration_operation_log" ("migrationId", "operationKey", "status") VALUES (${p1}, ${p2}, 'succeeded') ${conflictClause}`,
-            [migrationId, operationKey],
+            [migrationId, this.migrationOperationKeyForStorage(operationKey)],
             undefined,
             'write migration operation log'
         )
@@ -1608,14 +1619,6 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     "status" TEXT NOT NULL,
     PRIMARY KEY ("migrationId", "operationKey")
 )`, 'setup migration operation log table')
-    }
-
-    // MySQL 键列是定长 VARCHAR（TEXT 不能做主键）；operationKey 携带完整 DDL 文本可能超长，
-    //  在 MySQL 上以 sha256 代理键存储（读写两侧同一归一化，碰撞概率可忽略且判定精确）。
-    //  PG/PGLite/SQLite 保持原文键（可读、测试可 LIKE 前缀断言）。
-    private migrationOperationKeyForStorage(operationKey: string) {
-        if (getSchemaDialect(this.db).name !== 'mysql') return operationKey
-        return createHash('sha256').update(operationKey).digest('hex')
     }
 
     async readMigrationManifest(): Promise<MigrationManifest | undefined> {

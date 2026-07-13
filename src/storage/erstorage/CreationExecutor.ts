@@ -234,6 +234,76 @@ export class CreationExecutor {
     }
 
     /**
+     * combined（三表合一）子记录载荷的嵌套结构守卫。
+     *
+     * CAUTION 写路径只消费**宿主层**的分类列表（combinedNewRecords / isolated* / mergedLinkTarget* ...）；
+     *  挂在 combined 子记录自身分类列表上的次级结构（子记录的关系、更深层的 combined 记录）
+     *  没有任何执行者处理——只有 value 列经 getSameRowFieldAndValue 递归写入。放行的后果全部实测过（r27）：
+     *  - 子记录携带 isolated / 反向合并关系：link 行与关联记录**静默不创建**（零告警数据丢失）；
+     *  - 子记录携带 merged-FK ref：FK 列写入但 link 记录无 id、不可查询、零事件（响应式计算失明）；
+     *  - 深度 2 combined 新建：孙记录值写入行内但**无 id、无 create 事件**，按名字查询不可见；
+     *  - 新建子记录内嵌 combined ref：旧行不迁移，**同一逻辑 id 出现两行**（数据损坏）。
+     *  merged 拓扑下同形声明全部正常（子记录经 createRecord 递归）——物理拓扑不应改变声明面的合法性，
+     *  在实现完整的递归处理之前，必须 fail-fast 而不是静默损坏。
+     *
+     *  规则（与既有工作面精确对齐）：
+     *  - 新建的 combined 子记录：只允许 value 属性 + `&` link 数据；任何关系属性拒绝。
+     *    两步写法不受影响：先独立创建关联记录（其自身的 create 会处理全部关系），再以 {id} 引用。
+     *  - ref 子记录（抢夺/flashOut）：载荷残留全部忽略（既有契约），不检查。
+     *  - 同 id 原地更新的 ref 子记录：嵌套关系属性只允许**同 id 的幂等 ref**
+     *    （Transform 的 relation patch 会原样携带端点快照，必须放行）；
+     *    不同 id 的 ref / 嵌套新建 / null 清除会静默损坏（重复逻辑 id / 静默丢弃），拒绝。
+     */
+    private assertCombinedChildrenCarryNoUnsupportedStructure(newEntityData: NewRecordData, sameRowInPlaceAttributes: Set<string>, oldRecord?: Record) {
+        const listNestedRelationItems = (child: NewRecordData): { item: NewRecordData, kind: string }[] => ([
+            ...child.combinedNewRecords.map(item => ({ item, kind: 'combined (same-row) record' })),
+            ...child.combinedRecordIdRefs.map(item => ({ item, kind: 'combined (same-row) record' })),
+            ...child.combinedNullRecords.map(item => ({ item, kind: 'combined (same-row) record' })),
+            ...child.mergedLinkTargetNewRecords.map(item => ({ item, kind: 'relation (merged link)' })),
+            ...child.mergedLinkTargetRecordIdRefs.map(item => ({ item, kind: 'relation (merged link)' })),
+            ...child.mergedLinkTargetNullRecords.map(item => ({ item, kind: 'relation (merged link)' })),
+            ...child.differentTableMergedLinkNewRecords.map(item => ({ item, kind: 'relation (reverse merged link)' })),
+            ...child.differentTableMergedLinkRecordIdRefs.map(item => ({ item, kind: 'relation (reverse merged link)' })),
+            ...child.differentTableMergedLinkNullRecords.map(item => ({ item, kind: 'relation (reverse merged link)' })),
+            ...child.isolatedNewRecords.map(item => ({ item, kind: 'relation (isolated)' })),
+            ...child.isolatedRecordIdRefs.map(item => ({ item, kind: 'relation (isolated)' })),
+            ...child.isolatedNullRecords.map(item => ({ item, kind: 'relation (isolated)' })),
+        ])
+        const describe = (child: NewRecordData, nested: { item: NewRecordData, kind: string }) =>
+            `"${newEntityData.recordName}.${child.info!.attributeName}" is stored in the same physical row (combined / 三表合一), ` +
+            `and its nested ${nested.kind} attribute "${nested.item.info?.attributeName}" cannot be processed through this write. ` +
+            `The write path only handles relations declared on the host record; structures nested under a combined child are silently ` +
+            `lost or corrupted (missing links/ids/events, duplicated logical ids). ` +
+            `Create "${child.recordName}" first with its own relations (a standalone create handles them correctly), then reference it here as { id }.`
+
+        for (const child of newEntityData.combinedNewRecords) {
+            const nestedItems = listNestedRelationItems(child)
+            if (nestedItems.length) {
+                throw new Error(describe(child, nestedItems[0]))
+            }
+        }
+        for (const child of newEntityData.combinedRecordIdRefs) {
+            // 抢夺（非原地）ref：flashOut 以被抢行的数据为准，载荷残留被显式忽略——不检查。
+            if (!sameRowInPlaceAttributes.has(child.info!.attributeName)) continue
+            const oldChild = oldRecord?.[child.info!.attributeName]
+            for (const nested of listNestedRelationItems(child)) {
+                const nestedAttr = nested.item.info?.attributeName
+                // 同 id 幂等 ref（含快照残留）放行：写回同值无害，且 Transform patch 依赖该形态。
+                if (nested.item.isRef() && !nested.item.isNull()
+                    && oldChild?.[nestedAttr!]?.id !== undefined
+                    && oldChild[nestedAttr!].id === nested.item.getRef().id) continue
+                throw new Error(
+                    `in-place update of combined (same-row) record "${newEntityData.recordName}.${child.info!.attributeName}" ` +
+                    `carries nested ${nested.kind} attribute "${nestedAttr}" that is not an idempotent same-id reference. ` +
+                    `Re-pointing / creating / clearing relations of a combined child through its host update is not supported ` +
+                    `and would silently corrupt data (duplicated logical ids, missing events). ` +
+                    `Update "${child.recordName}" directly instead.`
+                )
+            }
+        }
+    }
+
+    /**
      * 预处理同行数据
      * CAUTION 因为这里分配了 id，并且所有的判断逻辑都在，所以事件也放在这里处理，而不是真实插入或者更新数据的时候。
      */
@@ -398,6 +468,7 @@ export class CreationExecutor {
                 }
             }
         }
+        this.assertCombinedChildrenCarryNoUnsupportedStructure(newEntityData, sameRowInPlaceAttributes, oldRecord)
         const flashOutRecordRasData: { [k: string]: RawEntityData } = await this.agent.flashOutCombinedRecordsAndMergedLinks(
             newEntityData,
             events,

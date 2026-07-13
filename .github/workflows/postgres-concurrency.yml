@@ -60,5 +60,5 @@ jobs:
       # r24 复盘教训：env-gated 的沉睡套件提供的置信度为零（F-1 存活 22 轮）。
       # CI 必须覆盖全部真实 PG 套件，而不只是 concurrency/scoped-sequence 两个。
       - run: npm run test:postgres
-      # MySQL env-gated 套件（驱动生命周期 + timestamp 契约）。
-      - run: npx vitest run tests/runtime/mysqlOpenIdempotency.spec.ts tests/runtime/driverCloseIdempotency.spec.ts tests/runtime/review-fixes-2026-07-13-r26-leftovers.spec.ts
+      # MySQL env-gated 套件（驱动生命周期 + timestamp 契约 + 迁移 operationKey 代理键）。
+      - run: npx vitest run tests/runtime/mysqlOpenIdempotency.spec.ts tests/runtime/driverCloseIdempotency.spec.ts tests/runtime/review-fixes-2026-07-13-r26-leftovers.spec.ts tests/runtime/mysqlMigrationOperationKey.spec.ts

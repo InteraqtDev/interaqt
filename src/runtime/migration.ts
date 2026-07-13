@@ -3323,11 +3323,19 @@ class MigrationScheduler {
     private queueEvents(events: RecordMutationEvent[], sourceComputationId: string) {
         for (const event of events) {
             const sourceMaps = this.sourceMapManager.findSourceMapsForMutation(event);
+            // CAUTION 同一计算的多个 dataDep 各注册一个 source——同一事件命中 N 个 source 时
+            //  只入队一次，否则 runIncrementalRecompute 对重复条目再次展开全部 source，
+            //  增量被平方级重放（与 live Scheduler 的 property-dep 去重同族，见 Scheduler
+            //  buildComputationMutationListener）。runIncrementalRecompute 内部按 source 迭代，
+            //  队列层面按 (computation, event) 去重即可保留每个 dep 的独立语义。
+            const queuedComputationIds = new Set<string>();
             for (const source of sourceMaps) {
                 const targetId = computationManifestId(source.computation);
                 if (targetId === sourceComputationId || !this.affectedIds.has(targetId)) continue;
                 if (!this.sourceMapManager.shouldTriggerUpdateComputation(source, event)) continue;
                 if (!("dataDep" in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, event)) continue;
+                if (queuedComputationIds.has(targetId)) continue;
+                queuedComputationIds.add(targetId);
                 if (!this.pendingEventsByComputation.has(targetId)) this.pendingEventsByComputation.set(targetId, []);
                 this.pendingEventsByComputation.get(targetId)!.push(event);
             }
@@ -3417,7 +3425,15 @@ class MigrationScheduler {
         for (const mutationEvent of mutationEvents) {
             const sourceMaps = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                 .filter(source => source.computation === computation);
+            // 与 live Scheduler 同一去重语义：同一事件命中同一计算的多个 property dep 时只跑一次
+            //  （详见 Scheduler.buildComputationMutationListener 的 CAUTION）。
+            const ranPropertyDepPaths = new Set<string>();
             for (const source of sourceMaps) {
+                if ("dataDep" in source && (source as DataBasedEntityEventsSourceMap).dataDep.type === "property") {
+                    const pathKey = ((source as DataBasedEntityEventsSourceMap).targetPath || []).join(".");
+                    if (ranPropertyDepPaths.has(pathKey)) continue;
+                    ranPropertyDepPaths.add(pathKey);
+                }
                 if (!("dataDep" in source)) {
                     const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
                     if (!eventRebuildHandler) {
