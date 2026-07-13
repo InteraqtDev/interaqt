@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.0](https://github.com/InteraqtDev/interaqt/compare/v4.0.6...v4.1.0) (2026-07-13)
+
+### Bug Fixes
+
+* r26 deep review — flashOut delete endpoints, Activity guard order, declaration guards, close idempotency ([b39efd2](https://github.com/InteraqtDev/interaqt/commit/b39efd2ec06c7cc072f30c6d82704f079fc5a838))
+
 ## [4.0.6](https://github.com/interaqtdev/interaqt/compare/v4.0.5...v4.0.6) (2026-07-13)
 
 ### Bug Fixes

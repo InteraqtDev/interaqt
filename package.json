@@ -45,7 +45,7 @@
     "sync:agent": "tsx scripts/sync-agent-files.ts",
     "release": "release-it"
   },
-  "version": "4.0.6",
+  "version": "4.1.0",
   "main": "dist/index.js",
   "files": [
     "dist",
