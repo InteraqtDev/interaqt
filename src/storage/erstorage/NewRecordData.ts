@@ -10,7 +10,10 @@ export type FieldAndValue = {
     name: string,
     field: string,
     value: any,
-    fieldType?: string
+    fieldType?: string,
+    // 语义类型（Property.type，如 'timestamp'/'boolean'）：fieldType 是 DB 列型（SQLite 的
+    //  timestamp 列是 'INT'），写路径的类型归一化必须按语义类型判定。
+    valueType?: string
 }
 
 export class NewRecordData {
@@ -257,7 +260,8 @@ export class NewRecordData {
                 name: info.attributeName,
                 field: info.field!,
                 value,
-                fieldType: info.fieldType!
+                fieldType: info.fieldType!,
+                valueType: (info.data as ValueAttribute).type
             })
             if (info.isComputed) {
                 updatedComputedFields.add(info.attributeName)
@@ -276,7 +280,8 @@ export class NewRecordData {
                         name: attr.attributeName,
                         field: attr.field!,
                         value: defaultVal,
-                        fieldType: attr.fieldType!
+                        fieldType: attr.fieldType!,
+                        valueType: (attr.data as ValueAttribute).type
                     })
                 }
             }
@@ -292,7 +297,8 @@ export class NewRecordData {
                         name: info.attributeName,
                         field: info.field!,
                         value: newValue,
-                        fieldType: info.fieldType!
+                        fieldType: info.fieldType!,
+                        valueType: (info.data as ValueAttribute).type
                     })
                 }
             }

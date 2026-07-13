@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import type { AttributeQueryData, DataDependencies } from './types.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
@@ -63,6 +64,7 @@ export class RealTime implements RealTimeInstance {
   };
   
   static create(args: RealTimeCreateArgs, options?: { uuid?: string }): RealTimeInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     const instance = new RealTime(args, options);
     
     // 检查 uuid 是否重复

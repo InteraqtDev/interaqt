@@ -290,6 +290,21 @@ export class CreationExecutor {
                 if (record.linkRecordData?.valueAttributes.length && oldRelated[LINK_SYMBOL]?.id) {
                     const linkEvent = this.buildSameRowUpdateEvent(record.linkRecordData, record.info!.linkName, oldRelated[LINK_SYMBOL])
                     if (linkEvent) {
+                        // CAUTION relation update 事件必须暴露 source/target 端点（r26 预言机第 7 条，
+                        //  与 create/delete 端点契约同构）：canonical 路径（updateRelationByName）的
+                        //  oldRecord 是 matchedEntity（含 managedRecordAttributes 端点），而本行内
+                        //  路径的 oldRecord 是 LINK_SYMBOL 数据——无端点，按端点定位/匹配 link update
+                        //  的下游（computeTarget、mergedMutationEventView 深度匹配）失明。
+                        //  端点放 oldRecord（快照语义，与 canonical 同位）；同 id 原地更新端点不变。
+                        const hostIsSource = record.info!.isRecordSource()
+                        const hostRef = { id: (newRawDataWithNewIds.id ?? oldRecord!.id) as string }
+                        const relatedRef = { id: oldRelated.id as string }
+                        linkEvent.oldRecord = {
+                            ...(linkEvent.oldRecord as globalThis.Record<string, unknown>),
+                            id: oldRelated[LINK_SYMBOL].id as string,
+                            [hostIsSource ? 'source' : 'target']: hostRef,
+                            [hostIsSource ? 'target' : 'source']: relatedRef,
+                        }
                         events?.push(linkEvent)
                         await this.filteredEntityManager.enqueuePostWriteUpdateCheck(events, record.info!.linkName, oldRelated[LINK_SYMBOL].id, linkEvent.keys!)
                     }

@@ -161,33 +161,43 @@ export class RecordQueryAgent implements RecordOperationAgent {
             //  ref 是 link 的 source/target，其 linkName 是虚拟 link，业务事件会漏发
             //  （写路径拓扑矩阵的事件完备性预言机发现，r17 追加）。
             if (newRecordIsLink && recordWithCombined.id) {
-                const oldBusinessLinkRecord = {
-                    ...Object.fromEntries(Object.entries(recordWithCombined).filter(([, v]) => v === null || typeof v !== 'object')),
-                    id: recordWithCombined.id,
-                    source: { id: recordWithCombined.source?.id },
-                    target: { id: recordWithCombined.target?.id },
-                }
-                // 旧业务 link 消失 ⇒ 两端实体在依赖该关系的 filtered entity 中的成员资格必须重算
-                // （与 deleteRecord 对 link 删除的处理同构，r21 F-2）：此前 addLink 抢夺形态下
-                //  旧 owner 只在 create/update 抢夺（业务属性 ref）分支被覆盖，link 形态的抢夺
-                //  （combinedRecordIdRefs 是虚拟端点 ref）绕过了下方 L191 的守卫——旧 owner 退出
-                //  视图零 delete 事件，下游计算永久陈旧。快照必须在物理清列之前采集；
-                //  被抢夺端点此刻处于行迁移中，settle 时查不到行会安全跳过（由 createRecord 级
-                //  的 collectCreationLinkChecks 在写入完成后覆盖）。
-                oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
-                    newEntityData.recordName,
-                    { sourceIds: [recordWithCombined.source?.id], targetIds: [recordWithCombined.target?.id] },
-                    events
-                ))
-                // 视图（filtered relation）成员资格必须在物理清列之前求值（谓词只由 SQL 求值）。
-                const oldBusinessLinkViewSnapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(newEntityData.recordName, [oldBusinessLinkRecord], events)
-                events?.push({
-                    type: 'delete',
-                    recordName: newEntityData.recordName,
-                    record: oldBusinessLinkRecord
-                })
-                if (events && oldBusinessLinkViewSnapshot) {
-                    this.filteredEntityManager.settleDeletionMemberships(oldBusinessLinkViewSnapshot, newEntityData.recordName, [oldBusinessLinkRecord], events, events)
+                // CAUTION delete 事件端点必须完备（r26 F-1 / 预言机第 6 条）：
+                //  此前用 `source: { id: recordWithCombined.source?.id }` 在端点未加载时
+                //  推入 `{ id: undefined }`——JSON 面看起来像有 source 键，computeTarget
+                //  读到的却是 undefined。merged-replace 兄弟路径会再发一份完备事件，
+                //  但残缺事件本身已足以让按端点匹配的下游失明/双计。缺端点时跳过本推送，
+                //  由下方 merged-replace / DeletionExecutor 规范形负责发出完备 delete。
+                const oldSourceId = recordWithCombined.source?.id
+                const oldTargetId = recordWithCombined.target?.id
+                if (oldSourceId !== undefined && oldTargetId !== undefined) {
+                    const oldBusinessLinkRecord = {
+                        ...Object.fromEntries(Object.entries(recordWithCombined).filter(([, v]) => v === null || typeof v !== 'object')),
+                        id: recordWithCombined.id,
+                        source: { id: oldSourceId },
+                        target: { id: oldTargetId },
+                    }
+                    // 旧业务 link 消失 ⇒ 两端实体在依赖该关系的 filtered entity 中的成员资格必须重算
+                    // （与 deleteRecord 对 link 删除的处理同构，r21 F-2）：此前 addLink 抢夺形态下
+                    //  旧 owner 只在 create/update 抢夺（业务属性 ref）分支被覆盖，link 形态的抢夺
+                    //  （combinedRecordIdRefs 是虚拟端点 ref）绕过了下方 L191 的守卫——旧 owner 退出
+                    //  视图零 delete 事件，下游计算永久陈旧。快照必须在物理清列之前采集；
+                    //  被抢夺端点此刻处于行迁移中，settle 时查不到行会安全跳过（由 createRecord 级
+                    //  的 collectCreationLinkChecks 在写入完成后覆盖）。
+                    oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
+                        newEntityData.recordName,
+                        { sourceIds: [oldSourceId], targetIds: [oldTargetId] },
+                        events
+                    ))
+                    // 视图（filtered relation）成员资格必须在物理清列之前求值（谓词只由 SQL 求值）。
+                    const oldBusinessLinkViewSnapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(newEntityData.recordName, [oldBusinessLinkRecord], events)
+                    events?.push({
+                        type: 'delete',
+                        recordName: newEntityData.recordName,
+                        record: oldBusinessLinkRecord
+                    })
+                    if (events && oldBusinessLinkViewSnapshot) {
+                        this.filteredEntityManager.settleDeletionMemberships(oldBusinessLinkViewSnapshot, newEntityData.recordName, [oldBusinessLinkRecord], events, events)
+                    }
                 }
             }
             for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
@@ -211,8 +221,26 @@ export class RecordQueryAgent implements RecordOperationAgent {
 
                     // 即将随物理清列消失的旧 link（旧 combined link + 被替换的旧 merged link）的
                     // filtered relation 视图成员资格：谓词只由 SQL 求值，必须在清列之前快照。
+                    // CAUTION delete 事件 payload 必须携带 source/target 端点（与 DeletionExecutor /
+                    //  同函数内 merged-link replace delete / create 事件同一契约，r26 F-1）：
+                    //  按端点定位的下游（StateMachine computeTarget、Transform eventDeps）
+                    //  此前对 flashOut create-steal 产生的 link delete 失明。视图 settle 复用同一
+                    //  快照，否则 filtered relation 名上的 delete 事件同样缺端点。
                     const oldCombinedLinkRecord = recordWithCombined.id
-                        ? recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL]
+                        ? (() => {
+                            const attrInfo = combinedRecordIdRef.info!
+                            const linkPayload = recordWithCombined[attrInfo.attributeName!][LINK_SYMBOL]
+                            const relatedId = recordWithCombined[attrInfo.attributeName!]?.id
+                            // 端点任一缺失则不构造残缺快照（与上方 oldBusinessLinkRecord 同契约）。
+                            if (!linkPayload || relatedId === undefined) return undefined
+                            const oldOwnerRef = { id: recordWithCombined.id }
+                            const oldRelatedRef = { id: relatedId }
+                            return {
+                                ...linkPayload,
+                                [attrInfo.isRecordSource() ? 'source' : 'target']: oldOwnerRef,
+                                [attrInfo.isRecordSource() ? 'target' : 'source']: oldRelatedRef,
+                            }
+                        })()
                         : undefined
                     const oldCombinedLinkViewSnapshot = oldCombinedLinkRecord?.id
                         ? await this.filteredEntityManager.collectInlineDeletionSnapshot(combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord], events)
@@ -226,12 +254,20 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             const oldRelatedBeforeClear = stolenDataBeforeClear[mergedAttrInfo.attributeName]
                             const oldLink = oldRelatedBeforeClear?.[LINK_SYMBOL]
                             if (!oldLink?.id) continue
-                            const snapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(mergedAttrInfo.linkName, [oldLink], events)
+                            const stolenIsSourceBeforeClear = this.map.getLinkInfoByName(newEntityData.recordName)
+                                .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
+                            // CAUTION 视图快照的 recordsById 是 filtered relation delete 事件的
+                            //  payload 来源（settleDeletionMemberships 优先读它）——必须携带端点，
+                            //  否则视图名 delete 事件缺 source/target（r26 预言机第 6 条的视图轨兄弟格）。
+                            const oldLinkWithEndpoints = {
+                                ...oldLink,
+                                source: stolenIsSourceBeforeClear ? { id: stolenDataBeforeClear.id } : { id: oldRelatedBeforeClear.id },
+                                target: stolenIsSourceBeforeClear ? { id: oldRelatedBeforeClear.id } : { id: stolenDataBeforeClear.id },
+                            }
+                            const snapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(mergedAttrInfo.linkName, [oldLinkWithEndpoints], events)
                             if (snapshot) oldMergedLinkViewSnapshots.set(mergedAttrInfo.attributeName, snapshot)
                             // 被替换的旧 merged link 消失 ⇒ 两端实体的成员资格快照（同 r21 F-2，
                             //  与上方旧业务 link 的处理同构；须在物理清列之前采集）。
-                            const stolenIsSourceBeforeClear = !this.map.getLinkInfoByName(newEntityData.recordName)
-                                .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
                             oldOwnerMembershipChecks.push(...await this.filteredEntityManager.collectLinkMembershipChecks(
                                 mergedAttrInfo.linkName,
                                 stolenIsSourceBeforeClear
@@ -252,13 +288,18 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     //  storage 从不以虚拟 link 名发事件（r18 死监听不变量的对偶面），旧业务 link 的
                     //  delete 事件已由上方 newRecordIsLink 分支按业务名发出。
                     if (recordWithCombined.id && !combinedRecordIdRef.info!.isLinkSourceRelation()) {
-                        events?.push({
-                            type: 'delete',
-                            recordName: combinedRecordIdRef.info!.linkName!,
-                            record: recordWithCombined[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL],
-                        })
-                        if (events && oldCombinedLinkViewSnapshot) {
-                            this.filteredEntityManager.settleDeletionMemberships(oldCombinedLinkViewSnapshot, combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord!], events, events)
+                        // 仅在端点完备时推送（oldCombinedLinkRecord 构造期已守卫）。
+                        if (oldCombinedLinkRecord
+                            && (oldCombinedLinkRecord as any).source?.id !== undefined
+                            && (oldCombinedLinkRecord as any).target?.id !== undefined) {
+                            events?.push({
+                                type: 'delete',
+                                recordName: combinedRecordIdRef.info!.linkName!,
+                                record: oldCombinedLinkRecord,
+                            })
+                            if (events && oldCombinedLinkViewSnapshot) {
+                                this.filteredEntityManager.settleDeletionMemberships(oldCombinedLinkViewSnapshot, combinedRecordIdRef.info!.linkName!, [oldCombinedLinkRecord], events, events)
+                            }
                         }
                     }
 
@@ -281,8 +322,14 @@ export class RecordQueryAgent implements RecordOperationAgent {
                             const oldRelated = stolenData[mergedAttrInfo.attributeName]
                             if (oldRelated?.id === undefined) continue
                             const oldLink = oldRelated[LINK_SYMBOL]
-                            const stolenIsSource = !this.map.getLinkInfoByName(newEntityData.recordName)
+                            const stolenIsSource = this.map.getLinkInfoByName(newEntityData.recordName)
                                 .isRelationSource(combinedRecordIdRef.recordName, mergedAttrInfo.attributeName)
+                            // 两端 id 必须都有——stolenData.id 在 flashOut 上下文中恒存在，
+                            //  但仍显式守卫，避免推入 { id: undefined }（r26 预言机第 6 条）。
+                            // CAUTION 此前 `!isRelationSource(...)` 把端点左右弄反（r26 预言机
+                            //  第 6 条值比对首跑抓出）：1:n merged-to-target 的 addRelation 抢夺
+                            //  把 Item 标成 source、User 标成 target，delete 事件与快照分裂。
+                            if (stolenData.id === undefined) continue
                             const oldMergedLinkRecord = {
                                 ...(oldLink || {}),
                                 source: stolenIsSource ? { id: stolenData.id } : { id: oldRelated.id },

@@ -1,7 +1,8 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
-import { StateNodeInstance } from './StateNode.js';
-import { StateTransferInstance } from './StateTransfer.js';
+import { StateNode, StateNodeInstance } from './StateNode.js';
+import { StateTransfer, StateTransferInstance } from './StateTransfer.js';
 
 export interface StateMachineInstance extends IInstance {
   states: StateNodeInstance[];
@@ -55,6 +56,7 @@ export class StateMachine implements StateMachineInstance {
   };
   
   static create(args: StateMachineCreateArgs, options?: { uuid?: string }): StateMachineInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     // CAUTION 声明期图完整性校验（r22）：运行期转移表（TransitionFinder）按 StateNode 的
     //  name 字符串索引——同名节点会被静默合并进同一个桶，各自的 computeValue / 转移语义
     //  产生歧义（命中哪个取决于 transfers 数组顺序）。initialState / transfer 端点脱离
@@ -108,10 +110,38 @@ export class StateMachine implements StateMachineInstance {
   }
   
   static clone(instance: StateMachineInstance, deep: boolean): StateMachineInstance {
+    // 浅 clone：共享 StateNode/StateTransfer 引用（既有语义）。
+    if (!deep) {
+      return this.create({
+        states: instance.states,
+        transfers: instance.transfers,
+        initialState: instance.initialState
+      });
+    }
+    // 深 clone（r26 遗留收口）：此前 deep 参数被忽略——克隆后修改任一侧的 StateNode/
+    //  StateTransfer 会静默影响另一侧（转移表按 name 索引，共享节点改名两台机器同时变）。
+    //  节点按 old→new 映射保持图同构；trigger 是纯数据模式，结构化深拷贝；
+    //  computeValue/computeTarget 是行为定义，与 Count.clone 对 callback 的处理一致共享引用。
+    const nodeMap = new Map<StateNodeInstance, StateNodeInstance>();
+    const cloneNode = (node: StateNodeInstance): StateNodeInstance => {
+      let cloned = nodeMap.get(node);
+      if (!cloned) {
+        cloned = StateNode.clone(node, true);
+        nodeMap.set(node, cloned);
+      }
+      return cloned;
+    };
+    const states = instance.states.map(cloneNode);
+    const transfers = instance.transfers.map(transfer => StateTransfer.create({
+      trigger: structuredClone(transfer.trigger),
+      current: cloneNode(transfer.current),
+      next: cloneNode(transfer.next),
+      computeTarget: transfer.computeTarget,
+    }));
     return this.create({
-      states: instance.states,
-      transfers: instance.transfers,
-      initialState: instance.initialState
+      states,
+      transfers,
+      initialState: cloneNode(instance.initialState),
     });
   }
   

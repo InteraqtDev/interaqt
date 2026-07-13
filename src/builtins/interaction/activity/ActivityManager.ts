@@ -106,15 +106,18 @@ export class ActivityManager {
                 args.activityId = created.activityId
             } else if (isHeadInteraction && args.activityId) {
                 // 带 activityId 的 head（如 every/race 组里第二个分支的 head）：
-                // 先校验状态可达，再走与非 head 相同的完整守卫。
-                await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
+                // CAUTION 必须先 fullGuard 再 checkActivityState（r26 I-1）：
+                //  ActivityStateError 携带完整 currentState 供可观测性，若先于 Condition
+                //  抛出，持有 activityId 的未授权调用方可探测工作流状态树。
                 await activityCall.fullGuard(this, interaction, args)
+                await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
             } else {
                 if (!args.activityId) {
                     throw new ActivityStateError('activityId must be provided for non-head interaction of an activity', { activityName: activityCall.activity.name })
                 }
-                await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
+                // 同上：权限守卫先于状态检查，避免 ActivityStateError.currentState 信息泄漏。
                 await activityCall.fullGuard(this, interaction, args)
+                await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
             }
         }
 

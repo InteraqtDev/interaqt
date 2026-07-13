@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID, stringifyAttribute, decodeFunctionValues } from '@core';
+import { validateCreateArgs, type PublicFieldDef } from '@core';
 import { InteractionInstance } from './Interaction.js';
 import { GatewayInstance } from './Gateway.js';
 import { EventInstance } from './Event.js';
@@ -107,6 +108,7 @@ export class Activity implements ActivityInstance {
   };
   
   static create(args: ActivityCreateArgs, options?: { uuid?: string }): ActivityInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     const instance = new Activity(args, options);
     
     // 检查 uuid 是否重复
@@ -191,7 +193,10 @@ export class ActivityGroup implements ActivityGroupInstance {
     type: {
       type: 'string' as const,
       required: true as const,
-      collection: false as const
+      collection: false as const,
+      // 与 ActivityCall 的 GroupStateNodeType 注册表一致（'program' 因无完成语义已除名）。
+      //  声明期白名单让 typo 在 create 时报错，而不是 ActivityManager 构造期。
+      options: ['any', 'every', 'race']
     },
     activities: {
       instanceType: {} as unknown as ActivityInstance,
@@ -202,6 +207,7 @@ export class ActivityGroup implements ActivityGroupInstance {
   };
   
   static create(args: ActivityGroupCreateArgs, options?: { uuid?: string }): ActivityGroupInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     const instance = new ActivityGroup(args, options);
     
     // 检查 uuid 是否重复

@@ -120,7 +120,7 @@ describe('Activity serialization', () => {
 
 describe('ActivityGroup serialization', () => {
     test('is() positive and negative', () => {
-        const instance = ActivityGroup.create({ type: 'parallel' });
+        const instance = ActivityGroup.create({ type: 'any' });
         expect(ActivityGroup.is(instance)).toBe(true);
         expect(ActivityGroup.is(null)).toBe(false);
         expect(ActivityGroup.is({ _type: 'Activity' })).toBe(false);
@@ -132,19 +132,19 @@ describe('ActivityGroup serialization', () => {
     });
 
     test('stringify/parse round-trip', () => {
-        const instance = ActivityGroup.create({ type: 'exclusive' }, { uuid: 'ag-1' });
+        const instance = ActivityGroup.create({ type: 'every' }, { uuid: 'ag-1' });
         const json = ActivityGroup.stringify(instance);
         clearAllInstances(ActivityGroup);
         const parsed = ActivityGroup.parse(json);
         expect(parsed.uuid).toBe('ag-1');
-        expect(parsed.type).toBe('exclusive');
+        expect(parsed.type).toBe('every');
     });
 
     test('clone() creates independent copy', () => {
-        const instance = ActivityGroup.create({ type: 'parallel' });
+        const instance = ActivityGroup.create({ type: 'any' });
         const cloned = ActivityGroup.clone(instance, false);
         expect(cloned.uuid).not.toBe(instance.uuid);
-        expect(cloned.type).toBe('parallel');
+        expect(cloned.type).toBe('any');
     });
 });
 
@@ -155,8 +155,8 @@ describe('Transfer serialization', () => {
     });
 
     test('is() positive and negative', () => {
-        const group1 = ActivityGroup.create({ type: 'p' });
-        const group2 = ActivityGroup.create({ type: 'q' });
+        const group1 = ActivityGroup.create({ type: 'any' });
+        const group2 = ActivityGroup.create({ type: 'every' });
         const instance = Transfer.create({
             name: 'flow',
             source: group1,
@@ -168,8 +168,8 @@ describe('Transfer serialization', () => {
     });
 
     test('clone() creates independent copy', () => {
-        const group1 = ActivityGroup.create({ type: 'a' });
-        const group2 = ActivityGroup.create({ type: 'b' });
+        const group1 = ActivityGroup.create({ type: 'any' });
+        const group2 = ActivityGroup.create({ type: 'race' });
         const instance = Transfer.create({ name: 't', source: group1, target: group2 });
         const cloned = Transfer.clone(instance, false);
         expect(cloned.uuid).not.toBe(instance.uuid);

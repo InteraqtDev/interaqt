@@ -157,11 +157,11 @@ describe("Interaction System - createClass functionality", () => {
       });
 
       const group = ActivityGroup.create({
-        type: "sequential",
+        type: "any",
         activities: [activity]
       });
 
-      expect(group.type).toBe("sequential");
+      expect(group.type).toBe("any");
       expect(group.activities).toHaveLength(1);
       expect(group.activities![0].name).toBe("SubActivity");
       expect(group._type).toBe("ActivityGroup");

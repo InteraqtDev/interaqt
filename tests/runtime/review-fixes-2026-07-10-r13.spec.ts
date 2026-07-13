@@ -247,18 +247,11 @@ describe('r13 review fixes', () => {
     });
 
     // ============ R-2 global 聚合缺 record 声明期错误 ============
-    test('R-2: global Summation without record fails with a protocol error, not a bare TypeError', async () => {
-        const dict = Dictionary.create({
-            name: 'r13BadSum',
-            type: 'number',
-            collection: false,
-            computation: Summation.create({ attributeQuery: ['value'] } as any),
-        });
-        const system = new MonoSystem(new PGLiteDB());
-        expect(() => new Controller({
-            system, entities: [], relations: [], eventSources: [], dict: [dict]
-        })).toThrow(/requires a "record" argument/);
-        await system.destroy();
+    test('R-2: global Summation without record fails at declaration time, not a bare TypeError', async () => {
+        // r26 遗留收口：record/property 缺失的错误从 Controller 构造期（r13）继续前移到
+        // Summation.create()（统一声明期校验）。
+        expect(() => Summation.create({ attributeQuery: ['value'] } as any))
+            .toThrow(/requires either "record".*or "property"/s);
     });
 
     // ============ R-5 StateMachine trigger null pattern 精确匹配 ============

@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import type { AttributeQueryData, DataDependencies, EntityInstance, RelationInstance } from './types.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
@@ -81,6 +82,12 @@ export class Any implements AnyInstance {
   };
   
   static create(args: AnyCreateArgs, options?: { uuid?: string }): AnyInstance {
+    // 统一声明期校验（r16 建议 4 / r26 落地）：static.public 的 required/options/constraints
+    //  在 create 时执行；record/property 二选一是聚合的结构性前提（缺失时 Scheduler 深处才炸）。
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
+    if (!args.record && !args.property) {
+      throw new Error(`${this.displayName}.create() requires either "record" (target entity/relation) or "property" (host relation property).`);
+    }
     const instance = new Any(args, options);
     
     // 检查 uuid 是否重复

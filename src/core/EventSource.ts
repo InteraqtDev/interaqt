@@ -1,4 +1,5 @@
 import { IInstance, generateUUID, SerializedData } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import { decodeFunctionValues, stringifyInstance } from './utils.js';
 import { EntityInstance } from './Entity.js';
 
@@ -119,6 +120,9 @@ export class EventSource<TArgs = unknown, TResult = void> implements EventSource
     args: EventSourceCreateArgs<TArgs, TResult>,
     options?: { uuid?: string }
   ): EventSourceInstance<TArgs, TResult> {
+    // 统一声明期校验（r16 建议 4 / r26 落地）：缺 entity 的 EventSource 到 dispatch 才炸
+    //  （storage.create(undefined.name)）。
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     const instance = new EventSource<TArgs, TResult>(args, options);
 
     const existing = this.instances.find(i => i.uuid === instance.uuid);

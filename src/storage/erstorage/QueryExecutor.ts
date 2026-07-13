@@ -5,7 +5,7 @@ import { RecordQuery, RecordQueryTree, LINK_SYMBOL } from "./RecordQuery.js"
 import { Modifier } from "./Modifier.js"
 import { FieldAliasMap } from "./util/FieldAliasMap.js"
 import { RecursiveContext, ROOT_LABEL } from "./util/RecursiveContext.js"
-import { setByPath, assert } from "../utils.js"
+import { normalizeTimestampReadValue, setByPath, assert } from "../utils.js"
 import { AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem } from "./AttributeQuery.js"
 import { MatchExp } from "./MatchExp.js"
 
@@ -120,6 +120,9 @@ export class QueryExecutor {
                     }
                 } else if (typeof value === 'number' && valueType === 'boolean') {
                     value = value !== 0
+                } else if (valueType === 'timestamp' && value !== null) {
+                    // r26：timestamp 读侧归一化为 epoch 毫秒（PG 系/MySQL 返回 Date、SQLite 返回 number）。
+                    value = normalizeTimestampReadValue(value)
                 }
                 if (value !== null) {
                     setByPath(obj, attributePath, value)

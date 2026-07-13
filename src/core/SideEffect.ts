@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 
 export interface SideEffectInstance extends IInstance {
@@ -44,6 +45,7 @@ export class SideEffect implements SideEffectInstance {
   };
   
   static create(args: SideEffectCreateArgs, options?: { uuid?: string }): SideEffectInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     const instance = new SideEffect(args, options);
     
     // 检查 uuid 是否重复

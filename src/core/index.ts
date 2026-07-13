@@ -39,3 +39,4 @@ export * from "./EventSource.js";
 // Core type aliases
 export type { ComputationRecord, UserRoleType } from "./types.js";
 
+export * from './klassValidation.js'

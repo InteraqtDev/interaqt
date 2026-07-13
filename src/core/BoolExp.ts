@@ -150,6 +150,17 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   };
   
   static create(args: BoolExpressionDataCreateArgs, options?: { uuid?: string }): BoolExpressionDataInstance {
+    // static.public.operator.options 此前从未接线（r26 I-3 / r16#4 家族）：
+    //  非法 operator 被声明期静默接受，直到首次 dispatch 求值才以 "invalid bool expression type" 暴露。
+    //  and/or 缺 right 是既有合法写法（单边包装），不在此收紧。
+    const operator = args.operator ?? 'and'
+    if (operator !== 'and' && operator !== 'or' && operator !== 'not') {
+      throw new Error(`BoolExpressionData operator "${String(operator)}" is invalid. Supported operators: 'and', 'or', 'not'.`)
+    }
+    if (operator === 'not' && args.right !== undefined) {
+      throw new Error(`BoolExpressionData operator 'not' takes only a left operand; do not provide right.`)
+    }
+
     const instance = new BoolExpressionData(args, options);
     
     // 检查 uuid 是否重复

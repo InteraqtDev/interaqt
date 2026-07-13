@@ -171,11 +171,11 @@ describe("Interaction System Refactored - compatibility test", () => {
       const activity2 = Activity.create({ name: "SubFlow2" });
       
       const group = ActivityGroup.create({
-        type: "parallel",
+        type: "any",
         activities: [activity1, activity2]
       });
       
-      expect(group.type).toBe("parallel");
+      expect(group.type).toBe("any");
       expect(group.activities).toHaveLength(2);
     });
   });
@@ -241,7 +241,7 @@ describe("Interaction System Refactored - compatibility test", () => {
         interactions: [interaction2]
       });
       const group = ActivityGroup.create({
-        type: "sequence",
+        type: "every",
         activities: [subActivity]
       });
       const activity = Activity.create({

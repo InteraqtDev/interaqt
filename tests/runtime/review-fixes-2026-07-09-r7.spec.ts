@@ -53,22 +53,11 @@ describe('review fixes 2026-07-09 r7', () => {
         expect(seen.size).toBeLessThanOrEqual(3);
     });
 
-    // ============ F-5: 'program' ActivityGroup rejected at build time ============
+    // ============ F-5: 'program' ActivityGroup rejected at declaration time ============
+    // r26 遗留收口：type 白名单前移到 ActivityGroup.create()（统一声明期校验）；
+    // ActivityCall.buildGraph 的运行期守卫保留为图手术路径的兜底。
     test("F-5: 'program' ActivityGroup is rejected with a clear error instead of dead-locking", () => {
-        const head = Interaction.create({ name: 'ProgHead', action: Action.create({ name: 'progHead' }) });
-        const stepA = Interaction.create({ name: 'ProgStepA', action: Action.create({ name: 'progStepA' }) });
-        const after = Interaction.create({ name: 'ProgAfter', action: Action.create({ name: 'progAfter' }) });
-        const group = ActivityGroup.create({
-            type: 'program',
-            activities: [Activity.create({ name: 'progSeqA', interactions: [stepA] })]
-        });
-        const act = Activity.create({
-            name: 'ProgFlow', interactions: [head, after], groups: [group],
-            transfers: [
-                Transfer.create({ name: 'pt1', source: head, target: group }),
-                Transfer.create({ name: 'pt2', source: group, target: after }),
-            ]
-        });
-        expect(() => new ActivityManager([act])).toThrow(/program.*not supported|not supported.*program/);
+        expect(() => ActivityGroup.create({ type: 'program' }))
+            .toThrow(/invalid "type".*"program".*"any", "every", "race"/s);
     });
 });

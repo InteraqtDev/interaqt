@@ -182,7 +182,14 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         return this.db.prepare(sql).run()
     }
     async close() {
-        this.db.close()
+        // CAUTION close 必须幂等（r26 I-4）：二次 close 不得抛错。
+        // better-sqlite3：已关闭的 Database.open === false；二次 close 会抛错。
+        if (!this.db || !this.db.open) return
+        try {
+            this.db.close()
+        } catch {
+            // already closed
+        }
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)

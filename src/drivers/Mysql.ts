@@ -80,6 +80,7 @@ export class MysqlDB implements Database{
         //  Controller.setup(false) 会先经 prepareMigrationSchema 打开只读连接做 manifest 校验，
         //  再走 system.setup 调用 open(false)。此前无条件 createConnection 会把旧工作连接孤儿化，
         //  悬挂到服务端 wait_timeout。forceDrop 需要重建库，先关旧连接再走完整建库路径。
+        this.closed = false
         if (this.db && forceDrop) {
             await this.db.end()
             this.db = undefined as unknown as Connection
@@ -149,7 +150,7 @@ export class MysqlDB implements Database{
         // CAUTION MySQL 不支持 UPDATE ... RETURNING，无法履行 idField 返回契约。
         //  这里如实记录并执行原始 SQL；调用方（storage 层）不依赖 update 的返回行。
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !== null && !(x instanceof Date)) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
         })
         logger.info({
             type:'update',
@@ -163,7 +164,7 @@ export class MysqlDB implements Database{
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !== null && !(x instanceof Date)) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
         })
 
         logger.info({
@@ -200,8 +201,16 @@ export class MysqlDB implements Database{
         })
         return  await this.db.query(sql)
     }
-    close() {
-        return this.db.end()
+    private closed = false
+    async close() {
+        // CAUTION close 必须幂等（r26 I-4）：二次 close 不得抛错。
+        if (this.closed || !this.db) return
+        this.closed = true
+        try {
+            await this.db.end()
+        } catch {
+            // already closed
+        }
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
