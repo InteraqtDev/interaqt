@@ -115,7 +115,11 @@ export class MatchExp {
         } else {
             // variable
             const matchAttributePath = (matchData.data.key as string).split('.')
-            const {resolvedPath, matchExpression:matchExpressionInPath} = matchAttributePath.reduce((result, part) => {
+            const atomValue = matchData.data.value
+            const isExistMatch = Array.isArray(atomValue) && typeof atomValue[0] === 'string' && (atomValue[0] as string).toLowerCase() === 'exist'
+            // 终段是 filtered relation 属性且操作符是 EXIST 时，link 谓词折叠进 EXIST 子查询（见下）。
+            let existInnerFold: MatchExpressionData | undefined
+            const {resolvedPath, matchExpression:matchExpressionInPath} = matchAttributePath.reduce((result, part, partIndex) => {
                 const currentPath = [...result.resolvedPath, part]
                 const currentPathInfo = this.map.getInfoByPath(currentPath)
                 const currentResolvedPath = result.resolvedPath.concat(currentPathInfo?.isLinkFiltered() ? currentPathInfo.getBaseAttributeInfo().attributeName : part)
@@ -125,11 +129,24 @@ export class MatchExp {
                 if(currentPathInfo?.isLinkFiltered()) {
                     const linkInfo = currentPathInfo.getLinkInfo()
                     const linkMatchExp = new MatchExp(linkInfo.getResolvedBaseRecordName()!, this.map, linkInfo.getResolvedMatchExpression())
-                    const reversePath = this.map.getReversePath(currentResolvedPath)
-                    const rebasePathStart = currentPathInfo.isRecordSource() ? 'source' : 'target'
-                    const rebasePath = [rebasePathStart, ...reversePath.slice(2)]
-                    const rebasedLinkMatch = linkMatchExp.rebase(rebasePath.join('.'))
-                    currentMatchExpression = currentMatchExpression? currentMatchExpression.and(rebasedLinkMatch) : rebasedLinkMatch
+                    if (isExistMatch && partIndex === matchAttributePath.length - 1) {
+                        // CAUTION 终段 filtered relation × EXIST：link 谓词不能 AND 在外层（r25 F-2）。
+                        //  EXIST 子查询按反向端点 id 独立关联，外层的 rebased 谓词落在**另一条** JOIN
+                        //  行上——两个原子对「不同的边」分别成立时整体误判为真（幻影多行）。谓词必须
+                        //  rebase 到子查询根（对端实体）后并进 EXIST 内层 match：内层的关联原子
+                        //  （reverseAttr.id）与谓词原子（reverseAttr.&.xxx）走同一条 JOIN 路径、
+                        //  合并到同一别名，"同一条边"的语义才成立。
+                        //  中段 filtered 属性维持外层 AND——EXIST 的关联引用（parentPath.id）与
+                        //  rebased 谓词共享外层同一 JOIN 别名，语义本就正确。
+                        const farSideAttribute = currentPathInfo.isRecordSource() ? 'target' : 'source'
+                        existInnerFold = linkMatchExp.rebase(farSideAttribute).data
+                    } else {
+                        const reversePath = this.map.getReversePath(currentResolvedPath)
+                        const rebasePathStart = currentPathInfo.isRecordSource() ? 'source' : 'target'
+                        const rebasePath = [rebasePathStart, ...reversePath.slice(2)]
+                        const rebasedLinkMatch = linkMatchExp.rebase(rebasePath.join('.'))
+                        currentMatchExpression = currentMatchExpression? currentMatchExpression.and(rebasedLinkMatch) : rebasedLinkMatch
+                    }
                 }
 
 
@@ -140,12 +157,28 @@ export class MatchExp {
                 }
             }, {path:[this.entityName], resolvedPath:[this.entityName], matchExpression:undefined} as {path:string[], resolvedPath:string[], matchExpression:MatchExp|undefined})
 
-            if( !matchExpressionInPath) {
+            if( !matchExpressionInPath && !existInnerFold) {
                 return matchData
             }
 
-            const baseMatchExpAtom = MatchExp.atom({key:resolvedPath.slice(1).join('.'), value: matchData.data.value})
-            return baseMatchExpAtom.and(matchExpressionInPath.data)
+            // EXIST 内层 match 允许 BoolExp / ExpressionData / 裸 MatchAtom / 缺省——统一归一化后
+            //  与折叠谓词 AND（与 collectExistReferencePaths 的归一化同一形态集合）。
+            let finalValue = atomValue
+            if (existInnerFold) {
+                const innerValue = (atomValue as [string, unknown])[1]
+                let innerExp: MatchExpressionData | undefined
+                if (innerValue instanceof BoolExp) {
+                    innerExp = innerValue as MatchExpressionData
+                } else if (BoolExp.isExpressionData(innerValue)) {
+                    innerExp = BoolExp.fromValue(innerValue as ExpressionData<MatchAtom>)
+                } else if (innerValue && typeof innerValue === 'object' && 'key' in (innerValue as object) && 'value' in (innerValue as object)) {
+                    innerExp = BoolExp.atom<MatchAtom>(innerValue as MatchAtom)
+                }
+                finalValue = ['exist', innerExp ? innerExp.and(existInnerFold) : existInnerFold]
+            }
+
+            const baseMatchExpAtom = MatchExp.atom({...matchData.data, key:resolvedPath.slice(1).join('.'), value: finalValue})
+            return matchExpressionInPath ? baseMatchExpAtom.and(matchExpressionInPath.data) : baseMatchExpAtom
         }
     }
     buildQueryTree(matchData: MatchExpressionData, recordQueryTree: RecordQueryTree) {

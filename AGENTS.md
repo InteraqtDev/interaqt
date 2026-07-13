@@ -347,14 +347,10 @@ sudo -u postgres psql -c "CREATE USER interaqt WITH PASSWORD 'interaqt' SUPERUSE
 sudo -u postgres psql -c "CREATE DATABASE interaqt OWNER interaqt;"       # default landing DB for the admin connection
 sudo -u postgres psql -c "CREATE DATABASE interaqt_test OWNER interaqt;"
 
-# run all real-PG suites
+# run all real-PG suites (concurrency, migration, scoped sequence, data
+# constraints, lock semantics, id consistency, json match)
 INTERAQT_POSTGRES_DATABASE=interaqt_test PGHOST=127.0.0.1 PGUSER=interaqt PGPASSWORD=interaqt \
-  npx vitest run tests/runtime/postgresqlConcurrency.spec.ts \
-                 tests/runtime/postgresqlMigration.spec.ts \
-                 tests/runtime/postgresqlScopedSequence.spec.ts \
-                 tests/runtime/postgresqlDataConstraints.spec.ts \
-                 tests/runtime/postgresqlLockRecord.spec.ts \
-                 tests/runtime/postgresqlIdConsistency.spec.ts
+ npm run test:postgres
 ```
 
 Each spec derives its own exclusive database name from `INTERAQT_POSTGRES_DATABASE`

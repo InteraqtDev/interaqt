@@ -157,8 +157,20 @@ export class Entity implements EntityInstance {
     if (args.inputEntities && args.inputEntities.length === 0) {
       throw new Error(`Entity "${args.name}" declares inputEntities as an empty array. A merged entity must have at least one inputEntity (same rule as Relation.inputRelations).`);
     }
+    // merged entity 的属性面 = inputEntities 属性并集 + commonProperties；直接声明 properties
+    // 与文档契约矛盾，且此前会被静默并进物理表（任何 input 视图都写不到的半孤儿列）——
+    // static.public 的 mergedEntityNoProperties 约束此前从未接线到 create（r25）。
+    if (args.inputEntities && args.properties && args.properties.length > 0) {
+      throw new Error(`Merged entity "${args.name}" cannot declare properties (got: ${args.properties.map(p => p.name).join(', ')}). Its property surface is the union of its inputEntities' properties; use commonProperties to require a shared property across all inputs.`);
+    }
+    // commonProperties 只在 merged entity 上有语义；孤立声明会被编译静默忽略——零告警失效（r25）。
+    if (args.commonProperties && args.commonProperties.length > 0 && !args.inputEntities) {
+      throw new Error(`Entity "${args.name}" declares commonProperties without inputEntities. commonProperties only has meaning on a merged entity — declare inputEntities as well, or move these into properties.`);
+    }
     // 保留名（id/_rowId）与重复属性名守卫：见 propertyNameGuards.ts。
+    // commonProperties 与 properties 共享同一物理属性命名空间，走同一守卫（r25：此前绕过）。
     validatePropertyNamesOnCreate(args.name, args.properties, 'Entity');
+    validatePropertyNamesOnCreate(args.name, args.commonProperties, 'Entity');
 
     const instance = new Entity(args, options);
     

@@ -356,8 +356,20 @@ export class Relation implements RelationInstance {
     if (args.type !== undefined && !VALID_RELATION_TYPES.includes(args.type)) {
       throw new Error(`Relation type "${args.type}" is invalid. Valid types: ${VALID_RELATION_TYPES.map(t => `'${t}'`).join(', ')}.`);
     }
+    // merged relation 的属性面 = inputRelations 属性并集 + commonProperties（与 Entity 同规则，
+    // r25：static.public 的 mergedRelationNoProperties 约束此前从未接线到 create）。
+    // CAUTION 守卫只放在 create：clone/图手术走 new Relation 直构——框架在 merged 编译与
+    //  bound-state 注入后会在克隆上携带合成属性，不能被本守卫拦截。
+    if (args.inputRelations && args.inputRelations.length > 0 && args.properties && args.properties.length > 0) {
+      throw new Error(`Merged relation${args.name ? ` "${args.name}"` : ''} cannot declare properties (got: ${args.properties.map(p => p.name).join(', ')}). Its property surface is the union of its inputRelations' properties; use commonProperties to require a shared property across all inputs.`);
+    }
+    if (args.commonProperties && args.commonProperties.length > 0 && !args.inputRelations) {
+      throw new Error(`Relation${args.name ? ` "${args.name}"` : ''} declares commonProperties without inputRelations. commonProperties only has meaning on a merged relation — declare inputRelations as well, or move these into properties.`);
+    }
     // 保留名（id/_rowId/source/target）与重复属性名：见 Entity.create 的同族守卫说明。
+    // commonProperties 与 properties 共享同一物理属性命名空间，走同一守卫（r25：此前绕过）。
     validatePropertyNamesOnCreate(args.name ?? `${args.source?.name}_${args.sourceProperty}_${args.targetProperty}_${args.target?.name}`, args.properties, 'Relation');
+    validatePropertyNamesOnCreate(args.name ?? `${args.source?.name}_${args.sourceProperty}_${args.targetProperty}_${args.target?.name}`, args.commonProperties, 'Relation');
     const instance = new Relation(args, options);
     
     // 检查 uuid 是否重复
