@@ -5,6 +5,25 @@
 ### Bug Fixes
 
 * r26 deep review — flashOut delete endpoints, Activity guard order, declaration guards, close idempotency ([b39efd2](https://github.com/InteraqtDev/interaqt/commit/b39efd2ec06c7cc072f30c6d82704f079fc5a838))
+* **storage:** relation-event endpoint contract enforced across delete/update/view tracks — event oracle rules 6/7 caught and fixed `{id:undefined}` endpoints, a swapped `stolenIsSource` on merged-replace deletes, endpoint-less in-row `&` update oldRecord, and endpoint-less filtered-view delete snapshots ([929b1e0](https://github.com/InteraqtDev/interaqt/commit/929b1e0f), [56b0507](https://github.com/InteraqtDev/interaqt/commit/56b0507c))
+* **runtime:** migration `operationKey` is content-addressed (`content#occurrence`) — resume survives plan reorder/insertion; legacy index-keys honored read-only ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+* **runtime:** `argsSignature` gains Date/Set/Map/RegExp codecs (previously collapsed to `{}`, making value changes migration-invisible); manifest generator `"4"→"5"` — existing deployments re-baseline via the standard gate ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+* **runtime:** corrupted migration manifest now throws a guided error with the `createMigrationBaseline()` recovery path ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+* **runtime:** Transform unique-index names use sha1 (collision-resistant); legacy weak-hash indexes are dropped on setup ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+* **core:** `StateMachine.clone(deep)` performs a real deep clone (isomorphic node mapping, structured-cloned triggers) ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+* **drivers:** MySQL passes `Date` params natively (was JSON.stringify → NaN reads on TIMESTAMP columns); migration bookkeeping tables are MySQL-compatible (VARCHAR keys, sha256 surrogate operation keys) ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+
+### Features
+
+* **core:** unified declaration-time validation — `static.public` required/options/constraints are enforced in every `create()` via the new `validateCreateArgs` (exported from `@core`); wired across Count/Every/Any/Summation/Average/WeightedSummation (record|property either-or), Transform (callback required, record XOR eventDeps), Custom, RealTime, SideEffect, EventSource, StateMachine, Activity, ActivityGroup (type whitelist `any|every|race`) ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+* **storage:** `type:'timestamp'` cross-driver epoch-ms contract — writes accept `Date | epoch-ms | ISO string`, reads (find/atomic) return `number`, match params (`=`/`in`/`between`) follow the same contract on SQLite/PGLite/PostgreSQL/MySQL ([946e404](https://github.com/InteraqtDev/interaqt/commit/946e404d))
+
+### Behavior changes (upgrade notes)
+
+* `timestamp` reads change from driver-native values (PG returned `Date`) to epoch-ms `number` everywhere.
+* Previously-silent invalid declarations now fail at `create()` (e.g. `Count.create({})`, `ActivityGroup.create({type:'sequential'})`, `EventSource.create()` without `entity`).
+* Unauthorized activity probes now receive the Condition error without `ActivityStateError.currentState`.
+* Migration manifest generator bumped to `"5"`; four-driver `close()` is idempotent.
 
 ## [4.0.6](https://github.com/interaqtdev/interaqt/compare/v4.0.5...v4.0.6) (2026-07-13)
 
