@@ -20,9 +20,11 @@ export const MIGRATION_MANIFEST_CURRENT_KEY = "current";
 // serialized explicit-undefined keys as invalid JSON fragments and collapsed NaN/Infinity
 // to null in stableStringify/canonicalizeArgsForSignature (undefined-vs-absent keys signed
 // differently; NaN collided with null; manifest objects with undefined-valued fields made
-// modelHash depend on that accident).
+// modelHash depend on that accident). Generator "4" collapsed Date/Set/Map/RegExp args to
+// `{}` (changing e.g. a Date literal in a trigger pattern was signature-invisible —
+// migration silently skipped); "5" adds tagged codecs for them.
 // Bump when signature collection semantics change.
-const MIGRATION_MANIFEST_GENERATOR_VERSION = "4";
+const MIGRATION_MANIFEST_GENERATOR_VERSION = "5";
 const HARD_DELETION_PROPERTY_NAME = "_isDeleted_";
 
 export class MigrationError extends Error {
@@ -547,6 +549,25 @@ export function hashMigrationDiff(diff: MigrationDiffFile) {
     return hash(diff);
 }
 
+// Date/Set/Map/RegExp 的规范编码（r26 遗留收口）：此前这些类型经对象分支坍缩为 `{}`——
+//  改一个 trigger 模式里的 Date 字面量对签名不可见，迁移静默跳过。带标签字符串/结构保持
+//  可区分且跨进程稳定（Set 成员、Map 条目按规范化 JSON 排序，与声明顺序无关）。
+function encodeExoticValue(value: object): unknown | undefined {
+    if (value instanceof Date) {
+        return `[Date:${Number.isNaN(value.getTime()) ? "NaN" : value.toISOString()}]`;
+    }
+    if (value instanceof RegExp) {
+        return `[RegExp:${value.toString()}]`;
+    }
+    if (value instanceof Set) {
+        return { "[Set]": [...value].map(item => stableStringify(item)).sort() };
+    }
+    if (value instanceof Map) {
+        return { "[Map]": [...value.entries()].map(([key, item]) => [stableStringify(key), stableStringify(item)] as const).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0) };
+    }
+    return undefined;
+}
+
 function stableStringify(value: unknown): string {
     if (value === null || typeof value !== "object") {
         if (typeof value === "function") return "[Function]";
@@ -558,6 +579,8 @@ function stableStringify(value: unknown): string {
         if (typeof value === "number" && !Number.isFinite(value)) return `"[${String(value)}]"`;
         return JSON.stringify(value);
     }
+    const exotic = encodeExoticValue(value);
+    if (exotic !== undefined) return stableStringify(exotic);
     if (Array.isArray(value)) {
         return `[${value.map(stableStringify).join(",")}]`;
     }
@@ -845,6 +868,9 @@ function canonicalizeArgsForSignature(value: unknown, seen = new WeakSet<object>
         if (typeof value === "number" && !Number.isFinite(value)) return `[${String(value)}]`;
         return value;
     }
+    // Date/Set/Map/RegExp（r26）：此前坍缩为 `{}`，值变更对签名不可见。
+    const exotic = encodeExoticValue(value);
+    if (exotic !== undefined) return exotic;
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
     if (Array.isArray(value)) return value.map(item => canonicalizeArgsForSignature(item, seen));

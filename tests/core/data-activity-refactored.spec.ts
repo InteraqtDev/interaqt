@@ -114,7 +114,7 @@ describe("Data and Activity Classes Refactored", () => {
         });
         
         const group = ActivityGroup.create({
-          type: "parallel"
+          type: "every"
         });
         
         const activity = Activity.create({
@@ -150,10 +150,10 @@ describe("Data and Activity Classes Refactored", () => {
     describe("ActivityGroup", () => {
       test("should create activity group instance", () => {
         const group = ActivityGroup.create({
-          type: "sequential"
+          type: "any"
         });
 
-        expect(group.type).toBe("sequential");
+        expect(group.type).toBe("any");
         expect(group.activities).toEqual([]);
         expect(group._type).toBe("ActivityGroup");
       });
@@ -163,7 +163,7 @@ describe("Data and Activity Classes Refactored", () => {
         const activity2 = Activity.create({ name: "Activity2" });
         
         const group = ActivityGroup.create({
-          type: "parallel",
+          type: "every",
           activities: [activity1, activity2]
         });
 
@@ -188,8 +188,8 @@ describe("Data and Activity Classes Refactored", () => {
       });
 
       test("should create transfer between activity groups", () => {
-        const group1 = ActivityGroup.create({ type: "sequential" });
-        const group2 = ActivityGroup.create({ type: "parallel" });
+        const group1 = ActivityGroup.create({ type: "any" });
+        const group2 = ActivityGroup.create({ type: "every" });
         
         const transfer = Transfer.create({
           name: "groupFlow",
@@ -236,7 +236,7 @@ describe("Data and Activity Classes Refactored", () => {
     test("should track instances", () => {
       const dp1 = DataPolicy.create({ match: { key: "status", value: ["=", "active"] } });
       const a1 = Activity.create({ name: "A1" });
-      const ag1 = ActivityGroup.create({ type: "seq" });
+      const ag1 = ActivityGroup.create({ type: "race" });
       const t1 = Transfer.create({ name: "t1", source: testInteraction, target: testGateway });
 
       expect(DataPolicy.instances).toHaveLength(1);

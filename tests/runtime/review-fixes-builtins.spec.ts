@@ -228,20 +228,12 @@ describe('S20: PayloadItem.type is enforced at runtime', () => {
     });
 });
 
-describe('S22: unknown ActivityGroup type fails at build time', () => {
-    test('ActivityManager rejects an unsupported group type with a clear message', () => {
-        const a = makeInteraction('unknownGroupA');
-        const group = ActivityGroup.create({
-            type: 'parallel-nonsense',
-            activities: [Activity.create({ name: 'unknownGroupSeq', interactions: [a] })],
-        });
-        const activity = Activity.create({
-            name: 'unknownGroupActivity',
-            interactions: [],
-            groups: [group],
-        });
-        expect(() => new ActivityManager([activity]))
-            .toThrowError(/ActivityGroup type "parallel-nonsense".*Supported types: 'any', 'every', 'race'/);
+describe('S22: unknown ActivityGroup type fails at declaration time', () => {
+    // r26 遗留收口：type 白名单从 ActivityManager 构造期前移到 ActivityGroup.create()
+    //  （统一声明期校验）。ActivityCall.buildGraph 的运行期守卫保留为图手术路径的兜底。
+    test('ActivityGroup.create rejects an unsupported group type with a clear message', () => {
+        expect(() => ActivityGroup.create({ type: 'parallel-nonsense' }))
+            .toThrowError(/ActivityGroup.*invalid "type".*"parallel-nonsense".*"any", "every", "race"/s);
     });
 });
 

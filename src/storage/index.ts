@@ -17,4 +17,4 @@ export * from './erstorage/SQLBuilder.js'
 export * from './erstorage/util/AliasManager.js'
 export * from './erstorage/util/RecursiveContext.js'
 // json 列写入/比较的规范序列化（runtime 的 atomic 写路径与 storage 写路径共用同一实现）。
-export { canonicalJSONStringify } from './utils.js'
+export { canonicalJSONStringify, normalizeTimestampInputToMs, normalizeTimestampReadValue, timestampParamForDialect } from './utils.js'

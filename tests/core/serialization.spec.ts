@@ -41,7 +41,7 @@ describe('Any serialization', () => {
     });
 
     test('is() positive and negative', () => {
-        const instance = Any.create({ callback: () => true });
+        const instance = Any.create({ callback: () => true, property: 'val' });
         expect(Any.is(instance)).toBe(true);
         expect(Any.is(null)).toBe(false);
         expect(Any.is({})).toBe(false);
@@ -49,7 +49,7 @@ describe('Any serialization', () => {
     });
 
     test('check() validates object shape', () => {
-        const instance = Any.create({ callback: () => true });
+        const instance = Any.create({ callback: () => true, property: 'val' });
         expect(Any.check(instance)).toBe(true);
         expect(Any.check(null)).toBe(false);
         expect(Any.check({})).toBe(false);
@@ -69,7 +69,7 @@ describe('Any serialization', () => {
 describe('Every serialization', () => {
     test('stringify/parse round-trip preserves data', () => {
         const callback = (item: any) => item.active;
-        const instance = Every.create({ callback, notEmpty: true }, { uuid: 'every-1' });
+        const instance = Every.create({ callback, property: 'val', notEmpty: true }, { uuid: 'every-1' });
 
         const json = Every.stringify(instance);
         const data = JSON.parse(json);
@@ -84,7 +84,7 @@ describe('Every serialization', () => {
     });
 
     test('is() positive and negative', () => {
-        const instance = Every.create({ callback: () => true });
+        const instance = Every.create({ callback: () => true, property: 'val' });
         expect(Every.is(instance)).toBe(true);
         expect(Every.is(null)).toBe(false);
         expect(Every.is({ _type: 'Any' })).toBe(false);
@@ -97,7 +97,7 @@ describe('Every serialization', () => {
     });
 
     test('clone() creates independent copy', () => {
-        const instance = Every.create({ callback: () => true, notEmpty: true });
+        const instance = Every.create({ callback: () => true, property: 'val', notEmpty: true });
         const cloned = Every.clone(instance, false);
         expect(cloned.uuid).not.toBe(instance.uuid);
         expect(cloned.callback).toBe(instance.callback);
@@ -344,7 +344,7 @@ describe('WeightedSummation serialization', () => {
     });
 
     test('is() positive and negative', () => {
-        const instance = WeightedSummation.create({ callback: () => 1 });
+        const instance = WeightedSummation.create({ callback: () => 1, property: 'p' });
         expect(WeightedSummation.is(instance)).toBe(true);
         expect(WeightedSummation.is(null)).toBe(false);
         expect(WeightedSummation.is({ _type: 'Any' })).toBe(false);

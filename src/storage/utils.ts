@@ -74,3 +74,43 @@ function sortObjectKeysDeep(value: unknown): unknown {
     }
     return value
 }
+
+// ============ timestamp 归一化（r26 遗留收口，r24/r25 boolean/json 归一化家族的最后一格） ============
+// 契约：type:'timestamp' 属性在 JS 面统一为 epoch 毫秒 number——
+//  写入接受 Date | number(ms) | ISO 字符串；读取（find/atomic）恒返回 number。
+//  物理列型保持既有映射（SQLite INT / PG 系 TIMESTAMP / MySQL TIMESTAMP，改列型会动 modelHash）。
+
+export function normalizeTimestampInputToMs(value: unknown, context: string): number {
+    if (value instanceof Date) {
+        const ms = value.getTime()
+        if (Number.isNaN(ms)) throw new Error(`Invalid Date for timestamp ${context}.`)
+        return ms
+    }
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) throw new Error(`Invalid number ${value} for timestamp ${context}; expected epoch milliseconds.`)
+        return value
+    }
+    if (typeof value === 'string') {
+        const ms = Date.parse(value)
+        if (Number.isNaN(ms)) throw new Error(`Cannot parse "${value}" as a timestamp for ${context}; expected epoch milliseconds, Date, or an ISO-8601 string.`)
+        return ms
+    }
+    throw new Error(`Unsupported timestamp value (${typeof value}) for ${context}; expected epoch milliseconds, Date, or an ISO-8601 string.`)
+}
+
+// 各方言的可绑定形态：TIMESTAMP 列（PG 系/MySQL）绑定 Date（驱动原生编码）；SQLite INT 列绑定毫秒数。
+export function timestampParamForDialect(ms: number, dialectName: string): unknown {
+    return dialectName === 'sqlite' ? ms : new Date(ms)
+}
+
+// 读侧归一化：PG 系/MySQL 驱动返回 Date；SQLite 返回 number；个别路径可能出现字符串。
+export function normalizeTimestampReadValue(value: unknown): unknown {
+    if (value === null || value === undefined) return value
+    if (value instanceof Date) return value.getTime()
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') {
+        const ms = Date.parse(value)
+        return Number.isNaN(ms) ? value : ms
+    }
+    return value
+}

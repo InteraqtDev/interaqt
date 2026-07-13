@@ -24,6 +24,7 @@ import {
     SystemSchemaOptions
 } from "./System.js";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash } from "node:crypto";
 import { RequireSerializableRetry, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer, type ConstraintPredicateOperator } from "@core";
@@ -40,7 +41,7 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, quoteIdentifier } from "@storage";
+import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, timestampParamForDialect } from "@storage";
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
@@ -56,6 +57,17 @@ function JSONStringify(value: unknown) {
 // and string interpolation corrupts them under MySQL's backslash escaping.
 function migrationSQLPlaceholders(dialectName: string, count: number): string[] {
     return Array.from({ length: count }, (_, index) => dialectName === 'postgres' ? `$${index + 1}` : '?')
+}
+
+// CAUTION operationKey 绝不能编码列表下标（r26 遗留收口，r25 §三 #2）：resume 前计划重排/插项
+//  会让「同 index 不同 SQL」被误标已完成——错误的 DDL 被跳过、已完成的被重跑。
+//  键 = 操作内容（phase/kind/table/column/logicalPath/SQL）；列表内完全相同的操作再追加
+//  出现序号 `#n`（相对顺序由计划生成器保证稳定）。旧格式（含下标）保留为只读回退：
+//  跨版本 resume 的 in-flight 迁移里旧键标记的操作仍被识别为已完成；新标记一律写内容键。
+function migrationOperationContentKey(phase: string, operation: MigrationDDLOperation): string {
+    const columnName = 'columnName' in operation ? operation.columnName || '' : ''
+    const sql = 'sql' in operation ? operation.sql || '' : ''
+    return `${phase}:${operation.kind}:${operation.tableName || ''}:${columnName}:${operation.logicalPath || ''}:${sql || operation.description}`
 }
 
 function JSONParse(value: string) {
@@ -432,10 +444,15 @@ class MonoStorage implements Storage{
         }
     }
 
-    private migrationOperationKey(phase: string, operation: MigrationDDLOperation, index: number) {
+    private legacyMigrationOperationKey(phase: string, operation: MigrationDDLOperation, index: number) {
         const columnName = 'columnName' in operation ? operation.columnName || '' : ''
         const sql = 'sql' in operation ? operation.sql || '' : ''
         return `${phase}:${index}:${operation.kind}:${operation.tableName || ''}:${columnName}:${operation.logicalPath || ''}:${sql || operation.description}`
+    }
+
+    private async isMigrationOperationCompleteWithLegacy(migrationId: string | undefined, contentKey: string, legacyKey: string) {
+        if (await this.isMigrationOperationComplete(migrationId, contentKey)) return true
+        return this.isMigrationOperationComplete(migrationId, legacyKey)
     }
 
     async isMigrationOperationComplete(migrationId: string | undefined, operationKey: string) {
@@ -466,6 +483,7 @@ class MonoStorage implements Storage{
     }
 
     private async applyMigrationOperations(phase: string, operations: MigrationDDLOperation[], migrationId?: string) {
+        const occurrenceByContent = new Map<string, number>()
         for (const [index, operation] of operations.entries()) {
             const sql = 'sql' in operation && operation.sql
                 ? operation.sql
@@ -473,8 +491,12 @@ class MonoStorage implements Storage{
                 ? `DROP TABLE IF EXISTS ${quoteIdentifier(operation.tableName, getSchemaDialect(this.db))}`
                 : undefined
             if (!sql) continue
-            const operationKey = this.migrationOperationKey(phase, operation, index)
-            if (await this.isMigrationOperationComplete(migrationId, operationKey)) continue
+            const content = migrationOperationContentKey(phase, operation)
+            const occurrence = occurrenceByContent.get(content) ?? 0
+            occurrenceByContent.set(content, occurrence + 1)
+            const operationKey = `${content}#${occurrence}`
+            const legacyKey = this.legacyMigrationOperationKey(phase, operation, index)
+            if (await this.isMigrationOperationCompleteWithLegacy(migrationId, operationKey, legacyKey)) continue
             await this.db.scheme(sql, operation.description)
             await this.markMigrationOperationComplete(migrationId, operationKey)
         }
@@ -517,10 +539,15 @@ class MonoStorage implements Storage{
     }
 
     async verifyMigrationPlan(plan: MigrationSchemaPlan, migrationId?: string) {
+        const occurrenceByContent = new Map<string, number>()
         for (const [index, operation] of plan.verificationDDL.entries()) {
             if (!operation.sql) continue
-            const operationKey = this.migrationOperationKey('verification', operation, index)
-            if (await this.isMigrationOperationComplete(migrationId, operationKey)) continue
+            const content = migrationOperationContentKey('verification', operation)
+            const occurrence = occurrenceByContent.get(content) ?? 0
+            occurrenceByContent.set(content, occurrence + 1)
+            const operationKey = `${content}#${occurrence}`
+            const legacyKey = this.legacyMigrationOperationKey('verification', operation, index)
+            if (await this.isMigrationOperationCompleteWithLegacy(migrationId, operationKey, legacyKey)) continue
             const rows = await this.db.query<Record<string, unknown>>(operation.sql, [], operation.description)
             if (rows.length > 0) {
                 throw new ConstraintSetupError(`Migration verification failed for ${operation.logicalPath || operation.description}`, {
@@ -803,6 +830,8 @@ class MonoStorage implements Storage{
         if (valueType === 'json' && typeof value === 'string' && this.db.returnsParsedJSON !== true) {
             return JSON.parse(value) as T
         }
+        // r26：timestamp 与 find 路径同一契约（epoch 毫秒）。
+        if (valueType === 'timestamp') return normalizeTimestampReadValue(value) as T
         return value as T
     }
 
@@ -815,6 +844,11 @@ class MonoStorage implements Storage{
     private normalizeRecordFieldParam(value: unknown, valueType: string | undefined): unknown {
         if (valueType === 'json' && value !== null && value !== undefined && typeof value !== 'string') {
             return canonicalJSONStringify(value)
+        }
+        // r26：timestamp 写参与 storage 写路径（prepareFieldValue）同一契约。
+        if (valueType === 'timestamp' && value !== null && value !== undefined) {
+            const ms = normalizeTimestampInputToMs(value, 'atomic write')
+            return timestampParamForDialect(ms, getSchemaDialect(this.db).name)
         }
         return value
     }
@@ -1519,27 +1553,32 @@ export class MonoSystem implements System {
     }
 
     private async ensureMigrationManifestTable() {
+        // CAUTION MySQL 不支持 TEXT 主键（"BLOB/TEXT column used in key specification
+        //  without a key length"）——键列按方言用定长 VARCHAR（r26 遗留收口时首次在真实
+        //  MySQL 上跑 Controller.setup 暴露的沉睡面）。operationKey 可能携带完整 DDL 文本，
+        //  超长键在 MySQL 上以 sha256 代理键存储（读写两侧同一归一化，精确唯一）。
+        const keyType = getSchemaDialect(this.db).name === 'mysql' ? 'VARCHAR(191)' : 'TEXT'
         await this.db.scheme(`
 CREATE TABLE IF NOT EXISTS "__interaqt_migration_manifest" (
-    "key" TEXT PRIMARY KEY,
+    "key" ${keyType} PRIMARY KEY,
     "value" TEXT NOT NULL
 )`, 'setup migration manifest table')
         await this.db.scheme(`
 CREATE TABLE IF NOT EXISTS "__interaqt_migration_log" (
-    "id" TEXT PRIMARY KEY,
+    "id" ${keyType} PRIMARY KEY,
     "modelHash" TEXT NOT NULL,
     "approvedDiffHash" TEXT NULL,
     "approvedDiffSummary" TEXT NULL,
     "decisionCount" INTEGER NOT NULL DEFAULT 0,
     "reviewedAt" TEXT NULL,
-    "phase" TEXT NOT NULL DEFAULT 'pending',
+    "phase" ${keyType} NOT NULL DEFAULT 'pending',
     "status" TEXT NOT NULL,
     "error" TEXT NULL,
     "createdAt" TEXT NOT NULL,
     "updatedAt" TEXT NOT NULL
 )`, 'setup migration log table')
         try {
-            await this.db.scheme(`ALTER TABLE "__interaqt_migration_log" ADD COLUMN IF NOT EXISTS "phase" TEXT NOT NULL DEFAULT 'pending'`, 'setup migration log phase column')
+            await this.db.scheme(`ALTER TABLE "__interaqt_migration_log" ADD COLUMN IF NOT EXISTS "phase" ${keyType} NOT NULL DEFAULT 'pending'`, 'setup migration log phase column')
         } catch {
             // Some drivers do not support ADD COLUMN IF NOT EXISTS; fresh schemas
             // already have the column and legacy duplicate-column failures are safe.
@@ -1559,16 +1598,24 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_log" (
         }
         await this.db.scheme(`
 CREATE TABLE IF NOT EXISTS "__interaqt_migration_lock" (
-    "key" TEXT PRIMARY KEY,
+    "key" ${keyType} PRIMARY KEY,
     "migrationId" TEXT NOT NULL
 )`, 'setup migration lock table')
         await this.db.scheme(`
 CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
-    "migrationId" TEXT NOT NULL,
-    "operationKey" TEXT NOT NULL,
+    "migrationId" ${keyType} NOT NULL,
+    "operationKey" ${keyType} NOT NULL,
     "status" TEXT NOT NULL,
     PRIMARY KEY ("migrationId", "operationKey")
 )`, 'setup migration operation log table')
+    }
+
+    // MySQL 键列是定长 VARCHAR（TEXT 不能做主键）；operationKey 携带完整 DDL 文本可能超长，
+    //  在 MySQL 上以 sha256 代理键存储（读写两侧同一归一化，碰撞概率可忽略且判定精确）。
+    //  PG/PGLite/SQLite 保持原文键（可读、测试可 LIKE 前缀断言）。
+    private migrationOperationKeyForStorage(operationKey: string) {
+        if (getSchemaDialect(this.db).name !== 'mysql') return operationKey
+        return createHash('sha256').update(operationKey).digest('hex')
     }
 
     async readMigrationManifest(): Promise<MigrationManifest | undefined> {
@@ -1581,7 +1628,19 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
             ['current'],
             'read migration manifest'
         )
-        return rows[0]?.value ? JSON.parse(rows[0].value) as MigrationManifest : undefined
+        if (!rows[0]?.value) return undefined
+        // 损坏的 manifest（手工改库/半写/截断）此前裸抛 SyntaxError——报错既不指明来源
+        //  也不给恢复路径。包一层带指引的受控错误（r26 遗留收口，r25 §三 #4）。
+        try {
+            return JSON.parse(rows[0].value) as MigrationManifest
+        } catch (error) {
+            throw new Error(
+                `Migration manifest in "__interaqt_migration_manifest" (key='current') is corrupted and cannot be parsed as JSON: ` +
+                `${error instanceof Error ? error.message : String(error)}. ` +
+                `This usually means the row was manually edited or a write was interrupted. ` +
+                `Recovery: verify the current entity/relation definitions match the existing schema, then re-baseline via controller.createMigrationBaseline().`
+            )
+        }
     }
 
     async writeMigrationManifest(manifest: MigrationManifest): Promise<void> {
@@ -1873,7 +1932,17 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         await this.setupTransformUniqueIndexes(states)
     }
 
+    // CAUTION 索引名哈希必须抗碰撞（r26 遗留收口，r25 §三 #3）：此前的 32-bit 弱哈希在
+    //  不同 (table, sourceField, indexField) 组合上可碰撞——两个 Transform 复用同一个
+    //  唯一索引名，第二个 CREATE UNIQUE INDEX IF NOT EXISTS 静默 no-op，唯一性约束错位。
+    //  sha1 截 20 hex（80-bit）在标识符长度预算内（idx_transform_ 前缀 14 + 20 = 34 < 63）。
     private hashIdentifier(input: string) {
+        return createHash('sha1').update(input).digest('hex').slice(0, 20)
+    }
+
+    // 旧 32-bit 弱哈希：仅用于计算 legacy 索引名以便清理（存量部署上旧名索引与新名索引
+    //  语义相同，重复存在无害但冗余；setup 时尽力 DROP，失败静默——索引清理不是关键路径）。
+    private legacyHashIdentifier(input: string) {
         let hash = 0
         for (let i = 0; i < input.length; i++) {
             hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0
@@ -1900,12 +1969,25 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
             const recordInfo = map.getRecordInfo(recordName)
             const [, sourceRecordIdField] = map.getTableAliasAndFieldName([recordName], sourceRecordId.key, true)
             const [, transformIndexField] = map.getTableAliasAndFieldName([recordName], transformIndex.key, true)
-            const indexName = `idx_transform_${this.hashIdentifier(`${recordInfo.table}_${sourceRecordIdField}_${transformIndexField}`)}`
+            const identifierInput = `${recordInfo.table}_${sourceRecordIdField}_${transformIndexField}`
+            const indexName = `idx_transform_${this.hashIdentifier(identifierInput)}`
             const dialect = getSchemaDialect(storage.db)
             await storage.db.scheme(
                 createUniqueIndexSQL(indexName, recordInfo.table, [sourceRecordIdField, transformIndexField], dialect),
                 `setup transform unique index ${recordName}`
             )
+            // 尽力清理旧 32-bit 哈希命名的等价索引（存量部署遗留；重复索引无害但冗余）。
+            const legacyIndexName = `idx_transform_${this.legacyHashIdentifier(identifierInput)}`
+            if (legacyIndexName !== indexName) {
+                try {
+                    const dropSQL = dialect.name === 'mysql'
+                        ? `DROP INDEX ${quoteIdentifier(legacyIndexName, dialect)} ON ${quoteIdentifier(recordInfo.table, dialect)}`
+                        : `DROP INDEX IF EXISTS ${quoteIdentifier(legacyIndexName, dialect)}`
+                    await storage.db.scheme(dropSQL, `drop legacy transform unique index ${recordName}`)
+                } catch {
+                    // MySQL 无 IF EXISTS：索引不存在时报错，静默即可。
+                }
+            }
         }
     }
 

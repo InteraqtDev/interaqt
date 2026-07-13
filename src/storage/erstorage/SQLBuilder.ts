@@ -1,6 +1,7 @@
 import { Database } from "@runtime";
 import { BoolExp } from "@core";
-import { canonicalJSONStringify } from "../utils.js";
+import { canonicalJSONStringify, normalizeTimestampInputToMs, timestampParamForDialect } from "../utils.js";
+import { getSchemaDialect } from "./SchemaDialect.js";
 import { EntityToTableMap } from "./EntityToTableMap.js";
 import { FieldMatchAtom, MatchExp } from "./MatchExp.js";
 import { AttributeQuery } from "./AttributeQuery.js";
@@ -467,7 +468,7 @@ ${innerQuerySQL}
      */
     buildInsertSQL(
         recordName: string,
-        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string }>
+        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string }>
     ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
@@ -478,7 +479,7 @@ INSERT INTO "${recordInfo.table}"
 VALUES
 (${fieldAndValues.map(() => p()).join(',')}) 
 `
-        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!))
+        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType))
         
         return [sql, params]
     }
@@ -492,7 +493,7 @@ VALUES
     buildUpdateSQL(
         entityName: string,
         idRef: { id: string | number },
-        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string }>
+        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string }>
     ): [string, unknown[]] {
         if (!columnAndValue.length) {
             return ['', []]
@@ -506,7 +507,7 @@ UPDATE "${entityInfo.table}"
 SET ${columnAndValue.map(({ field }) => `"${field}" = ${p()}`).join(',')}
 WHERE "${entityInfo.idField}" = (${p()})
 `
-        const params = [...columnAndValue.map(({ value, fieldType }) => this.prepareFieldValue(value, fieldType)), idRef.id]
+        const params = [...columnAndValue.map(({ value, fieldType, valueType }) => this.prepareFieldValue(value, fieldType, valueType)), idRef.id]
         
         return [sql, params]
     }
@@ -565,9 +566,16 @@ WHERE "${recordInfo.idField}" = ${p()}
      * CAUTION json 用规范序列化（键排序）：等值匹配的文本比较回退路径（MatchExp）
      *  依赖写入与匹配两侧的序列化一致，非规范形会让键序不同的等价对象匹配失败。
      */
-    prepareFieldValue(value: unknown, fieldType?: string): unknown {
+    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string): unknown {
         if (fieldType?.toLowerCase() === 'json') {
             return canonicalJSONStringify(value)
+        }
+        // timestamp（r26）：JS 面契约为 epoch 毫秒；按方言转为可绑定形态
+        //  （TIMESTAMP 列绑定 Date，SQLite INT 列绑定 number）。判定用语义类型——
+        //  SQLite 的 timestamp 列 fieldType 是 'INT'，无法从列型识别。
+        if (valueType === 'timestamp' && value !== null && value !== undefined) {
+            const ms = normalizeTimestampInputToMs(value, 'write')
+            return timestampParamForDialect(ms, getSchemaDialect(this.database).name)
         }
         return value
     }

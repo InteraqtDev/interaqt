@@ -23,12 +23,32 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # r25 建议落地：MySQL env-gated 套件（open/close 幂等、timestamp 契约）常驻运行，
+      # 不再依赖本地手工环境（沉睡面 = 零置信度）。
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: interaqt
+          MYSQL_PASSWORD: interaqt
+          MYSQL_DATABASE: interaqt_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     env:
       PGHOST: localhost
       PGPORT: "5432"
       PGUSER: postgres
       PGPASSWORD: postgres
       INTERAQT_POSTGRES_DATABASE: interaqt_test
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      INTERAQT_MYSQL_DATABASE: interaqt_mysql_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,3 +60,5 @@ jobs:
       # r24 复盘教训：env-gated 的沉睡套件提供的置信度为零（F-1 存活 22 轮）。
       # CI 必须覆盖全部真实 PG 套件，而不只是 concurrency/scoped-sequence 两个。
       - run: npm run test:postgres
+      # MySQL env-gated 套件（驱动生命周期 + timestamp 契约）。
+      - run: npx vitest run tests/runtime/mysqlOpenIdempotency.spec.ts tests/runtime/driverCloseIdempotency.spec.ts tests/runtime/review-fixes-2026-07-13-r26-leftovers.spec.ts

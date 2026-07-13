@@ -1,6 +1,7 @@
 import {BoolExp, BoolExpressionRawData, ExpressionData} from "@core";
 import {EntityToTableMap, RecordAttribute} from "./EntityToTableMap.js";
-import {assert, canonicalJSONStringify} from "../utils.js";
+import {assert, canonicalJSONStringify, normalizeTimestampInputToMs, timestampParamForDialect} from "../utils.js";
+import {getSchemaDialect} from "./SchemaDialect.js";
 import {RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "@runtime";
 import {PlaceholderGen} from "./SQLBuilder.js";
@@ -339,7 +340,14 @@ export class MatchExp {
         }
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database): [string, unknown[]] {
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database, valueType?: string): [string, unknown[]] {
+        // timestamp（r26）：匹配参数与写路径同一契约（Date|ms|ISO → 方言可绑定形态）。
+        //  语义类型判定（SQLite 的 timestamp 列 fieldType 是 'INT'）。
+        const prepareTimestampParam = (raw: unknown): unknown => {
+            if (valueType !== 'timestamp' || raw === null || raw === undefined) return raw
+            const ms = normalizeTimestampInputToMs(raw, `match key "${key}"`)
+            return timestampParamForDialect(ms, getSchemaDialect(db).name)
+        }
         let fieldValue =''
         let fieldParams:unknown[] = []
         const simpleOp = ['=', '>', '<', '<=', '>=', 'like', '!=']
@@ -380,7 +388,7 @@ export class MatchExp {
                 }
             } else {
                 fieldValue = `${value[0]} ${p()}`
-                fieldParams = [value[1]]
+                fieldParams = [prepareTimestampParam(value[1])]
             }
         } else if (lowerOp === 'is null' || lowerOp === 'is not null') {
             if (value[1] !== null) {
@@ -427,7 +435,7 @@ export class MatchExp {
                 }
             } else {
                 fieldValue = `IN (${value[1].map((_x: unknown) => p()).join(',')})`
-                fieldParams = value[1]
+                fieldParams = (value[1] as unknown[]).map(prepareTimestampParam)
             }
         } else if (lowerOp === 'not in') {
             assert(!isReferenceValue, 'reference value cannot use NOT IN to match')
@@ -454,7 +462,7 @@ export class MatchExp {
                 }
             } else {
                 fieldValue = `NOT IN (${value[1].map((_x: unknown) => p()).join(',')})`
-                fieldParams = value[1]
+                fieldParams = (value[1] as unknown[]).map(prepareTimestampParam)
             }
         } else if (lowerOp === 'between') {
             if (!Array.isArray(value[1]) || value[1].length !== 2) {
@@ -477,7 +485,7 @@ export class MatchExp {
                 fieldParams = []
             } else {
                 fieldValue = `BETWEEN ${p()} AND ${p()}`
-                fieldParams = [value[1][0], value[1][1]]
+                fieldParams = [prepareTimestampParam(value[1][0]), prepareTimestampParam(value[1][1])]
             }
         } else {
             let result
@@ -563,7 +571,7 @@ export class MatchExp {
 
                 const buildValueAtom = (fieldNamePath: [string, string]): BoolExp<FieldMatchAtom> | FieldMatchAtom => {
                     if (!nullSplit) {
-                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type)
                         return {
                             ...exp.data,
                             fieldName: fieldNamePath,
@@ -573,7 +581,7 @@ export class MatchExp {
                     }
                     let combinedParts: BoolExp<FieldMatchAtom> | undefined
                     for (const partValue of nullSplit.parts) {
-                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db)
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type)
                         const atomData = {
                             ...exp.data,
                             value: partValue,

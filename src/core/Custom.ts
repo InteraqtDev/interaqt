@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { DataDep } from './Computation.js';
 
@@ -149,6 +150,7 @@ export class Custom implements CustomInstance {
   };
   
   static create(args: CustomCreateArgs, options?: { uuid?: string }): CustomInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
     const instance = new Custom(args, options);
     
     // 检查 uuid 是否重复

@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { ComputationRecord, AttributeQueryData } from './types.js';
 
@@ -63,7 +64,7 @@ export class Transform implements TransformInstance {
     record: {
       type: ['Entity', 'Relation', 'Activity', 'Interaction'] as const,
       collection: false as const,
-      required: true as const
+      required: false as const
     },
     eventDeps: {
       instanceType: {} as unknown as {[key: string]: EventDep},
@@ -83,6 +84,14 @@ export class Transform implements TransformInstance {
   };
   
   static create(args: TransformCreateArgs, options?: { uuid?: string }): TransformInstance {
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
+    // record XOR eventDeps：数据驱动与事件驱动二选一（运行期 handle 同一断言的声明期前移）。
+    if (!args.record && !args.eventDeps) {
+      throw new Error('Transform.create() requires either "record" (data-driven) or "eventDeps" (event-driven).');
+    }
+    if (args.record && args.eventDeps) {
+      throw new Error('Transform.create() accepts either "record" or "eventDeps", not both.');
+    }
     const instance = new Transform(args, options);
     
     // 检查 uuid 是否重复

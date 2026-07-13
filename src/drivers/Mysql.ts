@@ -150,7 +150,7 @@ export class MysqlDB implements Database{
         // CAUTION MySQL 不支持 UPDATE ... RETURNING，无法履行 idField 返回契约。
         //  这里如实记录并执行原始 SQL；调用方（storage 层）不依赖 update 的返回行。
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !== null && !(x instanceof Date)) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
         })
         logger.info({
             type:'update',
@@ -164,7 +164,7 @@ export class MysqlDB implements Database{
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
+            return (typeof x === 'object' && x !== null && !(x instanceof Date)) ? JSON.stringify(x) : x===false ? 0 : x===true ? 1 : x
         })
 
         logger.info({

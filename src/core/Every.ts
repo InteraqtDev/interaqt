@@ -1,4 +1,5 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
+import { validateCreateArgs, type PublicFieldDef } from './klassValidation.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import type { EntityInstance, RelationInstance, AttributeQueryData, DataDependencies } from './types.js';
 
@@ -55,7 +56,7 @@ export class Every implements EveryInstance {
     record: {
       type: ['Entity', 'Relation'] as const,
       collection: false as const,
-      required: true as const
+      required: false as const
     },
     property: {
       type: 'string' as const,
@@ -90,6 +91,12 @@ export class Every implements EveryInstance {
   };
   
   static create(args: EveryCreateArgs, options?: { uuid?: string }): EveryInstance {
+    // 统一声明期校验（r16 建议 4 / r26 落地）：static.public 的 required/options/constraints
+    //  在 create 时执行；record/property 二选一是聚合的结构性前提（缺失时 Scheduler 深处才炸）。
+    validateCreateArgs(this.displayName, this.public as unknown as Record<string, PublicFieldDef>, args as unknown as Record<string, unknown>);
+    if (!args.record && !args.property) {
+      throw new Error(`${this.displayName}.create() requires either "record" (target entity/relation) or "property" (host relation property).`);
+    }
     const instance = new Every(args, options);
     
     // 检查 uuid 是否重复

@@ -69,17 +69,30 @@ sweep 后验证：全量 `npm test` **2022 passed / 33 skipped**；`npm run test
 - **I-3 `BoolExpressionData.create` 不执行 operator 白名单**：`operator: 'xor'` 声明期通过，首次求值才炸。修复：接线白名单 + `not` 不得带 `right`。
 - **I-4 四驱动 `close()` 非幂等**（open 幂等家族对称面）：二次 `close` 抛错。修复：PG/MySQL/SQLite/PGLite 一律幂等守卫。
 
-### 记录，本轮不修（按影响排序）
+### 遗留项收口（follow-up 轮，全部红-绿验证；回归固化于 `review-fixes-2026-07-13-r26-leftovers.spec.ts` 15 用例）
 
-1. **迁移 `operationKey` 含 DDL 列表下标**（r25 §三 #2）：resume 前计划重排会误标已完成——改键格式影响进行中的迁移，需配套设计，不宜顺手改。
-2. **timestamp 读路径无跨驱动归一化**（r25 §三 #5）：行为变更，需 CHANGELOG。
-3. **`canonicalizeArgsForSignature` 的 Date/Set/Map/RegExp codec**（多轮遗留）。
-4. **Transform `hashIdentifier` 32-bit 弱哈希**（r25 §三 #3）：换哈希触发存量索引重建。
-5. **createClass 统一声明期校验**（r16 建议 4，十轮复确）：本轮又手写两处守卫，积压持续增长；Count/Every/Transform 的 `required` 字段等仍未接线。
-6. **filtered targetPath 全量重算风暴**（多轮复确）：性能项。
-7. **StateMachine.clone 共享图、`new StateMachine` 绕过 create 守卫**。
-8. **Activity 图校验只在 ActivityManager 构造期**（声明期缺口）。
-9. 其余 r25 §三 清单（dedupe / 深嵌 EXIST 别名 / 等）——本轮无新增证据。
+多轮「记录不修」清单本轮一次性清理，防止继续干扰后续工作：
+
+| # | 遗留项（首记轮次） | 收口方式 |
+|---|-------------------|---------|
+| L-1 | 迁移 `operationKey` 含 DDL 下标（r25 #2） | 键改为**操作内容 + 同内容出现序号**（`content#n`）；旧下标键保留**只读回退**（跨版本 resume 的 in-flight 迁移不重跑）。既有注入下标键的迁移测试因双读原样通过 |
+| L-2 | `canonicalizeArgsForSignature` Date/Set/Map/RegExp 坍缩为 `{}`（r19 起） | 带标签 codec（Date ISO / RegExp 字面量 / Set·Map 按规范化排序）；`stableStringify` 同步；**generator "4"→"5"**（走既有 re-baseline 门） |
+| L-3 | `readMigrationManifest` 损坏 JSON 裸抛（r25 #4） | 受控错误：指明来源 + `createMigrationBaseline()` 恢复路径 |
+| L-4 | **createClass 统一声明期校验**（r16 建议 4，十一轮） | 汇合点 `validateCreateArgs`（`@core`）：static.public 的 required/options/constraints 统一执行；接线 Count/Every/Any/Summation/Average/WeightedSummation（+record/property 二选一）、Transform（callback 必填 + record XOR eventDeps）、Custom/RealTime/SideEffect/EventSource/StateMachine/Activity/ActivityGroup（type 白名单 any/every/race）。**顺带修正说谎的元数据**：聚合类 record.required 原为 true（property-level 用法合法）、Transform record.required 同 |
+| L-5 | StateMachine.clone 忽略 deep（r23 起） | 真深拷贝：节点 old→new 映射保持图同构、trigger structuredClone、行为函数按 Count.clone 惯例共享；浅 clone 语义不变 |
+| L-6 | Transform 索引名 32-bit 弱哈希（r25 #3） | sha1 截 20 hex；setup 时按同一 identifierInput 计算 legacy 名**尽力 DROP**（存量部署自动清理，重复索引期间无害） |
+| L-7 | timestamp 读写无跨驱动归一化（r25 #5） | **JS 面契约 = epoch 毫秒**：写接受 Date\|ms\|ISO（`prepareFieldValue` 按方言产出 Date/number），读（find/atomic）恒 number，match 参数同契约（=/in/between）；判定用**语义类型**（SQLite 列型 INT 无法识别）。4 驱动验证（PG/MySQL env-gated），顺带修 MySQL 驱动把 Date 参数 JSON.stringify 的兜底 |
+| 附带 | 迁移簿记表在真实 MySQL 上从未可用（沉睡面） | TEXT 主键/TEXT DEFAULT 不被 MySQL 支持——键列按方言 VARCHAR(191)，MySQL 上 operationKey 存 sha256 代理键（读写同一归一化） |
+| 附带 | CI MySQL service（r25 建议） | workflow 增加 mysql:8 service，env-gated MySQL 套件常驻运行 |
+
+**错误前移的既有测试更新**（错误信息同样清晰，位置更早）：r7 F-5（'program' group：manager 期→create 期）、r13 R-2（global Summation 缺 record：Controller 构造期→create 期）、S22（unknown group type 同前移）；serialization/interaction 系列夹具改用合法 group type 与 record/property。
+
+### 记录，暂不收口（有明确理由）
+
+1. **filtered targetPath 全量重算风暴**（多轮复确）：纯性能项，正确性由 full recompute 兜底；需先建基准判据（r23 结论维持），盲目改事件改写路径风险大于收益。
+2. **dedupe 扇出少去重 / 深嵌 EXIST 别名碰撞**（r25 #6/#7）：均未构造出红例，维持「记录待查」；预言机与矩阵未报异常。
+3. **post-pagination tie 稳定性**（r22#7）：行为变更需求不明确，维持记录。
+4. **MySQL storage 写路径需事务**：`transactions:false` 是驱动声明的既有限制（transactionCapability.spec 固化），非本轮引入。
 
 ---
 
