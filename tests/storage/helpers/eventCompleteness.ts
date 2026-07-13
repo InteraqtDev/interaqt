@@ -1,5 +1,5 @@
 /**
- * 事件完备性预言机（r17 复盘落地项，盲区 2；r25 扩展 payload 完备性）。
+ * 事件完备性预言机（r17 复盘落地项，盲区 2；r25 扩展 payload 完备性；r26 扩展 delete 端点完备性）。
  *
  * 契约：storage 写操作的「逻辑数据面 diff」必须与「事件面」互相解释——
  *  1. 每个新出现的记录必须有对应的 create 事件（缺失 = 下游计算漏加）；
@@ -14,6 +14,11 @@
  *     所以 create 事件 payload 必须覆盖行上全部非 NULL 的普通值字段且值一致。
  *     computed / computation 属性是契约的显式例外（create 事件不保证携带），
  *     经 schema.createPayloadExemptField 声明。
+ *  6. relation delete 事件端点完备性（r26 F-1 落地）：DeletionExecutor 规范形要求
+ *     link delete 的 `record` 携带 `source.id` / `target.id`（旧态快照）。按端点定位的
+ *     下游（StateMachine computeTarget、Transform eventDeps、Scheduler 脏集查询）把缺席
+ *     端点读成 undefined → transfer/增量永不触发。存在性规则（#2）拦不住「有 delete
+ *     但缺端点」——flashOut create-steal 曾在同函数兄弟分支已正确补端点的情况下漏网。
  */
 import { expect } from "vitest";
 import { EntityQueryHandle, MatchExp } from "@storage";
@@ -85,12 +90,18 @@ export function expectEventsToExplainDiff(
     after: LogicalSnapshot,
     events: RecordMutationEvent[],
     label = '',
-    options?: { ignoreField?: (fieldName: string) => boolean, createPayloadExemptField?: (recordName: string, fieldName: string) => boolean }
+    options?: {
+        ignoreField?: (fieldName: string) => boolean
+        createPayloadExemptField?: (recordName: string, fieldName: string) => boolean
+        /** relation 名集合：用于第 6 条 delete 端点完备性 */
+        relations?: string[]
+    }
 ) {
     const trackedNames = new Set(before.keys())
     const relevantEvents = events.filter(e => trackedNames.has(e.recordName))
     const ignoreField = options?.ignoreField
     const createPayloadExemptField = options?.createPayloadExemptField
+    const relationNames = new Set(options?.relations ?? [])
 
     for (const recordName of trackedNames) {
         const beforeRows = before.get(recordName)!
@@ -110,7 +121,8 @@ export function expectEventsToExplainDiff(
             .filter(item => item.changedFields.length > 0)
 
         const createEventIds = new Set(relevantEvents.filter(e => e.recordName === recordName && e.type === 'create').map(e => String(e.record?.id)))
-        const deleteEventIds = new Set(relevantEvents.filter(e => e.recordName === recordName && e.type === 'delete').map(e => String(e.record?.id ?? e.oldRecord?.id)))
+        const deleteEvents = relevantEvents.filter(e => e.recordName === recordName && e.type === 'delete')
+        const deleteEventIds = new Set(deleteEvents.map(e => String(e.record?.id ?? e.oldRecord?.id)))
         const updateEvents = relevantEvents.filter(e => e.recordName === recordName && e.type === 'update')
 
         // 1/2. 出现/消失的记录必须有事件
@@ -143,6 +155,40 @@ export function expectEventsToExplainDiff(
         for (const id of deletedIds) {
             expect(deleteEventIds.has(id),
                 `${label} [event-completeness] ${recordName}#${id} disappeared from storage but has NO delete event`).toBe(true)
+        }
+        // 6. relation delete 事件端点完备性（r26 F-1）：payload 必须带 source.id / target.id，
+        //    且与消失前快照一致。存在性规则（#2）拦不住「有 delete 缺端点」。
+        const isRelation = relationNames.has(recordName)
+            || [...beforeRows.values(), ...afterRows.values()].some(row => 'source' in row || 'target' in row)
+        if (isRelation) {
+            for (const event of deleteEvents) {
+                const id = String(event.record?.id ?? event.oldRecord?.id)
+                const sourceId = (event.record?.source as { id?: unknown } | undefined)?.id
+                    ?? (event.oldRecord?.source as { id?: unknown } | undefined)?.id
+                const targetId = (event.record?.target as { id?: unknown } | undefined)?.id
+                    ?? (event.oldRecord?.target as { id?: unknown } | undefined)?.id
+                expect(sourceId !== undefined && sourceId !== null,
+                    `${label} [event-completeness] ${recordName}#${id} delete event missing source.id — ` +
+                    `relation delete contract requires endpoint snapshot (DeletionExecutor canonical form); ` +
+                    `computeTarget(event.record.source.id) stays blind without it`).toBe(true)
+                expect(targetId !== undefined && targetId !== null,
+                    `${label} [event-completeness] ${recordName}#${id} delete event missing target.id — ` +
+                    `relation delete contract requires endpoint snapshot (DeletionExecutor canonical form); ` +
+                    `computeTarget(event.record.target.id) stays blind without it`).toBe(true)
+                const beforeRow = beforeRows.get(id)
+                if (beforeRow && ('source' in beforeRow || 'target' in beforeRow)) {
+                    if (beforeRow.source !== undefined && beforeRow.source !== null) {
+                        expect(JSON.stringify(sourceId) === JSON.stringify(beforeRow.source),
+                            `${label} [event-completeness] ${recordName}#${id} delete event source.id diverges from pre-delete snapshot ` +
+                            `(snapshot: ${JSON.stringify(beforeRow.source)}, payload: ${JSON.stringify(sourceId)})`).toBe(true)
+                    }
+                    if (beforeRow.target !== undefined && beforeRow.target !== null) {
+                        expect(JSON.stringify(targetId) === JSON.stringify(beforeRow.target),
+                            `${label} [event-completeness] ${recordName}#${id} delete event target.id diverges from pre-delete snapshot ` +
+                            `(snapshot: ${JSON.stringify(beforeRow.target)}, payload: ${JSON.stringify(targetId)})`).toBe(true)
+                    }
+                }
+            }
         }
         // 3. 字段变化必须被 update 事件 keys 覆盖
         for (const { id, changedFields } of changed) {
@@ -187,7 +233,11 @@ export async function withEventCompleteness(
     const events: RecordMutationEvent[] = []
     await op(events)
     const after = await snapshotLogicalState(handle, schema)
-    expectEventsToExplainDiff(before, after, events, label, { ignoreField: schema.ignoreField, createPayloadExemptField: schema.createPayloadExemptField })
+    expectEventsToExplainDiff(before, after, events, label, {
+        ignoreField: schema.ignoreField,
+        createPayloadExemptField: schema.createPayloadExemptField,
+        relations: schema.relations,
+    })
     return events
 }
 
@@ -219,7 +269,11 @@ export async function withRuntimeEventCompleteness(
         storage.unlisten?.(collector)
     }
     const after = await snapshotLogicalState(storage, effectiveSchema)
-    expectEventsToExplainDiff(before, after, events, label, { ignoreField: effectiveSchema.ignoreField, createPayloadExemptField: effectiveSchema.createPayloadExemptField })
+    expectEventsToExplainDiff(before, after, events, label, {
+        ignoreField: effectiveSchema.ignoreField,
+        createPayloadExemptField: effectiveSchema.createPayloadExemptField,
+        relations: effectiveSchema.relations,
+    })
     return events
 }
 
