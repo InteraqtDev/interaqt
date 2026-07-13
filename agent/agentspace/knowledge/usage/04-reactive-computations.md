@@ -1469,17 +1469,27 @@ This feature is particularly useful for:
 
 ## Using RealTime for Real-time Computations
 
-RealTime computation is a core feature in the interaqt framework for handling time-sensitive data and business logic. It allows you to declare time-based computations and automatically manages computation state and recomputation timing.
+RealTime computation is a core feature in the interaqt framework for handling time-sensitive data and business logic. It allows you to declare time-based computations; the framework evaluates them with the current time as input and persistently tracks when the value should next be re-evaluated.
+
+> **Important — what triggers a RealTime recomputation**: the framework **does not run an internal
+> timer**. A RealTime computation is (re)evaluated when one of its declared `dataDeps` changes
+> (same as every other computation) and during migration rebuilds. The computed
+> `nextRecomputeTime` / `lastRecomputeTime` bound states are **persisted for an external
+> scheduler**: read `nextRecomputeTime` (see State Management below) and drive re-evaluation from
+> your own cron job / message queue / interval — e.g. by dispatching an interaction or touching a
+> `dataDeps` record when the boundary passes. A property-level RealTime with neither
+> `attributeQuery` nor `dataDeps` is rejected at setup precisely because nothing would ever
+> trigger it.
 
 ### Understanding Real-time Computation
 
 #### What is Real-time Computation
 
 Real-time computation is a **time-aware reactive computation**:
-- **Time-driven**: Computation based on current time
-- **Automatic scheduling**: System automatically manages when to recompute
+- **Time as input**: The callback receives the evaluation-time `now` and computes with it
+- **Boundary tracking**: The framework computes and persists *when* the value would change (`nextRecomputeTime`)
 - **State persistence**: Computation state is persistently stored
-- **Critical point awareness**: Can calculate critical time points for state changes
+- **Critical point awareness**: Can solve critical time points for state changes (Inequality/Equation)
 
 ```typescript
 // Traditional time-related logic problems
@@ -1490,9 +1500,8 @@ function checkBusinessHours() {
 }
 
 // Problems:
-// 1. Need manual polling to check
+// 1. Scattered ad-hoc time logic, no persisted state
 // 2. Cannot predict state change time points
-// 3. State is not persistent
 
 // Using RealTime declarative solution
 const isBusinessHours = Dictionary.create({
@@ -1506,18 +1515,19 @@ const isBusinessHours = Dictionary.create({
   })
 });
 
-// ✅ System automatically manages when to recompute
-// ✅ Automatically calculates critical change time points (9am and 5pm)
+// ✅ Automatically solves critical change time points (9am and 5pm) into nextRecomputeTime
 // ✅ State persistently stored
+// ⚠️ Re-evaluation at those boundaries must be driven externally (cron / dispatch),
+//    or by any mutation of the declared dataDeps
 ```
 
 #### RealTime vs Regular Computation
 
 | Feature | RealTime Computation | Regular Reactive Computation |
 |---------|---------------------|------------------------------|
-| **Trigger Method** | Time-driven + Data-driven | Data-driven only |
+| **Trigger Method** | Data-driven (+ external time-driven via persisted boundary) | Data-driven only |
 | **Computation Input** | Current time + Data dependencies | Data dependencies only |
-| **Schedule Management** | Automatic time scheduling | Data change triggered only |
+| **Schedule Management** | Persists next-recompute boundary for external schedulers | Data change triggered only |
 | **State Management** | Dual state tracking | No special state |
 | **Critical Prediction** | Supports critical time point calculation | Not applicable |
 
@@ -1533,7 +1543,7 @@ const currentTimestamp = Dictionary.create({
   name: 'currentTimestamp',
   type: 'number',
   computation: RealTime.create({
-    nextRecomputeTime: (now: number, dataDeps: any) => 1000, // Update every second
+    nextRecomputeTime: (now: number, dataDeps: any) => 1000, // next boundary: +1s (drive re-evaluation externally)
     callback: async (now: Expression, dataDeps: any) => {
       return now.divide(1000); // Convert to seconds
     }
@@ -1551,7 +1561,7 @@ const timeBasedMetric = Dictionary.create({
   name: 'timeBasedMetric',
   type: 'number',
   computation: RealTime.create({
-    nextRecomputeTime: (now: number, dataDeps: any) => 5000, // Update every 5 seconds
+    nextRecomputeTime: (now: number, dataDeps: any) => 5000, // next boundary: +5s (drive re-evaluation externally)
     dataDeps: {
       config: {
         type: 'records',
@@ -1593,7 +1603,7 @@ const isAfterDeadline = Dictionary.create({
       
       // Check if current time exceeds deadline
       return now.gt(deadline);
-      // System will automatically recompute at deadline time point
+      // nextRecomputeTime is solved to the deadline; drive re-evaluation there externally
     }
   })
 });
@@ -1614,7 +1624,7 @@ const isExactHour = Dictionary.create({
       
       // Check if current time is exact hour
       return now.modulo(millisecondsInHour).eq(0);
-      // System will automatically calculate next exact hour time for recomputation
+      // The next exact-hour boundary is solved into nextRecomputeTime for external scheduling
     }
   })
 });
@@ -1658,7 +1668,7 @@ const userEntity = Entity.create({
       name: 'onlineMinutes',
       type: 'number',
       computation: RealTime.create({
-        nextRecomputeTime: (now: number, dataDeps: any) => 60000, // Update every minute
+        nextRecomputeTime: (now: number, dataDeps: any) => 60000, // next boundary: +1min (drive re-evaluation externally)
         dataDeps: {
           _current: {
             type: 'property',
@@ -1858,12 +1868,12 @@ const tooFrequent = RealTime.create({
 #### Proper Use of Inequality/Equation Types
 
 ```typescript
-// ✅ Use Inequality to let system automatically calculate optimal recomputation time
+// ✅ Use Inequality so the next boundary is solved automatically into nextRecomputeTime
 const smartScheduling = RealTime.create({
   // No need for nextRecomputeTime function
   callback: async (now, dataDeps) => {
     const deadline = 1640995200000;
-    return now.gt(deadline); // System will automatically recompute at deadline time point
+    return now.gt(deadline); // nextRecomputeTime is solved to the deadline; drive re-evaluation there externally
   }
 });
 

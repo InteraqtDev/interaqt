@@ -257,9 +257,15 @@ describe("review fixes 2026-07-08 r2", () => {
         expect((staticOr.raw as any).right?.type).toBe("expression");
     });
 
-    test("R-7: malformed and/or expression without right operand is rejected", () => {
-        const malformed = new BoolExp<any>({ type: "expression", operator: "and", left: { type: "atom", data: { key: "a", value: ["=", 1] } } } as any);
-        expect(() => malformed.evaluate(() => true)).toThrow(/right/i);
+    test("R-7 (superseded by r27 I-1): and/or without right operand evaluates as its left operand", () => {
+        // 契约演化：r2 把「缺 right 直接解引用的 TypeError」升格为明确报错；r26 I-3 声明期
+        //  确认单边包装（create({ left })）合法；r27 I-1 把求值语义统一为左透传（and/or 幺元），
+        //  否则声明期合法的 Conditions 会让每次 dispatch 都以内部错误失败。
+        const singleSided = new BoolExp<any>({ type: "expression", operator: "and", left: { type: "atom", data: { key: "a", value: ["=", 1] } } } as any);
+        expect(singleSided.evaluate(() => true)).toBe(true);
+        expect(singleSided.evaluate(() => false)).not.toBe(true);
+        // De Morgan 取反随左子树传播：NOT(single-and(A)) ≡ NOT A
+        expect(singleSided.not().evaluate(() => false)).toBe(true);
     });
 
     // -------------------------------------------------------------------------
