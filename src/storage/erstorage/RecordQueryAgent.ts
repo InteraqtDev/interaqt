@@ -125,9 +125,13 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
         const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map, true, true, false, true)
         for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
+            // CAUTION 行认领按**物理同住**寻址（physicalRowMatch）：被认领记录可能独居
+            //  （尚无任何配对，宿主槽位为空的 allowNull 行），逻辑配对守卫（r28 幻影配对
+            //  剪枝/守卫）会让这类行匹配不到——行搬迁机制自身必须看见物理事实。
             const attributeIdMatchAtom: MatchAtom = {
                 key: `${combinedRecordIdRef.info!.attributeName!}.id`,
-                value: ['=', combinedRecordIdRef.getRef().id]
+                value: ['=', combinedRecordIdRef.getRef().id],
+                physicalRowMatch: true
             }
             if (!match) {
                 match = MatchExp.atom(attributeIdMatchAtom)
@@ -139,6 +143,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
         const recordQuery = RecordQuery.create(newEntityData.recordName, this.map, {
             matchExpression: match,
             attributeQuery: attributeQuery,
+            physicalRowRead: true,
         }, undefined, undefined, undefined, false, true)
 
         const recordsWithCombined = await this.queryExecutor.findRecords(recordQuery, reason, undefined)

@@ -79,6 +79,13 @@ describe('attribute query test', () => {
                 nameContext: ["User", "profile"],
                 attribute: "title"
             },
+            // r28：combined x:1 读取自动附带 `&`（link id）用于幻影配对剪枝
+            //  （该测试夹具的 combined link 未建模独立 link id 列，解析落到行 id）。
+            {
+                tableAliasAndField: ["User", "_rowId"],
+                nameContext: ["User", "profile", "&"],
+                attribute: "id"
+            },
             // 1:1 字段
             {
                 tableAliasAndField: ["User", "Item_id"],
@@ -89,6 +96,12 @@ describe('attribute query test', () => {
                 tableAliasAndField: ["User", "Item_itemName"],
                 nameContext: ["User", "item"],
                 attribute: "itemName"
+            },
+            // r28：该夹具的 item 同为 combined（同表）关系，自动附带 `&`（link id）
+            {
+                tableAliasAndField: ["User", "_rowId"],
+                nameContext: ["User", "item", "&"],
+                attribute: "id"
             },
             // 1:n 字段
             {
@@ -112,6 +125,12 @@ describe('attribute query test', () => {
                 tableAliasAndField: ["User_leader", "Profile_title"],
                 nameContext: ["User", "leader", "profile"],
                 attribute: "title"
+            },
+            // r28：嵌套 combined（leader.profile）同样自动附带 `&`（link id）
+            {
+                tableAliasAndField: ["User_leader", "_rowId"],
+                nameContext: ["User", "leader", "profile", "&"],
+                attribute: "id"
             }
         ])
     });

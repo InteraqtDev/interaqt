@@ -349,6 +349,36 @@ describe('r28 — reliance link semantics are topology-equivalent (merged / isol
     })
 })
 
+describe('r28 — query face: combined x:1 reads gate on link-id (phantom pairing family)', () => {
+    test('orphan co-tenant is not read as a pairing: nested read and match path both empty; real pairing unaffected', async () => {
+        // 多 owner reliance 拓扑：B.out4→D 与 C.out3→D。装配出「B 与 C—D 配对同住一行、
+        //  但 B—D 从未 link」的行（B 经依赖侧领养进 D 的行，D 亡故后 B 与 C 孤儿同住，
+        //  C 再配对新 D）——此前 B.out4 幻影返回同住 D、matchExpression 误命中。
+        const B = Entity.create({ name: 'R28oB', properties: [P('label', 'string')] })
+        const C = Entity.create({ name: 'R28oC', properties: [P('label', 'string')] })
+        const D = Entity.create({ name: 'R28oD', properties: [P('label', 'string')] })
+        const out3 = Relation.create({ source: C, sourceProperty: 'out3', target: D, targetProperty: 'in3', type: '1:1', isTargetReliance: true })
+        const out4 = Relation.create({ source: B, sourceProperty: 'out4', target: D, targetProperty: 'in4', type: '1:1', isTargetReliance: true })
+        const { handle } = await bootstrap([B, C, D], [out3, out4])
+
+        const c1 = await handle.create('R28oC', { label: 'c1', out3: { label: 'd1' } })
+        const d1 = (await handle.find('R28oD', undefined, undefined, ['id']))[0]
+        await handle.update('R28oD', MatchExp.atom({ key: 'id', value: ['=', d1.id] }), { in4: { label: 'b1' } } as any)
+        await handle.delete('R28oD', MatchExp.atom({ key: 'id', value: ['=', d1.id] }))
+        await handle.update('R28oC', MatchExp.atom({ key: 'id', value: ['=', c1.id] }), { out3: { label: 'd5' } } as any)
+
+        // 幻影面：B1 从未与 d5 配对
+        const b1 = (await handle.find('R28oB', undefined, undefined, ['id', 'label', ['out4', { attributeQuery: ['id', 'label'] }]]))[0]
+        expect(b1.out4 ?? null).toBe(null)
+        expect(await handle.find('R28oB', MatchExp.atom({ key: 'out4.label', value: ['=', 'd5'] }), undefined, ['id'])).toHaveLength(0)
+        expect(await handle.findRelationByName(out4.name!, undefined, undefined, ['id'])).toHaveLength(0)
+        // 真实配对面：C1—d5 正常读出（含 match 路径）
+        const c1After = (await handle.find('R28oC', MatchExp.atom({ key: 'out3.label', value: ['=', 'd5'] }), undefined,
+            ['id', ['out3', { attributeQuery: ['id', 'label'] }]]))[0]
+        expect(c1After.out3?.label).toBe('d5')
+    })
+})
+
 describe('r28 — event payload contracts (fuzzer seeds 113/262)', () => {
     test('nested-new child\'s "&" link data lands in the link create event payload (was: row had the value, payload read as NULL)', async () => {
         const B = Entity.create({ name: 'R28mB', properties: [P('label', 'string')] })

@@ -2,11 +2,13 @@ import {BoolExp, BoolExpressionRawData, ExpressionData} from "@core";
 import {EntityToTableMap, RecordAttribute} from "./EntityToTableMap.js";
 import {assert, canonicalJSONStringify, normalizeTimestampInputToMs, timestampParamForDialect} from "../utils.js";
 import {getSchemaDialect} from "./SchemaDialect.js";
-import {RecordQueryTree} from "./RecordQuery.js";
+import {LINK_SYMBOL, RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "@runtime";
 import {PlaceholderGen} from "./SQLBuilder.js";
 
-export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean }
+// physicalRowMatch：内部行寻址标记（flashOut 行认领等）——combined 路径按「物理同住」匹配，
+//  不追加逻辑配对（link id 非空）守卫。公开查询面绝不设置该标记。
+export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean, physicalRowMatch?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
 
 export type FieldMatchAtom = MatchAtom & {
@@ -540,6 +542,47 @@ export class MatchExp {
             const attributeInfo = this.map.getInfoByPath([this.entityName].concat(matchAttributePath))!
 
             const namePath = [this.entityName].concat(matchAttributePath)
+
+            // CAUTION combined（三表合一）路径段按「同物理行」编译（无 JOIN 无 ON 条件），
+            //  路径原子会把偶然同住（orphan co-tenant）误判成关联命中（r28 幻影配对家族）。
+            //  非 combined 段的关联性由 JOIN 的 ON 条件保证；combined 段的等价物就是
+            //  「link id 列非空」。这里对路径中每个 combined 段追加 IS NOT NULL 守卫原子，
+            //  与原子 AND 组合（对称变体各自按变体路径求 link 字段）。
+            const buildCombinedSegmentGates = (variantAttributePath: string[]): FieldMatchAtom[] => {
+                // 物理行匹配（flashOut 行认领等内部消费方）刻意按「同住」寻址——不加逻辑配对守卫。
+                if (exp.data.physicalRowMatch) return []
+                const gates: FieldMatchAtom[] = []
+                for (let i = 0; i < variantAttributePath.length; i++) {
+                    const segmentPath = [this.entityName, ...variantAttributePath.slice(0, i + 1)]
+                    let segmentInfo
+                    try {
+                        segmentInfo = this.map.getInfoByPath(segmentPath)
+                    } catch {
+                        continue
+                    }
+                    if (!segmentInfo?.isRecord || !segmentInfo.isMergedWithParent()) continue
+                    // 虚拟 link（link record 自身的 source/target 端点）：配对真实性就是 link 行的存在，无守卫。
+                    if (segmentInfo.isLinkSourceRelation()) continue
+                    const [tableAlias, linkIdField] = this.map.getTableAliasAndFieldName([...segmentPath, LINK_SYMBOL], 'id')
+                    gates.push({
+                        key: `${variantAttributePath.slice(0, i + 1).join('.')}.&.id`,
+                        value: ['not', null],
+                        fieldName: [tableAlias, linkIdField],
+                        fieldValue: 'IS NOT NULL',
+                        fieldParams: [],
+                    } as FieldMatchAtom)
+                }
+                return gates
+            }
+            const withCombinedGates = (built: BoolExp<FieldMatchAtom> | FieldMatchAtom, variantAttributePath: string[]): BoolExp<FieldMatchAtom> | FieldMatchAtom => {
+                const gates = buildCombinedSegmentGates(variantAttributePath)
+                if (!gates.length) return built
+                let combined = built instanceof BoolExp ? built : BoolExp.atom<FieldMatchAtom>(built)
+                for (const gate of gates) combined = combined.and(gate)
+                return combined
+            }
+            const toBoolExpAtom = (built: BoolExp<FieldMatchAtom> | FieldMatchAtom): BoolExp<FieldMatchAtom> =>
+                built instanceof BoolExp ? built : BoolExp.atom<FieldMatchAtom>(built)
             // CAUTION 路径中的每个对称 n:n 段都会被展开成 :source/:target 变体（多段是笛卡尔积），
             //  变体之间以 OR 组合：任一方向可达即命中。只展开第一段会静默丢掉经后续对称段
             //  另一侧可达的行（查询半结果，r17 F-4）。
@@ -596,17 +639,14 @@ export class MatchExp {
                     return combinedParts!
                 }
 
-                const toBoolExpAtom = (built: BoolExp<FieldMatchAtom> | FieldMatchAtom): BoolExp<FieldMatchAtom> =>
-                    built instanceof BoolExp ? built : BoolExp.atom<FieldMatchAtom>(built)
-
                 if (!symmetricVariantPaths) {
-                    return buildValueAtom(this.getFinalFieldName(matchAttributePath))
+                    return withCombinedGates(buildValueAtom(this.getFinalFieldName(matchAttributePath)), matchAttributePath)
                 }
 
                 let combined: BoolExp<FieldMatchAtom> | undefined
                 for (const variantPath of symmetricVariantPaths) {
                     // 每个变体都要重新生成，因为需要不同的 placeholder。
-                    const variantExp = toBoolExpAtom(buildValueAtom(this.getFinalFieldName(variantPath)))
+                    const variantExp = toBoolExpAtom(withCombinedGates(buildValueAtom(this.getFinalFieldName(variantPath)), variantPath))
                     combined = combined ? combined.or(variantExp) : variantExp
                 }
                 return combined!
@@ -618,11 +658,11 @@ export class MatchExp {
                 //  注意，子查询中也可能对上层的引用，这个也放到上层好像能力有点重叠了。
                 const handleFnMatch = fnMatchHandler || ((data: FieldMatchAtom) => data)
                 if (!symmetricVariantPaths) {
-                    return handleFnMatch({
+                    return withCombinedGates(handleFnMatch({
                         ...exp.data,
                         namePath,
                         isFunctionMatch: true,
-                    })
+                    }), matchAttributePath)
                 }
 
                 let combined: BoolExp<FieldMatchAtom> | undefined
@@ -634,7 +674,8 @@ export class MatchExp {
                         namePath: variantNamePath,
                         isFunctionMatch: true,
                     })
-                    combined = combined ? combined.or(atomData) : BoolExp.atom<FieldMatchAtom>(atomData)
+                    const gated = toBoolExpAtom(withCombinedGates(atomData, variantPath))
+                    combined = combined ? combined.or(gated) : gated
                 }
                 return combined!
 
