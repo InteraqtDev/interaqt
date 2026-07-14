@@ -5,6 +5,28 @@
 ### Bug Fixes
 
 * r27 deep review — combined-child nested structure fail-fast, property-dep dedupe, single-sided BoolExp, aggregation XOR, MySQL opkey wiring, StateTransfer deep clone, onlyRelationData reject ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **storage:** combined (三表合一) child payloads carrying nested structures now fail fast at the `preprocessSameRowData` convergence point — six shapes previously lost or corrupted data silently (isolated n:n links dropped, nested-new records never created, merged-FK refs without link identity/events, depth-2 grandchildren without ids, nested refs duplicating logical ids); reachable at runtime through plain 1:1 `isTargetReliance` ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **runtime:** one mutation event hitting multiple property dataDeps of the same computation now runs it once per (computation, targetPath) — was N times, double-applying `useLastValue` increments and create-time initial computes; live Scheduler and migration chained rebuild share the contract ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **core:** single-sided and/or `BoolExpressionData` (legal at declaration since v4.1.0) evaluates as its left operand across all four readers (evaluate/evaluateAsync/map/SQL builder) — was throwing "missing the right operand" on every dispatch; De Morgan inversion intact ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **runtime:** the v4.1.0-documented MySQL migration operationKey sha256 surrogate is now actually wired into the MonoStorage read/write choke point (was dead code; >191-char keys silently truncated in the VARCHAR(191) PK under `ANSI_QUOTES`), verified against real MySQL 8 in CI ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **storage:** string ids passed through public APIs (whose signatures declare `string`) no longer split JS identity from SQL equality — all eight write-path id identity checks converge on `sameRecordId` (String-normalized); was producing duplicate logical-id rows and lost fields on numeric-id drivers ([481a0d4](https://github.com/interaqtdev/interaqt/commit/481a0d47))
+* **storage:** binding a new reliance dependent to an owner that already holds one fails fast on all three producer tracks (addRelation / direct link-record create / create-ref adoption) — was silently destroying the old dependent's row with no delete event; re-parenting a dependent and adopting a free owner remain legal ([481a0d4](https://github.com/interaqtdev/interaqt/commit/481a0d47))
+* **storage:** claiming a record as a relation endpoint while it shares its physical row with a cross-relation combined co-tenant fails fast — row migration does not carry `notRelianceCombined` co-tenants, so the co-tenant link was silently destroyed with no delete event; assign merged FKs on combined rows through the update track ([481a0d4](https://github.com/interaqtdev/interaqt/commit/481a0d47))
+* **core:** aggregations (Count/Every/Any/Summation/Average/WeightedSummation) reject `record` and `property` both set — `record` was silently ignored at runtime ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **core:** `StateTransfer.clone(x, true)` deep-copies `trigger` (was shared by reference — mutating a clone rewrote the original state machine's trigger) ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+* **storage:** the legacy `onlyRelationData` third attributeQuery tuple element is rejected loudly (was silently dropping the whole x:n attribute from results); `.cursor/rules` mis-documentation ("true = is collection") corrected ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+
+### Features
+
+* **tests:** write-path structural fuzzer (`tests/storage/writePathStructuralFuzz.spec.ts`) — random schemas (physical topologies emerge from declarations) × random nested write sequences (native + string id forms), judged by the event-completeness oracle plus new structural invariants (unique logical ids, no identity-less records); deterministic seeds with full op-log reproduction; caught three fatal bugs on its first run against the 27-round-reviewed codebase ([481a0d4](https://github.com/interaqtdev/interaqt/commit/481a0d47))
+
+### Behavior changes (upgrade notes)
+
+* Combined-topology child payloads carrying relation attributes / nested records fail fast (previously silent data loss or duplicate logical ids); create related records first, then reference by `{ id }`.
+* Multiple property dataDeps hit by one mutation event run the computation once (previously N times; first setup after upgrade recomputes stored values).
+* Reliance displacement and cross-relation co-tenant endpoint claims fail fast (previously silent row/link destruction).
+* Single-sided and/or evaluates as its left operand (previously threw at evaluation); code relying on that error should validate at declaration time instead.
+* RealTime docs no longer promise an internal time scheduler: `nextRecomputeTime` is persisted state for external schedulers; recomputation triggers remain dataDeps mutations and migration rebuilds.
 
 ## [4.1.0](https://github.com/InteraqtDev/interaqt/compare/v4.0.6...v4.1.0) (2026-07-13)
 
