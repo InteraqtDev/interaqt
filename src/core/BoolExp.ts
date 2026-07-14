@@ -178,12 +178,22 @@ export class BoolExpressionData implements BoolExpressionDataInstance {
   }
   
   static clone(instance: BoolExpressionDataInstance, deep: boolean): BoolExpressionDataInstance {
+    // CAUTION deep clone 的隔离契约与 StateMachine.clone(deep) / StateTransfer.clone(deep) 对齐
+    //  （r26 L-5 / r27 I-4 的兄弟面，r28 收口）：此前 deep 参数被忽略——克隆后对任一侧
+    //  子树节点的修改会隔空影响另一侧（守卫树共享引用）。deep 时递归克隆表达式/原子节点；
+    //  原子的 data（Condition/Attributive 等行为实例）按惯例共享引用（与 Count.clone 对
+    //  callback 的处理一致）。
+    const cloneOperand = (operand: BoolExpressionDataInstance | BoolAtomDataInstance): BoolExpressionDataInstance | BoolAtomDataInstance => {
+      if (BoolExpressionData.is(operand)) return BoolExpressionData.clone(operand, true)
+      if (BoolAtomData.is(operand)) return BoolAtomData.clone(operand, true)
+      return operand
+    }
     const args: BoolExpressionDataCreateArgs = {
-      left: instance.left
+      left: deep ? cloneOperand(instance.left) : instance.left
     };
     if (instance.type !== 'expression') args.type = instance.type;
     if (instance.operator !== 'and') args.operator = instance.operator;
-    if (instance.right !== undefined) args.right = instance.right;
+    if (instance.right !== undefined) args.right = deep ? cloneOperand(instance.right) : instance.right;
     
     return this.create(args);
   }

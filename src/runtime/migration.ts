@@ -3425,9 +3425,10 @@ class MigrationScheduler {
         for (const mutationEvent of mutationEvents) {
             const sourceMaps = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                 .filter(source => source.computation === computation);
-            // 与 live Scheduler 同一去重语义：同一事件命中同一计算的多个 property dep 时只跑一次
-            //  （详见 Scheduler.buildComputationMutationListener 的 CAUTION）。
+            // 与 live Scheduler 同一去重语义：同一事件命中同一计算的多个 property dep /
+            //  多个 eventDep 时只跑一次（详见 Scheduler.buildComputationMutationListener 的 CAUTION）。
             const ranPropertyDepPaths = new Set<string>();
+            let ranEventBased = false;
             for (const source of sourceMaps) {
                 if ("dataDep" in source && (source as DataBasedEntityEventsSourceMap).dataDep.type === "property") {
                     const pathKey = ((source as DataBasedEntityEventsSourceMap).targetPath || []).join(".");
@@ -3435,6 +3436,8 @@ class MigrationScheduler {
                     ranPropertyDepPaths.add(pathKey);
                 }
                 if (!("dataDep" in source)) {
+                    if (ranEventBased) continue;
+                    ranEventBased = true;
                     const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
                     if (!eventRebuildHandler) {
                         throw new UnrebuildableComputationError(`Event-based migration requires an approved event rebuild handler for ${dataContextPath(computation.dataContext)}`);

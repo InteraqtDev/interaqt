@@ -58,9 +58,10 @@ const int = (rng: Rng, max: number) => Math.floor(rng() * max)
 const EXPECTED_REJECTIONS: RegExp[] = [
     /cannot be processed through this write/,                 // r27 F-1 守卫（combined 子记录嵌套结构）
     /not an idempotent same-id reference/,                    // r27 F-1 守卫（原地 ref 嵌套异 id）
-    /cannot unlink reliance data/,                            // reliance 生命周期：只能随记录删除
+    /cannot unlink reliance data/,                            // reliance 生命周期：只能随记录删除（r28 起 update 轨带具体属性信息）
     /cannot bind a new reliance dependent/,                   // r27 F-4 守卫（reliance 置换 = 静默销毁旧依赖，fuzzer 首跑抓获）
-    /cannot claim .* as an endpoint of new relation record/,  // r27 F-5 守卫（跨关系 combined 同住行的 link-endpoint 认领，fuzzer 首跑抓获）
+    /cannot claim .* as an endpoint of new relation record/,  // r27 F-5 守卫（跨关系 combined 同住行的认领；r28 扩展到搬运子树 + host-attr 轨）
+    /cannot unlink combined relation .* both endpoints/,      // r28 守卫（两端搬运子树都持有其他 combined 配对时的 relocate fail-fast）
     /carries conflicting '&' link data/,                      // 重复引用携带矛盾 link 数据
     /cannot change (source|target) of relation record/,       // 关系端点不可变
     /link already exist/,                                     // addRelation 幂等冲突
