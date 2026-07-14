@@ -61,4 +61,6 @@ jobs:
       # CI 必须覆盖全部真实 PG 套件，而不只是 concurrency/scoped-sequence 两个。
       - run: npm run test:postgres
       # MySQL env-gated 套件（驱动生命周期 + timestamp 契约 + 迁移 operationKey 代理键）。
-      - run: npx vitest run tests/runtime/mysqlOpenIdempotency.spec.ts tests/runtime/driverCloseIdempotency.spec.ts tests/runtime/review-fixes-2026-07-13-r26-leftovers.spec.ts tests/runtime/mysqlMigrationOperationKey.spec.ts
+      # CAUTION 必须串行（--no-file-parallelism）：openIdempotency 以 information_schema.processlist
+      #  的连接计数为断言，同一 MySQL 用户下并行运行的其他套件会把计数抬高——假红。
+      - run: npx vitest run --no-file-parallelism tests/runtime/mysqlOpenIdempotency.spec.ts tests/runtime/driverCloseIdempotency.spec.ts tests/runtime/review-fixes-2026-07-13-r26-leftovers.spec.ts tests/runtime/mysqlMigrationOperationKey.spec.ts
