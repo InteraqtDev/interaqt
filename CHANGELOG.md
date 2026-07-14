@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.1](https://github.com/interaqtdev/interaqt/compare/v4.1.0...v4.1.1) (2026-07-14)
+
+### Bug Fixes
+
+* r27 deep review — combined-child nested structure fail-fast, property-dep dedupe, single-sided BoolExp, aggregation XOR, MySQL opkey wiring, StateTransfer deep clone, onlyRelationData reject ([611c6bc](https://github.com/interaqtdev/interaqt/commit/611c6bca876a7fb2332ed98e096d780e4d9dff41))
+
 ## [4.1.0](https://github.com/InteraqtDev/interaqt/compare/v4.0.6...v4.1.0) (2026-07-13)
 
 ### Bug Fixes
