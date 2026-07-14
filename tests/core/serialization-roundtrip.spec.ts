@@ -242,13 +242,17 @@ describe('full instance graph round-trip', () => {
     });
 
     test('property-level Summation/Average/Every/Count keep their `property` field through stringify', () => {
-        // 直接检查序列化输出，防止字段再次丢失
+        // 直接检查序列化输出，防止字段再次丢失。
+        // r27 I-2：record 与 property 互斥（同给时运行期静默偏好 property），property 面与
+        //  record 面分别用独立实例断言序列化完整性。
         const E = Entity.create({ name: 'E', properties: [Property.create({ name: 'score', type: 'number' })] });
         const R = Relation.create({ source: E, sourceProperty: 'others', target: E, targetProperty: 'owner', type: 'n:n' });
-        const count = Count.create({ record: R, property: 'score', direction: 'source' });
-        const data = JSON.parse(Count.stringify(count));
-        expect(data.public.property).toBe('score');
-        expect(data.public.direction).toBe('source');
-        expect(data.public.record).toBe(`uuid::${R.uuid}`);
+        const propertyCount = Count.create({ property: 'score', direction: 'source' });
+        const propertyData = JSON.parse(Count.stringify(propertyCount));
+        expect(propertyData.public.property).toBe('score');
+        expect(propertyData.public.direction).toBe('source');
+        const recordCount = Count.create({ record: R });
+        const recordData = JSON.parse(Count.stringify(recordCount));
+        expect(recordData.public.record).toBe(`uuid::${R.uuid}`);
     });
 });

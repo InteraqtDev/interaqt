@@ -75,6 +75,21 @@ function sortObjectKeysDeep(value: unknown): unknown {
     return value
 }
 
+// ============ 记录 id 相等（r27 F-3 收口） ============
+// CAUTION 写路径的 id 身份判定必须对 JS 类型不敏感：
+//  - 驱动分裂：SQLite/PG/MySQL 的 id 是 number，PGLite 是 uuid 字符串；
+//  - 公开 API 面把 id 声明为 string（addRelationByNameById(sourceEntityId: string, ...)），
+//    HTTP 载荷携带的 id 也天然是字符串——按签名传 String(id) 是完全合法的调用形态；
+//  - SQL 面（列亲和性/参数 cast）对 1 与 '1' 判定相等，而 JS `===` 判定不等——
+//    行匹配查到了行、JS 身份判定却说"不是同一个"，flashOut 行合并/同 id 原地判定被静默跳过，
+//    产出重复逻辑 id 行与字段丢失（写路径结构化 fuzzer 首跑抓获；r24 F-1 驱动侧分裂的 API 侧兄弟格）。
+//  与既有先例同构（QueryExecutor 批量回填、NewRecordData.dedupeRefItems 均按 String(id) 归一）。
+//  null/undefined 不与任何值相等（含彼此）：缺席的 id 没有身份。
+export function sameRecordId(a: unknown, b: unknown): boolean {
+    if (a === null || a === undefined || b === null || b === undefined) return false
+    return String(a) === String(b)
+}
+
 // ============ timestamp 归一化（r26 遗留收口，r24/r25 boolean/json 归一化家族的最后一格） ============
 // 契约：type:'timestamp' 属性在 JS 面统一为 epoch 毫秒 number——
 //  写入接受 Date | number(ms) | ISO 字符串；读取（find/atomic）恒返回 number。

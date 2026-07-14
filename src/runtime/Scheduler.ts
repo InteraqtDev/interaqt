@@ -542,6 +542,15 @@ export class Scheduler {
                     await this.assertScopedSequenceScopeUnchanged(mutationEvent)
                     const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                     if (sources.length > 0) {
+                        // CAUTION 同一计算声明多个 property dataDeps 时，每个 dep 都注册了自己的监听——
+                        //  一次 update 同时命中 N 个 dep 会得到 N 个 source，逐个执行会让同一计算对
+                        //  **同一个事件**跑 N 次（useLastValue 的增量被双重叠加、create 的初始计算双跑）。
+                        //  两次调用收到的是同一个事件对象，用户层无从区分去重（event.recordName/keys 全同），
+                        //  必须由框架合并：property dep（自身或同一 targetPath 的关联路径）对同一事件
+                        //  语义上就是「宿主的一次变更」，按 (computation, targetPath) 去重。
+                        //  records 型 dep 不去重——不同 dep 携带不同 match，membership 判定
+                        //  （entered/left/skip）按 dep 独立求值是增量语义的一部分。
+                        const ranPropertyDepPaths = new Map<Computation, Set<string>>()
                         for(const source of sources) {
                             if(!this.sourceMapManager.shouldTriggerUpdateComputation(source, mutationEvent)) {
                                 continue
@@ -549,6 +558,18 @@ export class Scheduler {
                             // 对于 EventBasedComputation，进行深度匹配检查
                             if (!('dataDep' in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
                                 continue
+                            }
+                            if ('dataDep' in source && (source as DataBasedEntityEventsSourceMap).dataDep.type === 'property') {
+                                const pathKey = ((source as DataBasedEntityEventsSourceMap).targetPath || []).join('.')
+                                let ranPaths = ranPropertyDepPaths.get(source.computation)
+                                if (!ranPaths) {
+                                    ranPaths = new Set<string>()
+                                    ranPropertyDepPaths.set(source.computation, ranPaths)
+                                }
+                                if (ranPaths.has(pathKey)) {
+                                    continue
+                                }
+                                ranPaths.add(pathKey)
                             }
                             // filtered 源的 update 监听挂在物理 base 名上（见 ComputationSourceMap），
                             // 路由前做成员资格守卫并把事件名改写回 filtered 名。

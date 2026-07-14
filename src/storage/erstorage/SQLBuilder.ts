@@ -183,14 +183,26 @@ ${modifierClause}
         } else {
             if (fieldMatchExp.isAnd()) {
                 const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix, p)
-                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix, p)
-                sql = `(${leftSql} AND ${rightSql})`
-                values.push(...leftValues, ...rightValues)
+                // 单边 and/or（缺 right）＝左透传（与 BoolExp.evaluate/evaluateAsync 同一契约）：
+                //  此前对 undefined right 递归会在 `fieldMatchExp.right!` 上抛难以定位的 TypeError。
+                if (!fieldMatchExp.right) {
+                    sql = leftSql
+                    values.push(...leftValues)
+                } else {
+                    const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right, prefix, p)
+                    sql = `(${leftSql} AND ${rightSql})`
+                    values.push(...leftValues, ...rightValues)
+                }
             } else if (fieldMatchExp.isOr()) {
                 const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix, p)
-                const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right!, prefix, p)
-                sql = `(${leftSql} OR ${rightSql})`
-                values.push(...leftValues, ...rightValues)
+                if (!fieldMatchExp.right) {
+                    sql = leftSql
+                    values.push(...leftValues)
+                } else {
+                    const [rightSql, rightValues] = this.buildWhereClause(fieldMatchExp.right, prefix, p)
+                    sql = `(${leftSql} OR ${rightSql})`
+                    values.push(...leftValues, ...rightValues)
+                }
             } else {
                 const [leftSql, leftValues] = this.buildWhereClause(fieldMatchExp.left, prefix, p)
                 sql = `NOT (${leftSql})`

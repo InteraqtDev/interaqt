@@ -21,6 +21,30 @@ export type PublicFieldDef = {
   constraints?: Record<string, (args: never) => unknown>
 }
 
+/**
+ * 聚合计算（Count/Every/Any/Summation/Average/WeightedSummation）的目标声明校验：
+ * record（global：聚合的目标集合）与 property（property-level：宿主上的关系属性）二选一。
+ *
+ * CAUTION 两者同给不是合法叠加：运行期（aggregationTemplate）property 分支优先，record
+ * 被**静默忽略**——声明者以为在聚合 record 指定的集合，实际绑定到了宿主的 property 关系，
+ * 产出错误数字且零告警。矛盾声明必须在声明期拒绝（显式控制）。
+ */
+export function validateAggregationTarget(
+  klassName: string,
+  args: { record?: unknown, property?: unknown },
+): void {
+  if (!args.record && !args.property) {
+    throw new Error(`${klassName}.create() requires either "record" (target entity/relation) or "property" (host relation property).`)
+  }
+  if (args.record && args.property) {
+    throw new Error(
+      `${klassName}.create() got both "record" and "property" — they are mutually exclusive targets. ` +
+      `At runtime "property" would win and "record" would be silently ignored (wrong aggregation with no warning). ` +
+      `Use "record" for global aggregation over an entity/relation, or "property" for a host-level relation aggregation.`
+    )
+  }
+}
+
 export function validateCreateArgs(
   klassName: string,
   publicDef: Record<string, PublicFieldDef>,

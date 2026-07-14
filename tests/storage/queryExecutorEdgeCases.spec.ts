@@ -182,18 +182,28 @@ describe('QueryExecutor edge cases', () => {
         expect(found.children).toBeDefined()
     })
 
-    test('onlyRelationData skips entity query for x:n', async () => {
+    test('legacy onlyRelationData third tuple element is rejected loudly (was: attribute silently absent)', async () => {
         const user1 = await entityQueryHandle.create('User', { name: 'OnlyRelUser', age: 25 })
         const team1 = await entityQueryHandle.create('Team', { name: 'OnlyRelTeam' })
         await entityQueryHandle.addRelationByNameById('User_teams_members_Team', user1.id, team1.id, { role: 'leader' })
 
-        const found = (await entityQueryHandle.find('User',
+        // r27 I-5：该标志从无可工作的实现——x:n 二阶段查询被跳过而主查询从不 SELECT x:n 数据，
+        //  结果里该属性静默整体缺失。第三元组位（曾被误档为 "is collection"）现在 fail-fast。
+        await expect(entityQueryHandle.find('User',
             MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
             undefined,
             ['*', ['teams', { attributeQuery: ['*'] }, true]],
-        ))[0]
+        )).rejects.toThrowError(/onlyRelationData.*silently drops|third tuple element/s)
 
+        // 对照：不带第三元组的同一查询返回完整集合（含 `&` 关系数据）。
+        const found = (await entityQueryHandle.find('User',
+            MatchExp.atom({ key: 'id', value: ['=', user1.id] }),
+            undefined,
+            ['*', ['teams', { attributeQuery: ['*', ['&', { attributeQuery: ['role'] }]] }]],
+        ))[0]
         expect(found.id).toBe(user1.id)
+        expect(found.teams).toHaveLength(1)
+        expect(found.teams[0]['&'].role).toBe('leader')
     })
 
     test('findPath in deeper tree exercises exit callback paths', async () => {

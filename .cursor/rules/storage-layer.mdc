@@ -26,12 +26,16 @@ Specifies which fields to return. Never omit this parameter.
 ['*']                           // all fields
 ['id', 'name', 'status']       // specific fields
 ['id', 'name',
-  ['target', {                  // nested relation traversal
+  ['target', {                  // nested relation traversal (works for both x:1 and x:n)
     attributeQuery: ['id', 'name'],
     // optional: modifier, matchExpression
-  }, true]                      // true = is collection
+  }]
 ]
 ```
+
+Collections (x:n) need no special marker — the relation type determines the result shape.
+Never pass a third tuple element: the legacy `onlyRelationData` flag is not supported and is
+rejected at query build time.
 
 ## Match Expressions
 

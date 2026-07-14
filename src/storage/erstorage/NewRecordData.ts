@@ -1,5 +1,6 @@
 import { EntityToTableMap, ValueAttribute } from "./EntityToTableMap.js";
 import { flatten } from "./util.js";
+import { sameRecordId } from "../utils.js";
 import { AttributeInfo } from "./AttributeInfo.js";
 import { Record } from "./RecordQueryAgent.js";
 import { LINK_SYMBOL } from "./RecordQuery.js";
@@ -330,7 +331,7 @@ export class NewRecordData {
                 //  数据静默丢失，聚合的增量基准也被抹掉（r17 F-2 的数据面）。
                 //  换了关联目标（replace）时 link 是新建的，未提供字段取默认值是正确语义，不传。
                 const attributeName = recordData.info?.attributeName!
-                const oldLinkRecord = oldRecord[attributeName]?.id === recordData.getRef().id
+                const oldLinkRecord = sameRecordId(oldRecord[attributeName]?.id, recordData.getRef().id)
                     ? oldRecord[attributeName]?.[LINK_SYMBOL]
                     : undefined
                 result.push(...recordData.linkRecordData.getSameRowFieldAndValue(oldLinkRecord)

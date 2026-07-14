@@ -1,6 +1,6 @@
 import { EntityIdRef, Database, RecordMutationEvent } from "@runtime";
 import { EntityToTableMap } from "./EntityToTableMap.js";
-import { assert } from "../utils.js";
+import { assert, sameRecordId } from "../utils.js";
 import { MatchAtom, MatchExp, MatchExpressionData } from "./MatchExp.js";
 import { AttributeQuery, AttributeQueryData } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
@@ -146,6 +146,83 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // const hasNoConflict = recordsWithCombined.length === 1 && !recordsWithCombined[0].id
         // 开始 merge 数据，并记录 unLink 事件
         const newRecordIsLink = this.map.getRecordInfo(newEntityData.recordName).isRelation && !!this.map.data.links[newEntityData.recordName]
+
+        // CAUTION reliance 置换（displacement）守卫（r27 fuzzer 首跑抓获）：
+        //  1:1 isTargetReliance 的排他性意味着「给已持有依赖的 owner 绑定新的依赖」必然置换旧依赖；
+        //  而 reliance 的生命周期契约是「依赖只能随 owner 删除」（update 轨的 unlink 守卫早已
+        //  fail-fast："cannot unlink reliance data"）。combined 拓扑下置换走 flashOut 的物理
+        //  行搬迁——被置换的旧依赖不在被认领槽位的搬运子树里，其同行列被 deleteRecordSameRowData
+        //  **静默物理销毁**：无 delete 事件、无级联语义、记录凭空消失。同一契约的三条兄弟轨：
+        //  - addRelation / 直建 link record（link-endpoint 认领：owner 端点行上同关系槽位已占用）；
+        //  - create/update 携带 owner ref（依赖侧领养已被占用的 owner，如 { in2: { id: owner } }）；
+        //  - update 换绑 owner 的依赖 ref（既有 unlink 守卫覆盖）。
+        //  判据必须是**同一关系**上的占用（occupied slot 的 linkName === 本次建立的 link）：
+        //  被认领记录在其他 reliance 关系上的依赖随行搬运是合法整行子树携带（host-attr steal），
+        //  端点行上无关 merged link 的重写也不受影响。同 id 幂等 ref（占用者就是本次声明的另一端）放行。
+        const assertNoRelianceDisplacement = (claimedRecordName: string, claimed: Record, throughLinkName: string, incomingDependentId?: unknown) => {
+            const claimedInfo = this.map.getRecordInfo(claimedRecordName)
+            for (const relianceInfo of claimedInfo.sameTableReliance) {
+                if (relianceInfo.linkName !== throughLinkName) continue
+                const occupantId = claimed?.[relianceInfo.attributeName]?.id
+                if (occupantId === undefined || occupantId === null) continue
+                if (incomingDependentId !== undefined && sameRecordId(occupantId, incomingDependentId)) continue
+                throw new Error(
+                    `cannot bind a new reliance dependent to "${claimedRecordName}" (id: ${claimed.id}) over relation "${throughLinkName}": ` +
+                    `it still owns dependent "${relianceInfo.recordName}" (id: ${occupantId}) via "${claimedRecordName}.${relianceInfo.attributeName}". ` +
+                    `Reliance data lives and dies with its owner — displacing it would silently destroy the current dependent's row with no delete event. ` +
+                    `Delete the current dependent record first, then create the new relation.`
+                )
+            }
+        }
+        // CAUTION F-5（fuzzer seed 3）：link-endpoint 认领的行搬迁子树由
+        //  getAttributeQueryDataForRecord 的递归深度决定——递归对 notRelianceCombined 不下钻
+        //  （sameTableReliance 会随行搬运，L 探针验证），被认领记录经**其他** mergeLinks combined
+        //  关系同住的 link 列在 deleteRecordSameRowData 清行时被物理销毁（r17 的 combinedLinkFields
+        //  清列本是「端点删除 ⇒ link 必须消失」的删除语义，行搬迁复用它继承了删除语义）——
+        //  **link 静默消失、零 delete 事件**。在实现完整深度的行搬运之前 fail-fast。
+        //  注意：正因为 flashOut 查询不加载这些列，守卫必须自行按需查询（同一个深度限制
+        //  否则也会让守卫失明）；只有 schema 上存在跨关系 combined 的记录才产生额外查询。
+        const assertNoNonRelianceCoTenant = async (claimedRecordName: string, claimed: Record, throughLinkName: string) => {
+            const claimedInfo = this.map.getRecordInfo(claimedRecordName)
+            const coTenantAttrs = claimedInfo.notRelianceCombined.filter(combinedInfo =>
+                combinedInfo.linkName !== throughLinkName
+                && !(claimedInfo.isRelation && (combinedInfo.attributeName === 'source' || combinedInfo.attributeName === 'target'))
+            )
+            if (!coTenantAttrs.length) return
+            const loaded = (await this.queryExecutor.findRecords(RecordQuery.create(claimedRecordName, this.map, {
+                matchExpression: MatchExp.atom({ key: 'id', value: ['=', claimed.id] }),
+                attributeQuery: ['id', ...coTenantAttrs.map(info => [info.attributeName, { attributeQuery: ['id'] }] as [string, { attributeQuery: string[] }])],
+                modifier: { limit: 1 }
+            }), `check combined co-tenants of ${claimedRecordName} before endpoint claim`))[0]
+            for (const combinedInfo of coTenantAttrs) {
+                const coTenantId = loaded?.[combinedInfo.attributeName]?.id
+                if (coTenantId === undefined || coTenantId === null) continue
+                throw new Error(
+                    `cannot claim "${claimedRecordName}" (id: ${claimed.id}) as an endpoint of new relation record "${throughLinkName}": ` +
+                    `it shares its physical row with "${combinedInfo.recordName}" (id: ${coTenantId}) through combined relation "${combinedInfo.linkName}" ` +
+                    `("${claimedRecordName}.${combinedInfo.attributeName}"), and the row migration triggered by an endpoint claim does not carry ` +
+                    `non-reliance combined co-tenants — the combined relation would be silently destroyed with no delete event. ` +
+                    `Remove the combined relation "${combinedInfo.linkName}" first, then create the new relation.`
+                )
+            }
+        }
+        for (const recordWithCombined of recordsWithCombined) {
+            for (const combinedRecordIdRef of combinedRecordIdRefsToFlash) {
+                const claimed = recordWithCombined[combinedRecordIdRef.info?.attributeName!]
+                if (!sameRecordId(claimed?.id, combinedRecordIdRef.getRef().id)) continue
+                if (newRecordIsLink) {
+                    // link-endpoint 轨：本次建立的 link 就是 newEntityData 自身；对端依赖 id 在 rawData 上。
+                    const claimedIsSource = combinedRecordIdRef.info!.attributeName === 'source'
+                    const incomingDependentId = (newEntityData.rawData?.[claimedIsSource ? 'target' : 'source'] as { id?: unknown } | undefined)?.id
+                    assertNoRelianceDisplacement(combinedRecordIdRef.recordName, claimed, newEntityData.recordName, incomingDependentId)
+                    await assertNoNonRelianceCoTenant(combinedRecordIdRef.recordName, claimed, newEntityData.recordName)
+                } else {
+                    // host-attr 轨：本次建立的 link 是「宿主—被认领记录」之间的 combined link；
+                    //  新依赖是宿主自己（owner ref 领养形态：{ in2: { id: owner } } 时宿主为依赖侧）。
+                    assertNoRelianceDisplacement(combinedRecordIdRef.recordName, claimed, combinedRecordIdRef.info!.linkName!, newOwnerId ?? newEntityData.getData().id)
+                }
+            }
+        }
         // CAUTION 被抢夺的旧 owner 会失去 combined 关联端点（deleteRecordSameRowData 物理清列），
         //  其 filtered entity 成员资格必须重算——否则「查询面已退出、事件面无 delete」，下游对该
         //  filtered 视图的响应式计算永久陈旧（combined × filtered 交叉格，r18 复盘已标注为空白）。
@@ -206,7 +283,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
                 //  （source.id=u2）与 u1 的行（target.id=p）——处理 u1 的行时 source 属性上是 u1
                 //  而不是 u2，若只判真值就会把无关的 u1 一并 flashOut，并在 result 上产生
                 //  同名属性冲突（"should not have same combined record" 内部断言崩溃，r17 拓扑矩阵首跑发现）。
-                if (recordWithCombined[combinedRecordIdRef.info?.attributeName!]?.id === combinedRecordIdRef.getRef().id) {
+                if (sameRecordId(recordWithCombined[combinedRecordIdRef.info?.attributeName!]?.id, combinedRecordIdRef.getRef().id)) {
 
                     // 抢夺既有 owner（recordWithCombined.id 存在）且被抢的是业务关系端点（非虚拟 link 的
                     // source/target）时，先快照该 owner 在依赖此关系属性的 filtered entity 上的成员资格。

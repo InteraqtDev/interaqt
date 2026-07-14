@@ -88,8 +88,14 @@ export class StateTransfer implements StateTransferInstance {
   }
   
   static clone(instance: StateTransferInstance, deep: boolean): StateTransferInstance {
+    // CAUTION deep clone 的隔离契约与 StateMachine.clone(deep) 对齐（r26 L-5 的兄弟面）：
+    //  trigger 是纯数据模式，deep 时必须 structuredClone——否则修改克隆的 trigger.record
+    //  会静默改写原 transfer 的触发条件（状态机行为被隔空篡改）。
+    //  current/next 保持引用共享：节点身份必须与所属 StateMachine 的 states 数组同一
+    //  （standalone clone 没有节点映射上下文，克隆节点会产生游离孤儿）；整图深拷贝
+    //  请走 StateMachine.clone(sm, true)。computeTarget 按惯例共享行为函数（Count.clone 同）。
     return this.create({
-      trigger: instance.trigger,
+      trigger: deep ? structuredClone(instance.trigger) : instance.trigger,
       current: instance.current,
       next: instance.next,
       computeTarget: instance.computeTarget

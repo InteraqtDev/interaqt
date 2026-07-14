@@ -536,8 +536,10 @@ describe("review fixes 2026-07-09 r3", () => {
                 Property.create({ name: "name", type: "string" }),
                 Property.create({
                     name: "allDone", type: "boolean",
+                    // r27 I-2：record 与 property 互斥（此前 record 在 property 在场时被静默忽略，
+                    //  本夹具的 record: Task 本就是死配置）。property-level 聚合只声明 property。
                     computation: Every.create({
-                        record: Task, property: "tasks",
+                        property: "tasks",
                         attributeQuery: ["done"],
                         callback: (task: any) => !!task.done,
                         notEmpty: true,

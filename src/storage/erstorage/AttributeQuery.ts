@@ -176,6 +176,20 @@ export class AttributeQuery {
             const item = (typeof rawItem === 'string' ? [rawItem, {}, false] : rawItem)  as AttributeQueryDataRecordItem
             const [attributeName, subQueryData, onlyRelationData] = item
 
+            // CAUTION 第三元组位（历史遗留的 onlyRelationData 标志）没有任何可工作的实现：
+            //  它让 x:n 关联的二阶段查询被跳过，而主查询从不 SELECT x:n 的任何数据——
+            //  结果里该属性**静默整体缺失**（既没有实体数据也没有 `&` 关系数据，零告警）。
+            //  该标志也没有内部生产点。误传 true（例如把它当成 "is collection" 标记）
+            //  必须 fail-fast，而不是静默丢数据。集合形状由关系类型决定，无需任何标记。
+            if (onlyRelationData) {
+                throw new Error(
+                    `attributeQuery for "${this.recordName}.${attributeName}" passes a third tuple element (true). ` +
+                    `This legacy "onlyRelationData" flag has no working implementation — it silently drops the whole ` +
+                    `attribute from the result. Remove the third element; x:n collections need no marker ` +
+                    `(the relation type determines the result shape), and relation data is selected via the '&' key.`
+                )
+            }
+
             if (attributeName === LINK_SYMBOL) {
                 assert(!!(this.parentRecord && this.attributeName), `parent record and attribute name cannot be empty when query link data, you passed ${this.parentRecord} ${this.attributeName}`)
                 const info = this.map.getInfo(this.parentRecord!, this.attributeName!)

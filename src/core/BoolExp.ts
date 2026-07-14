@@ -363,7 +363,9 @@ export class BoolExp<T> {
       if (this.isNot()) {
         return newLeft.not()
       } else {
-        const newRight = this.right!.map(fn, ['right'])
+        // 单边 and/or（缺 right）＝左透传（与 evaluate/evaluateAsync 同一契约）。
+        if (!this.right) return newLeft
+        const newRight = this.right.map(fn, ['right'])
         return this.isAnd() ? newLeft.and(newRight) : newLeft.or(newRight)
       }
     } else {
@@ -423,8 +425,13 @@ export class BoolExp<T> {
     //  NOT(A AND B) ≡ (NOT A) OR (NOT B)。短路与错误透传语义保持不变。
     if (this.isOr() || this.isAnd()) {
       const evaluatesAsAnd = inverse ? this.isOr() : this.isAnd()
-      const right = this.requireRight(this.isAnd() ? 'and' : 'or')
+      // CAUTION 单边 and/or（缺 right）是声明期合法形态（BoolExpressionData.create({ left }) 的
+      //  单边包装，r26 I-3 明确不收紧）——求值语义 = 左操作数直接透传（and/or 的幺元语义）。
+      //  此前这里抛 "missing the right operand"：声明期合法的 Conditions 让每次 dispatch
+      //  都以内部错误失败，而不是按守卫语义求值。inverse 随左子树正常传播。
+      const right = this.right
       const leftResult = this.left.evaluate(atomHandle, currentStack, inverse)
+      if (!right) return leftResult
       if (evaluatesAsAnd) {
         if (leftResult !== true) return leftResult
         return right.evaluate(atomHandle, currentStack, inverse)
@@ -438,15 +445,6 @@ export class BoolExp<T> {
     }
 
     throw new Error(`invalid bool expression type: ${JSON.stringify(this.raw)}`)
-  }
-
-  // fail fast：畸形的 and/or 表达式（缺 right 操作数）如果直接解引用会抛出难以定位的 TypeError。
-  private requireRight(operator: 'and' | 'or'): BoolExp<T> {
-    const right = this.right
-    if (!right) {
-      throw new Error(`invalid bool expression: "${operator}" expression is missing the right operand: ${JSON.stringify(this.raw)}`)
-    }
-    return right
   }
   
   async evaluateAsync(atomHandle: AtomHandle<T>, stack :ExpressionData<T>[] = [], inverse: boolean = false): Promise<true|EvaluateError<T>> {
@@ -475,8 +473,10 @@ export class BoolExp<T> {
     //  这是守卫链（evaluateAsync）实际走的路径，NOT 组合的权限判定正确性依赖于此。
     if (this.isOr() || this.isAnd()) {
       const evaluatesAsAnd = inverse ? this.isOr() : this.isAnd()
-      const right = this.requireRight(this.isAnd() ? 'and' : 'or')
+      // 单边 and/or 透传左操作数（与同步 evaluate 同一契约，见其 CAUTION）。
+      const right = this.right
       const leftResult = await this.left.evaluateAsync(atomHandle, currentStack, inverse)
+      if (!right) return leftResult
       if (evaluatesAsAnd) {
         if (leftResult !== true) return leftResult
         return right.evaluateAsync(atomHandle, currentStack, inverse)
