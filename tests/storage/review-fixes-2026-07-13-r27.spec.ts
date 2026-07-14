@@ -88,10 +88,15 @@ describe('r27 F-1 — combined child nested structures fail fast instead of sile
 
     test('update: in-place combined ref carrying different-id nested ref is rejected (was: duplicate logical id rows)', async () => {
         const handle = await bootstrap(['User.profile', 'Profile.avatar'])
-        const p1 = await handle.create('Profile', { title: 'p1', avatar: { url: 'a1' } })
-        await handle.create('Profile', { title: 'p2', avatar: { url: 'a2' } })
+        // CAUTION 装配顺序（r28 收紧）：认领携带 combined co-tenant 的 profile 现在会被
+        //  跨关系同住守卫拒绝（此前 avatar 的 combined link 在行搬迁中静默销毁、零事件），
+        //  所以先认领裸 profile，再在原地补 avatar。
+        const p1 = await handle.create('Profile', { title: 'p1' })
         const u = await handle.create('User', { name: 'u1', profile: { id: p1.id } })
+        await handle.update('Profile', MatchExp.atom({ key: 'id', value: ['=', p1.id] }), { avatar: { url: 'a1' } } as any)
+        await handle.create('Profile', { title: 'p2', avatar: { url: 'a2' } })
         const avatars = await handle.find('Avatar', undefined, undefined, ['*'])
+        expect(avatars).toHaveLength(2)
         const a2 = avatars.find((a: any) => a.url === 'a2')!
         await expect(handle.update('User', MatchExp.atom({ key: 'id', value: ['=', u.id] }),
             { profile: { id: p1.id, avatar: { id: a2.id } } } as any))
