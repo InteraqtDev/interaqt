@@ -344,12 +344,14 @@ describe('Relation name getter', () => {
 
 describe('Entity.public constraint functions', () => {
     test('commonProperties.constraints.eachNameUnique validates unique property names', () => {
+        // r32：谓词按 klassValidation 契约读取完整 create args 的 commonProperties 字段
+        //  （此前误读 properties——r27 记录的潜伏元数据缺陷）。
         const constraint = Entity.public.commonProperties.constraints.eachNameUnique;
         const p1 = Property.create({ name: 'a', type: 'string' });
         const p2 = Property.create({ name: 'b', type: 'string' });
         const p3 = Property.create({ name: 'a', type: 'number' });
-        expect(constraint({ properties: [p1, p2] })).toBe(true);
-        expect(constraint({ properties: [p1, p3] })).toBe(false);
+        expect(constraint({ commonProperties: [p1, p2] })).toBe(true);
+        expect(constraint({ commonProperties: [p1, p3] })).toBe(false);
     });
 
     test('inputEntities.constraints.mergedEntityNoProperties rejects properties on merged entity', () => {

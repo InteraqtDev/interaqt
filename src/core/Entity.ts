@@ -87,9 +87,13 @@ export class Entity implements EntityInstance {
       collection: true as const,
       required: false as const,
       constraints: {
-        eachNameUnique: ({properties}: {properties: PropertyInstance[]}) => {
-          const uniqueNames = new Set(properties.map((p: PropertyInstance) => p.name));
-          return uniqueNames.size === properties.length;
+        // CAUTION 谓词收到的是完整 create args（klassValidation 契约），本字段名是
+        //  commonProperties——此前误读 properties（r27 记录的潜伏元数据缺陷，r32 修正）：
+        //  接线后会拿宿主 properties 判 commonProperties 的唯一性（merged entity 的
+        //  properties 恒空 ⇒ 谓词崩溃/恒真，约束形同虚设）。
+        eachNameUnique: ({commonProperties}: {commonProperties: PropertyInstance[]}) => {
+          const uniqueNames = new Set(commonProperties.map((p: PropertyInstance) => p.name));
+          return uniqueNames.size === commonProperties.length;
         }
       },
       defaultValue: () => []
