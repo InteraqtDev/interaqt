@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.1.4](https://github.com/interaqtdev/interaqt/compare/v4.1.3...v4.1.4) (2026-07-15)
+
+### Features
+
+* **tests:** fuzzer oracle 7b — filtered-relation nested-read completeness (r30-A lesson as mechanism) ([474db7c](https://github.com/interaqtdev/interaqt/commit/474db7c2b066e470bf9cf8e4c006552e3067c38b))
+
+### Bug Fixes
+
+* **builtins:** r30 — isRef payload null/non-object gives a clean guard error ([6dea78d](https://github.com/interaqtdev/interaqt/commit/6dea78d9186def4acda3a3404c93d7d90d4932b6))
+* **builtins:** r30 — reject activity transfers that reach into a group's nested nodes ([2eb203b](https://github.com/interaqtdev/interaqt/commit/2eb203b430bc12f3e24229965a342d56fed6f9ae))
+* **runtime:** r30 — invalidate superseded async tasks on sync/resolved recompute (fatal) ([07acb56](https://github.com/interaqtdev/interaqt/commit/07acb568d10f8693adf104f72ab7696561054010))
+* **storage:** r30 — filtered relation over combined base read consistency (fatal, r28 regression) ([69158a3](https://github.com/interaqtdev/interaqt/commit/69158a39f2842779aace81002c3a4fdf3b6c2a8a))
+
 ## [4.1.3](https://github.com/interaqtdev/interaqt/compare/v4.1.2...v4.1.3) (2026-07-15)
 
 r29 quality pillars: the three generative-testing steps promised by the r28 retrospective landed —
