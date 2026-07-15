@@ -159,9 +159,16 @@ class InteractionState {
             //  新增/删除分支时，旧状态照常水合会静默改变语义：every 组少一个新分支照样"完成"、
             //  children 整体缺失则永远无法完成（静默卡死）。分支数不一致 = 定义漂移，fail-fast
             //  （r30 跨分支 transfer 守卫的 resume 面兄弟格；决策支持后再放开）。
+            //  CAUTION 'any' group 的运行期剪枝（一个分支推进后兄弟分支被移除）是合法的
+            //  children 收缩——凡是会剪枝的 group 类型只能校验上界（多于声明数 = 必然漂移）；
+            //  不剪枝的类型（'every'）严格相等。
             const expectedBranchCount = node.childSeqs?.length ?? 0
             const persistedBranchCount = data?.children?.length ?? 0
-            if (persistedBranchCount !== expectedBranchCount) {
+            const groupTypePrunesBranches = node.content.type === 'any'
+            const branchCountDrifted = groupTypePrunesBranches
+                ? persistedBranchCount > expectedBranchCount
+                : persistedBranchCount !== expectedBranchCount
+            if (branchCountDrifted) {
                 throw new ActivityStateError(
                     `activity "${graph.activity.name}": persisted state of group "${data.uuid}" carries ${persistedBranchCount} branch state(s) but the current definition declares ${expectedBranchCount} branch(es). ` +
                     `The activity definition has drifted while this instance was in flight — completing the persisted branches would silently ${persistedBranchCount < expectedBranchCount ? 'skip the newly added branch(es)' : 'wait for removed branch(es) forever'}. ` +

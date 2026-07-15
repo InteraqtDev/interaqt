@@ -169,6 +169,67 @@ export class QueryExecutor {
     }
 
     /**
+     * r31：x:1 嵌套读取的谓词强制执行。
+     *
+     * x:1 子查询被编译进父查询的 LEFT JOIN，其 matchExpression（用户在嵌套 attributeQuery
+     * 里声明的谓词，或 filtered relation 重写注入的谓词）从不进入 JOIN 条件——JOIN 面只有
+     * 结构（id 连接）。这里对携带谓词的 x:1 节点逐父记录发探针查询（谓词 + 反向 id 约束，
+     * 与 x:n 独立查询的谓词机制完全同构），不命中则把已挂载的关联**置 null**：
+     * 语义 = 「谓词过滤关联记录本身」，父记录保留（与顶层 match 过滤父记录是两个不同的面）。
+     *
+     * 递归遍历与 pruneUnpairedCombinedReads 同构：x:1 主干逐层下钻（被上层置 null 的
+     * 分支自然跳过）；parentLink 上的 x:1 同样覆盖。goto 节点跳过（goto 分支的独立查询
+     * 已自带谓词合并）。x:n 节点无需处理（findXToManyRelatedRecords 的独立查询天然生效）。
+     *
+     * 性能注：探针是逐父记录的 id-only 查询（潜在 N+1），只在声明了谓词的 x:1 节点上发生；
+     * 与既有 goto / per-parent x:n 路径的代价形态一致。
+     */
+    private async enforceXToOnePredicates(records: Record[], entityQuery: RecordQuery): Promise<void> {
+        if (entityQuery.physicalRowRead) return
+        for (const subQuery of entityQuery.attributeQuery.xToOneRecords) {
+            if (subQuery.goto) continue
+            const resultKey = subQuery.alias || subQuery.attributeName!
+            if (subQuery.hasRelatedPredicate) {
+                const info = this.map.getInfo(subQuery.parentRecord!, subQuery.attributeName!)
+                const reverseAttributeName = info.getReverseInfo()?.attributeName!
+                for (const record of records) {
+                    const related = record[resultKey]
+                    if (!related || typeof related !== 'object' || related.id === undefined || related.id === null) continue
+                    const probeMatch = subQuery.matchExpression.and({
+                        key: `${reverseAttributeName}.id`,
+                        value: ['=', record.id]
+                    })
+                    const probeQuery = RecordQuery.create(subQuery.recordName, this.map, {
+                        matchExpression: probeMatch.data,
+                        attributeQuery: ['id'],
+                    })
+                    const matched = await this.findRecords(probeQuery, `enforce x:1 predicate: ${subQuery.parentRecord}.${subQuery.attributeName}`)
+                    if (!matched.some(item => String(item.id) === String(related.id))) {
+                        record[resultKey] = null
+                    }
+                }
+            }
+            // 递归下钻仍然挂载着的 x:1 子结构
+            const survivors = records
+                .map(record => record[resultKey])
+                .filter((related): related is Record => !!related && typeof related === 'object')
+            if (survivors.length) {
+                await this.enforceXToOnePredicates(survivors, subQuery)
+                // parentLink 上的 x:1（关系记录的关联实体）
+                const parentLinkQuery = subQuery.attributeQuery.parentLinkRecordQuery
+                if (parentLinkQuery) {
+                    const linkRecords = survivors
+                        .map(related => related[LINK_SYMBOL])
+                        .filter((link): link is Record => !!link && typeof link === 'object')
+                    if (linkRecords.length) {
+                        await this.enforceXToOnePredicates(linkRecords, parentLinkQuery)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 去除完全相同的原始行（等价于 SQL DISTINCT）
      * 用于消除 match 中出现 x:n 路径时 LEFT JOIN 产生的 fan-out 重复。
      * 因为 SELECT 始终包含各级记录的 id，真正不同的记录必然有列差异，所以完全相同的行一定是重复行。
@@ -285,6 +346,13 @@ export class QueryExecutor {
 
         // r28：combined x:1 嵌套读取的幻影配对剪枝（配对真实性以 link id 列为真相源）。
         this.pruneUnpairedCombinedReads(records, entityQuery)
+
+        // r31：x:1 嵌套读取的谓词强制执行（用户 matchExpression / filtered relation 注入的谓词）。
+        //  JOIN 编译不消费子查询谓词——此前 filtered x:1 属性返回未过滤的 base 配对、
+        //  普通 x:1 的 matchExpression 被静默忽略（r30 记录的预存缺口）。
+        //  必须在补全枝干（completeXToOneLeftoverRecords 等）之前执行：被谓词置 null 的
+        //  关联不应再补全其子结构。
+        await this.enforceXToOnePredicates(records, entityQuery)
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context
