@@ -22,7 +22,7 @@ import { KlassByName } from "interaqt";
 import { RetryableWriteConflict } from "../../src/runtime/transaction.js";
 import { MatchExp } from "@storage";
 import { PGLiteDB } from "@drivers";
-import { Custom, Dictionary, Entity, Property, Transform } from "@core";
+import { Custom, Dictionary, Entity, Property, Summation, Transform } from "@core";
 import { approveGeneratedMigrationDiff, migrateWithApproval } from "./helpers/migrationApproval.js";
 
 describe("r32 — recorded items", () => {
@@ -287,6 +287,86 @@ describe("r32 — recorded items", () => {
         };
         await migrateWithApproval(controllerV2, { approvedDiff: reApproved as any });
         expect((await systemV2.storage.find("R32ChainPromo", undefined, undefined, ["label"])).map(item => item.label)).toEqual(["promo-20"]);
+        await db.close();
+    });
+
+    // ---------- C｜r31 测试债：迁移 patch 事件 oldRecord 完备性的直接行为断言 ----------
+
+    test("C: migration update-patch events carry complete oldRecord — filtered-membership exits on a three-level Transform chain are detected (r31 contract, direct positive proof)", async () => {
+        // Product --TransformA--> Deal --TransformB--> Promo；BigPromo = filtered(Promo, value > 15)；
+        // bigPromoSum = Summation(BigPromo.value)。
+        // V2 只改 TransformA：price 10 → amount 30（Promo 10→30 **进入** BigPromo），
+        // price 20 → amount 11（Promo 20→11 **退出** BigPromo）。
+        // TransformB 是链式依赖：其对 Promo 的 update patch 事件由 writeComputationPatch 合成——
+        // bigPromoSum 的成员资格判定（resolveFilteredUpdateEvent）读这些事件的 oldRecord 判断
+        // 「此前是否是成员」。oldRecord 若是 {id}-only（r31 修复前形态），退出面判定失真，
+        // 汇总残留退出成员的旧值。断言迁移后 sum 恰为 30（若退出漏判则为 50/41 等）。
+        const buildModel = (version: 1 | 2) => {
+            const Product = new Entity({
+                name: "R32OldRecProduct",
+                properties: [new Property({ name: "price", type: "number" }, { uuid: "r32-oldrec-product-price" })],
+            }, { uuid: "r32-oldrec-product" });
+            const transformA = new Transform({
+                record: Product,
+                attributeQuery: ["id", "price"],
+                callback: version === 1
+                    ? (item: any) => [{ amount: item.price }]
+                    : (item: any) => [{ amount: item.price > 15 ? item.price - 9 : item.price * 3 }],
+            }, { uuid: "r32-oldrec-transform-a" });
+            const Deal = new Entity({
+                name: "R32OldRecDeal",
+                properties: [new Property({ name: "amount", type: "number" }, { uuid: "r32-oldrec-deal-amount" })],
+                computation: transformA,
+            }, { uuid: "r32-oldrec-deal" });
+            const transformB = new Transform({
+                record: Deal,
+                attributeQuery: ["id", "amount"],
+                callback: (item: any) => [{ value: item.amount }],
+            }, { uuid: "r32-oldrec-transform-b" });
+            const Promo = new Entity({
+                name: "R32OldRecPromo",
+                properties: [new Property({ name: "value", type: "number" }, { uuid: "r32-oldrec-promo-value" })],
+                computation: transformB,
+            }, { uuid: "r32-oldrec-promo" });
+            const BigPromo = new Entity({
+                name: "R32OldRecBigPromo",
+                baseEntity: Promo,
+                matchExpression: MatchExp.atom({ key: "value", value: [">", 15] }),
+            }, { uuid: "r32-oldrec-big-promo" });
+            const bigPromoSum = new Dictionary({
+                name: "r32OldRecBigPromoSum",
+                type: "number",
+                collection: false,
+                computation: new Summation({
+                    record: BigPromo,
+                    attributeQuery: ["value"],
+                }, { uuid: "r32-oldrec-big-promo-sum-computation" }),
+            }, { uuid: "r32-oldrec-big-promo-sum" });
+            return { entities: [Product, Deal, Promo, BigPromo], dict: [bigPromoSum] };
+        };
+
+        const db = new PGLiteDB();
+        const systemV1 = new MonoSystem(db);
+        systemV1.conceptClass = KlassByName;
+        const modelV1 = buildModel(1);
+        await new Controller({ system: systemV1, entities: modelV1.entities, relations: [], dict: modelV1.dict }).setup(true);
+        await systemV1.storage.create("R32OldRecProduct", { price: 10 });
+        await systemV1.storage.create("R32OldRecProduct", { price: 20 });
+        expect(await systemV1.storage.dict.get("r32OldRecBigPromoSum")).toBe(20);
+        const promosBefore = await systemV1.storage.find("R32OldRecPromo", undefined, undefined, ["id", "value"]);
+
+        const systemV2 = new MonoSystem(db);
+        systemV2.conceptClass = KlassByName;
+        const modelV2 = buildModel(2);
+        const controllerV2 = new Controller({ system: systemV2, entities: modelV2.entities, relations: [], dict: modelV2.dict });
+        await migrateWithApproval(controllerV2);
+
+        // 迁移是 update patch 面（无删除/重建）：Promo 逻辑 id 保持不变
+        const promosAfter = await systemV2.storage.find("R32OldRecPromo", undefined, undefined, ["id", "value"]);
+        expect(promosAfter.map(item => String(item.id)).sort()).toEqual(promosBefore.map(item => String(item.id)).sort());
+        expect(promosAfter.map(item => item.value).sort((a, b) => a - b)).toEqual([11, 30]);
+        // 进入 + 退出双向成员资格变化都被检出：sum 恰为 30（退出漏判 ⇒ 50/41；进入漏判 ⇒ 0/11）
+        expect(await systemV2.storage.dict.get("r32OldRecBigPromoSum")).toBe(30);
         await db.close();
     });
 });

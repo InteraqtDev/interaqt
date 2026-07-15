@@ -3181,9 +3181,9 @@ async function writeComputationResult(
     record?: Record<string, unknown>,
     options: MigrationOptions = {},
     writeOptions: { forceMutationEvent?: boolean; skipAsNull?: boolean } = {},
-) {
+): Promise<RecordMutationEvent[]> {
     if (result instanceof ComputationResultSkip) {
-        if (!writeOptions.skipAsNull || computation.dataContext.type !== "property") return undefined;
+        if (!writeOptions.skipAsNull || computation.dataContext.type !== "property") return [];
         const propertyContext = computation.dataContext;
         const nonNull = controller.system.storage.schema.constraints.some(constraint =>
             constraint.kind === "non-null" &&
@@ -3202,11 +3202,27 @@ async function writeComputationResult(
         throw new AsyncMigrationComputationError(`Migration requires direct final output, not asyncReturn resolution, for ${dataContextPath(computation.dataContext)}`);
     }
     const previous = await controller.retrieveLastValue(computation.dataContext, record);
-    if (!writeOptions.forceMutationEvent && isEqualValue(previous, result)) return undefined;
-    if (!isEqualValue(previous, result)) {
-        await controller.applyResult(computation.dataContext, result, record);
+    if (!writeOptions.forceMutationEvent && isEqualValue(previous, result)) return [];
+    if (isEqualValue(previous, result)) {
+        // forceMutationEvent 且值未变（takeover 接管既有事实值）：没有 storage 写入可捕获，
+        //  合成事件让依赖计算仍然 rebuild。
+        const forced = createMutationEventForOutput(computation.dataContext, result, previous, record);
+        return forced ? [forced] : [];
     }
-    return createMutationEventForOutput(computation.dataContext, result, previous, record);
+    // CAUTION property 写入以 storage 事件为真相源（r32，与 writeComputationPatch 同一契约）：
+    //  applyResult 的宿主 update / 硬删除 delete 会连带派生事件（filtered entity 成员资格
+    //  create/delete、级联删除）——手工合成的单一事件会让链式依赖对成员资格退出等派生事实失明。
+    //  entity/relation（eventRebuildHandler 的全量替换）刻意不流事件：其授权模型是人工批准的
+    //  handler 决策，依赖计算经 rebuildPlan 走全量重算（增量流会引入派生行 id 翻搅与
+    //  destructive-scope 噪声）。global 的 dict 写路径无派生事件，保持合成。
+    if (computation.dataContext.type === "property") {
+        const storageEvents: RecordMutationEvent[] = [];
+        await controller.applyResult(computation.dataContext, result, record, storageEvents);
+        return storageEvents;
+    }
+    await controller.applyResult(computation.dataContext, result, record);
+    const event = createMutationEventForOutput(computation.dataContext, result, previous, record);
+    return event ? [event] : [];
 }
 
 async function writeComputationPatch(controller: Controller, computation: Computation, patch: ComputationResultPatch | ComputationResultPatch[] | unknown, record?: Record<string, unknown>, options: MigrationOptions = {}) {
@@ -3221,8 +3237,7 @@ async function writeComputationPatch(controller: Controller, computation: Comput
     const events: RecordMutationEvent[] = [];
     for (const item of patches) {
         if (!item || typeof item !== "object" || !("type" in item)) {
-            const event = await writeComputationResult(controller, computation, item, record, options);
-            if (event) events.push(event);
+            events.push(...await writeComputationResult(controller, computation, item, record, options));
             continue;
         }
         const typedPatch = item as ComputationResultPatch;
@@ -3230,40 +3245,24 @@ async function writeComputationPatch(controller: Controller, computation: Comput
         //  删除只能在这里产生，拒绝即 kill-resume 死循环）。删除乐观执行并以 delete 事件出账，
         //  由 MigrationScheduler 的删除审计在重算结束时与已批准 scope 精确对账——不一致则
         //  抛错回滚，未经审计的销毁依然无法提交。
-        // CAUTION 合成事件的 oldRecord/previous 必须在 apply **之前**读取真实前态（r31）：
-        //  这些事件经 MigrationScheduler.queueEvents 喂给链式依赖计算——增量分支读
-        //  event.oldRecord 的字段、eventDep/trigger 的合并视图匹配（{...oldRecord, ...record}）
-        //  都依赖前态完备。此前 update/delete 只带 {id}、property patch 强制 previous=undefined，
-        //  迁移链上的事件契约与 live 轨分裂（依赖计算静默拿错前态）。
+        // CAUTION 链式依赖喂食的事件流以 storage 产出为唯一真相源（r32）：storage 的 update/
+        //  delete 事件天然携带完整前态（写前 matched-entities 快照——r31「前态完备」契约的
+        //  收敛实现），且包含**派生事件**（filtered entity 成员资格 create/delete、级联删除）。
+        //  此前手工合成单一事件：成员资格退出对下游聚合完全不可见（exit 面静默失真——
+        //  与 live 轨分裂）。
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
-            const outputRecordName = computation.dataContext.id.name!;
-            let previousRecord: Record<string, unknown> | undefined;
-            if (typedPatch.type === "update" || typedPatch.type === "delete") {
-                previousRecord = await controller.system.storage.findOne(
-                    outputRecordName,
-                    MatchExp.atom({ key: "id", value: ["=", typedPatch.affectedId] }),
-                    undefined,
-                    ["*"]
-                ) ?? undefined;
-            }
-            await controller.applyResultPatch(computation.dataContext, typedPatch, record);
-            events.push({
-                recordName: outputRecordName,
-                type: typedPatch.type === "insert" ? "create" : typedPatch.type,
-                record: typedPatch.type === "delete"
-                    ? (previousRecord ?? { id: String(typedPatch.affectedId) }) as any
-                    : (typedPatch.type === "update"
-                        ? { ...(typedPatch.data as Record<string, unknown>), id: previousRecord?.id ?? typedPatch.affectedId } as any
-                        : typedPatch.data as any),
-                oldRecord: typedPatch.type === "update" || typedPatch.type === "delete"
-                    ? (previousRecord ?? { id: String(typedPatch.affectedId) }) as any
-                    : undefined,
-                keys: typedPatch.data && typeof typedPatch.data === "object" ? Object.keys(typedPatch.data as Record<string, unknown>) : undefined,
-            });
+            const storageEvents: RecordMutationEvent[] = [];
+            await controller.applyResultPatch(computation.dataContext, typedPatch, record, storageEvents);
+            events.push(...storageEvents);
+        } else if (computation.dataContext.type === "property") {
+            // property patch 同样以 storage 事件为真相源（含硬删除的 delete 事件与
+            //  filtered 成员资格派生事件）。
+            const storageEvents: RecordMutationEvent[] = [];
+            await controller.applyResultPatch(computation.dataContext, typedPatch, record, storageEvents);
+            events.push(...storageEvents);
         } else {
-            const previous = computation.dataContext.type === "property" || computation.dataContext.type === "global"
-                ? await controller.retrieveLastValue(computation.dataContext, record)
-                : undefined;
+            // global：dict 写路径无事件捕获面（也没有派生事件），保持合成。
+            const previous = await controller.retrieveLastValue(computation.dataContext, record);
             await controller.applyResultPatch(computation.dataContext, typedPatch, record);
             const event = createMutationEventForOutput(computation.dataContext, (typedPatch as any).data, previous, record);
             if (event) events.push(event);
@@ -3641,19 +3640,16 @@ class MigrationScheduler {
                         ? stripPropertyFromInput(record, computation.dataContext.id.name)
                         : record;
                     const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, record: handlerRecord });
-                    const event = await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions);
-                    if (event) events.push(event);
+                    events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions));
                 }
                 return events;
             }
             const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext });
-            const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);
-            return event ? [event] : [];
+            return writeComputationResult(this.controller, computation, result, undefined, this.options);
         }
         if (computation.dataContext.type === "global") {
             const dataDeps = await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation);
-            const event = await writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute!(dataDeps), undefined, this.options);
-            return event ? [event] : [];
+            return writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute!(dataDeps), undefined, this.options);
         }
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
             return recomputeTransformOutput(this.controller, computation as DataBasedComputation, this.options);
@@ -3674,8 +3670,7 @@ class MigrationScheduler {
                 computeDeps,
                 computeRecord,
             );
-            const event = await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions);
-            if (event) events.push(event);
+            events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions));
         }
         return events;
     }
@@ -3733,8 +3728,7 @@ class MigrationScheduler {
                         continue;
                     }
                     const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, mutationEvent });
-                    const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);
-                    if (event) events.push(event);
+                    events.push(...await writeComputationResult(this.controller, computation, result, undefined, this.options));
                     continue;
                 }
                 // 与 live Scheduler 的事件路由保持同一守卫：filtered 源的 update 监听挂在物理 base 名上，
@@ -3757,8 +3751,7 @@ class MigrationScheduler {
         if (executionResult.mode === "patch") {
             return writeComputationPatch(this.controller, computation, executionResult.result, record, this.options);
         }
-        const event = await writeComputationResult(this.controller, computation, executionResult.result, record, this.options);
-        return event ? [event] : [];
+        return writeComputationResult(this.controller, computation, executionResult.result, record, this.options);
     }
 }
 
