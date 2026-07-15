@@ -378,14 +378,18 @@ export async function checkPayload(controller: GuardController, interaction: Int
     }
 
     if (payloadDef.isCollection) {
-      if (payloadDef.isRef && !((payloadItem as unknown[]) as { id: string }[]).every(item => !!item.id)) {
+      // CAUTION 每个 ref 元素必须是「带 id 的对象」。null / 非对象元素（HTTP 客户端常发 null）
+      //  必须给出干净的守卫错误，而不是在 `item.id` 上抛出深层的裸 TypeError（obscure stack trace）。
+      if (payloadDef.isRef && !((payloadItem as unknown[])).every(item => !!item && typeof item === 'object' && !!(item as { id?: unknown }).id)) {
         throw new InteractionGuardError(
           `Payload validation failed for field '${payloadDef.name}': data not every is ref`,
           { type: `${payloadDef.name} data not every is ref`, checkType: 'payload' }
         );
       }
     } else {
-      if (payloadDef.isRef && !(payloadItem as { id: string }).id) {
+      // CAUTION null / 非对象（HTTP 客户端常发 null）必须落到干净的守卫错误，
+      //  不能在 `(payloadItem).id` 上抛裸 TypeError。
+      if (payloadDef.isRef && !(!!payloadItem && typeof payloadItem === 'object' && !!(payloadItem as { id?: unknown }).id)) {
         throw new InteractionGuardError(
           `Payload validation failed for field '${payloadDef.name}': data is not a ref`,
           { type: `${payloadDef.name} data is not a ref`, checkType: 'payload' }
