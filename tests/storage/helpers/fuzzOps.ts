@@ -10,9 +10,18 @@
  *  与顺序就是契约本身。pools 的内容/顺序由 runner 保证跨库一致（按创建序）。
  */
 import type { RecordMutationEvent } from '@runtime';
-import { EntityQueryHandle, MatchExp } from '@storage';
+import { MatchExp } from '@storage';
 import { chance, int, pick, type Rng } from './fuzzRandom.js';
 import type { FuzzSchema, RelationChoice } from './fuzzSchema.js';
+
+/** 写执行器的最小结构契约：storage 层 EntityQueryHandle 与 runtime 层 System.storage 都满足。 */
+export type FuzzWriteExecutor = {
+    create(entityName: string, rawData: Record<string, unknown>, events?: RecordMutationEvent[]): Promise<unknown>
+    update(entityName: string, match: unknown, rawData: Record<string, unknown>, events?: RecordMutationEvent[]): Promise<unknown>
+    delete(entityName: string, match: unknown, events?: RecordMutationEvent[]): Promise<unknown>
+    addRelationByNameById(relationName: string, sourceId: string, targetId: string, rawData?: Record<string, unknown>, events?: RecordMutationEvent[]): Promise<unknown>
+    removeRelationByName(relationName: string, match: unknown, events?: RecordMutationEvent[]): Promise<unknown>
+}
 
 export type IdPools = Map<string, unknown[]>
 
@@ -153,8 +162,8 @@ export async function decideNextOp(
     }
 }
 
-/** 在一个 EntityQueryHandle 上执行操作意图（id 已是该库的本地形态）。 */
-export async function executeOpIntent(handle: EntityQueryHandle, intent: Exclude<FuzzOpIntent, null>, events: RecordMutationEvent[]): Promise<void> {
+/** 在一个写执行器上执行操作意图（id 已是该库的本地形态）。 */
+export async function executeOpIntent(handle: FuzzWriteExecutor, intent: Exclude<FuzzOpIntent, null>, events: RecordMutationEvent[]): Promise<void> {
     if (intent.op === 'create') {
         await handle.create(intent.entityName, intent.payload, events)
     } else if (intent.op === 'update') {
