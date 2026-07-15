@@ -1,8 +1,8 @@
 import { IInstance, SerializedData, generateUUID, stringifyAttribute, decodeFunctionValues } from '@core';
 import { validateCreateArgs, type PublicFieldDef } from '@core';
-import { InteractionInstance } from './Interaction.js';
-import { GatewayInstance } from './Gateway.js';
-import { EventInstance } from './Event.js';
+import { Interaction, InteractionInstance } from './Interaction.js';
+import { Gateway, GatewayInstance } from './Gateway.js';
+import { Event, EventInstance } from './Event.js';
 
 // Forward declarations for circular dependencies
 export interface ActivityInstance extends IInstance {
@@ -141,6 +141,35 @@ export class Activity implements ActivityInstance {
   }
   
   static clone(instance: ActivityInstance, deep: boolean): ActivityInstance {
+    // CAUTION deep clone 的隔离契约与 StateMachine.clone(deep) 对齐（r28 clone 家族收口）：
+    //  此前 deep 参数被忽略——克隆后对交互/网关/传递的修改会隔空影响原活动图。
+    //  deep 时按 old→new 节点映射克隆整图（transfers 的 source/target 必须重指到克隆节点，
+    //  否则克隆图与原图的节点集合失联）；嵌套子活动经 ActivityGroup 递归。
+    //  Interaction/Gateway 内部的行为定义（conditions 回调等）由各自的 clone(deep) 决定。
+    if (deep) {
+      const nodeMap = new Map<InteractionInstance | ActivityGroupInstance | GatewayInstance, InteractionInstance | ActivityGroupInstance | GatewayInstance>();
+      const cloneNode = <T extends InteractionInstance | ActivityGroupInstance | GatewayInstance>(node: T): T => {
+        let cloned = nodeMap.get(node)
+        if (!cloned) {
+          if (Interaction.is(node)) cloned = Interaction.clone(node, true)
+          else if (ActivityGroup.is(node)) cloned = ActivityGroup.clone(node, true)
+          else cloned = Gateway.clone(node as GatewayInstance, true)
+          nodeMap.set(node, cloned)
+        }
+        return cloned as T
+      }
+      const args: ActivityCreateArgs = { name: instance.name };
+      if (instance.interactions?.length) args.interactions = instance.interactions.map(cloneNode);
+      if (instance.gateways?.length) args.gateways = instance.gateways.map(cloneNode);
+      if (instance.groups?.length) args.groups = instance.groups.map(cloneNode);
+      if (instance.events?.length) args.events = instance.events.map(event => Event.clone(event, true));
+      if (instance.transfers?.length) args.transfers = instance.transfers.map(transfer => Transfer.create({
+        name: transfer.name,
+        source: cloneNode(transfer.source),
+        target: cloneNode(transfer.target),
+      }));
+      return this.create(args);
+    }
     const args: ActivityCreateArgs = {
       name: instance.name
     };
@@ -241,7 +270,10 @@ export class ActivityGroup implements ActivityGroupInstance {
     const args: ActivityGroupCreateArgs = {
       type: instance.type
     };
-    if (instance.activities && instance.activities.length > 0) args.activities = instance.activities;
+    if (instance.activities && instance.activities.length > 0) {
+      // deep：嵌套子活动整图递归克隆（与 Activity.clone(deep) 的节点映射契约一致）。
+      args.activities = deep ? instance.activities.map(sub => Activity.clone(sub, true)) : instance.activities;
+    }
     
     return this.create(args);
   }

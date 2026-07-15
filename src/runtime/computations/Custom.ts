@@ -154,6 +154,41 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
         computationPhase: 'custom-incremental-plan'
       })
     }
+
+    // CAUTION 同一 source 的多个 records/global dep + 默认增量计划（无 planIncremental）：
+    //  每个 dep 注册独立的 create/delete（global: create/update）监听，单个事件命中全部同源
+    //  dep → incrementalCompute 对**同一个事件**执行 N 次（useLastValue 的增量被 N 倍叠加，
+    //  r28 实测 +2）。records dep 之间刻意不做框架级去重（不同 match 的 membership 判定是
+    //  per-dep 增量语义的组成部分，r27 F-2 契约），因此同源多 dep 的执行次数语义必须由用户
+    //  经 planIncremental(context.depKey) 显式声明（skip 掉冗余 dep 或按 dep 分流），
+    //  默认路径下静默 N 倍执行是数据损坏，声明期拒绝。
+    if ((args.incrementalCompute || args.incrementalPatchCompute) && !args.planIncremental) {
+      const sourceNamesByDepKind = new Map<string, string[]>()
+      Object.entries(this.dataDeps).forEach(([depName, dep]) => {
+        if (dep.type !== 'records' && dep.type !== 'global') return
+        const sourceName = (dep as { source?: { name?: string } }).source?.name
+        if (!sourceName) return
+        const key = `${dep.type}:${sourceName}`
+        if (!sourceNamesByDepKind.has(key)) sourceNamesByDepKind.set(key, [])
+        sourceNamesByDepKind.get(key)!.push(depName)
+      })
+      for (const [key, depNames] of sourceNamesByDepKind) {
+        if (depNames.length > 1) {
+          throw new ComputationProtocolError(
+            `Custom computation "${args.name}" declares multiple ${key.split(':')[0]} dataDeps on the same source "${key.split(':')[1]}" ` +
+            `(${depNames.join(', ')}) with an incremental path but no planIncremental. A single mutation event on that source matches ` +
+            `every one of these deps and would run incrementalCompute once per dep (N-fold increments — silent data corruption). ` +
+            `Either merge them into one dep, or declare planIncremental and use context.depKey to decide which dep events to act on (skip the rest).`,
+            {
+              handleName: this.constructor.name,
+              computationName: args.name,
+              dataContext: this.dataContext,
+              computationPhase: 'custom-incremental-plan'
+            }
+          )
+        }
+      }
+    }
     
     // 如果提供了 createState，调用它来初始化 state
     if (this.createStateCallback) {

@@ -151,6 +151,26 @@ export class UpdateExecutor {
                 continue
             }
 
+            // CAUTION reliance link 不走 unlink（unlink 对 reliance 一律 fail-fast）：
+            //  - 槽位已占用（换绑/清空既有依赖配对）⇒ 语义级 fail-fast——owner 侧换绑/置 null 会把
+            //    旧依赖留成无主（displacement），依赖侧换绑经 update 轨暂不支持（addRelation /
+            //    create-ref 轨支持 re-parent，r28 拓扑等价矩阵）；
+            //  - 槽位空闲 ⇒ 没有旧关系可解，直接放行（此前对「给空闲 owner 经 update 赋依赖」
+            //    也抛 "cannot unlink"，属于把无操作误判为违规，r28 修正）。
+            if (linkInfo.isTargetReliance) {
+                const attributeName = newRelatedEntityData.info!.attributeName
+                const oldRelatedId = matchedEntity[attributeName]?.id
+                if (oldRelatedId !== undefined && oldRelatedId !== null) {
+                    throw new Error(
+                        `cannot unlink reliance data by updating "${entityName}.${attributeName}" (current related id: ${oldRelatedId}). ` +
+                        `Reliance data lives and dies with its owner — re-pointing or clearing the pairing through update would leave the current ` +
+                        `dependent orphaned. Delete the dependent record instead (deleting the owner cascades it), or use addRelation to re-parent ` +
+                        `a dependent onto a new owner.`
+                    )
+                }
+                continue
+            }
+
             await this.agent.unlink(
                 linkInfo.name,
                 MatchExp.atom({
@@ -206,11 +226,54 @@ export class UpdateExecutor {
             newEntityData.isolatedNullRecords
         )
 
+        // CAUTION reliance link 的 update-replace 不走 unlink（对 reliance 一律 fail-fast）。
+        //  update 的 replace 语义 = 「终态集合 = 声明集合」；对 reliance，任何**从终态里消失的
+        //  既有依赖**都会被留成无主 ⇒ 语义级 fail-fast。声明集合 ⊇ 既有集合（纯新增 / 幂等
+        //  快照回写）不孤儿化任何依赖 ⇒ 放行：已 link 的 ref 幂等跳过，新增项经 addLink →
+        //  createRecord 入口的 reliance 槽位守卫处理（含 re-parent 他人依赖，r28 拓扑等价矩阵）。
+        const relianceLinkedRefIds = new Map<string, Set<string>>()
+        {
+            const relianceAttrs = new Map<string, NewRecordData[]>()
+            for (const relatedEntityData of otherTableEntitiesData) {
+                if (!relatedEntityData.info!.getLinkInfo().isTargetReliance) continue
+                const attributeName = relatedEntityData.info!.attributeName!
+                if (!relianceAttrs.has(attributeName)) relianceAttrs.set(attributeName, [])
+                relianceAttrs.get(attributeName)!.push(relatedEntityData)
+            }
+            for (const [attributeName, items] of relianceAttrs) {
+                const linkInfo = items[0].info!.getLinkInfo()
+                const hostSide = linkInfo.isRelationSource(entityName, attributeName) ? 'source' : 'target'
+                const otherSide = hostSide === 'source' ? 'target' : 'source'
+                const currentLinks = await this.agent.findRecords(RecordQuery.create(linkInfo.name, this.map, {
+                    matchExpression: MatchExp.atom({ key: `${hostSide}.id`, value: ['=', matchedEntity.id] }),
+                    attributeQuery: ['id', [otherSide, { attributeQuery: ['id'] }]]
+                }), `check reliance pairings before update ${entityName}.${attributeName}`)
+                const currentIds = currentLinks.map(link => link[otherSide]?.id).filter(id => id !== undefined && id !== null)
+                const declaredRefIds = new Set(items.filter(item => item.isRef()).map(item => String(item.getRef().id)))
+                const orphaned = currentIds.filter(id => !declaredRefIds.has(String(id)))
+                if (orphaned.length) {
+                    throw new Error(
+                        `cannot unlink reliance data by updating "${entityName}.${attributeName}": the declared value drops currently paired ` +
+                        `dependent/owner id(s) ${JSON.stringify(orphaned)}. Reliance data lives and dies with its owner — dropping a pairing through ` +
+                        `update would leave the dependent orphaned. Delete the dependent record instead (deleting the owner cascades it), ` +
+                        `or use addRelation to re-parent a dependent onto a new owner.`
+                    )
+                }
+                relianceLinkedRefIds.set(attributeName, new Set(currentIds.map(String)))
+            }
+        }
+
         // CAUTION 由于 xToMany 的数组情况会平铺处理，所以这里可能出现两次，所以这里记录一下排重
         const removedLinkName = new Set()
         for (let relatedEntityData of otherTableEntitiesData) {
             const linkInfo = relatedEntityData.info!.getLinkInfo()
             if (removedLinkName.has(linkInfo.name)) {
+                continue
+            }
+
+            // reliance：无 unlink（上方守卫已保证不会孤儿化），已 link 的 ref 在下方建立环节幂等跳过。
+            if (linkInfo.isTargetReliance) {
+                removedLinkName.add(linkInfo.name)
                 continue
             }
 
@@ -241,6 +304,20 @@ export class UpdateExecutor {
         for (let newRelatedEntityData of otherTableEntitiesData) {
             // 跳过已显式设置为 null 的关系属性
             if (newEntityData.rawData[newRelatedEntityData.info?.attributeName!] === null) {
+                continue;
+            }
+
+            // reliance 幂等快照回写：已 link 的 ref 不重复建立（否则 addLink 的
+            // 「link already exist」内部断言会把合法的快照回写打崩）。
+            if (newRelatedEntityData.isRef()
+                && relianceLinkedRefIds.get(newRelatedEntityData.info!.attributeName!)?.has(String(newRelatedEntityData.getRef().id))) {
+                const idempotentRef = newRelatedEntityData.getRef() as Record
+                if (newRelatedEntityData.info!.isXToMany) {
+                    if (!result[newRelatedEntityData.info!.attributeName!]) result[newRelatedEntityData.info!.attributeName!] = []
+                    result[newRelatedEntityData.info!.attributeName!].push(idempotentRef)
+                } else {
+                    result[newRelatedEntityData.info!.attributeName!] = idempotentRef
+                }
                 continue;
             }
             

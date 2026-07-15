@@ -85,8 +85,18 @@ export class Conditions implements ConditionsInstance {
   }
   
   static clone(instance: ConditionsInstance, deep: boolean): ConditionsInstance {
+    // deep 时递归克隆守卫树（BoolExpressionData/BoolAtomData），隔离契约与
+    // StateMachine.clone(deep) 家族对齐（r28）；叶子上的 Condition 行为实例按惯例共享。
     const args: ConditionsCreateArgs = {};
-    if (instance.content !== undefined) args.content = instance.content;
+    if (instance.content !== undefined) {
+      if (deep && BoolExpressionData.is(instance.content)) {
+        args.content = BoolExpressionData.clone(instance.content, true);
+      } else if (deep && BoolAtomData.is(instance.content)) {
+        args.content = BoolAtomData.clone(instance.content, true);
+      } else {
+        args.content = instance.content;
+      }
+    }
     
     return this.create(args);
   }

@@ -550,14 +550,28 @@ export class Scheduler {
                         //  语义上就是「宿主的一次变更」，按 (computation, targetPath) 去重。
                         //  records 型 dep 不去重——不同 dep 携带不同 match，membership 判定
                         //  （entered/left/skip）按 dep 独立求值是增量语义的一部分。
+                        // CAUTION 事件驱动计算（Transform eventDeps / StateMachine trigger）同理按
+                        //  (computation, event) 去重（r28）：多个 eventDep 是订阅模式的**并集**不是
+                        //  执行倍增器——重叠模式（宽窄两个 eventDep 同时命中一个 create）此前让
+                        //  eventBasedIncrementalPatchCompute 对同一事件插入两份派生记录（静默重复行）。
+                        //  两次调用收到完全相同的事件对象、callback 无 dep 身份可区分，只能由框架合并
+                        //  （StateMachine 注册期已按 (recordName,type) 折叠 + 脏记录去重，天然单跑；
+                        //  本守卫把同一契约提升到全部事件驱动计算）。
                         const ranPropertyDepPaths = new Map<Computation, Set<string>>()
+                        const ranEventBasedComputations = new Set<Computation>()
                         for(const source of sources) {
                             if(!this.sourceMapManager.shouldTriggerUpdateComputation(source, mutationEvent)) {
                                 continue
                             }
                             // 对于 EventBasedComputation，进行深度匹配检查
-                            if (!('dataDep' in source) && !this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
-                                continue
+                            if (!('dataDep' in source)) {
+                                if (!this.sourceMapManager.shouldTriggerEventBasedComputation(source as EventBasedEntityEventsSourceMap, mutationEvent)) {
+                                    continue
+                                }
+                                if (ranEventBasedComputations.has(source.computation)) {
+                                    continue
+                                }
+                                ranEventBasedComputations.add(source.computation)
                             }
                             if ('dataDep' in source && (source as DataBasedEntityEventsSourceMap).dataDep.type === 'property') {
                                 const pathKey = ((source as DataBasedEntityEventsSourceMap).targetPath || []).join('.')

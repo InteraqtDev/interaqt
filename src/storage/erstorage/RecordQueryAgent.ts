@@ -32,6 +32,7 @@ export interface RecordOperationAgent {
     createRecordDependency(newRecordData: NewRecordData, events?: RecordMutationEvent[]): Promise<NewRecordData>
     updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: RecordMutationEvent[]): Promise<Record[]>
     unlink(linkName: string, matchExpressionData: MatchExpressionData, moveSource?: boolean, reason?: string, events?: RecordMutationEvent[]): Promise<Record[]>
+    deleteRecord(recordName: string, matchExp: MatchExpressionData, events?: RecordMutationEvent[], inSameRowDataOp?: boolean): Promise<Record[]>
     deleteRecordSameRowData(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[], inSameRowDataOp?: boolean): Promise<Record[]>
     addLinkFromRecord(entity: string, attribute: string, entityId: string, relatedEntityId: string, attributes?: RawEntityData, events?: RecordMutationEvent[]): Promise<EntityIdRef>
     unlinkOldOwnersOfExclusiveTargets(newEntityData: NewRecordData, events?: RecordMutationEvent[], currentRecord?: Record): Promise<void>
@@ -124,9 +125,13 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
         const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map, true, true, false, true)
         for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
+            // CAUTION 行认领按**物理同住**寻址（physicalRowMatch）：被认领记录可能独居
+            //  （尚无任何配对，宿主槽位为空的 allowNull 行），逻辑配对守卫（r28 幻影配对
+            //  剪枝/守卫）会让这类行匹配不到——行搬迁机制自身必须看见物理事实。
             const attributeIdMatchAtom: MatchAtom = {
                 key: `${combinedRecordIdRef.info!.attributeName!}.id`,
-                value: ['=', combinedRecordIdRef.getRef().id]
+                value: ['=', combinedRecordIdRef.getRef().id],
+                physicalRowMatch: true
             }
             if (!match) {
                 match = MatchExp.atom(attributeIdMatchAtom)
@@ -138,6 +143,7 @@ export class RecordQueryAgent implements RecordOperationAgent {
         const recordQuery = RecordQuery.create(newEntityData.recordName, this.map, {
             matchExpression: match,
             attributeQuery: attributeQuery,
+            physicalRowRead: true,
         }, undefined, undefined, undefined, false, true)
 
         const recordsWithCombined = await this.queryExecutor.findRecords(recordQuery, reason, undefined)
@@ -174,35 +180,24 @@ export class RecordQueryAgent implements RecordOperationAgent {
                 )
             }
         }
-        // CAUTION F-5（fuzzer seed 3）：link-endpoint 认领的行搬迁子树由
+        // CAUTION F-5（fuzzer seed 3）＋子树扩展（r28）：link-endpoint / host-attr 认领的行搬迁子树由
         //  getAttributeQueryDataForRecord 的递归深度决定——递归对 notRelianceCombined 不下钻
-        //  （sameTableReliance 会随行搬运，L 探针验证），被认领记录经**其他** mergeLinks combined
-        //  关系同住的 link 列在 deleteRecordSameRowData 清行时被物理销毁（r17 的 combinedLinkFields
-        //  清列本是「端点删除 ⇒ link 必须消失」的删除语义，行搬迁复用它继承了删除语义）——
-        //  **link 静默消失、零 delete 事件**。在实现完整深度的行搬运之前 fail-fast。
-        //  注意：正因为 flashOut 查询不加载这些列，守卫必须自行按需查询（同一个深度限制
-        //  否则也会让守卫失明）；只有 schema 上存在跨关系 combined 的记录才产生额外查询。
+        //  （sameTableReliance 会随行搬运，L 探针验证），被认领记录（或其随行 reliance 子树成员）
+        //  经**其他** combined 关系同住的 link 列在行搬迁清列时被物理销毁或悬挂（r17 的
+        //  combinedLinkFields 清列本是「端点删除 ⇒ link 必须消失」的删除语义，行搬迁复用它
+        //  继承了删除语义）——**link 静默消失、零 delete 事件**。在实现完整深度的行搬运之前
+        //  fail-fast。判定必须覆盖整棵搬运子树：子树外的 combined 配对即冲突（配对进子树内部
+        //  ——如 reliance 反向边指向宿主——随行搬运，合法）。
         const assertNoNonRelianceCoTenant = async (claimedRecordName: string, claimed: Record, throughLinkName: string) => {
-            const claimedInfo = this.map.getRecordInfo(claimedRecordName)
-            const coTenantAttrs = claimedInfo.notRelianceCombined.filter(combinedInfo =>
-                combinedInfo.linkName !== throughLinkName
-                && !(claimedInfo.isRelation && (combinedInfo.attributeName === 'source' || combinedInfo.attributeName === 'target'))
-            )
-            if (!coTenantAttrs.length) return
-            const loaded = (await this.queryExecutor.findRecords(RecordQuery.create(claimedRecordName, this.map, {
-                matchExpression: MatchExp.atom({ key: 'id', value: ['=', claimed.id] }),
-                attributeQuery: ['id', ...coTenantAttrs.map(info => [info.attributeName, { attributeQuery: ['id'] }] as [string, { attributeQuery: string[] }])],
-                modifier: { limit: 1 }
-            }), `check combined co-tenants of ${claimedRecordName} before endpoint claim`))[0]
-            for (const combinedInfo of coTenantAttrs) {
-                const coTenantId = loaded?.[combinedInfo.attributeName]?.id
-                if (coTenantId === undefined || coTenantId === null) continue
+            const conflict = (await this.collectOutOfSubtreeCombinedPairings(claimedRecordName, claimed.id, throughLinkName))[0]
+            if (conflict) {
                 throw new Error(
                     `cannot claim "${claimedRecordName}" (id: ${claimed.id}) as an endpoint of new relation record "${throughLinkName}": ` +
-                    `it shares its physical row with "${combinedInfo.recordName}" (id: ${coTenantId}) through combined relation "${combinedInfo.linkName}" ` +
-                    `("${claimedRecordName}.${combinedInfo.attributeName}"), and the row migration triggered by an endpoint claim does not carry ` +
-                    `non-reliance combined co-tenants — the combined relation would be silently destroyed with no delete event. ` +
-                    `Remove the combined relation "${combinedInfo.linkName}" first, then create the new relation.`
+                    `its row-migration subtree member "${conflict.memberRecordName}" (id: ${conflict.memberId}) is paired with ` +
+                    `"${conflict.partnerRecordName}" (id: ${conflict.partnerId}) through combined relation "${conflict.linkName}" ` +
+                    `("${conflict.memberRecordName}.${conflict.attributeName}"), and the row migration does not carry combined pairings that ` +
+                    `reach outside the subtree — that relation would be silently destroyed with no delete event. ` +
+                    `Remove the combined relation "${conflict.linkName}" first, then create the new relation.`
                 )
             }
         }
@@ -220,6 +215,13 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     // host-attr 轨：本次建立的 link 是「宿主—被认领记录」之间的 combined link；
                     //  新依赖是宿主自己（owner ref 领养形态：{ in2: { id: owner } } 时宿主为依赖侧）。
                     assertNoRelianceDisplacement(combinedRecordIdRef.recordName, claimed, combinedRecordIdRef.info!.linkName!, newOwnerId ?? newEntityData.getData().id)
+                    // CAUTION 跨关系同住守卫必须与 link-endpoint 轨同构接线（r28，fuzzer seed 108/119）：
+                    //  create/update 载荷携带 { attr: { id } } 认领对方（host-attr 轨）与 addRelation
+                    //  认领端点（link-endpoint 轨）是同一契约的两条轨。此前只有 link-endpoint 轨有
+                    //  守卫——host-attr 轨认领一个经**其他** combined 关系同住的记录（含作为其他记录
+                    //  reliance 依赖的记录：reverse 端属性同样在 notRelianceCombined 里）时，行搬迁
+                    //  不携带这些同住结构，link/依赖关系被静默物理销毁（零 delete 事件）。
+                    await assertNoNonRelianceCoTenant(combinedRecordIdRef.recordName, claimed, combinedRecordIdRef.info!.linkName!)
                 }
             }
         }
@@ -356,8 +358,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
                     }
 
                     // TODO 如果没有冲突的话，可以不用删除原来的数据。外面直接更新这一行就行了
-                    //1. 删掉 combined 原来的所有同行数据
-                    await this.deleteRecordSameRowData(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
+                    //1. 清掉被抢记录在旧行上的数据。
+                    // CAUTION 纯物理搬迁（被抢记录连同其 reliance 子树随后整体写入新行，id 不变），
+                    //  绝不能走 deleteRecordSameRowData 的逻辑删除级联——那会把子树成员的独立表
+                    //  link 行与异表 reliance 记录当作「随记录死亡」物理删除且零事件
+                    //  （r28，fuzzer seed 270 家族：被抢记录的 isolated n:n link 静默消失）。
+                    await this.deletionExecutor.clearRowDataForMigration(combinedRecordIdRef.recordName, [{id: recordWithCombined[combinedRecordIdRef.info?.attributeName!].id}])
 
                     //2. 如果是抢夺，要记录一下事件。
                     // CAUTION 只对业务关系端点（非虚拟 link 的 source/target）发 delete 事件：
@@ -382,9 +388,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
 
                     //3. merge 数据并建立新的关系。
                     assert(!result[combinedRecordIdRef.info?.attributeName!], `should not have same combined record, conflict attribute: ${combinedRecordIdRef.info?.attributeName!}`)
-                    result[combinedRecordIdRef.info?.attributeName!] = {
-                        ...recordWithCombined[combinedRecordIdRef.info?.attributeName!]
-                    }
+                    // NULL 列如实物化（与 relocate 同一契约）：快照缺席键 ⟺ 库里 NULL，
+                    // 不物化会在写入新行时被 defaultValue 静默改写。
+                    result[combinedRecordIdRef.info?.attributeName!] = this.materializeNullsForRowMigration(
+                        combinedRecordIdRef.recordName,
+                        recordWithCombined[combinedRecordIdRef.info?.attributeName!]
+                    )
 
                     // CAUTION 当正在创建的是 merged link record（如 1:n 关系合并进 n 端的行）而被抢夺的
                     //  端点记录上已有【同一业务关系】的旧 link 时，旧 link 的列不能随行迁移：
@@ -474,6 +483,126 @@ export class RecordQueryAgent implements RecordOperationAgent {
     }
 
     /**
+     * 物理行搬迁数据的 NULL 物化（r28，fuzzer seed 424/446）。
+     *
+     * CAUTION 查询结果对 NULL 列**省略键**，而写路径对**缺席键**应用 defaultValue——
+     *  两个约定叠加会让搬迁（relocate / flashOut 抢夺）把被移记录里显式为 NULL 的列
+     *  静默重置回默认值（数据被改写且零 update 事件）。搬迁数据是完整行快照
+     *  （深查询加载全部 value 属性），缺席 ⟺ 库里 NULL，这里如实物化为显式 null。
+     *  覆盖：记录自身、随行 reliance 子树、以及两者的行内 link（`&`）数据。
+     */
+    private materializeNullsForRowMigration(recordName: string, data: RawEntityData): RawEntityData {
+        const recordInfo = this.map.getRecordInfo(recordName)
+        const result: RawEntityData = { ...data }
+        for (const attr of recordInfo.valueAttributes) {
+            if (!(attr.attributeName in result)) result[attr.attributeName] = null
+        }
+        const materializeLinkData = (linkName: string, holder: RawEntityData) => {
+            const linkData = holder[LINK_SYMBOL]
+            if (!linkData || typeof linkData !== 'object' || linkData.id === undefined) return
+            const linkInfo = this.map.getRecordInfo(linkName)
+            const filledLink: RawEntityData = { ...linkData }
+            for (const attr of linkInfo.valueAttributes) {
+                if (!(attr.attributeName in filledLink)) filledLink[attr.attributeName] = null
+            }
+            holder[LINK_SYMBOL] = filledLink
+        }
+        for (const relianceInfo of recordInfo.sameTableReliance) {
+            const child = result[relianceInfo.attributeName]
+            if (child && typeof child === 'object' && (child as RawEntityData).id !== undefined) {
+                // CAUTION 幻影同住剪枝（r28，seed 369 家族的迁移面）：combined x:1 的嵌套读取按
+                //  「同物理行」编译，偶然同住（orphan co-tenant）会被读成 reliance 依赖——搬迁时
+                //  把它写进新行会产生**重复逻辑 id 行**。真实配对在深查询数据上必带 `&`（link id）；
+                //  缺失 ⇒ 幻影，剪除（该记录留在原行，随其真实配对生活）。
+                if ((child as RawEntityData)[LINK_SYMBOL]?.id === undefined || (child as RawEntityData)[LINK_SYMBOL]?.id === null) {
+                    delete result[relianceInfo.attributeName]
+                    continue
+                }
+                const filledChild = this.materializeNullsForRowMigration(relianceInfo.recordName, child as RawEntityData)
+                materializeLinkData(relianceInfo.linkName!, filledChild)
+                result[relianceInfo.attributeName] = filledChild
+            }
+        }
+        for (const mergedInfo of recordInfo.mergedRecordAttributes) {
+            const related = result[mergedInfo.attributeName]
+            if (related && typeof related === 'object' && (related as RawEntityData).id !== undefined) {
+                const filledRelated: RawEntityData = { ...(related as RawEntityData) }
+                materializeLinkData(mergedInfo.linkName!, filledRelated)
+                result[mergedInfo.attributeName] = filledRelated
+            }
+        }
+        return result
+    }
+
+    /**
+     * 收集「行搬迁子树之外」的 combined 配对（r28 统一守卫谓词）。
+     *
+     * 行搬迁（flashOut 抢夺 / relocate 解除）搬运的子树 = 被移记录 + 其 sameTableReliance
+     * 闭包。子树成员经其他 combined 关系与**子树外**记录的配对无法随行搬运（attributeQuery
+     * 递归深度契约），搬迁会把这些 link 静默销毁/悬挂——调用方据此 fail-fast 或换端搬运。
+     * 配对进子树内部（reliance 反向边、被排除的 through-link）合法。
+     */
+    private async collectOutOfSubtreeCombinedPairings(recordName: string, recordId: unknown, throughLinkName?: string): Promise<Array<{
+        memberRecordName: string, memberId: unknown,
+        partnerRecordName: string, partnerId: unknown,
+        linkName: string, attributeName: string
+    }>> {
+        type Member = { recordName: string, id: unknown }
+        const subtree: Member[] = []
+        const seen = new Set<string>()
+        const enqueue = (member: Member) => {
+            const key = `${member.recordName}\0${String(member.id)}`
+            if (seen.has(key)) return
+            seen.add(key)
+            subtree.push(member)
+        }
+        enqueue({ recordName, id: recordId })
+        // 1. 展开 sameTableReliance 闭包（逐层查询；链上限为 schema 中的 reliance 深度）
+        for (let i = 0; i < subtree.length; i++) {
+            const member = subtree[i]
+            const memberInfo = this.map.getRecordInfo(member.recordName)
+            const relianceAttrs = memberInfo.sameTableReliance
+            if (!relianceAttrs.length) continue
+            const loaded = (await this.queryExecutor.findRecords(RecordQuery.create(member.recordName, this.map, {
+                matchExpression: MatchExp.atom({ key: 'id', value: ['=', member.id] }),
+                attributeQuery: ['id', ...relianceAttrs.map(info => [info.attributeName, { attributeQuery: ['id'] }] as [string, { attributeQuery: string[] }])],
+                modifier: { limit: 1 }
+            }), `expand reliance subtree of ${member.recordName} for row-migration check`))[0]
+            for (const info of relianceAttrs) {
+                const dependentId = loaded?.[info.attributeName]?.id
+                if (dependentId !== undefined && dependentId !== null) {
+                    enqueue({ recordName: info.recordName, id: dependentId })
+                }
+            }
+        }
+        // 2. 每个成员的 notRelianceCombined 配对：子树外即冲突
+        const conflicts: Array<{ memberRecordName: string, memberId: unknown, partnerRecordName: string, partnerId: unknown, linkName: string, attributeName: string }> = []
+        for (const member of subtree) {
+            const memberInfo = this.map.getRecordInfo(member.recordName)
+            const combinedAttrs = memberInfo.notRelianceCombined.filter(info =>
+                info.linkName !== throughLinkName
+                && !(memberInfo.isRelation && (info.attributeName === 'source' || info.attributeName === 'target')))
+            if (!combinedAttrs.length) continue
+            const loaded = (await this.queryExecutor.findRecords(RecordQuery.create(member.recordName, this.map, {
+                matchExpression: MatchExp.atom({ key: 'id', value: ['=', member.id] }),
+                attributeQuery: ['id', ...combinedAttrs.map(info => [info.attributeName, { attributeQuery: ['id'] }] as [string, { attributeQuery: string[] }])],
+                modifier: { limit: 1 }
+            }), `check combined pairings of ${member.recordName} for row-migration subtree`))[0]
+            for (const info of combinedAttrs) {
+                const partnerId = loaded?.[info.attributeName]?.id
+                if (partnerId === undefined || partnerId === null) continue
+                if (seen.has(`${info.recordName}\0${String(partnerId)}`)) continue
+                conflicts.push({
+                    memberRecordName: member.recordName, memberId: member.id,
+                    partnerRecordName: info.recordName, partnerId,
+                    linkName: info.linkName!, attributeName: info.attributeName
+                })
+            }
+        }
+        return conflicts
+    }
+
+    /**
      * 重定位合并记录数据用于链接
      * 用于 unlink 场景中处理合并记录的数据迁移
      *
@@ -500,14 +629,45 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // link 自身的 filtered relation 视图成员资格也要在行还活着时快照（下面先物理搬迁再 push 事件）。
         const linkViewSnapshot = await this.filteredEntityManager.collectInlineDeletionSnapshot(linkName, records, events)
 
-        const toMoveRecordInfo = this.map.getLinkInfoByName(linkName)[moveSource ? 'sourceRecordInfo' : 'targetRecordInfo']
+        // CAUTION 行搬迁不携带搬运子树之外的 combined 配对（getAttributeQueryDataForRecord 的
+        //  递归对 notRelianceCombined 不下钻，与 F-5 同一深度契约）——把带着这些配对的记录移走
+        //  会把那些 link 物理销毁/悬挂且零 delete 事件（r28，fuzzer seed 187：星形共享行 A+C+D，
+        //  unlink A—D 默认移 D，D—C 的 out2 link 静默消失）。搬迁方按端点逐条决策：
+        //  默认端点（连同其 reliance 子树）无子树外配对 ⇒ 照常移；有 ⇒ 尝试翻转移对端
+        //  （对端干净时等价成立——行搬迁只是物理编码手段，移哪端不改变「解除这条 link」的语义）；
+        //  两端都有 ⇒ fail-fast（物理上无法在不销毁其他配对的前提下解除）。
+        const linkInfo = this.map.getLinkInfoByName(linkName)
 
-        // 1. 把这些数据删除，在下面重新插入到新行
-        await this.deleteRecordSameRowData(toMoveRecordInfo.name, records.map(r => r[moveAttribute]))
-
-        // 2. 重新插入到新行
         for (let record of records) {
-            const toMoveRecordData = new NewRecordData(this.map, toMoveRecordInfo.name, record[moveAttribute])
+            let recordMoveAttribute = moveAttribute
+            let toMoveRecordInfo = moveAttribute === 'source' ? linkInfo.sourceRecordInfo : linkInfo.targetRecordInfo
+            const defaultMoverConflicts = await this.collectOutOfSubtreeCombinedPairings(toMoveRecordInfo.name, record[recordMoveAttribute].id, linkName)
+            if (defaultMoverConflicts.length) {
+                const otherAttribute = recordMoveAttribute === 'source' ? 'target' : 'source'
+                const otherRecordInfo = otherAttribute === 'source' ? linkInfo.sourceRecordInfo : linkInfo.targetRecordInfo
+                const otherMoverConflicts = await this.collectOutOfSubtreeCombinedPairings(otherRecordInfo.name, record[otherAttribute].id, linkName)
+                if (otherMoverConflicts.length) {
+                    const describe = (conflicts: Array<{ memberRecordName: string, attributeName: string, linkName: string }>) =>
+                        conflicts.map(info => `"${info.memberRecordName}.${info.attributeName}" (relation "${info.linkName}")`).join(', ')
+                    throw new Error(
+                        `cannot unlink combined relation "${linkName}" between "${linkInfo.sourceRecordInfo.name}" (id: ${record.source?.id}) and ` +
+                        `"${linkInfo.targetRecordInfo.name}" (id: ${record.target?.id}): both endpoints' row-migration subtrees still hold other combined ` +
+                        `(same-row) pairings — ${describe(defaultMoverConflicts)}; ${describe(otherMoverConflicts)}. ` +
+                        `Row migration cannot carry those pairings, so unlinking now would silently destroy them with no delete event. ` +
+                        `Remove the other combined relation(s) first, then unlink "${linkName}".`
+                    )
+                }
+                recordMoveAttribute = otherAttribute
+                toMoveRecordInfo = otherRecordInfo
+            }
+
+            // 1. 清掉旧行上的数据（纯物理搬迁：没有记录逻辑死亡，绝不能走逻辑删除的级联——
+            //    子树成员的独立表 link 行/异表 reliance 会被连坐物理销毁，r28 fuzzer seed 270）
+            await this.deletionExecutor.clearRowDataForMigration(toMoveRecordInfo.name, [record[recordMoveAttribute]])
+
+            // 2. 重新插入到新行（NULL 列如实物化，避免缺席键被 defaultValue 改写）
+            const toMoveRecordData = new NewRecordData(this.map, toMoveRecordInfo.name,
+                this.materializeNullsForRowMigration(toMoveRecordInfo.name, record[recordMoveAttribute]))
             await this.creationExecutor.insertSameRowData(toMoveRecordData, undefined)
 
             // 3. 增加 delete 关系的事件（base link 之后紧跟其 filtered relation 视图的 delete）

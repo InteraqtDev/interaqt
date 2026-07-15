@@ -13,6 +13,9 @@ export type RecordQueryData = {
     label?: string,
     goto?: string
     exit? : (data:RecursiveContext) => Promise<boolean | void>
+    // 内部物理行读取标记（flashOut 行认领等）：结果按物理行原样返回，
+    // 不做 combined 幻影配对剪枝（QueryExecutor.pruneUnpairedCombinedReads）。
+    physicalRowRead?: boolean
 }
 
 
@@ -41,7 +44,7 @@ export class RecordQuery {
             value: ['not', null]
         })
 
-        return new RecordQuery(
+        const query = new RecordQuery(
             baseRecordName,
             map,
             matchExpression,
@@ -57,7 +60,10 @@ export class RecordQuery {
             data.exit,
             alias
         )
+        query.physicalRowRead = !!data.physicalRowRead
+        return query
     }
+    public physicalRowRead = false
 
     constructor(
         public recordName: string,

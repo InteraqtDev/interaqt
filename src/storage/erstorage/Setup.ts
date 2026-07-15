@@ -126,7 +126,25 @@ export class DBSetup {
         // 4. 记录 log
         this.mergeLog.push({ joinTargetRecord, record, link })
     }
-    combineRecordTable(mergeTarget: string, toMerge: string, link: string,) {
+    /**
+     * combined（三表合一）的行槽位排他不变量：一张物理行对每个实体类型只有一个槽位，
+     * 「同行」因此只能表达**一条**配对事实。若一对实体已经同表（无论是另一条 combined 关系
+     * 直接放置，还是经中间实体的 combined 链间接放置），再为这对实体建立第二条 combined
+     * 关系，两条关系会共享同一个物理槽位——实测后果（r28，fuzzer seed 123/136/156）：
+     *  - 查询面：x:1 combined 读取按「同行即相关」编译，第二条关系对同住行产生**幻影关联**
+     *    （从未 link 过的 `a.out3` 返回同住记录、matchExpression 误命中）；
+     *  - 写入面：经第二条关系认领对方时，flashOut 行搬迁与目的行槽位碰撞，同住记录被
+     *    静默覆盖/销毁（零事件）；
+     *  - 删除面：reliance 分支按幻影配对级联删除从未依赖过的记录；
+     *  - 互为 reliance（A⇄B）时深查询递归无终止（栈溢出）。
+     * 检测点收敛于此：实体对已同表 ⇒ 返回 'co-located'，由调用方决定 fail-fast（显式
+     * mergeLinks）还是降级为关系表合并（reliance 自动合表，声明语义不变）。
+     */
+    combineRecordTable(mergeTarget: string, toMerge: string, link: string,): string[] | 'co-located' | undefined {
+        if (this.recordToTableMap.get(mergeTarget) === this.recordToTableMap.get(toMerge)) {
+            this.mergeLog.push({ joinTargetRecord: mergeTarget, record: toMerge, link, coLocated: true })
+            return 'co-located'
+        }
         let linkConflict
         // target/toMerge 一定是不同实体才能merge 所以这里可以用这个判断方向
         const virtualLinkName = (this.map.records[link].attributes.source as RecordAttribute).linkName
@@ -1023,6 +1041,17 @@ export class DBSetup {
                 )
                 const recordToMove = sourceRecord === currentRecord ? targetRecord : sourceRecord
                 const conflicts = this.combineRecordTable(currentRecord, recordToMove, linkName)
+                if (conflicts === 'co-located') {
+                    // 显式 mergeLinks 无法履行时必须拒绝（explicit control）：这对实体已被其他
+                    // combined 关系（直接或经链）放进同一张表，第二条 combined 放置会共享行槽位
+                    // ——幻影关联/行搬迁碰撞/幻影级联（见 combineRecordTable 注释）。
+                    throw new Error(
+                        `cannot merge link "${linkName}" (mergeLinks path "${path}"): "${currentRecord}" and "${recordToMove}" already share a physical table ` +
+                        `through another combined relation (directly or via a chain of combined relations). A physical row has exactly one slot per entity type, ` +
+                        `so a second combined relation over the same pair would read/write the co-tenant's slot — phantom relations in queries and silent row ` +
+                        `collisions on writes. Remove this path from mergeLinks (the relation will be compiled as a merged/isolated link instead).`
+                    )
+                }
                 if (conflicts) {
                     throw new Error(`conflict found when join ${linkName}, ${conflicts.join(',')} already merged with ${currentRecord}`)
                 }
@@ -1071,7 +1100,11 @@ export class DBSetup {
                     `(non-reliance 1:1 keeps the target in its own table).`
                 )
             }
-            // 只是尝试。有冲突就不会处理
+            // 只是尝试。有冲突就不会处理。
+            // CAUTION 'co-located'（端点对已被其他 combined 关系直接/经链同表放置）时**必须降级**：
+            //  行槽位排他不变量（见 combineRecordTable）。合表只是 Setup 的内部优化决策，
+            //  降级为关系表合并（FK 列在 source 行上）后 1:1 与 reliance 生命周期语义全部保留；
+            //  互为 reliance（A⇄B）与链闭合形态由此获得正确编译，而不是幻影配对/栈溢出。
             const conflicts = this.combineRecordTable(sourceRecord, targetRecord, linkRecord!)
             if (!conflicts) {
                 linkData.mergedTo = 'combined'

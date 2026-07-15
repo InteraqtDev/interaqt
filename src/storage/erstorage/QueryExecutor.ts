@@ -133,6 +133,42 @@ export class QueryExecutor {
     }
 
     /**
+     * combined（三表合一）x:1 嵌套读取的幻影配对剪枝（r28）。
+     *
+     * CAUTION combined x:1 按「同物理行」编译（无 JOIN），同行读取本身无法区分真实配对与
+     *  偶然同住（orphan co-tenant、多 combined 关系装配出的同住）——历史操作留下的同住会被
+     *  读成「已配对」（幻影关联：从未 link 过的 `b.out4` 返回同住记录）。配对真实性的唯一
+     *  真相源是 link id 列：AttributeQuery 为 combined x:1 自动附带 `&`（id），这里以它为准
+     *  剪除幻影嵌套对象；用户未请求 `&` 时（syntheticParentLink）剥除辅助数据。
+     *  findRelationByName 一直按 link id 判定（正确面），本剪枝把实体嵌套读取拉齐到同一真相源。
+     */
+    private pruneUnpairedCombinedReads(records: Record[], entityQuery: RecordQuery): void {
+        // 内部物理行读取（flashOut 行认领等）按物理同住语义原样返回。
+        if (entityQuery.physicalRowRead) return
+        for (const subQuery of entityQuery.attributeQuery.xToOneRecords) {
+            const attributeInfo = this.map.getInfo(subQuery.parentRecord!, subQuery.attributeName!)
+            // 虚拟 link（link record 的 source/target 端点）：配对真实性就是 link 行的存在，不剪。
+            const isCombined = attributeInfo.isRecord && attributeInfo.isMergedWithParent() && !attributeInfo.isLinkSourceRelation()
+            const resultKey = subQuery.alias || subQuery.attributeName!
+            for (const record of records) {
+                const related = record[resultKey]
+                if (!related || typeof related !== 'object') continue
+                if (isCombined) {
+                    const linkId = related[LINK_SYMBOL]?.id
+                    if (linkId === undefined || linkId === null) {
+                        delete record[resultKey]
+                        continue
+                    }
+                    if (subQuery.attributeQuery.syntheticParentLink) {
+                        delete related[LINK_SYMBOL]
+                    }
+                }
+                this.pruneUnpairedCombinedReads([related], subQuery)
+            }
+        }
+    }
+
+    /**
      * 去除完全相同的原始行（等价于 SQL DISTINCT）
      * 用于消除 match 中出现 x:n 路径时 LEFT JOIN 产生的 fan-out 重复。
      * 因为 SELECT 始终包含各级记录的 id，真正不同的记录必然有列差异，所以完全相同的行一定是重复行。
@@ -246,6 +282,9 @@ export class QueryExecutor {
             )
         }
         const records = this.structureRawReturns(dedupedRawReturns, entityQuery.recordName, fieldAliasMap)
+
+        // r28：combined x:1 嵌套读取的幻影配对剪枝（配对真实性以 link id 列为真相源）。
+        this.pruneUnpairedCombinedReads(records, entityQuery)
 
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context

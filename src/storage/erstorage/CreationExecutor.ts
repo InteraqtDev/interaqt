@@ -90,6 +90,49 @@ export class CreationExecutor {
     }
 
     /**
+     * 非 combined 拓扑上 reliance link 建立的语义收口（r28，reliance 拓扑等价矩阵）。
+     *
+     * CAUTION 物理拓扑是 Setup 的内部优化决策，声明面语义必须跨拓扑等价。combined（三表合一）
+     *  的行为是既定契约（r27b 固化）：
+     *   - 认领他人的依赖（re-parent）：合法——旧 link 删除（带事件）、依赖随行迁移到新 owner；
+     *   - owner 已持有依赖时绑定**另一个**依赖（displacement）：fail-fast（旧依赖会被静默销毁）。
+     *  merged（FK 列，如自引用 1:1 reliance / 合表降级）与 isolated（1:n reliance 恒独立表）
+     *  此前两侧全漏：re-parent 变成静默双 link（1:x 排他破坏，级联删除会销毁他人仍引用的依赖），
+     *  1:1 displacement 变成 FK 槽位静默覆盖（旧 link 零事件消失）。
+     *
+     *  收口点 = createRecord（所有非 combined link record 的创建必经；combined 由 flashOut
+     *  汇合点上的既有守卫处理）：
+     *   - 1:1 source（owner）侧被不同依赖占用 ⇒ fail-fast（与 combined 的 F-4 同一错误契约）；
+     *   - target（依赖）侧已有不同 owner ⇒ re-parent：删除旧 link（delete 事件），等价于
+     *     combined 的行迁移语义。deleteRecord 是有意为之——用户面的 unlink/removeRelation
+     *     对 reliance 一律 fail-fast（依赖不能被留成无主），而 re-parent 全程保持依赖有主。
+     */
+    private async ensureRelianceLinkSlotsBeforeCreate(linkName: string, sourceId: unknown, targetId: unknown, events?: RecordMutationEvent[]) {
+        const linkInfo = this.map.getLinkInfoByName(linkName)
+        if (linkInfo.isOneToOne) {
+            const existingDependent = (await this.queryExecutor.findRecords(RecordQuery.create(linkName, this.map, {
+                matchExpression: MatchExp.atom({ key: 'source.id', value: ['=', sourceId] }),
+                attributeQuery: ['id', ['target', { attributeQuery: ['id'] }]],
+                modifier: { limit: 1 }
+            }), `check reliance owner occupancy before creating link ${linkName}`))[0]
+            if (existingDependent && !sameRecordId(existingDependent.target?.id, targetId)) {
+                throw new Error(
+                    `cannot bind a new reliance dependent to "${linkInfo.sourceRecordInfo.name}" (id: ${sourceId}) over relation "${linkName}": ` +
+                    `it still owns dependent "${linkInfo.targetRecordInfo.name}" (id: ${existingDependent.target?.id}). ` +
+                    `Reliance data lives and dies with its owner — displacing it would silently destroy the current dependent's link with no delete event. ` +
+                    `Delete the current dependent record first, then create the new relation.`
+                )
+            }
+        }
+        // 依赖侧恒排他（reliance 是 1:x）：旧 owner 的 link 以 re-parent 语义删除（带事件）。
+        await this.agent.deleteRecord(
+            linkName,
+            MatchExp.atom({ key: 'target.id', value: ['=', targetId] }),
+            events
+        )
+    }
+
+    /**
      * 创建记录（主入口）
      */
     async createRecord(newEntityData: NewRecordData, queryName?: string, events?: RecordMutationEvent[]): Promise<EntityIdRef> {
@@ -102,6 +145,19 @@ export class CreationExecutor {
                 `cannot create record of merged (union) type "${newEntityData.originalRecordName}" directly. ` +
                 `A merged entity/relation is an abstract union type; create the record through one of its input types instead.`
             )
+        }
+
+        // 非 combined 的 reliance link record 创建：owner 侧占用 fail-fast + 依赖侧 re-parent
+        // （combined 的对应语义由 flashOut 汇合点上的守卫处理，见 ensureRelianceLinkSlotsBeforeCreate）。
+        const recordAsLinkInfo = this.map.data.links[newEntityData.recordName]
+            ? this.map.getLinkInfoByName(newEntityData.recordName)
+            : undefined
+        if (recordAsLinkInfo?.isTargetReliance && !recordAsLinkInfo.isCombined()) {
+            const sourceRef = newEntityData.rawData?.source as { id?: unknown } | undefined
+            const targetRef = newEntityData.rawData?.target as { id?: unknown } | undefined
+            if (targetRef?.id !== undefined) {
+                await this.ensureRelianceLinkSlotsBeforeCreate(newEntityData.recordName, sourceRef?.id, targetRef.id, events)
+            }
         }
 
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
@@ -186,17 +242,41 @@ export class CreationExecutor {
         for (const record of newEntityData.mergedLinkTargetRecordIdRefs) {
             const linkInfo = record.info!.getLinkInfo()
             if (!linkInfo.isOneToOne) continue
-            // reliance 是生命周期依赖，unlink 是业务级 fail-fast（只能随 record 删除）；
-            // "抢夺" 语义不适用，保持既有行为。
-            if (linkInfo.isTargetReliance) continue
             const attributeName = record.info!.attributeName
             const refId = record.getRef().id
             if (currentRecord && sameRecordId(currentRecord[attributeName]?.id, refId)) continue
             // FK 侧（宿主自己的旧值）由写入自身替换/上层 unlink 处理；这里解除的是"目标记录的旧 owner"。
             const otherSideAttr = record.info!.isRecordSource() ? 'target' : 'source'
+            const oldOwnerMatch = MatchExp.atom({ key: `${otherSideAttr}.id`, value: ['=', refId] })
+            if (linkInfo.isTargetReliance) {
+                if (record.info!.isRecordSource()) {
+                    // ref = 依赖（宿主是 owner）：re-parent 语义（与 combined 的 flashOut 行迁移等价，
+                    //  r28 拓扑等价矩阵）——旧 owner 的 link 删除（带事件），依赖全程有主。
+                    //  用户面的 unlink/removeRelation 仍然 fail-fast（依赖不能被留成无主），
+                    //  所以这里走 deleteRecord 而不是 unlink。
+                    await this.agent.deleteRecord(linkInfo.name, oldOwnerMatch, events)
+                } else {
+                    // ref = owner（宿主是依赖，领养 owner）：owner 已持有**另一个**依赖 ⇒ displacement
+                    //  （旧依赖会被留成无主/静默销毁），与 combined 轨的 F-4 守卫同一契约。
+                    const occupant = (await this.queryExecutor.findRecords(RecordQuery.create(linkInfo.name, this.map, {
+                        matchExpression: oldOwnerMatch,
+                        attributeQuery: ['id', ['target', { attributeQuery: ['id'] }]],
+                        modifier: { limit: 1 }
+                    }), `check reliance owner occupancy before adopting via ${newEntityData.recordName}.${attributeName}`))[0]
+                    if (occupant) {
+                        throw new Error(
+                            `cannot bind a new reliance dependent to "${linkInfo.sourceRecordInfo.name}" (id: ${refId}) over relation "${linkInfo.name}": ` +
+                            `it still owns dependent "${linkInfo.targetRecordInfo.name}" (id: ${occupant.target?.id}). ` +
+                            `Reliance data lives and dies with its owner — displacing it would silently orphan the current dependent. ` +
+                            `Delete the current dependent record first, then create the new relation.`
+                        )
+                    }
+                }
+                continue
+            }
             await this.agent.unlink(
                 linkInfo.name,
-                MatchExp.atom({ key: `${otherSideAttr}.id`, value: ['=', refId] }),
+                oldOwnerMatch,
                 false,
                 `unlink old owner of exclusive 1:1 target ${newEntityData.recordName}.${attributeName}`,
                 events
@@ -222,6 +302,15 @@ export class CreationExecutor {
             }
         })
         if (!updatedKeys.length) return null
+        // CAUTION relation update 事件的端点契约：端点以 oldRecord（存储侧快照）为准（r26），
+        //  event.record 不携带端点。此前 getData() 的展开把**用户载荷形态**的幂等端点 ref
+        //  原样带进 record——HTTP 载荷的 id 天然是字符串（'1'），与存储原生形态（1）在
+        //  merged 视图（record 优先）里分裂：按端点匹配/定位的下游拿到与快照不同形态的 id
+        //  （r28，fuzzer seed 262 家族；F-3 字符串 id 家族的事件面兄弟格）。
+        if (recordInfo.isRelation) {
+            delete updateRecord.source
+            delete updateRecord.target
+        }
         return {
             type: 'update',
             recordName,
@@ -418,6 +507,16 @@ export class CreationExecutor {
             const newRelatedId = newRawDataWithNewIds[record.info!.attributeName].id
             const oldRelatedId = oldRecord?.[record.info!.attributeName]?.id
             if (!(newRelatedId === oldRelatedId || sameRecordId(newRelatedId, oldRelatedId))) {
+                // CAUTION 载荷已携带 link id ⇒ 物理行搬迁（relocate / flashOut 的整行重插），
+                //  link 的**逻辑身份**必须保留（r28，fuzzer seed 114）：此前无条件重新发号，
+                //  搬迁行上的 merged link 旧 id 消失、新 id 凭空出现且两侧都零事件——事件流
+                //  与数据 diff 永久对不上（响应式计算按 link id 增量的全部失明）。
+                //  逻辑新建（用户载荷、createRecordDependency 产物）不会携带 link id，
+                //  与「支持外部 record id」同一契约形态（见本函数开头）。
+                const carriedLinkId = newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]?.id
+                if (carriedLinkId !== undefined && carriedLinkId !== null) {
+                    continue
+                }
                 newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] = {
                     ...(newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] || {}),
                     id: await this.database.getAutoId(record.info!.linkName!),
@@ -510,9 +609,19 @@ export class CreationExecutor {
         // 1. 处理关系往 attribute 方向合并的新数据
         for (let record of newEntityData.differentTableMergedLinkNewRecords) {
             const reverseAttribute = record.info?.getReverseInfo()?.attributeName!
-            const newRecordDataWithMyId = record.merge({
-                [reverseAttribute]: currentIdRef
-            })
+            // CAUTION `&` link 数据必须挂到反向 ref 上（与下方老数据分支同一形状，r28 fuzzer seed 113）：
+            //  子记录顶层的 linkRecordData 此前原样保留——行写入经 getSameRowFieldAndValue 的
+            //  isLinkMergedWithAttribute 分支正确落列，但 link create 事件 payload 只读
+            //  反向属性上的 LINK_SYMBOL——用户的 `&` 属性（如无默认值的 note）在事件里缺席，
+            //  下游本地求值按 NULL 解读（records match / trigger 深度匹配对该 link 失明）。
+            //  挂到 ref 上后行写入与事件 payload 读同一数据源；顶层键随之剔除，避免双写同列。
+            const { [LINK_SYMBOL]: childLinkData, ...childRawData } = record.rawData
+            const newRecordDataWithMyId = new NewRecordData(this.map, record.originalRecordName, {
+                ...childRawData,
+                [reverseAttribute]: childLinkData === undefined
+                    ? currentIdRef
+                    : { ...currentIdRef, [LINK_SYMBOL]: childLinkData }
+            }, record.info)
             const newRecordIdRef = await this.createRecord(newRecordDataWithMyId, `create record ${newEntityData.recordName}.${record.info?.attributeName}`, events)
             if (record.info!.isXToMany) {
                 if (!newIdRefs[record.info!.attributeName]) {
@@ -596,8 +705,12 @@ export class CreationExecutor {
         // 4. 处理完全独立的老数据和的关系。
         for (let key in newEntityData.isolatedRecordIdRefs) {
             const record = newEntityData.isolatedRecordIdRefs[key]
-            // 针对 x:1 关系要先删除原来的关系
-            if (record.info!.isXToOne) {
+            // 针对 x:1 关系要先删除原来的关系。
+            // CAUTION reliance link 跳过此处的 unlink：占用/re-parent 语义统一由 createRecord 入口的
+            //  ensureRelianceLinkSlotsBeforeCreate 处理（r28 拓扑等价矩阵）——此处的 unlink 按被引用
+            //  记录的一侧匹配，对 1:n reliance（owner 侧非排他）会误删 owner 与其他依赖的 link，
+            //  且 unlink 对 reliance 一律 fail-fast，连「领养空闲 owner」都会被误拒。
+            if (record.info!.isXToOne && !record.info!.getLinkInfo().isTargetReliance) {
                 const match = MatchExp.atom({
                     key: record.info?.isRecordSource() ? 'target.id' : 'source.id',
                     value: ['=', record.getRef().id]
