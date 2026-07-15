@@ -372,7 +372,13 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async compute({ _current, ...dataDeps }: { _current: any, [key: string]: any }): Promise<TResult> {
-        const relations = _current[this.relationAttr] || []
+        // CAUTION x:1 关系的宿主属性是 to-one：查询返回对象而非数组（r29，迁移生成 fuzz 首跑
+        //  seed 3 抓获）。运行期增量路径按 link 事件逐项维护、从不带着已填充的 to-one 走全量
+        //  compute，所以裸 for...of 一直没炸；迁移/手动全量重算轨会带着填充值进来——
+        //  「property 聚合的关联行集合」在此归一，所有聚合模板（Count/Sum/Avg/Every/Any/
+        //  Weighted 的 property 模式）共用这一个读取点。
+        const relatedOfCurrent = _current[this.relationAttr]
+        const relations = Array.isArray(relatedOfCurrent) ? relatedOfCurrent : (relatedOfCurrent ? [relatedOfCurrent] : [])
         const values: V[] = []
         for (const relatedItem of relations) {
             const relationStateRecord = relatedItem[LINK_SYMBOL] || relatedItem
