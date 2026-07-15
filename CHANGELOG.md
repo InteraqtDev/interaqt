@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.1.3](https://github.com/interaqtdev/interaqt/compare/v4.1.2...v4.1.3) (2026-07-15)
+
+### Features
+
+* **tests:** computation-layer generative fuzz (random aggregate declarations vs naive recompute) ([fc3f0f0](https://github.com/interaqtdev/interaqt/commit/fc3f0f063abf950ffebed8c4948d8f9644fb11b5))
+* **tests:** driver differential fuzzer (SQLite vs PGLite, same seed, per-op reconciliation) ([ab31325](https://github.com/interaqtdev/interaqt/commit/ab3132519a1132d79ef06560250c1e872adfc1dc))
+* **tests:** extend structural fuzzer domain to filtered/merged entities; fix 4 merged-domain write-path fatals ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb)), closes [#8](https://github.com/interaqtdev/interaqt/issues/8)
+* **tests:** migration generative fuzz (random schema pair + data -> migrate vs oracles, kill-resume) ([2ab13d8](https://github.com/interaqtdev/interaqt/commit/2ab13d873df68f736185a63613abdc7de655b9e4))
+
 ## [4.1.2](https://github.com/interaqtdev/interaqt/compare/v4.1.1...v4.1.2) (2026-07-15)
 
 r28 deep review: the fuzzer seed pool was expanded to 1–499 × 50 ops, closing every open G-family
