@@ -219,21 +219,15 @@ export function genSchema(rng: Rng, tag: string, options?: { includeFiltered?: b
     // CAUTION merged 编译把 inputs 变成物理 union base 上的视图（__type 判别）：
     //  merged 名承载 base 事件契约（create/update/delete 全量对账），input 名只有
     //  成员资格事件。
-    // CAUTION 生成域限制（r29 extended 首跑发现 EXT-1 开放家族，见 quality-plan §1.4b）：
-    //  x:1（merged FK）/ combined 关系的端点是 merged input 时，Setup 的字段-表装配在
-    //  rebase 后错位（查询期 "no such column" fail-loud，seeds 2/10/50/71/72/81 @
-    //  FUZZ_MERGED_FULL=1）。该交互收口前，CI 生成域把 merged pair 限制在
-    //  「仅参与 n:n（isolated link）关系或无关系」的实体；FUZZ_MERGED_FULL=1 解除限制
-    //  供家族收口时复现。mergeLinks 端点同样排除。
+    // r32：EXT-1（merged input 作为 x:1/combined 端点时 Setup 字段-表装配错位）已收口
+    //  （record.table 统一以 recordToTableMap 为真相源，见 Setup.assignTableAndField），
+    //  x:1/combined 端点回归生成域（原 FUZZ_MERGED_FULL 门已成为默认行为）。
+    //  mergeLinks 端点仍排除：显式 mergeLinks 路径以视图名寻址合表的面尚未定谳/支持。
     const mergedEntities: MergedEntityChoice[] = []
     if (options?.includeMerged) {
-        const fullDomain = process.env.FUZZ_MERGED_FULL === '1'
         const excluded = new Set<string>()
         for (const c of relationChoices) {
             if (mergeLinks.includes(`${c.source}.${c.sourceProperty}`)) {
-                excluded.add(c.source); excluded.add(c.target)
-            }
-            if (!fullDomain && c.relType !== 'n:n') {
                 excluded.add(c.source); excluded.add(c.target)
             }
         }
