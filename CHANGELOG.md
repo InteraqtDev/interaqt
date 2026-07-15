@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.2](https://github.com/interaqtdev/interaqt/compare/v4.1.1...v4.1.2) (2026-07-15)
+
+### Bug Fixes
+
+* **storage:** r28 — combined x:1 reads gate on link-id column (phantom pairing family, query face) ([b152814](https://github.com/interaqtdev/interaqt/commit/b1528147e425ca26c6be42059fddc7066153e65e))
+* **storage:** r28 deep review — row-slot exclusivity, migration vs deletion semantics, reliance topology equivalence ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+
 ## [4.1.1](https://github.com/interaqtdev/interaqt/compare/v4.1.0...v4.1.1) (2026-07-14)
 
 ### Bug Fixes
