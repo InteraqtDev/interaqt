@@ -25,7 +25,7 @@ import {
 } from "./System.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { RequireSerializableRetry, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
+import { RequireSerializableRetry, RetryableWriteConflict, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer, type ConstraintPredicateOperator } from "@core";
 import {
@@ -321,10 +321,22 @@ class MonoStorage implements Storage{
             }
         } else {
             const args: [string, RawEntityData] = [DICTIONARY_RECORD, { key, value: {raw:value}}]
-            if (emitEvents) {
-                await this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), args, [])
-            } else {
-                await this.queryHandle!.create(...args, [])
+            try {
+                if (emitEvents) {
+                    await this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), args, [])
+                } else {
+                    await this.queryHandle!.create(...args, [])
+                }
+            } catch (error) {
+                // CAUTION find-then-create 的并发竞态（r12-I-1）：两个事务同时 findOne 落空、
+                //  同时 create 同一 key。唯一索引（DictionaryEntity key）把此前的静默双行变成
+                //  数据库冲突；转成可重试事务错误让 dispatch 重跑本次尝试——重试后 findOne
+                //  命中已提交行、走上方 update 轨（收敛）。PG 系事务在错误后即 aborted，
+                //  不能在本事务内改道 update，必须经重试路径。
+                if (normalizeDatabaseError(error, this.db).isUniqueViolation) {
+                    throw new RetryableWriteConflict(`concurrent create of dictionary key "${key}"`, { cause: error })
+                }
+                throw error
             }
         }
     }

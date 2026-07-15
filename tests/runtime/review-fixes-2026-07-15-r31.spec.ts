@@ -240,7 +240,7 @@ describe("r31 runtime review fixes", () => {
         await system.destroy();
     });
 
-    test("E2: eventDep with keys / unknown field / non-object record pattern is rejected at declaration (was: silently dropped)", async () => {
+    test("E2: eventDep with unknown field / non-object record pattern / invalid keys is rejected at declaration (was: silently dropped)", async () => {
         const makeDoc = (suffix: string) => Entity.create({
             name: `EvDoc${suffix}`,
             properties: [Property.create({ name: "status", type: "string" })],
@@ -254,13 +254,7 @@ describe("r31 runtime review fixes", () => {
             }),
         });
 
-        // keys 在 eventDep 上不受支持——此前被注册面静默丢弃（过滤条件消失 → 每次匹配事件都触发）
-        const doc1 = makeDoc("K");
-        const system1 = new MonoSystem(new PGLiteDB());
-        expect(() => new Controller({ system: system1, entities: [doc1, makeAudit("K", { recordName: "EvDocK", type: "update", keys: ["status"] })], relations: [] }))
-            .toThrow(/does not support "keys".*event\.keys/s);
-
-        // 未知字段（typo）同样静默丢弃
+        // 未知字段（typo）此前被注册面静默丢弃（过滤条件消失 → 每次匹配事件都触发）
         const doc2 = makeDoc("T");
         const system2 = new MonoSystem(new PGLiteDB());
         expect(() => new Controller({ system: system2, entities: [doc2, makeAudit("T", { recordName: "EvDocT", type: "update", recrod: { status: "x" } })], relations: [] }))
@@ -271,6 +265,50 @@ describe("r31 runtime review fixes", () => {
         const system3 = new MonoSystem(new PGLiteDB());
         expect(() => new Controller({ system: system3, entities: [doc3, makeAudit("P", { recordName: "EvDocP", type: "update", record: "published" })], relations: [] }))
             .toThrow(/"record" must be a plain object/);
+
+        // keys 只能声明在 update 模式上（create/delete 事件不携带 keys，声明永不命中）
+        const doc4 = makeDoc("C");
+        const system4 = new MonoSystem(new PGLiteDB());
+        expect(() => new Controller({ system: system4, entities: [doc4, makeAudit("C", { recordName: "EvDocC", type: "create", keys: ["status"] })], relations: [] }))
+            .toThrow(/keys can only be declared on 'update' patterns/);
+
+        // keys 的属性名 typo 永不命中
+        const doc5 = makeDoc("Y");
+        const system5 = new MonoSystem(new PGLiteDB());
+        expect(() => new Controller({ system: system5, entities: [doc5, makeAudit("Y", { recordName: "EvDocY", type: "update", keys: ["statuss"] })], relations: [] }))
+            .toThrow(/does not match any declared property/);
+    });
+
+    test("E3: eventDep keys — 'this update touched X' subset semantics (same contract as trigger.keys)", async () => {
+        const Doc = Entity.create({
+            name: "KeysDoc",
+            properties: [
+                Property.create({ name: "title", type: "string" }),
+                Property.create({ name: "status", type: "string" }),
+            ],
+        });
+        const AuditLog = Entity.create({
+            name: "KeysAudit",
+            properties: [Property.create({ name: "status", type: "string" })],
+            computation: Transform.create({
+                eventDeps: { statusTouched: { recordName: "KeysDoc", type: "update", keys: ["status"] } },
+                callback: (event: any) => ({ status: event.record.status }),
+            }),
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Doc, AuditLog], relations: [] });
+        await controller.setup(true);
+
+        const doc = await system.storage.create("KeysDoc", { title: "t0", status: "draft" });
+        // title-only update：keys=['title'] ⊉ ['status'] → 不触发（此前 keys 被静默丢弃会误触发）
+        await system.storage.update("KeysDoc", MatchExp.atom({ key: "id", value: ["=", doc.id] }), { title: "t1" });
+        expect(await system.storage.find("KeysAudit", undefined, undefined, ["*"])).toHaveLength(0);
+        // status update：keys 命中 → 触发一次
+        await system.storage.update("KeysDoc", MatchExp.atom({ key: "id", value: ["=", doc.id] }), { status: "published" });
+        const audits = await system.storage.find("KeysAudit", undefined, undefined, ["*"]);
+        expect(audits).toHaveLength(1);
+        expect(audits[0].status).toBe("published");
+        await system.destroy();
     });
 
     test("D: destructive deletion scope count reports 0 (not the whole table) when recompute deletes nothing", async () => {

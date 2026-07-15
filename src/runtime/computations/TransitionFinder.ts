@@ -10,13 +10,13 @@ import { ComputationError, ComputationProtocolError } from "../errors/Computatio
  *  - trigger 轨：TransitionFinder 以 deepPartialMatch 整对象匹配，未知字段（typo）在
  *    事件上永不存在 → transfer 永不触发（静默死转移，under-trigger）；
  *  - eventDep 轨：ComputationSourceMap 注册时只拷贝已知字段，未知字段（typo 的
- *    record、或 trigger 才支持的 keys）被静默丢弃 → 过滤条件消失（静默过触发，over-trigger）。
+ *    record 等）被静默丢弃 → 过滤条件消失（静默过触发，over-trigger）。
  * record/oldRecord 若存在必须是普通对象：原始值/数组经 deepPartialMatch 与对象事件
  * 永不相等，同样是静默死声明。
  */
 export function validateMutationEventPatternSurface(
     pattern: unknown,
-    options: { allowKeys: boolean, allowPhase: boolean },
+    options: { allowPhase: boolean },
     describeContext: () => string
 ): void {
     if (!pattern || typeof pattern !== 'object' || Array.isArray(pattern)) {
@@ -25,18 +25,10 @@ export function validateMutationEventPatternSurface(
             { handleName: 'RecordMutationEventPattern', computationPhase: 'pattern-surface-validation' }
         )
     }
-    const allowed = new Set(['recordName', 'type', 'record', 'oldRecord'])
-    if (options.allowKeys) allowed.add('keys')
+    const allowed = new Set(['recordName', 'type', 'keys', 'record', 'oldRecord'])
     if (options.allowPhase) allowed.add('phase')
     for (const field of Object.keys(pattern as Record<string, unknown>)) {
         if (allowed.has(field)) continue
-        if (field === 'keys' && !options.allowKeys) {
-            throw new ComputationProtocolError(
-                `${describeContext()}: eventDep does not support "keys" — it would be silently dropped at registration and the dependency would fire on every matching event. ` +
-                `Filter inside the callback via event.keys (e.g. return null when !event.keys?.includes('field')), or use a StateMachine StateTransfer.trigger, which supports keys.`,
-                { handleName: 'RecordMutationEventPattern', computationPhase: 'pattern-surface-validation' }
-            )
-        }
         throw new ComputationProtocolError(
             `${describeContext()}: unknown pattern field "${field}". Mutation events only carry {recordName, type, keys, record, oldRecord} — ` +
             `an unknown field can never match (trigger: the transfer would silently never fire) or would be silently ignored (eventDep: the filter would silently vanish). Check for a typo.`,
@@ -59,6 +51,74 @@ export function validateMutationEventPatternSurface(
             `${describeContext()}: invalid phase ${JSON.stringify(patternObj.phase)}. Supported phases: PHASE_BEFORE_ALL (0), PHASE_NORMAL (1), PHASE_AFTER_ALL (2).`,
             { handleName: 'RecordMutationEventPattern', computationPhase: 'pattern-surface-validation' }
         )
+    }
+}
+
+type ModelDeclarationLike = { name?: string, properties?: { name: string }[], baseEntity?: unknown, baseRelation?: unknown, inputEntities?: unknown[] }
+type ModelSurface = {
+    entities: ModelDeclarationLike[],
+    relations: (ModelDeclarationLike & { source?: { name?: string }, target?: { name?: string }, sourceProperty?: string, targetProperty?: string })[]
+}
+
+/**
+ * 校验 pattern.keys 的取值面（trigger / eventDep 共用）：
+ * - keys 只在 update 事件上存在（create/delete 事件不携带 keys，匹配器对缺席 keys 直接判不中）
+ *   ——声明在 create/delete 模式上的 keys 是永不命中的死声明；
+ * - keys 必须是非空数组（空数组 vacuous 恒真，等价于不声明却更易误读）；
+ * - 每个 key 必须是记录（含 filtered 链 / merged inputs）上声明的值属性——
+ *   关系属性不产生宿主 update 事件（专门报错指路）、未声明属性名（typo）永不命中。
+ * 无法解析的 recordName（系统记录等）跳过属性校验，交给运行期语义。
+ */
+export function validateMutationEventPatternKeys(
+    model: ModelSurface,
+    pattern: { recordName?: string, type?: string, keys?: unknown },
+    throwError: (message: string) => never
+): void {
+    if (!pattern || pattern.keys === undefined) return
+    if (!Array.isArray(pattern.keys) || pattern.keys.length === 0) {
+        throwError(`keys must be a non-empty array of property names. An empty array matches every update vacuously — omit keys entirely to match any update.`)
+    }
+    if (pattern.type !== 'update') {
+        throwError(`keys can only be declared on 'update' patterns — only update events carry a keys array ('${pattern.type}' events never do), so this declaration can never match.`)
+    }
+    if (!pattern.recordName) return
+    const keys = pattern.keys as string[]
+
+    // 收集记录的有效属性：沿 filtered 链（baseEntity/baseRelation）向下，
+    // 并展开 merged entity（inputEntities）——merged entity 自身没有 properties，
+    // 其有效属性是全部输入实体属性的并集。
+    const recordChainNames = new Set<string>()
+    const propertyNames = new Set<string>(['id'])
+    const start = model.entities.find(e => e.name === pattern.recordName)
+        ?? model.relations.find(r => r.name === pattern.recordName)
+    if (!start) return
+    const pending: unknown[] = [start]
+    const visited = new Set<unknown>()
+    while (pending.length) {
+        const current = pending.pop() as ModelDeclarationLike
+        if (!current || visited.has(current)) continue
+        visited.add(current)
+        if (current.name) recordChainNames.add(current.name)
+        for (const property of (current.properties ?? [])) propertyNames.add(property.name)
+        if (current.baseEntity) pending.push(current.baseEntity)
+        if (current.baseRelation) pending.push(current.baseRelation)
+        for (const input of (current.inputEntities ?? [])) pending.push(input)
+    }
+    // 本记录（含 base 链）上的关系属性
+    const relationAttributes = new Set<string>()
+    for (const relation of model.relations) {
+        const sourceName = relation.source?.name
+        const targetName = relation.target?.name
+        if (sourceName && recordChainNames.has(sourceName) && relation.sourceProperty) relationAttributes.add(relation.sourceProperty)
+        if (targetName && recordChainNames.has(targetName) && relation.targetProperty) relationAttributes.add(relation.targetProperty)
+    }
+
+    for (const key of keys) {
+        if (propertyNames.has(key)) continue
+        if (relationAttributes.has(key)) {
+            throwError(`keys ["${key}"] refers to a relation attribute. Relation replacement does not emit a host update event carrying this key, so the declaration would never fire. Declare the pattern on the relation record's create/delete events instead (e.g. { recordName: '<relationName>', type: 'create' }).`)
+        }
+        throwError(`keys ["${key}"] does not match any declared property of "${pattern.recordName}", so the declaration would never fire. Declare the property or fix the key name.`)
     }
 }
 

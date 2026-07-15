@@ -2421,8 +2421,11 @@ export function getStorageBlockingChanges(oldManifest: MigrationManifest, newMan
         }
         for (const attr of newRecord.attributeDetails || []) {
             const oldAttr = oldAttrs.get(attr.name);
-            if (!oldAttr || isComputed(oldRecord.recordName, attr.name, oldManifest) || isComputed(newRecord.recordName, attr.name, newManifest)) continue;
-            if (oldAttr.kind !== attr.kind || oldAttr.tableName !== attr.tableName || oldAttr.fieldName !== attr.fieldName || oldAttr.sourceField !== attr.sourceField || oldAttr.targetField !== attr.targetField) {
+            if (!oldAttr) continue;
+            const attrComputed = isComputed(oldRecord.recordName, attr.name, oldManifest) || isComputed(newRecord.recordName, attr.name, newManifest);
+            // CAUTION 物理路径迁移的豁免只适用于 computed 属性（值由 rebuild 重算回填，
+            //  新列 ADD 后回填即一致；旧列残留为惰值）。fact 属性的路径变更仍然阻塞。
+            if (!attrComputed && (oldAttr.kind !== attr.kind || oldAttr.tableName !== attr.tableName || oldAttr.fieldName !== attr.fieldName || oldAttr.sourceField !== attr.sourceField || oldAttr.targetField !== attr.targetField)) {
                 blocking.push({
                     kind: "physical-path-move",
                     logicalPath: `${newRecord.recordName}.${attr.name}`,
@@ -2431,13 +2434,20 @@ export function getStorageBlockingChanges(oldManifest: MigrationManifest, newMan
                     reason: "fact attribute physical path changed",
                 });
             }
+            // CAUTION 类型/collection 变更对 computed 属性**不豁免**（r31）：compute-route DDL
+            //  只有 ADD COLUMN、没有 ALTER COLUMN，重算会把新逻辑类型的值写进旧物理列——
+            //  PG 系 loud 报错、SQLite 亲和静默收纳（读回类型漂移）。此前 isComputed 跳过整组
+            //  对比，computed 属性的类型变更迁移零感知。（fact→computed 同型接管不受影响：
+            //  类型相等不触发。）
             if (oldAttr.type !== attr.type || oldAttr.fieldType !== attr.fieldType || oldAttr.collection !== attr.collection) {
                 blocking.push({
                     kind: "unsupported-destructive-schema-change",
                     logicalPath: `${newRecord.recordName}.${attr.name}`,
                     oldPhysicalPath: `${oldAttr.type || "?"}/${oldAttr.fieldType || "?"}/${oldAttr.collection === true}`,
                     newPhysicalPath: `${attr.type || "?"}/${attr.fieldType || "?"}/${attr.collection === true}`,
-                    reason: "fact attribute type, field type, or collection flag changed",
+                    reason: attrComputed
+                        ? "computed attribute type, field type, or collection flag changed — compute-route DDL cannot ALTER the existing column; migrate the column manually or add a new property"
+                        : "fact attribute type, field type, or collection flag changed",
                 });
             }
         }
@@ -3134,17 +3144,42 @@ async function writeComputationPatch(controller: Controller, computation: Comput
         if ((typedPatch.type === "delete") && (computation.dataContext.type === "entity" || computation.dataContext.type === "relation")) {
             throw new DestructiveComputedOutputError(`Migration refuses delete patch for ${dataContextPath(computation.dataContext)} without explicit audited scope`);
         }
-        await controller.applyResultPatch(computation.dataContext, typedPatch, record);
+        // CAUTION 合成事件的 oldRecord/previous 必须在 apply **之前**读取真实前态（r31）：
+        //  这些事件经 MigrationScheduler.queueEvents 喂给链式依赖计算——增量分支读
+        //  event.oldRecord 的字段、eventDep/trigger 的合并视图匹配（{...oldRecord, ...record}）
+        //  都依赖前态完备。此前 update/delete 只带 {id}、property patch 强制 previous=undefined，
+        //  迁移链上的事件契约与 live 轨分裂（依赖计算静默拿错前态）。
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
+            const outputRecordName = computation.dataContext.id.name!;
+            let previousRecord: Record<string, unknown> | undefined;
+            if (typedPatch.type === "update" || typedPatch.type === "delete") {
+                previousRecord = await controller.system.storage.findOne(
+                    outputRecordName,
+                    MatchExp.atom({ key: "id", value: ["=", typedPatch.affectedId] }),
+                    undefined,
+                    ["*"]
+                ) ?? undefined;
+            }
+            await controller.applyResultPatch(computation.dataContext, typedPatch, record);
             events.push({
-                recordName: computation.dataContext.id.name!,
+                recordName: outputRecordName,
                 type: typedPatch.type === "insert" ? "create" : typedPatch.type,
-                record: typedPatch.type === "delete" ? { id: String(typedPatch.affectedId) } as any : typedPatch.data as any,
-                oldRecord: typedPatch.type === "update" || typedPatch.type === "delete" ? { id: String(typedPatch.affectedId) } as any : undefined,
+                record: typedPatch.type === "delete"
+                    ? (previousRecord ?? { id: String(typedPatch.affectedId) }) as any
+                    : (typedPatch.type === "update"
+                        ? { ...(typedPatch.data as Record<string, unknown>), id: previousRecord?.id ?? typedPatch.affectedId } as any
+                        : typedPatch.data as any),
+                oldRecord: typedPatch.type === "update" || typedPatch.type === "delete"
+                    ? (previousRecord ?? { id: String(typedPatch.affectedId) }) as any
+                    : undefined,
                 keys: typedPatch.data && typeof typedPatch.data === "object" ? Object.keys(typedPatch.data as Record<string, unknown>) : undefined,
             });
         } else {
-            const event = createMutationEventForOutput(computation.dataContext, (typedPatch as any).data, undefined, record);
+            const previous = computation.dataContext.type === "property" || computation.dataContext.type === "global"
+                ? await controller.retrieveLastValue(computation.dataContext, record)
+                : undefined;
+            await controller.applyResultPatch(computation.dataContext, typedPatch, record);
+            const event = createMutationEventForOutput(computation.dataContext, (typedPatch as any).data, previous, record);
             if (event) events.push(event);
         }
     }

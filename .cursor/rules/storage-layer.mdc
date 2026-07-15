@@ -19,6 +19,11 @@ storage.update(entityName, matchExp, rawData, events?): Promise<any>
 storage.delete(entityName, matchExp, events?): Promise<any>
 ```
 
+CAUTION: for `update`/`delete`, an `undefined` matchExp means **every record** of the
+entity (whole-table write). This is the documented contract for intentional bulk writes
+(e.g. a single-row settings entity); TypeScript marks the parameter required, so only
+explicitly passing `undefined` reaches it. Always pass a MatchExp for targeted writes.
+
 ## AttributeQuery — Always Required for find/findOne
 Specifies which fields to return. Never omit this parameter.
 

@@ -290,6 +290,10 @@ export class ComputationSourceMapManager {
                     sortedERMutationEventSources[eventDep.phase||PHASE_NORMAL].push({
                         type: eventDep.type,
                         recordName: eventDep.recordName,
+                        // CAUTION 模式字段必须全量拷贝：注册面漏拷的字段=静默消失的过滤条件
+                        //  （r31 H7 之前 keys 在此被丢弃；外层字段面已由
+                        //  validateMutationEventPatternSurface 在声明期收口）。
+                        keys: eventDep.keys,
                         record: eventDep.record,
                         oldRecord: eventDep.oldRecord,
                         computation
@@ -372,10 +376,18 @@ export class ComputationSourceMapManager {
      * @returns 是否匹配
      */
     shouldTriggerEventBasedComputation(source: EventBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent): boolean {
-        // 对于 EventBasedComputation，检查 eventDep 中的 record 和 oldRecord 字段是否匹配
+        // 对于 EventBasedComputation，检查 eventDep 中的 keys/record/oldRecord 字段是否匹配
         const eventDep = source as EventDep & { computation: Computation }
-        
-        
+
+        // keys 子集语义（与 TransitionFinder.matchMutationEvent 同一契约）：
+        // 声明的每个 key 都出现在事件的 keys 里才命中——「本次更新触及了这些字段」。
+        // 非 update 事件不携带 keys（声明期已拒绝 keys × create/delete 组合）。
+        if (eventDep.keys !== undefined) {
+            const eventKeys = mutationEvent.keys
+            if (!Array.isArray(eventDep.keys) || !Array.isArray(eventKeys)) return false
+            if (!eventDep.keys.every(key => eventKeys.includes(key))) return false
+        }
+
         // 如果 eventDep 中定义了 record 字段，需要深度匹配
         if (eventDep.record !== undefined) {
             // 对于 update 操作，mutationEvent.record 可能只包含更新的字段，record 模式按

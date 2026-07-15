@@ -12,6 +12,8 @@ type ComputationPhase = typeof PHASE_BEFORE_ALL|typeof PHASE_NORMAL|typeof PHASE
 type EventDep = {
   recordName: string;
   type: 'create'|'delete'|'update';
+  /** 「本次更新触及了字段 X」（子集语义，仅 update 事件携带 keys）——与 StateTransfer.trigger.keys 同一契约 */
+  keys?: string[];
   record?: Record<string, unknown>
   oldRecord?: Record<string, unknown>
   phase?: ComputationPhase

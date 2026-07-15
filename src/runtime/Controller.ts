@@ -505,6 +505,10 @@ export class Controller {
         //  同一 system 上其他 controller 的监听器无法从这里注销——共享 system 的进程必须
         //  在 migrate 前对旧 controller 调用 teardown()。迁移成功后 scheduler.setup(false)
         //  会重新注册监听。
+        // CAUTION 应用层 `storage.listen` 回调同理无法从这里注销（r31 记录项）：迁移期的
+        //  真实写入（默认值回填、重算落库）仍会派发给它们，而链式 rebuild 用的是各步骤
+        //  **返回**的合成事件流（两条轨刻意分离）。迁移必须在没有业务监听者在场的进程/
+        //  时机执行——这是运维契约：不要在处理业务流量的进程上原地 migrate。
         this.scheduler.teardown()
         // 迁移重算读取 global dataDeps 时走 dict.get，声明了 defaultValue 的新字典此时还没有
         //  存储行（setup 尚未运行）——先注册声明驱动的读回退，保证重算与迁移后运行时读到同一批默认值。

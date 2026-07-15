@@ -24,6 +24,19 @@ export class RequireSerializableRetry extends Error {
     }
 }
 
+/**
+ * 「重跑同一事务即可收敛」的写冲突（与 RETRYABLE_ERROR_CODES 同一契约，但由框架
+ * 写路径显式抛出）：典型形态是 find-then-create 的并发竞态撞唯一索引——重试后
+ * find 命中已提交行、走 update 轨。抛出方必须保证重试路径确实收敛（幂等或改道）。
+ */
+export class RetryableWriteConflict extends Error {
+    constructor(public reason: string, options?: { cause?: unknown }) {
+        super(`Retryable write conflict: ${reason}`, options);
+        this.name = "RetryableWriteConflict";
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+}
+
 export class NestedDispatchError extends FrameworkError {
     constructor(options: {
         outerEventSourceName?: string;
@@ -104,6 +117,7 @@ const RETRYABLE_ERROR_CODES = new Set(["40001", "40P01", "57P01", "ECONNRESET", 
 export function isRetryableTransactionError(error: unknown): boolean {
     return collectErrorChain(error).some(item => {
         if (!item || typeof item !== "object") return false;
+        if (item instanceof RetryableWriteConflict) return true;
         const code = (item as ErrorLike).code;
         return typeof code === "string" && RETRYABLE_ERROR_CODES.has(code);
     });
