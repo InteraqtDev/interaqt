@@ -64,6 +64,9 @@ export class RecordQuery {
         return query
     }
     public physicalRowRead = false
+    // x:1 嵌套读取携带谓词（用户 matchExpression / filtered relation 注入）的标记：
+    // JOIN 编译不消费子查询谓词，由 QueryExecutor.enforceXToOnePredicates 强制执行。
+    public hasRelatedPredicate = false
 
     constructor(
         public recordName: string,
@@ -92,7 +95,7 @@ export class RecordQuery {
     // CAUTION 特别注意这里的参数，不能让用取用原本的 matchExpression, attributeQuery, modifier 里面的 data 传进来。
     //   因为  data 不能代表一切配置，例如 attributeQuery 里面 还有个 shouldQueryParentLinkData 就是保存在 this 上的。
     derive({ matchExpression, attributeQuery, modifier } : { matchExpression?: MatchExp, attributeQuery?: AttributeQuery, modifier?: Modifier}) {
-        return new RecordQuery(
+        const derived = new RecordQuery(
             this.recordName,
             this.map,
             matchExpression||this.matchExpression,
@@ -110,6 +113,9 @@ export class RecordQuery {
             //  否则结果挂载会退回 base 属性名。
             this.alias
         )
+        derived.hasRelatedPredicate = this.hasRelatedPredicate
+        derived.physicalRowRead = this.physicalRowRead
+        return derived
     }
 }
 

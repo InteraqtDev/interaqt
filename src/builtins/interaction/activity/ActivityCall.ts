@@ -133,7 +133,18 @@ class InteractionState {
         return state
     }
     public static create(data:InteractionStateData, graph: ActivityCall, parent?: ActivitySeqState) {
-        const node = graph.getNodeByUUID(data.uuid)! as ActivityGroupNode
+        const node = graph.getNodeByUUID(data.uuid) as ActivityGroupNode | undefined
+        // CAUTION 持久化状态里的 uuid 必须能在当前活动图里解析。解析不到 = 活动定义在
+        //  实例在飞期间发生了漂移（节点被移除/uuid 变更）或状态被外部改写——继续走
+        //  下去是裸 TypeError（读 undefined.content），且后续行为未定义。fail-fast。
+        if (!node) {
+            throw new ActivityStateError(
+                `activity "${graph.activity.name}" state references node uuid "${data.uuid}" which does not exist in the current activity graph. ` +
+                `The activity definition has drifted while this instance was in flight (a node was removed or its uuid changed), or the persisted state was corrupted. ` +
+                `In-flight instances must be completed or discarded before deploying an incompatible activity definition.`,
+                { activityName: graph.activity.name }
+            )
+        }
         const isGroup = ActivityGroup.is((node as ActivityGroupNode).content)
 
         if (isGroup) {
@@ -143,6 +154,28 @@ class InteractionState {
             const groupState = new GroupStateNode(node!, graph, parent)
 
             groupState.isGroup = true
+            // CAUTION group 的完成判定（isGroupCompleted = children.every(!current)）跑在
+            //  **持久化的** children 上，而不是当前定义的 childSeqs 上。定义在实例在飞期间
+            //  新增/删除分支时，旧状态照常水合会静默改变语义：every 组少一个新分支照样"完成"、
+            //  children 整体缺失则永远无法完成（静默卡死）。分支数不一致 = 定义漂移，fail-fast
+            //  （r30 跨分支 transfer 守卫的 resume 面兄弟格；决策支持后再放开）。
+            //  CAUTION 'any' group 的运行期剪枝（一个分支推进后兄弟分支被移除）是合法的
+            //  children 收缩——凡是会剪枝的 group 类型只能校验上界（多于声明数 = 必然漂移）；
+            //  不剪枝的类型（'every'）严格相等。
+            const expectedBranchCount = node.childSeqs?.length ?? 0
+            const persistedBranchCount = data?.children?.length ?? 0
+            const groupTypePrunesBranches = node.content.type === 'any'
+            const branchCountDrifted = groupTypePrunesBranches
+                ? persistedBranchCount > expectedBranchCount
+                : persistedBranchCount !== expectedBranchCount
+            if (branchCountDrifted) {
+                throw new ActivityStateError(
+                    `activity "${graph.activity.name}": persisted state of group "${data.uuid}" carries ${persistedBranchCount} branch state(s) but the current definition declares ${expectedBranchCount} branch(es). ` +
+                    `The activity definition has drifted while this instance was in flight — completing the persisted branches would silently ${persistedBranchCount < expectedBranchCount ? 'skip the newly added branch(es)' : 'wait for removed branch(es) forever'}. ` +
+                    `In-flight instances must be completed or discarded before deploying an incompatible activity definition.`,
+                    { activityName: graph.activity.name }
+                )
+            }
             groupState.children = data?.children?.map((v) => {
                 return ActivitySeqState.create(v, graph, groupState)
             })

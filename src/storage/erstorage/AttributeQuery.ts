@@ -274,6 +274,16 @@ export class AttributeQuery {
                 if (syntheticParentLink) {
                     relatedEntity.attributeQuery.syntheticParentLink = true
                 }
+                // CAUTION x:1 嵌套读取由父查询的 JOIN 编译，子查询的 matchExpression（用户声明
+                //  或 filtered relation 注入的谓词）不进入 JOIN——必须标记出来，由
+                //  QueryExecutor.enforceXToOnePredicates 以逐父探针查询强制执行
+                //  （谓词不命中 ⇒ 该关联置 null，父记录保留——与 x:n 独立查询的谓词语义一致）。
+                //  x:n 节点的谓词由 findXToManyRelatedRecords 的独立查询天然生效，无需标记。
+                //  虚拟 link 端点（source/target，isLinkSourceRelation）除外：端点是结构性引用，
+                //  不参与谓词过滤（也没有可探针的反向属性）。
+                if (attributeInfo.isXToOne && relatedSubQueryData.matchExpression && !attributeInfo.isLinkSourceRelation()) {
+                    relatedEntity.hasRelatedPredicate = true
+                }
 
                 this.relatedRecords.push(relatedEntity)
                 if (attributeInfo.isXToMany) {

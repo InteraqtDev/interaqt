@@ -439,6 +439,24 @@ function mergeProperties(
     const mergedProperties: PropertyInstance[] = [];
     const itemPropertyMap = new Map<string, { [key: string]: PropertyInstance }>();
     const mergedPropertyMap: { [k: string]: PropertyInstance } = Object.fromEntries(mergedItem.commonProperties?.map(prop => [prop.name, prop]) || []);
+    // CAUTION 同名 property 在 union 合并下共享同一物理列。类型（或 collection 形态）冲突时
+    //  绝不能静默 last-wins：后处理的 input 会改写先处理 input 的列类型（先者的 number 列
+    //  变 TEXT，数据以错误类型读回——零告警的 schema 损坏）。commonProperties 已按
+    //  name+type 校验自身与各 input 的一致性；这里把同一约束推广到**全部**同名合并点。
+    const mergeCompatiblePropertyMap = (target: { [k: string]: PropertyInstance }, source: { [k: string]: PropertyInstance }, sourceItemName: string) => {
+        for (const [propName, prop] of Object.entries(source)) {
+            const existing = target[propName];
+            if (existing && (existing.type !== prop.type || !!existing.collection !== !!prop.collection)) {
+                throw new Error(
+                    `Merged ${isEntity(mergedItem) ? 'entity' : 'relation'} "${getItemName(mergedItem)}": property "${propName}" of input "${sourceItemName}" ` +
+                    `(type: ${prop.type}${prop.collection ? ', collection' : ''}) conflicts with the already-merged declaration ` +
+                    `(type: ${existing.type}${existing.collection ? ', collection' : ''}). Same-name properties across merged inputs share one physical column ` +
+                    `and must declare the identical type (and collection shape) — rename one of them or align the types.`
+                );
+            }
+            target[propName] = prop;
+        }
+    };
 
     // 收集所有同名 properties。
     // 如果这个 item 已经是 filtered item，那么就从 base item 获取 properties。
@@ -455,8 +473,8 @@ function mergeProperties(
         );
         itemPropertyMap.set(getItemName(inputItem), propertyMap);
 
-        // 合并 property map
-        Object.assign(mergedPropertyMap, propertyMap);
+        // 合并 property map（同名冲突 fail-fast，见上方 CAUTION）
+        mergeCompatiblePropertyMap(mergedPropertyMap, propertyMap, getItemName(inputItem));
 
         const isInputItemMergedItem = !!getInputItems(inputItem);
         // 递归处理所有子孙节点
@@ -477,8 +495,8 @@ function mergeProperties(
                             .map(prop => [prop.name, prop])
                     );
                     itemPropertyMap.set(childItemName, childItemPropertyMap);
-                    // 继续合并
-                    Object.assign(mergedPropertyMap, childItemPropertyMap);
+                    // 继续合并（同名冲突 fail-fast，见上方 CAUTION）
+                    mergeCompatiblePropertyMap(mergedPropertyMap, childItemPropertyMap, childItemName);
                 }
             }
             childItemNames.push(...(itemTree.get(childItemName) || []));

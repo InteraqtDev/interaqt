@@ -208,7 +208,7 @@ const Tag = Entity.create({
   name: 'Tag',
   properties: [
     Property.create({ name: 'name', type: 'string' }),
-    Property.create({ name: 'color', type: 'string', defaultValue: '#666666' })
+    Property.create({ name: 'color', type: 'string', defaultValue: () => '#666666' })
   ],
   constraints: [
     UniqueConstraint.create({
@@ -337,7 +337,7 @@ const Friendship = Relation.create({
     Property.create({ 
       name: 'status', 
       type: 'string', 
-      defaultValue: 'pending'  // pending, accepted, blocked
+      defaultValue: () => 'pending'  // pending, accepted, blocked
     })
   ]
 });
@@ -540,7 +540,7 @@ const Post = Entity.create({
   properties: [
     Property.create({ name: 'title', type: 'string' }),
     Property.create({ name: 'content', type: 'string' }),
-    Property.create({ name: 'status', type: 'string', defaultValue: 'draft' }),
+    Property.create({ name: 'status', type: 'string', defaultValue: () => 'draft' }),
     Property.create({ name: 'createdAt', type: 'string', defaultValue: () => new Date().toISOString() })
   ]
 });
@@ -557,7 +557,7 @@ const Tag = Entity.create({
   name: 'Tag',
   properties: [
     Property.create({ name: 'name', type: 'string' }),
-    Property.create({ name: 'color', type: 'string', defaultValue: '#666666' })
+    Property.create({ name: 'color', type: 'string', defaultValue: () => '#666666' })
   ],
   constraints: [
     UniqueConstraint.create({

@@ -264,8 +264,31 @@ ${modifierClause}
                     finalAttribute
                 )
                 
-                const fullFieldRef = `${this.withPrefix(prefix)}${tableAlias}`
-                return `"${fullFieldRef}"."${fieldName}" ${normalizedOrder}`
+                const fullFieldRef = `${this.withPrefix(prefix)}${tableAlias}"."${fieldName}`
+
+                // CAUTION combined（三表合一）路径段按「同物理行」编译（无 JOIN 无 ON），
+                //  排序键会把偶然同住（orphan co-tenant）的幽灵列值当作关联值参与排序
+                //  （r28 幻影配对家族的 Modifier 面，r31 定谳：读取面 prune 为 null、排序面
+                //  仍按幽灵值排序）。与 match 面的 buildCombinedSegmentGates 同一真相源：
+                //  路径中每个 combined 段的 link id 列非空才取值，否则该排序键按 NULL 处理。
+                const combinedGateRefs: string[] = []
+                for (let i = 0; i < pathParts.length - 1; i++) {
+                    const segmentPath = [recordName, ...pathParts.slice(0, i + 1)]
+                    let segmentInfo
+                    try {
+                        segmentInfo = this.map.getInfoByPath(segmentPath)
+                    } catch {
+                        continue
+                    }
+                    if (!segmentInfo?.isRecord || !segmentInfo.isMergedWithParent()) continue
+                    if (segmentInfo.isLinkSourceRelation()) continue
+                    const [gateAlias, linkIdField] = this.map.getTableAliasAndFieldName([...segmentPath, LINK_SYMBOL], 'id')
+                    combinedGateRefs.push(`"${this.withPrefix(prefix)}${gateAlias}"."${linkIdField}" IS NOT NULL`)
+                }
+                if (combinedGateRefs.length) {
+                    return `CASE WHEN ${combinedGateRefs.join(' AND ')} THEN "${fullFieldRef}" ELSE NULL END ${normalizedOrder}`
+                }
+                return `"${fullFieldRef}" ${normalizedOrder}`
             }).join(',')}`)
         }
 

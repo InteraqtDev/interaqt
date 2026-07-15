@@ -62,6 +62,18 @@ export class Modifier {
                         `Order by an aggregated computed property instead, or sort in application code.`
                     )
                 }
+                // CAUTION filtered relation 属性段（r31）：orderBy 的路径解析不经过 AttributeQuery
+                //  的 base 重写，filtered link 无物理表——继续编译会生成引用不存在别名/列的 SQL
+                //  （"no such column: REL_….undefined" 这类与用户写法脱节的裸错误）。且带谓词的
+                //  排序语义（谓词不命中按 NULL 排）尚未实现。fail-fast 指引用 base 属性名。
+                if (info?.isRecord && (info as { isLinkFiltered?: () => boolean }).isLinkFiltered?.()) {
+                    const baseAttr = (info as unknown as { getBaseAttributeInfo: () => { attributeName: string } }).getBaseAttributeInfo().attributeName
+                    throw new Error(
+                        `orderBy path "${key}" traverses the filtered relation attribute "${pathParts.slice(0, i).join('.')}" — ` +
+                        `ordering through a filtered relation is not supported yet (its predicate cannot be applied to a sort key). ` +
+                        `Order by the base attribute path instead (e.g. "${[...pathParts.slice(0, i - 1), baseAttr, ...pathParts.slice(i)].join('.')}").`
+                    )
+                }
             }
             
             // 如果有多个部分，说明需要 JOIN 关联表

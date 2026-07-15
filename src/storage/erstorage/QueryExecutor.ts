@@ -169,6 +169,67 @@ export class QueryExecutor {
     }
 
     /**
+     * r31：x:1 嵌套读取的谓词强制执行。
+     *
+     * x:1 子查询被编译进父查询的 LEFT JOIN，其 matchExpression（用户在嵌套 attributeQuery
+     * 里声明的谓词，或 filtered relation 重写注入的谓词）从不进入 JOIN 条件——JOIN 面只有
+     * 结构（id 连接）。这里对携带谓词的 x:1 节点逐父记录发探针查询（谓词 + 反向 id 约束，
+     * 与 x:n 独立查询的谓词机制完全同构），不命中则把已挂载的关联**置 null**：
+     * 语义 = 「谓词过滤关联记录本身」，父记录保留（与顶层 match 过滤父记录是两个不同的面）。
+     *
+     * 递归遍历与 pruneUnpairedCombinedReads 同构：x:1 主干逐层下钻（被上层置 null 的
+     * 分支自然跳过）；parentLink 上的 x:1 同样覆盖。goto 节点跳过（goto 分支的独立查询
+     * 已自带谓词合并）。x:n 节点无需处理（findXToManyRelatedRecords 的独立查询天然生效）。
+     *
+     * 性能注：探针是逐父记录的 id-only 查询（潜在 N+1），只在声明了谓词的 x:1 节点上发生；
+     * 与既有 goto / per-parent x:n 路径的代价形态一致。
+     */
+    private async enforceXToOnePredicates(records: Record[], entityQuery: RecordQuery): Promise<void> {
+        if (entityQuery.physicalRowRead) return
+        for (const subQuery of entityQuery.attributeQuery.xToOneRecords) {
+            if (subQuery.goto) continue
+            const resultKey = subQuery.alias || subQuery.attributeName!
+            if (subQuery.hasRelatedPredicate) {
+                const info = this.map.getInfo(subQuery.parentRecord!, subQuery.attributeName!)
+                const reverseAttributeName = info.getReverseInfo()?.attributeName!
+                for (const record of records) {
+                    const related = record[resultKey]
+                    if (!related || typeof related !== 'object' || related.id === undefined || related.id === null) continue
+                    const probeMatch = subQuery.matchExpression.and({
+                        key: `${reverseAttributeName}.id`,
+                        value: ['=', record.id]
+                    })
+                    const probeQuery = RecordQuery.create(subQuery.recordName, this.map, {
+                        matchExpression: probeMatch.data,
+                        attributeQuery: ['id'],
+                    })
+                    const matched = await this.findRecords(probeQuery, `enforce x:1 predicate: ${subQuery.parentRecord}.${subQuery.attributeName}`)
+                    if (!matched.some(item => String(item.id) === String(related.id))) {
+                        record[resultKey] = null
+                    }
+                }
+            }
+            // 递归下钻仍然挂载着的 x:1 子结构
+            const survivors = records
+                .map(record => record[resultKey])
+                .filter((related): related is Record => !!related && typeof related === 'object')
+            if (survivors.length) {
+                await this.enforceXToOnePredicates(survivors, subQuery)
+                // parentLink 上的 x:1（关系记录的关联实体）
+                const parentLinkQuery = subQuery.attributeQuery.parentLinkRecordQuery
+                if (parentLinkQuery) {
+                    const linkRecords = survivors
+                        .map(related => related[LINK_SYMBOL])
+                        .filter((link): link is Record => !!link && typeof link === 'object')
+                    if (linkRecords.length) {
+                        await this.enforceXToOnePredicates(linkRecords, parentLinkQuery)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 去除完全相同的原始行（等价于 SQL DISTINCT）
      * 用于消除 match 中出现 x:n 路径时 LEFT JOIN 产生的 fan-out 重复。
      * 因为 SELECT 始终包含各级记录的 id，真正不同的记录必然有列差异，所以完全相同的行一定是重复行。
@@ -286,6 +347,13 @@ export class QueryExecutor {
         // r28：combined x:1 嵌套读取的幻影配对剪枝（配对真实性以 link id 列为真相源）。
         this.pruneUnpairedCombinedReads(records, entityQuery)
 
+        // r31：x:1 嵌套读取的谓词强制执行（用户 matchExpression / filtered relation 注入的谓词）。
+        //  JOIN 编译不消费子查询谓词——此前 filtered x:1 属性返回未过滤的 base 配对、
+        //  普通 x:1 的 matchExpression 被静默忽略（r30 记录的预存缺口）。
+        //  必须在补全枝干（completeXToOneLeftoverRecords 等）之前执行：被谓词置 null 的
+        //  关联不应再补全其子结构。
+        await this.enforceXToOnePredicates(records, entityQuery)
+
         // 如果当前的 query 有 label，那么下面任何遍历 record 的地方都要 Push stack。
         const nextRecursiveContext = (entityQuery.label && entityQuery.label !== context.label) ? context.spawn(entityQuery.label) : context
 
@@ -346,7 +414,7 @@ export class QueryExecutor {
 
                         setByPath(
                             record,
-                            [subEntityQuery.alias || subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.attributeName!],
+                            [subEntityQuery.alias || subEntityQuery.attributeName!, LINK_SYMBOL, subEntityQueryOfSubLink.alias || subEntityQueryOfSubLink.attributeName!],
                             await this.findRecords(
                                 queryOfThisRecord,
                                 `finding relation data: ${entityQuery.recordName}.${subEntityQuery.attributeName}.&.${subEntityQueryOfSubLink.attributeName}`,
@@ -511,7 +579,7 @@ export class QueryExecutor {
                         const linkId = item[LINK_SYMBOL].id
                         setByPath(
                             item,
-                            [LINK_SYMBOL, subEntityQueryOfLink.attributeName!],
+                            [LINK_SYMBOL, subEntityQueryOfLink.alias || subEntityQueryOfLink.attributeName!],
                             await this.findXToManyRelatedRecords(
                                 subEntityQueryOfLink.parentRecord!,
                                 subEntityQueryOfLink.attributeName!,
@@ -546,15 +614,20 @@ export class QueryExecutor {
             const reverseAttributeName = info.getReverseInfo()?.attributeName!
 
             for(let xToOneSubQuery of entityQuery.attributeQuery.parentLinkRecordQuery.attributeQuery.xToOneRecords) {
+                // CAUTION 结果统一按 alias 挂载/读取（filtered relation 的对外名 ≠ base 属性名，
+                //  见 completeXToOneLeftoverRecords 第 2 步的 CAUTION）。alias 对非 filtered 关系
+                //  恒等于 attributeName，对普通关系无行为差异。
+                const xToOneResultKey = xToOneSubQuery.alias || xToOneSubQuery.attributeName!
                 for(let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
+                    const xToManyResultKey = xToManySubSubQuery.alias || xToManySubSubQuery.attributeName!
                     for(let record of records) {
                         // 可空关系：反向属性或 link 上的 x:1 不存在时跳过（与下方第 2 步的空守卫一致）。
-                        if (!record[reverseAttributeName]?.[LINK_SYMBOL]?.[xToOneSubQuery.attributeName!]) continue
+                        if (!record[reverseAttributeName]?.[LINK_SYMBOL]?.[xToOneResultKey]) continue
                         const nextContext = entityQuery.label ? context.concat(record) : context
-                        record[reverseAttributeName][LINK_SYMBOL][xToOneSubQuery.attributeName!][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                        record[reverseAttributeName][LINK_SYMBOL][xToOneResultKey][xToManyResultKey] = await this.findXToManyRelatedRecords(
                             xToManySubSubQuery.parentRecord!,
                             xToManySubSubQuery.attributeName!,
-                            record[reverseAttributeName][LINK_SYMBOL][xToOneSubQuery.attributeName!].id,
+                            record[reverseAttributeName][LINK_SYMBOL][xToOneResultKey].id,
                             xToManySubSubQuery,
                             recordQueryRef,
                             nextContext
@@ -572,6 +645,10 @@ export class QueryExecutor {
             //  关系恒等于 attributeName，此改动对普通关系无行为差异。
             const subResultKey = xToOneSubQuery.alias || xToOneSubQuery.attributeName!
             for (let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
+                // CAUTION x:n 枝干的挂载 key 同样必须按 alias（filtered x:n 嵌套在 x:1 之下时，
+                //  按 base 名挂载会让 filtered 名下的结果整体缺失、且过滤后的子集泄漏到 base 名下，
+                //  与请求 base 属性的结果互相覆盖）。alias 对非 filtered 关系恒等于 attributeName。
+                const xToManyResultKey = xToManySubSubQuery.alias || xToManySubSubQuery.attributeName!
                 for(let record of records) {
                     if (!record[subResultKey]) {
                         // Skip this record if the x:1 relation is null
@@ -579,7 +656,7 @@ export class QueryExecutor {
                     }
                     
                     const nextContext = entityQuery.label ? context.concat(record) : context
-                    record[subResultKey][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                    record[subResultKey][xToManyResultKey] = await this.findXToManyRelatedRecords(
                         xToManySubSubQuery.parentRecord!,
                         xToManySubSubQuery.attributeName!,
                         record[subResultKey].id,
@@ -713,7 +790,7 @@ export class QueryExecutor {
                     // 查找这个 link 的 x:n 关联实体
                     setByPath(
                         record,
-                        [LINK_SYMBOL, subEntityQueryOfLink.attributeName!],
+                        [LINK_SYMBOL, subEntityQueryOfLink.alias || subEntityQueryOfLink.attributeName!],
                         await this.findXToManyRelatedRecords(
                             subEntityQueryOfLink.parentRecord!,
                             subEntityQueryOfLink.attributeName!,

@@ -126,17 +126,17 @@ const User = Entity.create({
     Property.create({ 
       name: 'status', 
       type: 'string',
-      defaultValue: 'active'
+      defaultValue: () => 'active'
     }),
     Property.create({ 
       name: 'score', 
       type: 'number',
-      defaultValue: 0
+      defaultValue: () => 0
     }),
     Property.create({ 
       name: 'isVerified', 
       type: 'boolean',
-      defaultValue: false
+      defaultValue: () => false
     })
   ]
 });
@@ -163,7 +163,7 @@ const Order = Entity.create({
     Property.create({ 
       name: 'status', 
       type: 'string',
-      defaultValue: 'pending'
+      defaultValue: () => 'pending'
     })
   ]
 });
@@ -229,7 +229,7 @@ const Product = Entity.create({
   name: 'Product',
   properties: [
     Property.create({ name: 'price', type: 'number' }),
-    Property.create({ name: 'taxRate', type: 'number', defaultValue: 0.1 }),
+    Property.create({ name: 'taxRate', type: 'number', defaultValue: () => 0.1 }),
     Property.create({
       name: 'totalPrice',
       type: 'number',
@@ -374,7 +374,7 @@ const User = Entity.create({
     Property.create({ 
       name: 'status', 
       type: 'string',
-      defaultValue: 'active'
+      defaultValue: () => 'active'
     }),
     Property.create({ 
       name: 'createdAt', 
@@ -387,13 +387,13 @@ const User = Entity.create({
       name: 'profile', 
       type: 'object',
       collection: false,
-      defaultValue: {}
+      defaultValue: () => ({})
     }),
     Property.create({ 
       name: 'tags', 
       type: 'string',
       collection: true,
-      defaultValue: []
+      defaultValue: () => []
     }),
     
     // Optional fields

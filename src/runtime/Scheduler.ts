@@ -21,6 +21,7 @@ import {
     EntityCreateEventsSourceMap
 } from "./ComputationSourceMap.js";
 import { createScopedSequenceSignatures, scopedSequenceComputationId } from "./scopedSequenceManifest.js";
+import { mergedMutationEventView } from "./computations/TransitionFinder.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export { EtityMutationEvent };
@@ -760,12 +761,20 @@ export class Scheduler {
     }
     async computeEventBasedDirtyRecordsAndEvents(source: EventBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         const eventBasedComputation = source.computation as EventBasedComputation
+        // CAUTION 事件驱动计算的**全部消费者**必须与匹配器读同一事件视图（r20 契约的消费侧收口）：
+        //  update 事件的 record 只携带本次写入的字段，匹配（TransitionFinder / eventDep deepMatch）
+        //  按合并后的当前状态（{...oldRecord, ...record}）求值。若消费者（StateMachine 的
+        //  computeTarget / computeValue、Transform 的 event callback）拿到的仍是 partial record，
+        //  「匹配命中但回调读不到命中所依据的字段」——computeTarget 静默返回空目标（转移无声失效）、
+        //  callback 读未变更字段得到 undefined（派生记录字段静默缺失）。keys / oldRecord 原样保留，
+        //  「本次更新触及了哪些字段」的语义仍由 keys 表达。create/delete 事件原样透传。
+        const consumerEvent = mergedMutationEventView(mutationEvent) as RecordMutationEvent
         if (eventBasedComputation.computeDirtyRecords) {
-            let dirtyRecords = (await eventBasedComputation.computeDirtyRecords!(mutationEvent)) || []
+            let dirtyRecords = (await eventBasedComputation.computeDirtyRecords!(consumerEvent)) || []
             dirtyRecords = Array.isArray(dirtyRecords) ? dirtyRecords : [dirtyRecords]
-            return dirtyRecords.filter(Boolean).map(record => [record, mutationEvent]) as [any, EtityMutationEvent][]
+            return dirtyRecords.filter(Boolean).map(record => [record, consumerEvent]) as [any, EtityMutationEvent][]
         } else {
-            return [[null, mutationEvent]] as [any, EtityMutationEvent][]
+            return [[null, consumerEvent]] as [any, EtityMutationEvent][]
         }
     }
     isDataBasedComputation(computation: Computation): computation is DataBasedComputation {

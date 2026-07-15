@@ -171,3 +171,25 @@ describe('S15: name format validation is enforced at create()', () => {
         expect(() => Dictionary.create({ name: 'bad;drop', type: 'string' })).toThrow(/invalid/);
     });
 });
+
+describe('r31: non-function defaultValue/computed rejected at create()', () => {
+    // 写路径只对函数形态的 defaultValue 求值——字面量默认值会被静默忽略（字段落 NULL、零告警），
+    // 与 type 白名单同族的"声明形同虚设"缺口，声明期拒绝。
+    test('Property.create rejects a literal defaultValue', () => {
+        expect(() => Property.create({ name: 'role', type: 'string', defaultValue: 'user' as any }))
+            .toThrow(/non-function defaultValue/);
+        expect(() => Property.create({ name: 'role2', type: 'string', defaultValue: () => 'user' })).not.toThrow();
+    });
+
+    test('Property.create rejects a literal computed', () => {
+        expect(() => Property.create({ name: 'total', type: 'number', computed: 42 as any }))
+            .toThrow(/non-function computed/);
+        expect(() => Property.create({ name: 'total2', type: 'number', computed: (r: any) => r.a + r.b })).not.toThrow();
+    });
+
+    test('Dictionary.create rejects a literal defaultValue', () => {
+        expect(() => Dictionary.create({ name: 'threshold', type: 'number', defaultValue: 10 as any }))
+            .toThrow(/non-function defaultValue/);
+        expect(() => Dictionary.create({ name: 'threshold2', type: 'number', defaultValue: () => 10 })).not.toThrow();
+    });
+});

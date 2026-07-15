@@ -320,8 +320,22 @@ export class MatchExp {
 
     getReferenceFieldValue(valueStr: string) {
         const matchAttributePath = valueStr.split('.')
+        const rootName = this.contextRootEntity || this.entityName
+        // CAUTION filtered relation 属性段（r31）：引用路径不经过 AttributeQuery 的 base 重写，
+        //  filtered link 无物理表——继续解析会生成引用不存在别名/列的 SQL。fail-fast 指引 base 名。
+        for (let i = 1; i < matchAttributePath.length; i++) {
+            const info = this.map.getInfoByPath([rootName, ...matchAttributePath.slice(0, i)])
+            if (info?.isRecord && (info as { isLinkFiltered?: () => boolean }).isLinkFiltered?.()) {
+                const baseAttr = (info as unknown as { getBaseAttributeInfo: () => { attributeName: string } }).getBaseAttributeInfo().attributeName
+                throw new Error(
+                    `reference value "${valueStr}" traverses the filtered relation attribute "${matchAttributePath.slice(0, i).join('.')}" — ` +
+                    `filtered relation attributes are not supported in reference paths yet. ` +
+                    `Reference the base attribute path instead (e.g. "${[...matchAttributePath.slice(0, i - 1), baseAttr, ...matchAttributePath.slice(i)].join('.')}").`
+                )
+            }
+        }
         const [tableAlias, rawFieldName] = this.map.getTableAliasAndFieldName(
-            [this.contextRootEntity || this.entityName].concat(matchAttributePath.slice(0, -1)),
+            [rootName].concat(matchAttributePath.slice(0, -1)),
             matchAttributePath.at(-1)!
         )
         return `${tableAlias}.${rawFieldName}`

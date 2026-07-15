@@ -130,11 +130,9 @@ async function assertStructuralInvariants(handle: EntityQueryHandle, schema: Fuz
     //    r30-A 的教训：filtered-over-combined 的**形状**自 r29 起就在生成域里，此前全绿是因为
     //    没有任何预言机读过「经 filtered 属性名的实体嵌套读取面」——第 6 条（配对读取一致）只读
     //    base 属性面，第 7 条（谓词一致）只读 relation-name 面。生成域 × 预言机读取面才是真覆盖。
-    //    断言：link 面（findRelationByName(filteredName)）报告的每一条配对，都必须出现在
-    //    经 filtered 属性名的嵌套读取里（配对不得静默消失——r30-A 的损坏面即 prune 误删真实配对）。
-    //    CAUTION 暂为超集断言（嵌套读取 ⊇ filtered link 面）而非相等：嵌套 x:1 子查询谓词不下推
-    //    是记录在案的独立预存缺口（r30 报告「filtered x:1 谓词」项，x:1 base 的嵌套读取当前会
-    //    多读到谓词不匹配的 base 配对）。该缺口收口后升级为相等断言。
+    //    断言（r31 起为**相等**）：经 filtered 属性名的嵌套读取配对集合 = link 面
+    //    （findRelationByName(filteredName)）配对集合。缺失面 = r30-A 的 prune 误删；
+    //    多余面 = 谓词不下推泄漏（r30 记录的 x:1 谓词缺口，r31 enforceXToOnePredicates 收口）。
     for (const filteredRelation of schema.filteredRelations) {
         const { baseChoice, name } = filteredRelation
         const frSourceProperty = `fr_${baseChoice.sourceProperty}`
@@ -150,10 +148,62 @@ async function assertStructuralInvariants(handle: EntityQueryHandle, schema: Fuz
         }
         const filteredLinkRows = await handle.findRelationByName(name, undefined, undefined,
             ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]])
+        const linkPairs = new Set<string>()
         for (const link of filteredLinkRows) {
             const pair = `${(link.source as { id?: unknown })?.id}->${(link.target as { id?: unknown })?.id}`
+            linkPairs.add(pair)
             expect(nestedPairs.has(pair),
                 `${label} [filtered-nested-read] ${name}: pairing ${pair} visible on the link face but MISSING from the ${baseChoice.source}.${frSourceProperty} nested read`).toBe(true)
+        }
+        for (const pair of nestedPairs) {
+            expect(linkPairs.has(pair),
+                `${label} [filtered-nested-read] ${name}: pairing ${pair} returned by the ${baseChoice.source}.${frSourceProperty} nested read but ABSENT from the link face (predicate leak)`).toBe(true)
+        }
+        // 7b-deep（r31-S1 收口：挂载深度是读取面的子维度）。同一 filtered 属性在
+        //    **x:1 主干之下**（completeXToOneLeftoverRecords 补全枝干）与在顶层（上方 7b）
+        //    是两个独立的实现点：r31-S1 中前者把结果挂到 base 属性名下（filtered 名整体缺失、
+        //    子集泄漏到 base 名），顶层面全绿。断言（r31 起为**相等**，与 7b 同步升级）：
+        //    经「parent --x:1--> host」进入的嵌套读取，host 的 filtered 属性给出与 link 面
+        //    完全一致的配对（对可达 host 而言）——缺失 = 挂载缺口，多余 = 谓词泄漏。
+        //    纯读取侧断言、零 rng 调用——决策流契约不受影响，既有种子池全部有效。
+        const parentEntries: Array<{ parent: string, parentAttr: string }> = []
+        for (const choice of schema.relationChoices) {
+            if (choice.symmetric) continue
+            if (choice.target === baseChoice.source && (choice.relType === 'n:1' || choice.relType === '1:1')) {
+                parentEntries.push({ parent: choice.source, parentAttr: choice.sourceProperty })
+            }
+            if (choice.source === baseChoice.source && (choice.relType === '1:n' || choice.relType === '1:1')) {
+                parentEntries.push({ parent: choice.target, parentAttr: choice.targetProperty })
+            }
+        }
+        for (const { parent, parentAttr } of parentEntries) {
+            const parentRows = await handle.find(parent, undefined, undefined,
+                ['id', [parentAttr, { attributeQuery: ['id', [frSourceProperty, { attributeQuery: ['id'] }]] }]])
+            const reachableHostIds = new Set<string>()
+            const deepPairs = new Set<string>()
+            for (const parentRow of parentRows) {
+                const host = parentRow[parentAttr] as Record<string, unknown> | undefined
+                if (!host || host.id === null || host.id === undefined) continue
+                reachableHostIds.add(String(host.id))
+                const related = host[frSourceProperty]
+                const items = Array.isArray(related) ? related : (related ? [related] : [])
+                for (const item of items as Record<string, unknown>[]) {
+                    if (item.id !== null && item.id !== undefined) deepPairs.add(`${host.id}->${item.id}`)
+                }
+            }
+            const reachableLinkPairs = new Set<string>()
+            for (const link of filteredLinkRows) {
+                const hostId = (link.source as { id?: unknown })?.id
+                if (hostId === null || hostId === undefined || !reachableHostIds.has(String(hostId))) continue
+                const pair = `${hostId}->${(link.target as { id?: unknown })?.id}`
+                reachableLinkPairs.add(pair)
+                expect(deepPairs.has(pair),
+                    `${label} [filtered-nested-read-deep] ${name}: pairing ${pair} visible on the link face but MISSING from the ${parent}.${parentAttr}.${frSourceProperty} nested read (x:1-trunk mount face)`).toBe(true)
+            }
+            for (const pair of deepPairs) {
+                expect(reachableLinkPairs.has(pair),
+                    `${label} [filtered-nested-read-deep] ${name}: pairing ${pair} returned by the ${parent}.${parentAttr}.${frSourceProperty} nested read but ABSENT from the link face (predicate leak on the x:1-trunk face)`).toBe(true)
+            }
         }
     }
     // 8. merged (union) 一致性（r29）：find(merged) 的 id 集合 = 各 input id 集合的不相交并

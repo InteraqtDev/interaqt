@@ -55,6 +55,13 @@ export class PGLiteDB implements Database{
         this.db = new PGlite(this.database)
     }
     async open(forceDrop = false) {
+        // CAUTION open 必须能在 close 之后复活连接（r26 I-4 close 幂等家族的对称面，r31 收口）：
+        //  PG/MySQL/SQLite 三驱动都支持 close→open 重入；此前 PGLite 的 closed 标志不复位、
+        //  实例不重建，close 后的一切使用抛底层 "PGlite is closed"，生命周期契约在四驱动间分裂。
+        if (this.closed) {
+            this.db = new PGlite(this.database)
+            this.closed = false
+        }
         // PGLite doesn't support CREATE/DROP DATABASE commands
         // When forceDrop is true, we'll drop all existing tables instead
         
@@ -126,8 +133,11 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
+        // CAUTION Date 必须原样交给驱动绑定（timestamp 列的方言可绑定形态，r26 契约）。
+        //  JSON.stringify(Date) 产出**带引号**的字符串，能否被接受完全依赖 PG datetime
+        //  解析器对双引号的历史容忍——与 MySQL 驱动（r26 已排除 Date）同一契约。
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x
+            return (typeof x === 'object' && x !==null && !(x instanceof Date)) ? JSON.stringify(x) : x
         })
         logger.info({
             type:'update',
@@ -141,8 +151,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     async insert(sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
+        // Date 原样绑定（同 update 的 CAUTION）。
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) :  x
+            return (typeof x === 'object' && x !==null && !(x instanceof Date)) ? JSON.stringify(x) :  x
         })
         logger.info({
             type:'insert',

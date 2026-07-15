@@ -104,6 +104,22 @@ export class Property implements PropertyInstance {
         `Allowed types: ${ALLOWED_PROPERTY_TYPES.join(', ')}.`
       );
     }
+    // defaultValue/computed 必须是函数（r31）：写路径只对 `typeof === 'function'` 的
+    //  defaultValue 求值，非函数（如 defaultValue: 'user' 的直觉写法）会被**静默忽略**——
+    //  字段落 NULL、零告警的声明失效。与 type 白名单同族的"声明形同虚设"缺口，声明期拒绝。
+    if (args.defaultValue !== undefined && typeof args.defaultValue !== 'function') {
+      throw new Error(
+        `Property "${args.name}" declares a non-function defaultValue (${JSON.stringify(args.defaultValue)}). ` +
+        `defaultValue must be a function evaluated at record creation, e.g. defaultValue: () => ${JSON.stringify(args.defaultValue)}. ` +
+        `A literal value would be silently ignored by the write path.`
+      );
+    }
+    if (args.computed !== undefined && typeof args.computed !== 'function') {
+      throw new Error(
+        `Property "${args.name}" declares a non-function computed (${JSON.stringify(args.computed)}). ` +
+        `computed must be a function of the record's own row, e.g. computed: (record) => ...`
+      );
+    }
 
     const instance = new Property(args, options);
     

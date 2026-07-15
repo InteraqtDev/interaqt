@@ -1,4 +1,4 @@
-import { Entity, Property } from "@core";
+import { Entity, Property, UniqueConstraint } from "@core";
 import { GlobalBoundState } from "./computations/Computation.js";
 import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
@@ -333,6 +333,13 @@ export const DictionaryEntity = Entity.create({
             type: 'json',
             collection: false,
         })
+    ],
+    // CAUTION key 唯一是 dict 语义的守恒律（r12-I-1，r31 收口）：并发 dispatch 的
+    //  find-then-create 竞态会写出同 key 双行——之后 findOne 非确定、update 只改一行留幽灵。
+    //  唯一索引把静默双行变成数据库层冲突；写路径（setDictionaryValue）把该冲突转成
+    //  可重试事务错误，重试后 findOne 命中已提交行并走 update 轨（收敛）。
+    constraints: [
+        UniqueConstraint.create({ name: 'interaqt_dictionary_key_unique', properties: ['key'] })
     ]
 })
 

@@ -3,6 +3,7 @@ import {
   Controller,
   Entity,
   KlassByName,
+  MatchExp,
   MonoSystem,
   Property,
   UniqueConstraint,
@@ -52,6 +53,37 @@ describeIfPostgres("PostgreSQL data constraints", () => {
           rawCode: "23505",
         },
       });
+    } finally {
+      await system.destroy();
+    }
+  });
+
+  // r31：驱动 insert/update 的 Date 参数必须原样绑定（此前 JSON.stringify 产出带引号字符串，
+  // 能否入库依赖 PG datetime 解析器对双引号的历史容忍）。方言匹配探针——PGLite 不能替代真实 PG
+  // 的 pg 客户端参数序列化路径（AGENTS.md fix-the-class 清单第 7 条）。
+  test("timestamp Date params bind natively through the real pg client (insert + update)", async () => {
+    const EventRec = Entity.create({
+      name: "PgTimestampEventRec",
+      properties: [
+        Property.create({ name: "name", type: "string" }),
+        Property.create({ name: "happenedAt", type: "timestamp" }),
+      ],
+    });
+
+    const system = new MonoSystem(new PostgreSQLDB(`${process.env.INTERAQT_POSTGRES_DATABASE!}_r31ts`, dbOptions));
+    system.conceptClass = KlassByName;
+    const controller = new Controller({ system, entities: [EventRec], relations: [] });
+    await controller.setup(true);
+    try {
+      const ms = Date.UTC(2026, 0, 2, 3, 4, 5);
+      const created = await system.storage.create("PgTimestampEventRec", { name: "e1", happenedAt: new Date(ms) });
+      const readBack = await system.storage.findOne("PgTimestampEventRec", MatchExp.atom({ key: "id", value: ["=", created.id] }), undefined, ["*"]);
+      expect(readBack.happenedAt).toBe(ms);
+
+      const ms2 = Date.UTC(2026, 5, 6, 7, 8, 9);
+      await system.storage.update("PgTimestampEventRec", MatchExp.atom({ key: "id", value: ["=", created.id] }), { happenedAt: new Date(ms2) });
+      const readBack2 = await system.storage.findOne("PgTimestampEventRec", MatchExp.atom({ key: "id", value: ["=", created.id] }), undefined, ["*"]);
+      expect(readBack2.happenedAt).toBe(ms2);
     } finally {
       await system.destroy();
     }

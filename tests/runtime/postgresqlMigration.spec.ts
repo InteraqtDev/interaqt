@@ -577,7 +577,9 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
     const plan = await controllerV2.migrate({ approvedDiff });
 
-    expect(plan.schemaPlan?.verificationDDL).toHaveLength(2);
+    // 只断言本实体的两条用户约束：schema 级 verificationDDL 还包含系统表约束
+    // （如 r31 起 _Dictionary_ key 的唯一守恒律），精确总数断言会随系统约束演化而脆化。
+    expect(plan.schemaPlan?.verificationDDL.filter(operation => operation.logicalPath?.startsWith("PgConstraintMatrixAccount"))).toHaveLength(2);
     expect(plan.schemaPlan?.postRecomputeDDL.length).toBeGreaterThanOrEqual(2);
     const migrated = await systemV2.storage.findOne("PgConstraintMatrixAccount", undefined, undefined, ["*"]);
     expect(migrated.normalizedEmail).toBe("a@example.com");

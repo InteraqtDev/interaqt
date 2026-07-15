@@ -46,6 +46,16 @@ export type ScopedSequenceMatchExpression =
 export interface ScopedSequenceInstance extends IInstance {
   name: string;
   scope: ScopedSequenceScopeItem[];
+  /**
+   * 参与编号的记录过滤器——**create-time 语义**（与 scope 的不可变契约不同）：
+   * 只在记录创建时求值一次，决定该记录是否分配序号。之后 match 字段的更新
+   * **不会**重新编号、不会回收号码、也不被禁止（业务字段的正常流转，如
+   * status: active → cancelled，已编号记录保留其号码）；创建时未命中的记录
+   * 永远保持未编号（序号列为 null）。需要"持续成员资格"语义时，请把可变维度
+   * 建模在 scope 之外、或以 filtered entity + 独立计算表达。
+   * （scope 字段则相反：编号后不可变，运行期守卫直接拒绝——见 Scheduler 的
+   * ScopedSequence scope guard。）
+   */
   match?: ScopedSequenceMatchExpression;
   initialValue?: number;
   step?: number;

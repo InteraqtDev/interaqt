@@ -36,9 +36,11 @@ export function normalizeDatabaseError(error: unknown, database?: Database): Nor
     const rawCode = raw.code as string | number | undefined ?? raw.errno as string | number | undefined
     const constraintName = readRawString(raw, ['constraint', 'constraintName', 'index', 'sqlMessage'])
     const sqliteFields = parseSQLiteUniqueFields(message)
+    // CAUTION 通用 SQLITE_CONSTRAINT 不能算 unique violation：NOT NULL / CHECK / FK 失败也可能
+    //  携带该通用码，误判会让调用方按"重复键"处理（upsert 重试等）。真正的 unique 失败由
+    //  扩展码 SQLITE_CONSTRAINT_UNIQUE 或消息文本（'UNIQUE constraint failed'）识别。
     const isUniqueViolation = rawCode === '23505'
         || rawCode === 'SQLITE_CONSTRAINT_UNIQUE'
-        || rawCode === 'SQLITE_CONSTRAINT'
         || rawCode === 1062
         || message.includes('UNIQUE constraint failed')
         || message.includes('duplicate key value violates unique constraint')

@@ -7,7 +7,8 @@ import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { assert } from "../util.js";
 import { RequireSerializableRetry } from "../transaction.js";
-import { ComputationError } from "../errors/ComputationErrors.js";
+import { ComputationError, ComputationProtocolError } from "../errors/ComputationErrors.js";
+import { validateMutationEventPatternKeys, validateMutationEventPatternSurface } from "./TransitionFinder.js";
 
 // CAUTION Transform 派生记录的身份由框架管理（sourceRecordId + transformIndex），callback 返回
 //  顶层 `id` 会被 storage 的"外部 id"路径原样写入：id 来自源实体的发号序列（或 uuid），与派生
@@ -39,6 +40,23 @@ export class RecordsTransformHandle implements DataBasedComputation {
         this.transformCallback = this.args.callback.bind(this.controller)
         
         if (this.args.eventDeps) {
+            // 模式面校验（与 StateMachine trigger 同一声明面、同一实现）：
+            //  外层未知字段在注册时被静默丢弃（过滤条件消失 → 静默过触发）；
+            //  keys 取值面（非空数组 / 仅 update / 声明过的值属性）与 trigger.keys 同一契约。
+            for (const [eventDepName, eventDep] of Object.entries(this.args.eventDeps)) {
+                const describeDep = () => `Transform computation of ${this.dataContext.type} "${(this.dataContext.id as { name?: string }).name}": eventDep "${eventDepName}"`
+                validateMutationEventPatternSurface(eventDep, { allowPhase: true }, describeDep)
+                validateMutationEventPatternKeys(
+                    this.controller,
+                    eventDep as { recordName?: string, type?: string, keys?: unknown },
+                    (message: string) => {
+                        throw new ComputationProtocolError(
+                            `${describeDep()}: ${message}`,
+                            { handleName: 'Transform', computationPhase: 'event-dep-keys-validation' }
+                        )
+                    }
+                )
+            }
             this.eventDeps = this.args.eventDeps
         } else {
             this.dataDeps = {

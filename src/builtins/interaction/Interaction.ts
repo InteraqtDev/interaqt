@@ -333,6 +333,16 @@ export async function checkPayload(controller: GuardController, interaction: Int
   const payload = eventArgs.payload || {};
   const payloadDefs = interaction.payload?.items || [];
 
+  // CAUTION payload 必须是普通对象。字符串/数组是 truthy 且 typeof 'object'（数组）或可被
+  //  Object.keys 枚举出下标（字符串），不拒绝就会落到 "0 in payload is not defined" 这类
+  //  与用户写法脱节的错误信息。
+  if (typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new InteractionGuardError(
+      `payload of interaction ${interaction.name} must be a plain object, got ${Array.isArray(payload) ? 'array' : typeof payload}`,
+      { type: 'payload not an object', checkType: 'payload' }
+    );
+  }
+
   const payloadKeys = Object.keys(payload);
   for (const payloadKey of payloadKeys) {
     if (!payloadDefs.some(payloadDef => payloadDef.name === payloadKey)) {
@@ -344,14 +354,18 @@ export async function checkPayload(controller: GuardController, interaction: Int
   }
 
   for (const payloadDef of payloadDefs) {
-    if (payloadDef.required && !(payloadDef.name! in payload)) {
+    const payloadItem = payload[payloadDef.name!];
+    // CAUTION required 按「值是否为 undefined」判定，而不是 `in` 的键存在性：
+    //  显式传 { field: undefined }（in 为 true）会跳过下方全部类型/ref/base 校验，
+    //  required 声明被静默绕过（守卫 fail-open）。undefined 值与缺键在 JSON 语义下
+    //  等价于"未提供"，统一按 missing 拒绝。
+    if (payloadDef.required && payloadItem === undefined) {
       throw new InteractionGuardError(
         `Payload validation failed for field '${payloadDef.name}': missing`,
         { type: `${payloadDef.name} missing`, checkType: 'payload' }
       );
     }
 
-    const payloadItem = payload[payloadDef.name!];
     // CAUTION must be `continue`, not `return`: a missing optional field only skips
     // its own checks, never the validation of the fields defined after it.
     if (payloadItem === undefined) continue;
