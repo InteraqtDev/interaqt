@@ -16,6 +16,33 @@ class IDSystem {
             await this.db.scheme(`ALTER TABLE "_IDS_" MODIFY name VARCHAR(191), ADD PRIMARY KEY (name)`)
         }
     }
+    /**
+     * 计数器与存量数据对账（r28 记录项，r32 收口；与 PG 驱动 setupSequences 同一契约）：
+     * setup(false) attach 到已有数据而 _IDS_ 计数器缺失/落后（手工导入、备份恢复、跨库
+     * 搬迁）时，getAutoId 会从 1 重发号——逻辑 id 列没有唯一索引，重复 id 是静默数据损坏。
+     * 只向前推进（GREATEST(last, 存量最大 id)），绝不回拨。
+     */
+    async setupSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
+        // open() 已 SET ANSI_QUOTES，双引号标识符可用。
+        const quote = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`
+        for (const record of records) {
+            const rows = await this.db.query<{ max: number | string | null }>(
+                `SELECT COALESCE(MAX(${quote(record.idField)}), 0) AS max FROM ${quote(record.tableName)}`,
+                [],
+                `read max id for ${record.recordName}`
+            )
+            const maxExistingId = Number(rows[0]?.max ?? 0)
+            if (maxExistingId >= 1) {
+                await this.db.update(
+                    `INSERT INTO "_IDS_" (name, last) VALUES (?, ?)
+ON DUPLICATE KEY UPDATE last = GREATEST(last, VALUES(last))`,
+                    [record.recordName, maxExistingId],
+                    undefined,
+                    `reconcile id counter for ${record.recordName}`
+                )
+            }
+        }
+    }
     // CAUTION LAST_INSERT_ID() 是会话级的，而「UPSERT + SELECT」是两条语句：同一连接上并发的
     //  getAutoId 交错执行会让两次 SELECT 读到同一个值（实测复现）。用本地分配链把两条语句
     //  串成不可交错的对；跨连接/跨进程由 UPSERT 的原子性 + 会话隔离保证。
@@ -214,6 +241,9 @@ export class MysqlDB implements Database{
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
+    }
+    async setupRecordSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
+        return this.idSystem.setupSequences(records)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
         // CAUTION 方言必须识别自己 mapToDBFieldType 产出的全部 json fieldType 形态（r25 I-1）：

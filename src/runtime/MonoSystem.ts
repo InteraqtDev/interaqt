@@ -41,7 +41,7 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, timestampParamForDialect } from "@storage";
+import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
@@ -628,18 +628,22 @@ class MonoStorage implements Storage{
 
     private createPostRecomputeSchemaPlan(dbSetup: DBSetup): { verificationDDL: AdditiveDDLOperation[], postRecomputeDDL: AdditiveDDLOperation[] } {
         const dialect = getSchemaDialect(this.db)
-        if (dbSetup.constraintSchemaItems.length && dialect.constraints?.unique !== true) {
-            const hasUnique = dbSetup.constraintSchemaItems.some(item => item.kind === 'unique')
+        // 框架内部 kv 约束（_System_/_Dictionary_）在能力缺失方言上跳过（与 setup 面的
+        //  createConstraintSQL 同一契约，见 shouldSkipConstraintForDialect）；只对用户声明的
+        //  约束做能力 fail-fast。
+        const constraintSchemaItems = dbSetup.constraintSchemaItems.filter(item => !shouldSkipConstraintForDialect(item, dialect))
+        if (constraintSchemaItems.length && dialect.constraints?.unique !== true) {
+            const hasUnique = constraintSchemaItems.some(item => item.kind === 'unique')
             if (hasUnique) throw new ConstraintSetupError(`Migration post-recompute unique constraints are not supported by ${dialect.name}`, {
                 driver: this.db.constructor?.name,
             })
         }
-        if (dbSetup.constraintSchemaItems.some(item => item.kind === 'non-null') && dialect.constraints?.nonNull !== true) {
+        if (constraintSchemaItems.some(item => item.kind === 'non-null') && dialect.constraints?.nonNull !== true) {
             throw new ConstraintSetupError(`Migration post-recompute non-null constraints are not supported by ${dialect.name}`, {
                 driver: this.db.constructor?.name,
             })
         }
-        const verificationDDL = dbSetup.constraintSchemaItems.map(item => ({
+        const verificationDDL = constraintSchemaItems.map(item => ({
             kind: 'verify' as const,
             sql: item.kind === 'unique' ? this.createUniqueVerificationSQL(item) : this.createNonNullVerificationSQL(item),
             tableName: item.tableName,
@@ -716,8 +720,11 @@ class MonoStorage implements Storage{
             )
             return new Set(rows.map(row => row.name))
         }
+        // CAUTION MySQL 8.0 的 information_schema 视图返回**大写**列头（TABLE_NAME），
+        //  与查询书写的大小写无关——必须显式 alias，否则 row.table_name 恒 undefined，
+        //  返回的表集合全是 undefined（manifest 判存失效、hasExistingData 裸 TypeError）。
         const rows = await this.db.query<{ table_name: string }>(
-            `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()`,
+            `SELECT table_name AS \`table_name\` FROM information_schema.tables WHERE table_schema = DATABASE()`,
             [],
             'migration list tables'
         )
@@ -743,8 +750,9 @@ class MonoStorage implements Storage{
             )
             return new Set(rows.map(row => row.name))
         }
+        // 同 getExistingTables：MySQL information_schema 列头大写，必须显式 alias。
         const rows = await this.db.query<{ column_name: string }>(
-            `SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?`,
+            `SELECT column_name AS \`column_name\` FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?`,
             [tableName],
             `migration list columns ${tableName}`
         )

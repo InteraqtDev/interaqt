@@ -22,11 +22,15 @@ const config = {
   password: process.env.MYSQL_PASSWORD || 'interaqt',
 };
 
-async function countConnections() {
+// CAUTION 连接计数按**本套件独占的 database** 过滤（processlist.DB = 连接的默认库），
+//  不能按 user 过滤：其他 MySQL env-gated 套件与本套件共用同一 MySQL 用户，并行运行时
+//  它们的连接会污染计数（r28 记录的并行互扰假红，r32 收口——每个套件的库名唯一）。
+//  admin 连接不带默认库，天然排除。
+async function countConnections(database: string) {
   const admin = await mysql.createConnection(config);
   const [rows] = await admin.query(
-    `SELECT COUNT(*) AS cnt FROM information_schema.processlist WHERE user = ? AND command != 'Query'`,
-    [config.user]
+    `SELECT COUNT(*) AS cnt FROM information_schema.processlist WHERE user = ? AND db = ? AND command != 'Query'`,
+    [config.user, database]
   );
   await admin.end();
   return Number((rows as Array<{ cnt: unknown }>)[0].cnt);
@@ -34,7 +38,7 @@ async function countConnections() {
 
 describe.skipIf(!MYSQL_ENABLED)('MySQL open() idempotency (r25 I-2)', () => {
   test('openForSchemaRead → open(false) → open(false) reuses the working connection', async () => {
-    const database = process.env.INTERAQT_MYSQL_DATABASE!
+    const database = `${process.env.INTERAQT_MYSQL_DATABASE!}_open_idem`
     // openForSchemaRead 契约要求库已存在（对应 setup(false) 之前已 install 过的场景）。
     const admin = await mysql.createConnection(config);
     await admin.query(`CREATE DATABASE IF NOT EXISTS \`${database.replace(/`/g, '``')}\``);
@@ -42,15 +46,15 @@ describe.skipIf(!MYSQL_ENABLED)('MySQL open() idempotency (r25 I-2)', () => {
 
     const db = new MysqlDB(database, config);
     await db.openForSchemaRead();
-    const afterSchemaRead = await countConnections();
+    const afterSchemaRead = await countConnections(database);
 
     await db.open(false);
-    const afterOpen = await countConnections();
+    const afterOpen = await countConnections(database);
     // 复用连接：不新增
     expect(afterOpen).toBe(afterSchemaRead);
 
     await db.open(false);
-    expect(await countConnections()).toBe(afterSchemaRead);
+    expect(await countConnections(database)).toBe(afterSchemaRead);
 
     // 复用路径上框架表必须完成初始化（openForSchemaRead 刻意跳过 _IDS_）
     const ids = await db.query<{ cnt: unknown }>(
@@ -62,7 +66,7 @@ describe.skipIf(!MYSQL_ENABLED)('MySQL open() idempotency (r25 I-2)', () => {
 
     // forceDrop：关旧连接、重建库，同样不泄漏
     await db.open(true);
-    expect(await countConnections()).toBeLessThanOrEqual(afterOpen);
+    expect(await countConnections(database)).toBeLessThanOrEqual(afterOpen);
     const probe = await db.query<{ ok: number }>('SELECT 1 AS ok', [], 'probe');
     expect(probe[0].ok).toBe(1);
 

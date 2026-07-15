@@ -244,6 +244,36 @@ describe("r32 — recorded items (storage)", () => {
         await db.close();
     });
 
+    // ---------- C｜_IDS_ 计数器与存量数据对账（r28 记录的 driver 项） ----------
+
+    test("C1: SQLite — setup(false) reconciles the _IDS_ counter with existing MAX(id) (was: silent duplicate logical ids after counter loss)", async () => {
+        const db = new SQLiteDB(":memory:");
+        const mk = () => Entity.create({ name: "R32IdsUser", properties: [Property.create({ name: "name", type: "string" })] });
+        const system1 = new MonoSystem(db);
+        const c1 = new Controller({ system: system1, entities: [mk()], relations: [] });
+        await c1.setup(true);
+        await system1.storage.create("R32IdsUser", { name: "u1" });
+        await system1.storage.create("R32IdsUser", { name: "u2" });
+        // 模拟手工导入/备份恢复的库：计数器丢失（此前：u3 静默拿到 id=1，与 u1 重复）
+        await db.scheme("DELETE FROM _IDS_");
+
+        const system2 = new MonoSystem(db);
+        const c2 = new Controller({ system: system2, entities: [mk()], relations: [] });
+        await c2.setup(false);
+        const created = await system2.storage.create("R32IdsUser", { name: "u3" });
+        const all = await system2.storage.find("R32IdsUser", undefined, undefined, ["id", "name"]);
+        expect(new Set(all.map(row => String(row.id))).size).toBe(3);
+        expect(Number(created.id)).toBe(3);
+        // 计数器落后（非缺失）同样只向前推进
+        await db.scheme("UPDATE _IDS_ SET last = 1 WHERE name = 'R32IdsUser'");
+        const system3 = new MonoSystem(db);
+        const c3 = new Controller({ system: system3, entities: [mk()], relations: [] });
+        await c3.setup(false);
+        const created4 = await system3.storage.create("R32IdsUser", { name: "u4" });
+        expect(Number(created4.id)).toBe(4);
+        await db.close();
+    });
+
     test("B2 (guard): plain filtered entity whose base gets table-combined keeps a live table pointer", async () => {
         // EXT-1 的同族普通面：filtered entity 的 base 被（非 merged 的）合表移动。
         const Host = Entity.create({ name: "R32GHost", properties: [Property.create({ name: "label", type: "string" })] });
