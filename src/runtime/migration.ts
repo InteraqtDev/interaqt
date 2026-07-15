@@ -2906,7 +2906,10 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
                 dataContext: dataContextPath(computation.dataContext),
                 recordName: hostName,
                 ids,
-                count: ids.length || records?.length,
+                // CAUTION count 语义：能重算时 = 实际会删除的行数（ids.length，包括 0）；
+                //  无法重算（读不到存量 / 无 compute）时 = 存量行数上界。此前 `ids.length || records.length`
+                //  在「重算结果为一行都不删（ids=[]）」时把 count 误报成全表行数——审查面被误导。
+                count: records && typeof (computation as DataBasedComputation).compute === "function" ? ids.length : records?.length,
                 reason: "hard deletion computed property may delete host records whose recomputed value is true",
             });
         }

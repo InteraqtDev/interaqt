@@ -749,8 +749,11 @@ export class Controller {
     private cloneDispatchArgs<TArgs>(args: TArgs): TArgs {
         if (!args || typeof args !== 'object') return args
         const cloned = { ...(args as Record<string, unknown>) }
+        // CAUTION 克隆不得改变形状：数组展开成 `{...arr}` 会变成普通对象（{0:…,1:…}），
+        //  守卫（checkPayload 的非对象拒绝）就再也看不到"payload 是数组"这个非法形态，
+        //  错误信息退化成 "0 in payload is not defined"。数组按数组克隆，交给守卫按原形拒绝。
         if (cloned.payload && typeof cloned.payload === 'object') {
-            cloned.payload = { ...(cloned.payload as Record<string, unknown>) }
+            cloned.payload = Array.isArray(cloned.payload) ? [...cloned.payload] : { ...(cloned.payload as Record<string, unknown>) }
         }
         if (cloned.user && typeof cloned.user === 'object') {
             cloned.user = { ...(cloned.user as Record<string, unknown>) }

@@ -283,10 +283,14 @@ Or if you want to use state name as value, you should not set ${this.dataContext
         // 同一个 record 被多次返回导致 incrementalCompute 被多次调用的问题。
         // incrementalCompute 会根据 record 的当前状态来判断是否需要处理，
         // 如果当前状态不匹配则会 skip，所以去重后的行为是正确的。
+        // CAUTION id 一律 String 归一后判等：不同 transfer 的 computeTarget 可能分别返回
+        //  用户载荷形态（字符串 id）与存储查询形态（驱动原生 id），裸值 Set 判不等时
+        //  同一记录被处理两次——一次事件连走两个状态（与写路径 sameRecordId 同族的身份判定）。
         const seen = new Set<string>()
         return allRecords.filter((record: any) => {
-            if (seen.has(record.id)) return false
-            seen.add(record.id)
+            const idKey = String(record.id)
+            if (seen.has(idKey)) return false
+            seen.add(idKey)
             return true
         })
     }

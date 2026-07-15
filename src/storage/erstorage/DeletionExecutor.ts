@@ -438,7 +438,10 @@ export class DeletionExecutor {
      */
     async deleteDifferentTableReliance(recordName: string, records: EntityIdRef[], events?: RecordMutationEvent[]) {
         const recordInfo = this.map.getRecordInfo(recordName)
-        const recordsById = events ? new Map(records.map(r => [r.id, r])) : undefined
+        // CAUTION key 一律 String(id)：records 来自调用方（可能携带公开 API 传入的字符串 id），
+        //  事件端点 id 来自存储查询（驱动原生形态）。裸值 Map 判不等时事件富化被静默跳过
+        //  （link delete 事件端点保持 thin），与 QueryExecutor 批量回填、sameRecordId 的归一化约定一致。
+        const recordsById = events ? new Map(records.map(r => [String(r.id), r])) : undefined
 
         for (let info of recordInfo.differentTableReliance) {
             const matchInIds = MatchExp.atom({
@@ -454,7 +457,7 @@ export class DeletionExecutor {
                 for (let i = eventsLengthBeforeDelete; i < events.length; i++) {
                     const event = events[i]
                     if (event.recordName === info.linkName) {
-                        const record = recordsById!.get(event.record![info.isRecordSource() ? 'source' : 'target'].id)
+                        const record = recordsById!.get(String(event.record![info.isRecordSource() ? 'source' : 'target'].id))
                         if (record) {
                             event.record![info.isRecordSource() ? 'source' : 'target'] = record
                         }

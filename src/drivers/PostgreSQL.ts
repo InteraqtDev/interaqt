@@ -298,8 +298,11 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
         const finalSQL = `${sql} ${idField ? `RETURNING "${idField}" AS id`: ''}`
+        // CAUTION Date 必须原样交给驱动绑定（timestamp 列的方言可绑定形态，r26 契约）。
+        //  JSON.stringify(Date) 产出**带引号**的字符串（'"2026-…Z"'），能否被接受完全依赖
+        //  PG datetime 解析器对双引号的历史容忍——与 MySQL 驱动（r26 已排除 Date）同一契约。
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x
+            return (typeof x === 'object' && x !==null && !(x instanceof Date)) ? JSON.stringify(x) : x
         })
         logger.info({
             type:'update',
@@ -312,8 +315,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     async insert(sql:string, values:unknown[], name='')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})
+        // Date 原样绑定（同 update 的 CAUTION）。
         const params = values.map(x => {
-            return (typeof x === 'object' && x !==null) ? JSON.stringify(x) : x
+            return (typeof x === 'object' && x !==null && !(x instanceof Date)) ? JSON.stringify(x) : x
         })
         logger.info({
             type:'insert',
