@@ -2,16 +2,61 @@
 
 ## [4.1.4](https://github.com/interaqtdev/interaqt/compare/v4.1.3...v4.1.4) (2026-07-15)
 
-### Features
-
-* **tests:** fuzzer oracle 7b — filtered-relation nested-read completeness (r30-A lesson as mechanism) ([474db7c](https://github.com/interaqtdev/interaqt/commit/474db7c2b066e470bf9cf8e4c006552e3067c38b))
+r30 deep review: four bugs fixed (two fatal silent-corruption, one fatal-but-narrow in the activity
+layer, one robustness), plus the escape analysis landed as mechanisms — a new fuzzer oracle
+(filtered nested-read completeness, sensitivity-checked red on the pre-fix code) and two dimension-registry
+axes. Full report: `agentspace/output/deep-review-2026-07-15-r30.md`; retrospective:
+`agentspace/output/r30-test-blindness-retrospective.md`.
 
 ### Bug Fixes
 
-* **builtins:** r30 — isRef payload null/non-object gives a clean guard error ([6dea78d](https://github.com/interaqtdev/interaqt/commit/6dea78d9186def4acda3a3404c93d7d90d4932b6))
-* **builtins:** r30 — reject activity transfers that reach into a group's nested nodes ([2eb203b](https://github.com/interaqtdev/interaqt/commit/2eb203b430bc12f3e24229965a342d56fed6f9ae))
-* **runtime:** r30 — invalidate superseded async tasks on sync/resolved recompute (fatal) ([07acb56](https://github.com/interaqtdev/interaqt/commit/07acb568d10f8693adf104f72ab7696561054010))
-* **storage:** r30 — filtered relation over combined base read consistency (fatal, r28 regression) ([69158a3](https://github.com/interaqtdev/interaqt/commit/69158a39f2842779aace81002c3a4fdf3b6c2a8a))
+* **storage:** filtered relation over a combined (three-tables-in-one) base is no longer silently pruned
+  to empty on nested reads (fatal, regression introduced with the v4.1.2 phantom-pairing prune) — the
+  synthetic `&` pairing-truth-source decision and `pruneUnpairedCombinedReads` now both judge the base
+  topology; nested x:n / deep x:1 completion under a filtered x:1 attribute reads the alias result key,
+  so those branches are backfilled instead of silently skipped ([69158a3](https://github.com/interaqtdev/interaqt/commit/69158a39f2842779aace81002c3a4fdf3b6c2a8a))
+* **runtime:** a newer value applied via the sync / `ComputationResult.resolved` path can no longer be
+  overwritten by a slower, superseded async task completing afterwards (fatal) — async "latest-ness" was
+  judged only by task-row id ordering and the sync path creates no task row; superseded not-yet-applied
+  tasks for the freshnessKey are now deleted before the sync result applies ([07acb56](https://github.com/interaqtdev/interaqt/commit/07acb568d10f8693adf104f72ab7696561054010))
+* **builtins:** an activity `Transfer` whose endpoint is a node nested inside a group's child activity is
+  rejected at build time (fatal) — it previously resolved through the recursion-wide node map and silently
+  rewired the nested node's `next` pointer across branch boundaries, corrupting ordering and
+  every/any/race semantics at runtime ([2eb203b](https://github.com/interaqtdev/interaqt/commit/2eb203b430bc12f3e24229965a342d56fed6f9ae))
+* **builtins:** `null` / non-object items on an `isRef` payload are rejected with a clean
+  `InteractionGuardError` instead of a bare `TypeError` deep in the guard ([6dea78d](https://github.com/interaqtdev/interaqt/commit/6dea78d9186def4acda3a3404c93d7d90d4932b6))
+
+### Features
+
+* **tests:** fuzzer oracle 7b — filtered-relation nested-read completeness: every pairing visible on the
+  link face (`findRelationByName(filteredName)`) must appear in the entity nested read through the
+  filtered attribute name. Assertion-only (zero rng calls, existing seed pools unaffected); with the
+  storage fix reverted, extended seed 2 goes red on exactly the r30-A corruption face ([474db7c](https://github.com/interaqtdev/interaqt/commit/474db7c2b066e470bf9cf8e4c006552e3067c38b))
+
+### Behavior changes (upgrade notes)
+
+* **New build-time fail-fast**: activity transfers must connect nodes declared at the same activity level
+  (its own `interactions`/`groups`). Definitions that previously built silently with a cross-level
+  transfer endpoint now throw at `ActivityManager` construction — model branching with `ActivityGroup`
+  instead.
+* **Superseded async tasks are deleted, not kept**: when a sync/resolved recompute supersedes pending or
+  not-yet-applied async tasks for the same freshnessKey, those task rows are removed. External workers
+  writing back results by task id will find their update a no-op (the daemon then skips as
+  `missing-task`) — this is the intended convergence; workers must not treat it as an error.
+* `isRef` payload validation rejects `null`/non-object items with an `InteractionGuardError`
+  (`checkType: 'payload'`) where callers previously observed a `TypeError`.
+
+### Known Issues
+
+* Migration of a Transform **chain** whose upstream change shrinks its output is refused
+  (`Migration refuses delete patch ... without explicit audited scope`) and cannot be approved — the
+  destructive-scope audit evaluates each computation against pre-migration data, so cascade deletions of
+  dependent Transforms are not approvable. Fail-loud; needs cascade-aware destructive scope. Tracked in
+  `agentspace/output/deep-review-2026-07-15-r30.md` §四 (E).
+* Nested x:1 sub-query `matchExpression`s are not applied on nested reads (plain or filtered), so a
+  filtered x:1 relation attribute returns its base pairing regardless of the filter predicate. The
+  relation-name face (`findRelationByName`) applies predicates correctly. Pre-existing gap, documented in
+  the r30 report; the fuzzer's oracle 7b uses a superset assertion until this closes.
 
 ## [4.1.3](https://github.com/interaqtdev/interaqt/compare/v4.1.2...v4.1.3) (2026-07-15)
 
