@@ -354,7 +354,18 @@ class MonoStorage implements Storage{
         if (origin) {
             return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [SYSTEM_RECORD, match, { concept, key: key.toString(), value: JSONStringify(value)}], events)
         } else {
-            return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: JSONStringify(value)}], events)
+            try {
+                return await this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: JSONStringify(value)}], events)
+            } catch (error) {
+                // CAUTION find-then-create 的并发竞态（r12-I-1 的 _System_ 兄弟轨，r31 登记本轮收口）：
+                //  与 setDictionaryValue 同一契约——(concept, key) 唯一索引把静默双行变成数据库冲突，
+                //  这里转成可重试事务错误让调用方重跑；重试后 findOne 命中已提交行、走上方 update 轨。
+                //  PG 系事务在错误后即 aborted，不能在本事务内改道 update，必须经重试路径。
+                if (normalizeDatabaseError(error, this.db).isUniqueViolation) {
+                    throw new RetryableWriteConflict(`concurrent create of system record "${concept}"/"${key}"`, { cause: error })
+                }
+                throw error
+            }
         }
     }
     private requiresScopedSequenceState(options?: SystemSchemaOptions) {

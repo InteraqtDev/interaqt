@@ -39,7 +39,7 @@ import {
     getApprovedEmptyFactRecordRemovals,
     getChangedComputationsFromApprovedDiff,
     backfillNewFactPropertyDefaults,
-    getDestructiveDeletionScope,
+    getCascadeAwareDeletionScope,
     getNewFactPropertyBackfills,
     getNewFilteredDataContexts,
     getRecomputeBlockingChanges,
@@ -388,8 +388,15 @@ export class Controller {
         )
         const storageBlockingChanges = getStorageBlockingChanges(previousManifest, nextManifest)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
+        // r30-E：级联感知——优先以「回滚事务内真实执行 rebuildPlan」收集精确删除集
+        //  （含链式依赖计算对上游收缩的级联删除），审批面从此可以一轮给出精确 ids。
+        //  模拟不可行（MySQL / 缺 handler 等）时回退分析性一阶 scope。
         const destructiveScopes = options.includeDestructiveScope === true
-            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest, readHandle)
+            ? (await getCascadeAwareDeletionScope(this, provisionalRebuildPlan, previousManifest, readHandle, {
+                schemaPlan,
+                previousManifest,
+                nextManifest,
+            })).entries
             : []
         const safety = {
             blockingChanges: [
@@ -464,8 +471,16 @@ export class Controller {
         ]
         const blockingChanges = createPlanBlockingMessages(allBlockingChanges)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
-        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, previousManifest, readHandle)
-        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
+        // r30-E：入口断言用级联感知 scope（模拟成功 ⇒ ids 双向精确对账，dryRun 即可发现差异；
+        //  模拟不可行 ⇒ 只查存在性，ids 精确性由重算事务内的执行期对账兜底——一阶分析对
+        //  链式依赖计算的 ids 必然失真，不能作为精确断言的依据）。
+        const { entries: deletionScope, exact: deletionScopeExact } = await getCascadeAwareDeletionScope(this, rebuildPlan, previousManifest, readHandle, {
+            schemaPlan,
+            previousManifest,
+            nextManifest,
+            options: migrationOptions,
+        })
+        assertDestructiveScopeAllowed(migrationOptions, deletionScope, { idExactness: deletionScopeExact })
         await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest, readHandle)
         await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, previousManifest, readHandle)
         const factPropertyBackfills = getNewFactPropertyBackfills(this, previousManifest, nextManifest)
