@@ -231,10 +231,14 @@ export class DeletionExecutor {
         const clearedFieldSet = new Set(fieldsToClear)
 
         // 2. 行占用判定：足迹之外的记录身份列仍有值 ⇒ 清列；否则删行。
+        // CAUTION 不排除 filtered/merged-abstract 记录（r29，extended fuzzer seed 1 首跑抓获）：
+        //  merged (union) 编译后，物理身份列属于 merged-abstract 记录（input 是视图、其 id 字段
+        //  解析到 merged base 的列）——把它们排除会让「link 行 = 宿主行」的 merged link 删除
+        //  误判行无人占用而 DELETE ROW，宿主实体被物理销毁（零事件）。视图与 base 共享同一
+        //  id 字段，按字段判定天然去重，无需按记录种类排除。
         const hasSameRowData = Object.entries(this.map.data.records).some(([name, recordData]) => {
             if (name === recordName || recordData.table !== recordInfo.table) return false
-            if (recordData.isFilteredEntity || recordData.isFilteredRelation || recordData.isMergedAbstract) return false
-            const idField = (recordData.attributes.id as { field?: string }).field
+            const idField = (recordData.attributes.id as { field?: string } | undefined)?.field
             if (!idField || clearedFieldSet.has(idField)) return false
             return row[idField] !== null && row[idField] !== undefined
         })
@@ -374,9 +378,17 @@ export class DeletionExecutor {
         // 事件位置保持在 record 本身的 delete 事件之前。
         this.filteredEntityManager.settleDeletionMemberships(deletionSnapshot, recordName, records as Record[], linkAndCascadeEvents, ledgerEvents)
 
+        // CAUTION record 本身的 delete 事件必须以**物理名**发出（r29，extended fuzzer seed 37）：
+        //  级联轨（sameTableReliance / handleDeletedRecordReliance）以声明面名字（attr.recordName）
+        //  递归到这里——对 merged input / filtered 端点，声明名是视图：视图名下按契约只有
+        //  成员资格事件（由上方 settle 负责），record 级 delete 归物理 base 名。此前级联轨
+        //  按视图名发 record delete：物理名事件整体缺失（监听物理名的计算对删除失明），
+        //  视图名事件与成员资格 settle 重复（双 delete）。canonical 轨（deleteRecord）的
+        //  recordName 经 RecordQuery.create 已解析，此处归一让两条轨同一契约。
+        const physicalRecordName = this.map.getRecordInfo(recordName).resolvedBaseRecordName ?? recordName
         const recordDeleteEvents = records.map(record => ({
             type: 'delete',
-            recordName: recordName,
+            recordName: physicalRecordName,
             record,
         }) as RecordMutationEvent)
         return { linkAndCascadeEvents, recordDeleteEvents }

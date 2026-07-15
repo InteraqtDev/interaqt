@@ -101,6 +101,14 @@ export function expectEventsToExplainDiff(
         createPayloadExemptField?: (recordName: string, fieldName: string) => boolean
         /** relation 名集合：用于第 6 条 delete 端点完备性 */
         relations?: string[]
+        /**
+         * 只按成员资格对账的记录名（filtered entity/relation 视图名，r29）：
+         * 视图名下只有成员资格 create/delete 事件——字段 update 事件按契约恒以物理 base 名
+         * 发出（r18 死监听不变量的事件面），create 事件 payload / 端点契约也归 base 轨对账。
+         * 对这些名字只执行第 1/2/4 条（出现/消失必须有事件 + 无幻影事件），
+         * 跳过第 3/5/6/7 条（字段覆盖、payload 完备、端点完备）。
+         */
+        membershipOnlyRecords?: Set<string>
     }
 ) {
     const trackedNames = new Set(before.keys())
@@ -108,8 +116,10 @@ export function expectEventsToExplainDiff(
     const ignoreField = options?.ignoreField
     const createPayloadExemptField = options?.createPayloadExemptField
     const relationNames = new Set(options?.relations ?? [])
+    const membershipOnlyRecords = options?.membershipOnlyRecords
 
     for (const recordName of trackedNames) {
+        const membershipOnly = membershipOnlyRecords?.has(recordName) ?? false
         const beforeRows = before.get(recordName)!
         const afterRows = after.get(recordName)!
 
@@ -138,10 +148,11 @@ export function expectEventsToExplainDiff(
         }
         // 5. create 事件 payload 完备性：行上全部非 NULL 普通值字段必须出现在 payload 且值一致
         //    （快照完备性契约——r21 F-1 的本地求值把缺席键解读为 NULL；r25 F-1 的逃逸面）。
+        //    membership-only 名（filtered 视图）payload 契约归 base 轨对账，此处跳过。
         const createEventsById = new Map(relevantEvents
             .filter(e => e.recordName === recordName && e.type === 'create')
             .map(e => [String(e.record?.id), e]))
-        for (const id of createdIds) {
+        for (const id of membershipOnly ? [] : createdIds) {
             const createEvent = createEventsById.get(id)
             if (!createEvent?.record) continue
             const row = afterRows.get(id)!
@@ -172,8 +183,8 @@ export function expectEventsToExplainDiff(
         }
         // 6. relation delete 事件端点完备性（r26 F-1）：payload 必须带 source.id / target.id，
         //    且与消失前快照一致。存在性规则（#2）拦不住「有 delete 缺端点」。
-        const isRelation = relationNames.has(recordName)
-            || [...beforeRows.values(), ...afterRows.values()].some(row => 'source' in row || 'target' in row)
+        const isRelation = !membershipOnly && (relationNames.has(recordName)
+            || [...beforeRows.values(), ...afterRows.values()].some(row => 'source' in row || 'target' in row))
         if (isRelation) {
             for (const event of deleteEvents) {
                 const id = String(event.record?.id ?? event.oldRecord?.id)
@@ -204,8 +215,9 @@ export function expectEventsToExplainDiff(
                 }
             }
         }
-        // 3. 字段变化必须被 update 事件 keys 覆盖
-        for (const { id, changedFields } of changed) {
+        // 3. 字段变化必须被 update 事件 keys 覆盖（membership-only 名跳过：
+        //    字段 update 事件恒以物理 base 名发出，视图名只有成员资格事件）
+        for (const { id, changedFields } of membershipOnly ? [] : changed) {
             const coveredKeys = new Set(updateEvents
                 .filter(e => String(e.record?.id) === id)
                 .flatMap(e => (e.keys as string[] | undefined) ?? []))
