@@ -446,9 +446,12 @@ export class RecordQueryAgent implements RecordOperationAgent {
                         //  Transform eventDeps）此前对 flashOut 产生的 link create "查询可见、事件不可见"。
                         const stolenRelatedRef = { id: combinedRecordIdRef.getRef().id }
                         const newOwnerRef = { id: newOwnerId ?? newEntityData.getData().id }
+                        // id 序列按物理身份（resolvedBaseRecordName）发号——与 CreationExecutor.allocateRecordId
+                        // 同一契约（r29：视图名平行序列会与物理表既有 id 碰撞并静默覆写）。
+                        const flashOutLinkName = combinedRecordIdRef.info!.linkName!
                         result[combinedRecordIdRef.info?.attributeName!][LINK_SYMBOL] = {
                             ...(combinedRecordIdRef.linkRecordData?.getData() || {}),
-                            id: await this.database.getAutoId(combinedRecordIdRef.info!.linkName!),
+                            id: await this.database.getAutoId(this.map.getRecordInfo(flashOutLinkName).resolvedBaseRecordName ?? flashOutLinkName),
                         }
                         // CAUTION base link create 事件必须补齐 default-only 字段
                         //  （r25 F-1，与 preprocessSameRowData 的行内产生点同一契约）：

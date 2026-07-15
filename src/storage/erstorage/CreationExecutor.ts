@@ -285,6 +285,21 @@ export class CreationExecutor {
     }
 
     /**
+     * 按**物理身份序列**发号（r29，extended fuzzer seed 41 首跑抓获）。
+     *
+     * CAUTION id 序列属于物理记录（resolvedBaseRecordName），不属于声明名：
+     *  merged (union) 编译把 input 变成物理 base 上的视图、filtered entity/relation 同理——
+     *  以视图名发号会开出**平行序列**，与物理表已有 id 碰撞后写路径按「外部 id」语义
+     *  直接落列，静默覆写同 id 的既有记录（重复逻辑 id / 字段覆写，零事件）。
+     *  顶层 create 的 NewRecordData.recordName 构造期已解析；嵌套分类列表上的
+     *  attr.recordName / attr.linkName 是**声明名**，所有发号点必须经这里归一。
+     */
+    private async allocateRecordId(recordName: string): Promise<string> {
+        const resolved = this.map.getRecordInfo(recordName).resolvedBaseRecordName ?? recordName
+        return this.database.getAutoId(resolved)
+    }
+
+    /**
      * 构造同行数据的 update 事件（宿主记录 / combined 嵌套记录 / link 记录共用同一契约）：
      * keys = 本次实际写入的属性名（含被联动重算的 computed 属性），record 带 id，oldRecord 为变更前快照。
      */
@@ -403,7 +418,7 @@ export class CreationExecutor {
         //  也正是因为如此，所以我们通过一个参数 isUpdate 显式声明到底是不是 update，不能用有没有 id 来判断！
         if (!isUpdate && !newRawDataWithNewIds.id) {
             // 为自己分配 id，一定要在最前面，因为后面记录link 事件的地方一定要有 target/source 的 id
-            newRawDataWithNewIds.id = await this.database.getAutoId(newEntityData.recordName)
+            newRawDataWithNewIds.id = await this.allocateRecordId(newEntityData.recordName)
         } else if(isUpdate && !newRawDataWithNewIds.id) {
             // 因为用户传进来的 update 字段里面可能没有 id 字段，所以这里要加上。
             // newRawDataWithNewIds 用在了后面的 event 里面，保证有 id 才正确。外部可能会从 event 里面读。
@@ -475,7 +490,7 @@ export class CreationExecutor {
         for (let record of newEntityData.combinedNewRecords) {
             newRawDataWithNewIds[record.info!.attributeName] = {
                 ...newRawDataWithNewIds[record.info!.attributeName],
-                id: await this.database.getAutoId(record.info!.recordName!),
+                id: await this.allocateRecordId(record.info!.recordName!),
             }
             // CAUTION create 事件 payload 契约 = defaults + payload（r16 R-1）——base 名事件与
             //  filtered 视图事件是同一契约的两个消费方，统一走 completeEventPayloadWithDefaults
@@ -483,8 +498,12 @@ export class CreationExecutor {
             //  缺席的普通值属性按 NULL 解读（快照完备性契约，r21 F-1）、StateMachine trigger /
             //  Transform eventDeps 深度匹配失明——「谓词/匹配字段仅有默认值」形态下游静默
             //  少计/不触发（r25 F-1）。
+            // CAUTION defaults 必须按**声明名**（originalRecordName）求值（r29，extended fuzzer）：
+            //  merged input 的默认值经 mergeProperties 按具体类型分发（__type 判别列同理），
+            //  用 resolved 物理名求 defaults 会丢掉 type-dispatch 的全部默认值——事件 payload
+            //  缺 default-only 字段（行有值、payload 读 NULL）。事件的 recordName 仍是物理名。
             const combinedCreatePayload = NewRecordData.completeEventPayloadWithDefaults(
-                this.map, record.recordName, newRawDataWithNewIds[record.info!.attributeName]
+                this.map, record.originalRecordName, newRawDataWithNewIds[record.info!.attributeName]
             )
             events?.push({
                 type: 'create',
@@ -519,7 +538,7 @@ export class CreationExecutor {
                 }
                 newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] = {
                     ...(newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL] || {}),
-                    id: await this.database.getAutoId(record.info!.linkName!),
+                    id: await this.allocateRecordId(record.info!.linkName!),
                 }
 
                 const linkRecord = {...newRawDataWithNewIds[record.info!.attributeName][LINK_SYMBOL]}

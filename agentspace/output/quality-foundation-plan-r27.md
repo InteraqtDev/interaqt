@@ -61,15 +61,34 @@
 
 ### 1.3 展开路径（按杠杆排序）
 
-1. **驱动差分**（下一步，成本低杠杆高）：同一种子序列跑 SQLite + PGLite，逐操作 diff
+> **【r29 落地纪要】1–3 全部落地（详见 `deep-review-2026-07-15-r29-quality-pillars.md`）：**
+> - **驱动差分** → `tests/storage/driverDifferentialFuzz.spec.ts`：同种子意图流经 id 双射在
+>   SQLite（主）/PGLite（副）逐操作对账（错误语义 + 事件多重集 + 逻辑快照）。120 种子绿。
+>   固化契约决策：**一个操作内的兄弟事件顺序是驱动方言（无 ORDER BY 承诺），只比多重集**。
+> - **计算层生成** → `tests/runtime/computationGenerativeFuzz.spec.ts`：随机 (源 × 聚合 ×
+>   宿主位置) 声明（全局 dict / property 级、实体 / 关系 / filtered 视图源）× 随机写序列，
+>   每步与朴素全量重算对照。Count/Summation 天然非幂等 ⇒ 增量双跑/漏跑直接体现为值漂移
+>   （r27 F-2 的"执行计数 spy"由此结构性内建）。60 种子绿 + 预言机敏感性自检（坏真值必红）。
+> - **迁移生成** → `tests/runtime/migrationGenerativeFuzz.spec.ts`：随机 v1 schema（稳定
+>   uuid）× 随机存量数据 × 随机加法变异 → 真实两步审查 migrate。预言机：存量保真 / 默认值
+>   回填 / 新计算回填=朴素重算 / 迁移后可写 / **kill-resume 收敛**（偶数种子在第 N 次 DB
+>   调用注入故障 → 重跑必须收敛）。60 种子绿。
+> - storage fuzzer 表达域纳入 **filtered entity/relation + merged (union) entity**
+>   （filtered/extended 两个新模式）+ 预言机第 8 条（配对读取一致性）。首跑抓获 merged 域
+>   4 个致命家族并收口（见 §1.4b），EXT-1 开放家族建档。
+
+1. **驱动差分**（✅ r29）：同一种子序列跑 SQLite + PGLite，逐操作 diff
    查询结果与事件流——r24/r25 驱动分裂家族的机器化收口。真实 PG/MySQL 进 nightly。
-2. **计算层生成**：随机 dataDeps/聚合声明 + 随机 dispatch 序列，预言机 = 朴素全量重算对照
+2. **计算层生成**（✅ r29 数据驱动聚合面）：随机 dataDeps/聚合声明 + 随机 dispatch 序列，预言机 = 朴素全量重算对照
    （`symmetricAggregationMatrix` 已有样板）+ **执行计数 spy**（r27 F-2 的夹具幂等性遮蔽
-   只有非幂等观察者能抓）。
-3. **迁移生成**：随机 schema 对（前后版本）+ 随机存量数据 → migrate → 与"drop 重建 + 全量
+   只有非幂等观察者能抓；r29 以非幂等聚合的值漂移结构性实现）。
+   剩余扩张点：StateMachine/Transform 等事件驱动计算（需 InteractionEvent 轨）、async 计算。
+3. **迁移生成**（✅ r29）：随机 schema 对（前后版本）+ 随机存量数据 → migrate → 与"drop 重建 + 全量
    重算"对照；随机注入 kill-resume 点。
-4. **CI 编排**：PR 跑固定种子集（当前 8 种子 <1s）；nightly 跑大种子池 + 长序列；
-   失败种子自动进回归集（种子即测试用例）。
+   剩余扩张点：破坏性变异（删属性/删实体 → destructive-scope 决策轨）、计算**变更**（非新增）轨。
+4. **CI 编排**：PR 跑固定种子集（storage base 8 + extended 8 + 差分 6 + 计算 6 + 迁移 6，
+   合计 <40s）；nightly 跑大种子池 + 长序列（各套件 `FUZZ_*_SEED_START/COUNT/OPS` 环境变量
+   扩池）；失败种子自动进回归集（种子即测试用例）。
 
 ### 1.4 扩展探索的开放发现（100 种子 × 40 操作首跑，25 种子失败，去重后 ≥4 个独立家族）
 
@@ -100,11 +119,34 @@
 超过了此前数轮人肉审查的总和。CI 固定种子集保持在已收口的 1–8（全绿）；
 扩展池的收口进度以本表为准跟踪。
 
+### 1.4b r29 扩域首跑发现（filtered/merged 入生成域，60→120 种子）
+
+**已收口（当轮修复 + `mergedWritePathRegressions.spec.ts` 固化）——共同根源是
+「写路径以声明名/记录种类判定，而 merged 编译把 input 变成物理 base 上的视图」：**
+
+| 家族 | 症状 | 代表种子 | 收敛点修复 |
+|------|------|---------|-----------|
+| MRG-1 | merged FK link 删除把宿主实体**整行物理销毁**（零事件） | extended 1 | `clearOrDeletePhysicalRow` 行占用判定改按 **id 字段**（不按记录种类排除视图/抽象记录） |
+| MRG-2 | combined 嵌套新建按**视图名**发号 → 平行序列撞物理表既有 id → 静默覆写既有记录 | extended 41 | `CreationExecutor.allocateRecordId`：全部发号点经 `resolvedBaseRecordName` 归一（含 flashOut） |
+| MRG-3 | combined 嵌套新建 create 事件 payload 丢 type-dispatch 默认值（含 `__type`） | extended 41/24 | defaults 按 `originalRecordName` 求值（事件 recordName 仍是物理名） |
+| MRG-4 | 级联删除轨按**声明面名字**发 record delete → 物理名事件缺失 + 视图名双 delete | extended 37 | `deleteRecordSameRowDataGrouped` record delete 统一归物理名（canonical 轨已解析，级联轨归一） |
+| MIG-1 | property 聚合模板全量 compute 对 **to-one** 关系属性裸 for...of → 迁移回填 TypeError | mig-fuzz 3 | `aggregationTemplate.compute` 关联行读取点归一（对象→单元素数组），六种聚合共用 |
+
+**开放家族（生成域已相应收缩，收口后解除）：**
+
+| 家族 | 症状 | 代表种子 | 初判 |
+|------|------|---------|------|
+| EXT-1 | merged input 作为 x:1 / combined 关系端点时 Setup 字段-表装配错位 → 查询期 `no such column`（fail-loud） | extended 2/10/50/71/72/81（`FUZZ_MERGED_FULL=1`） | rebase 后 link FK 字段/属性字段落错表——需要专门一轮走 Setup 装配审计；CI 生成域暂把 merged pair 限制在仅 n:n/无关系实体（`fuzzSchema.ts` 有 CAUTION 注释） |
+
 ### 1.5 诚实的边界
 
-- fuzzer 的强度 = 预言机的强度 × 生成器的表达域。当前生成器不产出：filtered entity/relation、
-  merged (union) entity、computed/computation 属性、事务并发交错、activity/interaction 层。
-  这些按 1.3 逐步纳入表达域，纳入一类就等于把该类的全部人肉格子换成机器铺设。
+- fuzzer 的强度 = 预言机的强度 × 生成器的表达域。r29 后生成器已产出：filtered
+  entity/relation（嵌套链）、merged (union) entity（受限域，见 EXT-1）、数据驱动聚合声明
+  （全局/property 级）、迁移加法变异。仍不产出：**事件驱动计算（StateMachine/Transform）、
+  async 计算、事务并发交错、activity/interaction 层、迁移破坏性变异**。
+  这些按 1.3 剩余扩张点逐步纳入，纳入一类就等于把该类的全部人肉格子换成机器铺设。
+- 驱动差分当前覆盖 SQLite×PGLite；真实 PostgreSQL/MySQL 差分进 nightly 的机制已就绪
+  （runner 只依赖 Database 接口），但尚未接线。
 - 随机化不证明不存在 bug，只把「逃逸概率」变成种子数量的函数——这正是对指数空间唯一
   诚实的陈述方式。
 
