@@ -1,5 +1,97 @@
 # Changelog
 
+## Unreleased
+
+r32 recorded-items completion round: every deferred item from the r28–r31 review reports that was
+registered as "next round" work is closed — the two open fatal families (r30-E Transform-chain
+migration dead-end, r29 EXT-1 merged setup assembly), the r31 honest-boundary items (`_System_`
+uniqueness, migration oldRecord e2e proof, x:1 predicate probe batching), and the r28 driver-round
+items. Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
+
+### Bug Fixes
+
+* **runtime:** migration of a Transform **chain** whose upstream change shrinks its output is now
+  approvable and executes (was: `Migration refuses delete patch ... without explicit audited scope`,
+  an unapprovable kill-resume dead loop — the 4.1.4 known issue). The destructive deletion scope is
+  discovered **cascade-aware** by executing the rebuild plan inside a rolled-back transaction (same
+  MigrationScheduler, preRecomputeDDL applied transactionally; analytic fallback on MySQL / missing
+  handlers), so `generateMigrationDiff({ includeDestructiveScope: true })` reports exact ids —
+  including chained dependents' cascade deletions and cascade-dependent `_isDeleted_` hosts — and one
+  approval round suffices. During execution deletions are performed optimistically, collected per
+  computation, and reconciled bidirectionally against the approved scope before the SERIALIZABLE
+  transaction commits: unapproved destruction still cannot commit, and the audit error lists the
+  complete id set for one-step re-approval.
+* **runtime:** migration patch/result events now flow the **storage event stream** (complete
+  pre-state `oldRecord` plus derived events such as filtered-entity membership create/delete)
+  instead of hand-synthesized single events — chained dependents during migration no longer go
+  blind on filtered-membership exits (silent aggregate corruption on the exit face).
+* **storage:** EXT-1 closed — filtered/merged-input view records keep a live `table` pointer when
+  their physical base is moved by table combining (merged input as an x:1/combined relation
+  endpoint). Previously the stale creation-time pointer compiled JOINs against a phantom table
+  (`no such column`) and `buildTables` emitted an extra physical table. The fuzzer merged
+  generation domain is unlocked accordingly (`FUZZ_MERGED_FULL` gate removed).
+* **runtime:** `_System_` carries a composite `(concept, key)` unique index and
+  `storage.set(concept, key)` converts the find-then-create race conflict into a retryable write
+  conflict — the `_Dictionary_` conservation law's sibling track (r31 registered item).
+* **drivers:** SQLite/MySQL `_IDS_` counters reconcile with `MAX(id)` per record at setup —
+  attaching to existing data with lost/lagging counters re-issued ids from 1, a **silent**
+  duplicate-logical-id corruption (the id column carries no unique index on these drivers).
+  Same forward-only contract as the PostgreSQL driver's sequence reconciliation.
+* **drivers:** MySQL `information_schema` reads alias their columns — MySQL 8 returns uppercase
+  headers regardless of query case, so existing-table/column detection (manifest lookup,
+  `hasExistingData`, additive DDL planning) read `undefined` on the whole MySQL attach/migration
+  path.
+* **runtime:** framework-internal kv unique constraints (`_System_`/`_Dictionary_`) skip on
+  dialects without unique-constraint capability instead of failing the whole setup — the r31
+  `_Dictionary_` constraint made every MySQL `setup()` crash with `ConstraintSetupError`.
+  User-declared constraints still fail fast.
+* **runtime:** runtime NOT NULL violations of framework-declared `NonNullConstraint`s (physical
+  form `CHECK (field IS NOT NULL)`) map to `ConstraintViolationError` with kind `'non-null'`
+  (was: bare driver error; unique violations were already normalized).
+* **runtime:** duplicate `Dictionary` names are rejected at Controller construction with an
+  actionable message (was: `Migration identity is ambiguous for dictionary:x` from deep inside
+  manifest identity auditing).
+* **core:** the two latent public-metadata defects recorded in r27 are defused —
+  `Property.public.type.options` is a static array (was a function, incompatible with the
+  `validateCreateArgs` options contract) and `Entity.public.commonProperties.eachNameUnique`
+  reads `commonProperties` from create args (was reading `properties`, making the predicate
+  vacuous for merged entities once wired).
+
+### Performance
+
+* **storage:** x:1 nested-read predicate probes (`enforceXToOnePredicates`, r31) batch per
+  parent-id set when every predicate atom stays on the related record (one probe per ≤500 parents
+  instead of N+1). Pair-sensitive shapes (link-attribute predicates from the filtered-relation
+  rebase, `&` paths, reference values, EXIST) keep per-parent probes — a set-level probe would
+  leak one parent's qualifying edge onto another parent sharing the same related record.
+
+### Behavior changes (upgrade notes)
+
+* **Cascade deletions during migration are approvable and audited by execution**: approve the
+  `destructive-scope` decisions from the generated diff (now cascade-exact when the scope
+  simulation is available). If the simulation is unavailable, the first migrate attempt fails
+  inside the transaction with the complete executed-vs-approved diff (nothing is destroyed) and
+  the listed ids can be approved directly.
+* `_System_` gains a composite unique index on `(concept, key)`; deployments that hit the
+  historical race and hold duplicate rows must deduplicate them before upgrading (same audit as
+  the `_Dictionary_` unique index from the unreleased r31 round).
+* `assertDestructiveScopeAllowed` accepts an optional exactness mode; `getDestructiveDeletionScope`
+  remains the analytic first-order scope while the new `getCascadeAwareDeletionScope` is the
+  simulation-backed entry used by diff generation and `migrate`.
+* NOT NULL violations now surface as `ConstraintViolationError` (kind `'non-null'`) instead of
+  driver-specific CHECK errors; error-handling code matching on raw driver errors should match the
+  normalized type.
+* The `NOT(combined-path atom)` three-valued-logic divergence (r28 recorded item) is decided as a
+  contract: combined paths evaluate classically — an unpaired row satisfies the negation (there is
+  no NULL-row form on the same-row encoding). Documented at the `buildCombinedSegmentGates`
+  convergence point.
+
+### Known Issues
+
+* The 4.1.4 known issue "nested x:1 sub-query `matchExpression`s are not applied" was closed in
+  4.1.4's follow-up round (r31c) by `enforceXToOnePredicates`; the Transform-chain migration
+  dead-end is closed by this release.
+
 ## [4.1.4](https://github.com/interaqtdev/interaqt/compare/v4.1.3...v4.1.4) (2026-07-15)
 
 r30 deep review: four bugs fixed (two fatal silent-corruption, one fatal-but-narrow in the activity
