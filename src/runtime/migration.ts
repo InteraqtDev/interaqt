@@ -3022,9 +3022,10 @@ function collectAuditedDeletions(audit: MigrationDeletionAudit, computation: Com
     for (const event of events) {
         if (event.type !== "delete") continue;
         const recordName = context.type === "property" ? context.host.name! : context.id.name!;
-        // 事件 recordName 与计算输出（或宿主）一致才计入本计算的删除足迹；
-        //  经 storage 级联产生的其他记录事件不在此处出现（各删除产出点只 push 自己的 record delete）。
-        if (event.recordName !== recordName) continue;
+        // 只有 recordName 与计算输出（或硬删除宿主）一致的 delete 计入本计算的删除足迹。
+        //  事件流是 storage 的完整产出（r32）：关系 link 级联、filtered 视图成员资格 delete
+        //  等派生事件也在流里——它们随宿主删除守恒发生，不是独立的销毁决策，刻意不入审计
+        //  （与 destructive-scope 审批面的辖区一致：审计的是计算输出记录的删除）。
         const id = (event.record as { id?: unknown } | undefined)?.id;
         if (id === undefined || id === null) continue;
         const key = `${dataContextPath(context)}:${recordName}`;
