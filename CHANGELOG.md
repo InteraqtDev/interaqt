@@ -2,10 +2,33 @@
 
 ## [4.1.2](https://github.com/interaqtdev/interaqt/compare/v4.1.1...v4.1.2) (2026-07-15)
 
+r28 deep review: the fuzzer seed pool was expanded to 1–499 × 50 ops, closing every open G-family
+finding from v4.1.1 plus the newly caught H families. Full report:
+`agentspace/output/deep-review-2026-07-14-r28.md`.
+
 ### Bug Fixes
 
 * **storage:** r28 — combined x:1 reads gate on link-id column (phantom pairing family, query face) ([b152814](https://github.com/interaqtdev/interaqt/commit/b1528147e425ca26c6be42059fddc7066153e65e))
 * **storage:** r28 deep review — row-slot exclusivity, migration vs deletion semantics, reliance topology equivalence ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+* **storage:** row-slot exclusivity invariant at Setup — a second combined placement over an already co-located entity pair (directly or via a chain of combined relations) fails fast for explicit `mergeLinks` and degrades to a merged link for auto reliance combining; kills phantom x:1 reads, silent row-slot collisions on writes, phantom reliance cascades, and the mutual-reliance (A⇄B) deep-query stack overflow ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+* **storage:** physical row migration no longer reuses logical-deletion machinery — new `clearRowDataForMigration` (carried reliance subtrees' isolated link rows / cross-table reliance are no longer cascade-deleted with zero events), NULL columns are materialized so explicit nulls aren't rewritten by `defaultValue`, carried merged-link ids keep their logical identity (no silent re-numbering), and relocate flips the moved endpoint when the default mover's subtree holds other combined pairings (both-dirty fails fast) ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+* **storage:** co-tenancy ≠ pairing — deletion cascade/footprint decisions and combined x:1 reads/matches now use the link-id column as the pairing truth source: orphan co-tenants survive row-delete decisions, phantom pairings no longer cascade-delete other owners' dependents (half-cleared links fixed), multi-owner reliance deletions emit the other owner's link delete event; flashOut row claims keep physical-cohabitation addressing via explicit `physicalRowMatch`/`physicalRowRead` markers ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8), [b152814](https://github.com/interaqtdev/interaqt/commit/b1528147e425ca26c6be42059fddc7066153e65e))
+* **storage:** reliance link semantics are now topology-equivalent (combined / merged / isolated): re-parenting a dependent works on merged/isolated tracks (was silent double links breaking 1:x exclusivity), binding to an occupied 1:1 owner fails fast everywhere (was silent FK overwrite), free-owner adoption via create/update no longer throws a spurious "cannot unlink reliance data", and update only rejects declarations that would orphan an existing pairing (supersets and idempotent snapshot write-backs pass) ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+* **storage:** the host-attr claim track (`create/update` with `{ attr: { id } }`) runs the same cross-relation co-tenant guard as the link-endpoint track, extended to the whole row-migration subtree ([b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+* **storage:** link create events carry `&` attributes declared on nested-new child records (row had the value, event payload read as NULL downstream); relation update events no longer carry payload-shaped endpoints in `record` (string-form ids diverged from the storage snapshot in the merged mutation view — endpoints live on `oldRecord` in storage-native form) ([157a6e3](https://github.com/InteraqtDev/interaqt/commit/157a6e3b), [b180749](https://github.com/interaqtdev/interaqt/commit/b1807494e9045552b882089439ec35f297e00ee8))
+* **runtime:** event-based computations (Transform `eventDeps`) run once per (computation, event) — overlapping eventDep patterns previously inserted one derived record per matching dep for a single event (the callback receives the identical event object with no dep identity, so user-side dedupe is impossible); live Scheduler and migration replay share the contract ([157a6e3](https://github.com/InteraqtDev/interaqt/commit/157a6e3b))
+* **runtime:** Custom computations declaring multiple records/global dataDeps on the same source with an incremental path but no `planIncremental` fail fast at declaration (one create/delete event ran `incrementalCompute` once per dep — N-fold `useLastValue` increments); `planIncremental` + `context.depKey` routing remains the supported multi-dep shape ([157a6e3](https://github.com/InteraqtDev/interaqt/commit/157a6e3b))
+* **core:** `BoolExpressionData.clone(deep)` / `Conditions.clone(deep)` / `Activity.clone(deep)` / `ActivityGroup.clone(deep)` perform real deep clones aligned with the `StateMachine.clone(deep)` isolation contract (Activity re-points transfers to cloned nodes and recurses nested sub-activities; behavior instances stay shared by convention) — the `deep` flag was previously ignored ([157a6e3](https://github.com/InteraqtDev/interaqt/commit/157a6e3b))
+
+### Behavior changes (upgrade notes)
+
+* A second combined placement over an already co-located entity pair now fails fast (`mergeLinks`) or compiles as a merged link (auto reliance) — previously phantom relations and silent row collisions.
+* Combined x:1 nested reads and match paths gate on the link-id column: accidental co-tenants are no longer read back as pairings.
+* Row migrations (removeRelation on combined links, flashOut steals) no longer cascade-delete carried subtrees' separate-table relations, rewrite explicit nulls to defaults, or re-number merged link ids; a new fail-fast covers unlinking when both endpoints' subtrees hold other combined pairings.
+* Re-parenting a reliance dependent now takes effect on merged/isolated topologies (previously silent double links); displacement of an occupied owner fails fast on every topology; update declarations that drop an existing reliance pairing fail fast (supersets/idempotent write-backs pass).
+* Transform with overlapping `eventDeps` derives one record per event (previously one per matching dep — audit existing data for duplicates).
+* New declaration-time fail-fast: Custom with same-source records/global deps and a default incremental plan.
+* Relation update events: `record` no longer contains `source`/`target` (read them from `oldRecord`).
 
 ## [4.1.1](https://github.com/interaqtdev/interaqt/compare/v4.1.0...v4.1.1) (2026-07-14)
 
