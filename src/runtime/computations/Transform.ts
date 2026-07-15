@@ -8,6 +8,7 @@ import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { assert } from "../util.js";
 import { RequireSerializableRetry } from "../transaction.js";
 import { ComputationError } from "../errors/ComputationErrors.js";
+import { validateMutationEventPatternSurface } from "./TransitionFinder.js";
 
 // CAUTION Transform 派生记录的身份由框架管理（sourceRecordId + transformIndex），callback 返回
 //  顶层 `id` 会被 storage 的"外部 id"路径原样写入：id 来自源实体的发号序列（或 uuid），与派生
@@ -39,6 +40,15 @@ export class RecordsTransformHandle implements DataBasedComputation {
         this.transformCallback = this.args.callback.bind(this.controller)
         
         if (this.args.eventDeps) {
+            // 外层字段面校验（与 StateMachine trigger 同一声明面）：未知字段在注册时被静默丢弃
+            //  （过滤条件消失 → 静默过触发）；trigger 才支持的 keys 给出指路错误。
+            for (const [eventDepName, eventDep] of Object.entries(this.args.eventDeps)) {
+                validateMutationEventPatternSurface(
+                    eventDep,
+                    { allowKeys: false, allowPhase: true },
+                    () => `Transform computation of ${this.dataContext.type} "${(this.dataContext.id as { name?: string }).name}": eventDep "${eventDepName}"`
+                )
+            }
             this.eventDeps = this.args.eventDeps
         } else {
             this.dataDeps = {

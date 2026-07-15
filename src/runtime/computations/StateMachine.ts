@@ -4,12 +4,15 @@ import { EntityIdRef, RecordMutationEvent } from '../System.js';
 import { DataContext, PropertyDataContext } from "./Computation.js";
 import { ComputationResult, EventBasedComputation, EventDep, GlobalBoundState, RecordBoundState } from "./Computation.js";
 import { EtityMutationEvent } from "../Scheduler.js";
-import { TransitionFinder } from "./TransitionFinder.js";
+import { TransitionFinder, validateMutationEventPatternSurface } from "./TransitionFinder.js";
 import { assert } from "../util.js";
 import { ComputationProtocolError } from "../errors/index.js";
 
 /**
- * setup 期校验 trigger.keys：
+ * setup 期校验 trigger 模式面：
+ * 1. 外层字段面（validateMutationEventPatternSurface）：未知字段（typo）经 deepPartialMatch
+ *    在事件上永不存在 → transfer 永不触发（静默死转移）。对每个 transfer 无条件执行。
+ * 2. trigger.keys：
  * - keys 只对"宿主记录自身的值属性（含 computed）更新"有效。纯关系变更（如 update({profile: {id}})）
  *   不产生宿主 update 事件，只有关系记录的 create/delete 事件——指向关系属性的 keys 是永不命中的死声明。
  * - 未声明的属性名同理永不命中（typo 会静默失效）。
@@ -17,6 +20,13 @@ import { ComputationProtocolError } from "../errors/index.js";
  * 无法解析的 recordName（系统记录等）跳过校验，交给运行期语义。
  */
 function validateTriggerKeys(controller: Controller, args: StateMachineInstance, contextName: string) {
+    for (const transfer of args.transfers) {
+        validateMutationEventPatternSurface(
+            transfer.trigger,
+            { allowKeys: true, allowPhase: false },
+            () => `StateMachine ${contextName}: transfer "${transfer.current.name}" -> "${transfer.next.name}" trigger`
+        )
+    }
     for (const transfer of args.transfers) {
         const trigger = transfer.trigger as { recordName?: string, type?: string, keys?: unknown }
         if (!trigger || trigger.keys === undefined || !trigger.recordName) continue

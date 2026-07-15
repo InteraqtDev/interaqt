@@ -218,6 +218,10 @@ r30 的结论是「bug 住在防线隐式辖区与可达空间的差集里」。
 6. **消费侧可见性回归**（review-fixes-2026-07-15-r31.spec.ts）：A2 双向断言
    （合并视图可读未变更字段 + keys 仍只含变更字段）——为「匹配器/消费者同投影」契约
    留下第一个消费面敏感的夹具。
+7. **模式外层字段面守卫**（H7，`validateMutationEventPatternSurface`）：A 的读者枚举顺产的
+   家族收口——trigger/eventDep 的未知模式字段此前双轨静默失效（trigger 轨死转移 under-trigger、
+   eventDep 轨过滤条件消失 over-trigger），死监听不变量（r18 recordName / r22 type）的第三根轴。
+   登记册已回填「失效方向相反的双轨各铺一格」的矩阵要求。
 
 ## 八、给后续轮次的操作性规则（增补）
 

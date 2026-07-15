@@ -212,6 +212,67 @@ describe("r31 runtime review fixes", () => {
         await system.destroy();
     });
 
+    test("E: unknown trigger pattern field is rejected at declaration (was: silently dead transfer)", async () => {
+        const a = StateNode.create({ name: "a" });
+        const b = StateNode.create({ name: "b" });
+        const Doc = Entity.create({
+            name: "TypoDoc",
+            properties: [
+                Property.create({ name: "status", type: "string" }),
+                Property.create({
+                    name: "flag", type: "string",
+                    computation: StateMachine.create({
+                        states: [a, b], initialState: a,
+                        transfers: [StateTransfer.create({
+                            current: a, next: b,
+                            // 'recrod' 是 'record' 的 typo：deepPartialMatch 在事件上永远找不到该字段
+                            // → transfer 永不触发（静默死转移）。必须声明期拒绝。
+                            trigger: { recordName: "TypoDoc", type: "update", recrod: { status: "x" } } as any,
+                            computeTarget: (e: any) => ({ id: e.record.id }),
+                        })],
+                    }),
+                }),
+            ],
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        expect(() => new Controller({ system, entities: [Doc], relations: [] }))
+            .toThrow(/unknown pattern field "recrod"/);
+        await system.destroy();
+    });
+
+    test("E2: eventDep with keys / unknown field / non-object record pattern is rejected at declaration (was: silently dropped)", async () => {
+        const makeDoc = (suffix: string) => Entity.create({
+            name: `EvDoc${suffix}`,
+            properties: [Property.create({ name: "status", type: "string" })],
+        });
+        const makeAudit = (suffix: string, eventDep: any) => Entity.create({
+            name: `EvAudit${suffix}`,
+            properties: [Property.create({ name: "note", type: "string" })],
+            computation: Transform.create({
+                eventDeps: { dep: eventDep },
+                callback: () => null,
+            }),
+        });
+
+        // keys 在 eventDep 上不受支持——此前被注册面静默丢弃（过滤条件消失 → 每次匹配事件都触发）
+        const doc1 = makeDoc("K");
+        const system1 = new MonoSystem(new PGLiteDB());
+        expect(() => new Controller({ system: system1, entities: [doc1, makeAudit("K", { recordName: "EvDocK", type: "update", keys: ["status"] })], relations: [] }))
+            .toThrow(/does not support "keys".*event\.keys/s);
+
+        // 未知字段（typo）同样静默丢弃
+        const doc2 = makeDoc("T");
+        const system2 = new MonoSystem(new PGLiteDB());
+        expect(() => new Controller({ system: system2, entities: [doc2, makeAudit("T", { recordName: "EvDocT", type: "update", recrod: { status: "x" } })], relations: [] }))
+            .toThrow(/unknown pattern field "recrod"/);
+
+        // record 模式必须是普通对象（原始值与对象事件永不相等——静默死声明）
+        const doc3 = makeDoc("P");
+        const system3 = new MonoSystem(new PGLiteDB());
+        expect(() => new Controller({ system: system3, entities: [doc3, makeAudit("P", { recordName: "EvDocP", type: "update", record: "published" })], relations: [] }))
+            .toThrow(/"record" must be a plain object/);
+    });
+
     test("D: destructive deletion scope count reports 0 (not the whole table) when recompute deletes nothing", async () => {
         const db = new PGLiteDB();
         const { Custom } = await import("@core");
