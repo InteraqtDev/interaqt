@@ -2,12 +2,46 @@
 
 ## [4.1.3](https://github.com/interaqtdev/interaqt/compare/v4.1.2...v4.1.3) (2026-07-15)
 
+r29 quality pillars: the three generative-testing steps promised by the r28 retrospective landed —
+structural-fuzzer domain expansion (filtered/merged entities), driver differential fuzzing, and
+migration generative testing. Their first runs caught five bugs in the merged (union) entity and
+migration domains; all are fixed in this release. Full report:
+`agentspace/output/deep-review-2026-07-15-r29-quality-pillars.md`.
+
+### Bug Fixes
+
+* **storage:** removing a merged-FK relation whose host is a merged (union) input no longer physically
+  deletes the host row — the physical-row occupancy check now judges by id fields instead of excluding
+  filtered/merged-abstract record kinds ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb))
+* **storage:** combined nested-new child records of a merged input now allocate ids from the physical
+  sequence (`resolvedBaseRecordName`) — view-name parallel sequences could collide with existing physical
+  ids and silently overwrite records ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb))
+* **storage:** combined nested-new create events evaluate defaults under the declared name, restoring
+  type-dispatched default values (incl. the `__type` discriminator) in event payloads ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb))
+* **storage:** cascade-track record delete events are emitted under the physical name — merged-input
+  cascades previously emitted duplicate view-name deletes while listeners on the physical name stayed
+  blind ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb))
+* **runtime:** property-mode aggregations (Count/Summation/Average/Every/Any/WeightedSummation) no longer
+  crash on full recompute over to-one (x:1) relation attributes — this only surfaced on the migration
+  backfill track ([2ab13d8](https://github.com/interaqtdev/interaqt/commit/2ab13d873df68f736185a63613abdc7de655b9e4))
+
 ### Features
 
-* **tests:** computation-layer generative fuzz (random aggregate declarations vs naive recompute) ([fc3f0f0](https://github.com/interaqtdev/interaqt/commit/fc3f0f063abf950ffebed8c4948d8f9644fb11b5))
-* **tests:** driver differential fuzzer (SQLite vs PGLite, same seed, per-op reconciliation) ([ab31325](https://github.com/interaqtdev/interaqt/commit/ab3132519a1132d79ef06560250c1e872adfc1dc))
-* **tests:** extend structural fuzzer domain to filtered/merged entities; fix 4 merged-domain write-path fatals ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb)), closes [#8](https://github.com/interaqtdev/interaqt/issues/8)
-* **tests:** migration generative fuzz (random schema pair + data -> migrate vs oracles, kill-resume) ([2ab13d8](https://github.com/interaqtdev/interaqt/commit/2ab13d873df68f736185a63613abdc7de655b9e4))
+* **tests:** structural fuzzer domain expanded to filtered entities/relations and merged (union)
+  entities, with membership-event reconciliation, filtered-predicate and merged-union oracles, and the
+  pairing-read consistency oracle ([f9abb79](https://github.com/interaqtdev/interaqt/commit/f9abb7949c240a555bbe95a75b8ed645936f79fb))
+* **tests:** driver differential fuzzer — same seeded intent stream reconciled per-op between SQLite and
+  PGLite via an id bijection (error semantics, event multisets, logical snapshots) ([ab31325](https://github.com/interaqtdev/interaqt/commit/ab3132519a1132d79ef06560250c1e872adfc1dc))
+* **tests:** computation-layer generative fuzz — random aggregate declarations (global and
+  property-level, incl. filtered-view sources) checked against naive recompute after every write ([fc3f0f0](https://github.com/interaqtdev/interaqt/commit/fc3f0f063abf950ffebed8c4948d8f9644fb11b5))
+* **tests:** migration generative fuzz — random schema pairs with stable uuids, additive mutations,
+  fidelity/backfill oracles, and kill-resume fault injection ([2ab13d8](https://github.com/interaqtdev/interaqt/commit/2ab13d873df68f736185a63613abdc7de655b9e4))
+
+### Known Issues
+
+* merged (union) inputs used as endpoints of x:1/combined relations can compile misplaced columns at
+  setup (fail-loud `no such column` at query time). Tracked as EXT-1 in
+  `agentspace/output/quality-foundation-plan-r27.md` §1.4b; reproduce with `FUZZ_MERGED_FULL=1`.
 
 ## [4.1.2](https://github.com/interaqtdev/interaqt/compare/v4.1.1...v4.1.2) (2026-07-15)
 
