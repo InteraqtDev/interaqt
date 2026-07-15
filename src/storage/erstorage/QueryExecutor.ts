@@ -173,7 +173,7 @@ export class QueryExecutor {
      *
      * x:1 子查询被编译进父查询的 LEFT JOIN，其 matchExpression（用户在嵌套 attributeQuery
      * 里声明的谓词，或 filtered relation 重写注入的谓词）从不进入 JOIN 条件——JOIN 面只有
-     * 结构（id 连接）。这里对携带谓词的 x:1 节点逐父记录发探针查询（谓词 + 反向 id 约束，
+     * 结构（id 连接）。这里对携带谓词的 x:1 节点发探针查询（谓词 + 反向 id 约束，
      * 与 x:n 独立查询的谓词机制完全同构），不命中则把已挂载的关联**置 null**：
      * 语义 = 「谓词过滤关联记录本身」，父记录保留（与顶层 match 过滤父记录是两个不同的面）。
      *
@@ -181,8 +181,11 @@ export class QueryExecutor {
      * 分支自然跳过）；parentLink 上的 x:1 同样覆盖。goto 节点跳过（goto 分支的独立查询
      * 已自带谓词合并）。x:n 节点无需处理（findXToManyRelatedRecords 的独立查询天然生效）。
      *
-     * 性能注：探针是逐父记录的 id-only 查询（潜在 N+1），只在声明了谓词的 x:1 节点上发生；
-     * 与既有 goto / per-parent x:n 路径的代价形态一致。
+     * 性能（r32，批量面）：谓词**纯落在关联记录自身**（不经反向属性折回父侧）时，探针按
+     * 父 id 集合批量（IN + 结果 id 集判存活，与 findXToManyRelatedRecordsBatched 同构）——
+     * 谓词与具体父无关，R 挂在 P 行上即 R-连-P 成立，存活判定 = R.id ∈ 命中集。
+     * pair 敏感谓词（filtered relation 的 link 属性谓词 rebase 后带反向前缀、`&` 路径、
+     * 引用值、EXIST）对「哪条边」敏感——集合探针会把 P1 的合格边误判给 P2，保持逐父探针。
      */
     private async enforceXToOnePredicates(records: Record[], entityQuery: RecordQuery): Promise<void> {
         if (entityQuery.physicalRowRead) return
@@ -192,20 +195,45 @@ export class QueryExecutor {
             if (subQuery.hasRelatedPredicate) {
                 const info = this.map.getInfo(subQuery.parentRecord!, subQuery.attributeName!)
                 const reverseAttributeName = info.getReverseInfo()?.attributeName!
-                for (const record of records) {
+                const candidates = records.filter(record => {
                     const related = record[resultKey]
-                    if (!related || typeof related !== 'object' || related.id === undefined || related.id === null) continue
-                    const probeMatch = subQuery.matchExpression.and({
-                        key: `${reverseAttributeName}.id`,
-                        value: ['=', record.id]
-                    })
-                    const probeQuery = RecordQuery.create(subQuery.recordName, this.map, {
-                        matchExpression: probeMatch.data,
-                        attributeQuery: ['id'],
-                    })
-                    const matched = await this.findRecords(probeQuery, `enforce x:1 predicate: ${subQuery.parentRecord}.${subQuery.attributeName}`)
-                    if (!matched.some(item => String(item.id) === String(related.id))) {
-                        record[resultKey] = null
+                    return !!related && typeof related === 'object' && related.id !== undefined && related.id !== null
+                })
+                if (candidates.length > 1 && this.matchStaysOnRelatedRecord(subQuery.matchExpression, reverseAttributeName)) {
+                    const BATCH_SIZE = 500
+                    for (let start = 0; start < candidates.length; start += BATCH_SIZE) {
+                        const chunk = candidates.slice(start, start + BATCH_SIZE)
+                        const probeMatch = subQuery.matchExpression.and({
+                            key: `${reverseAttributeName}.id`,
+                            value: ['in', chunk.map(record => record.id)]
+                        })
+                        const probeQuery = RecordQuery.create(subQuery.recordName, this.map, {
+                            matchExpression: probeMatch.data,
+                            attributeQuery: ['id'],
+                        })
+                        const matched = await this.findRecords(probeQuery, `enforce x:1 predicate (batched): ${subQuery.parentRecord}.${subQuery.attributeName}`)
+                        const matchedIds = new Set(matched.map(item => String(item.id)))
+                        for (const record of chunk) {
+                            if (!matchedIds.has(String(record[resultKey].id))) {
+                                record[resultKey] = null
+                            }
+                        }
+                    }
+                } else {
+                    for (const record of candidates) {
+                        const related = record[resultKey]
+                        const probeMatch = subQuery.matchExpression.and({
+                            key: `${reverseAttributeName}.id`,
+                            value: ['=', record.id]
+                        })
+                        const probeQuery = RecordQuery.create(subQuery.recordName, this.map, {
+                            matchExpression: probeMatch.data,
+                            attributeQuery: ['id'],
+                        })
+                        const matched = await this.findRecords(probeQuery, `enforce x:1 predicate: ${subQuery.parentRecord}.${subQuery.attributeName}`)
+                        if (!matched.some(item => String(item.id) === String(related.id))) {
+                            record[resultKey] = null
+                        }
                     }
                 }
             }
@@ -227,6 +255,40 @@ export class QueryExecutor {
                 }
             }
         }
+    }
+
+    /**
+     * 判定谓词的每个原子都纯粹落在关联记录自身（含其正向子路径），没有：
+     * - 以反向属性开头折回父侧的路径（filtered relation 的 link 属性谓词 rebase 后的形态，
+     *   pair 敏感：同一条关联记录经不同父的边可有不同 link 值）；
+     * - `&`（link）路径段（同上，link 数据属于具体的边）；
+     * - 引用值（isReferenceValue，语义依赖查询上下文）；
+     * - EXIST 子查询（内层可引用外层路径）。
+     * 只有全部满足，谓词求值才与「经由哪个父读到它」无关——enforceXToOnePredicates 的
+     * 集合级批量探针以此为安全前提。
+     */
+    private matchStaysOnRelatedRecord(matchExpression: MatchExp, reverseAttributeName: string): boolean {
+        let pure = true
+        const visit = (data: MatchExp['data']): void => {
+            if (!data || !pure) return
+            if (data.isExpression()) {
+                visit(data.left as MatchExp['data'])
+                if (data.right) visit(data.right as MatchExp['data'])
+                return
+            }
+            const atom = data.data as { key: string, value: [string, unknown], isReferenceValue?: boolean }
+            const keyParts = String(atom.key).split('.')
+            if (
+                keyParts[0] === reverseAttributeName ||
+                keyParts.includes(LINK_SYMBOL) ||
+                atom.isReferenceValue ||
+                (Array.isArray(atom.value) && String(atom.value[0]).toLowerCase() === 'exist')
+            ) {
+                pure = false
+            }
+        }
+        visit(matchExpression.data)
+        return pure
     }
 
     /**
