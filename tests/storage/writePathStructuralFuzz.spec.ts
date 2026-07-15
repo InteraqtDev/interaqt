@@ -126,6 +126,36 @@ async function assertStructuralInvariants(handle: EntityQueryHandle, schema: Fuz
         expect(actualIds, `${label} [filtered-predicate] ${filteredRelation.name} membership diverges from declared predicate over ${filteredRelation.baseChoice.relation.name}`)
             .toEqual(expectedIds)
     }
+    // 7b. filtered relation 嵌套读取面完备性（r30-A 收口：面 × 名字形态矩阵的缺格）。
+    //    r30-A 的教训：filtered-over-combined 的**形状**自 r29 起就在生成域里，此前全绿是因为
+    //    没有任何预言机读过「经 filtered 属性名的实体嵌套读取面」——第 6 条（配对读取一致）只读
+    //    base 属性面，第 7 条（谓词一致）只读 relation-name 面。生成域 × 预言机读取面才是真覆盖。
+    //    断言：link 面（findRelationByName(filteredName)）报告的每一条配对，都必须出现在
+    //    经 filtered 属性名的嵌套读取里（配对不得静默消失——r30-A 的损坏面即 prune 误删真实配对）。
+    //    CAUTION 暂为超集断言（嵌套读取 ⊇ filtered link 面）而非相等：嵌套 x:1 子查询谓词不下推
+    //    是记录在案的独立预存缺口（r30 报告「filtered x:1 谓词」项，x:1 base 的嵌套读取当前会
+    //    多读到谓词不匹配的 base 配对）。该缺口收口后升级为相等断言。
+    for (const filteredRelation of schema.filteredRelations) {
+        const { baseChoice, name } = filteredRelation
+        const frSourceProperty = `fr_${baseChoice.sourceProperty}`
+        const rows = await handle.find(baseChoice.source, undefined, undefined,
+            ['id', [frSourceProperty, { attributeQuery: ['id'] }]])
+        const nestedPairs = new Set<string>()
+        for (const row of rows) {
+            const related = row[frSourceProperty]
+            const items = Array.isArray(related) ? related : (related ? [related] : [])
+            for (const item of items as Record<string, unknown>[]) {
+                if (item.id !== null && item.id !== undefined) nestedPairs.add(`${row.id}->${item.id}`)
+            }
+        }
+        const filteredLinkRows = await handle.findRelationByName(name, undefined, undefined,
+            ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]])
+        for (const link of filteredLinkRows) {
+            const pair = `${(link.source as { id?: unknown })?.id}->${(link.target as { id?: unknown })?.id}`
+            expect(nestedPairs.has(pair),
+                `${label} [filtered-nested-read] ${name}: pairing ${pair} visible on the link face but MISSING from the ${baseChoice.source}.${frSourceProperty} nested read`).toBe(true)
+        }
+    }
     // 8. merged (union) 一致性（r29）：find(merged) 的 id 集合 = 各 input id 集合的不相交并
     for (const merged of schema.mergedEntities) {
         const inputIdSets: string[][] = []
