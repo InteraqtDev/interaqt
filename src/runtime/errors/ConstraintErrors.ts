@@ -1,6 +1,6 @@
 import { ErrorCategory, ErrorSeverity, FrameworkError } from './FrameworkError.js';
 
-export type ConstraintViolationKind = 'unique';
+export type ConstraintViolationKind = 'unique' | 'non-null';
 
 export type ConstraintViolationErrorOptions = {
     kind: ConstraintViolationKind,
@@ -22,7 +22,7 @@ export class ConstraintViolationError extends FrameworkError {
         super(message, {
             errorType: 'ConstraintViolationError',
             context: {
-                code: options.violationCode || 'UNIQUE_CONSTRAINT_VIOLATION',
+                code: options.violationCode || (options.kind === 'non-null' ? 'NON_NULL_CONSTRAINT_VIOLATION' : 'UNIQUE_CONSTRAINT_VIOLATION'),
                 kind: options.kind,
                 constraintName: options.constraintName,
                 recordName: options.recordName,

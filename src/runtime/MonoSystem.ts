@@ -1415,21 +1415,44 @@ RETURNING "lastValue" AS value`,
         const existing = findConstraintViolationError(error)
         if (existing) return existing
         const normalized = normalizeDatabaseError(error, this.db)
-        if (!normalized.isUniqueViolation) return error
-        const item = this.findConstraintForError(error)
-        return new ConstraintViolationError(
-            item ? `Unique constraint "${item.constraintName}" was violated` : 'Unique constraint was violated',
-            {
-                kind: 'unique',
-                constraintName: item?.constraintName,
-                recordName: item?.recordName,
-                properties: item?.kind === 'unique' ? item.properties : item ? [item.property] : undefined,
-                violationCode: item?.violationCode,
-                driver: normalized.driver,
-                rawCode: normalized.rawCode,
-                causedBy: error instanceof Error ? error : undefined,
+        if (normalized.isUniqueViolation) {
+            const item = this.findConstraintForError(error)
+            return new ConstraintViolationError(
+                item ? `Unique constraint "${item.constraintName}" was violated` : 'Unique constraint was violated',
+                {
+                    kind: 'unique',
+                    constraintName: item?.constraintName,
+                    recordName: item?.recordName,
+                    properties: item?.kind === 'unique' ? item.properties : item ? [item.property] : undefined,
+                    violationCode: item?.violationCode,
+                    driver: normalized.driver,
+                    rawCode: normalized.rawCode,
+                    causedBy: error instanceof Error ? error : undefined,
+                }
+            )
+        }
+        // NonNullConstraint 的运行期命中（物理形态 CHECK (field IS NOT NULL)）此前返回裸驱动
+        //  错误（r28 记录项）：只在能定位到本框架声明的 non-null 约束时归一——用户自建的
+        //  CHECK 约束不在辖区，保持原错误。
+        if (normalized.isCheckViolation) {
+            const item = this.findConstraintForError(error)
+            if (item?.kind === 'non-null') {
+                return new ConstraintViolationError(
+                    `Non-null constraint "${item.constraintName}" was violated`,
+                    {
+                        kind: 'non-null',
+                        constraintName: item.constraintName,
+                        recordName: item.recordName,
+                        properties: [item.property],
+                        violationCode: item.violationCode,
+                        driver: normalized.driver,
+                        rawCode: normalized.rawCode,
+                        causedBy: error instanceof Error ? error : undefined,
+                    }
+                )
             }
-        )
+        }
+        return error
     }
     async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = [], shouldDispatch?: (event: RecordMutationEvent) => boolean): Promise<unknown> {
         if (!this.isInTransaction()) {

@@ -202,6 +202,21 @@ export class Controller {
             this.eventSourcesByUUID.set(es.uuid, es)
         }
 
+        // CAUTION fail fast（r28 记录的报错质量项，r32 收口）：同名 Dictionary 此前要到
+        //  createMigrationManifest 的身份唯一性审计才被拒绝，错误信息
+        //  （"Migration identity is ambiguous for dictionary:x"）与用户的实际操作
+        //  （两个同名 Dictionary.create）距离太远。在声明入口用用户语言直接指出。
+        const dictNames = new Set<string>()
+        for (const dictionary of this.dict) {
+            if (dictNames.has(dictionary.name)) {
+                throw new Error(
+                    `Duplicate Dictionary name "${dictionary.name}". Dictionary names must be unique within a Controller — ` +
+                    `both declarations would read and write the same global value. Rename one of the Dictionary.create({ name: '${dictionary.name}' }) declarations.`
+                )
+            }
+            dictNames.add(dictionary.name)
+        }
+
         const entitiesByName = new Map(this.entities.map(e => [e.name, e]))
         for (const es of this.eventSources) {
             if (!es.entity || !es.entity.name) continue

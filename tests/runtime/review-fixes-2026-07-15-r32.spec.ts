@@ -17,12 +17,12 @@
  *   兄弟格：硬删除属性（_isDeleted_）依赖上游 Transform 输出的级联删除同一机制覆盖。
  */
 import { describe, expect, test } from "vitest";
-import { Controller, MonoSystem, SYSTEM_RECORD, recomputeChangedComputations, assertDestructiveScopeAllowed } from "@runtime";
+import { Controller, MonoSystem, SYSTEM_RECORD, ConstraintViolationError } from "@runtime";
 import { KlassByName } from "interaqt";
 import { RetryableWriteConflict } from "../../src/runtime/transaction.js";
 import { MatchExp } from "@storage";
 import { PGLiteDB } from "@drivers";
-import { Custom, Dictionary, Entity, Property, Summation, Transform } from "@core";
+import { Custom, Dictionary, Entity, NonNullConstraint, Property, Summation, Transform } from "@core";
 import { approveGeneratedMigrationDiff, migrateWithApproval } from "./helpers/migrationApproval.js";
 
 describe("r32 — recorded items", () => {
@@ -368,5 +368,41 @@ describe("r32 — recorded items", () => {
         // 进入 + 退出双向成员资格变化都被检出：sum 恰为 30（退出漏判 ⇒ 50/41；进入漏判 ⇒ 0/11）
         expect(await systemV2.storage.dict.get("r32OldRecBigPromoSum")).toBe(30);
         await db.close();
+    });
+
+    // ---------- D｜r28 记录项：NonNullConstraint 运行期命中归一为 ConstraintViolationError ----------
+
+    test("D: a runtime NOT NULL (CHECK) violation maps to ConstraintViolationError kind 'non-null' (was: bare driver error)", async () => {
+        const Doc = Entity.create({
+            name: "R32NnDoc",
+            properties: [Property.create({ name: "title", type: "string" })],
+            constraints: [NonNullConstraint.create({ name: "r32_doc_title_not_null", property: "title" })],
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({ system, entities: [Doc], relations: [] });
+        await controller.setup(true);
+
+        const doc = await system.storage.create("R32NnDoc", { title: "t1" });
+        let violation: unknown;
+        await system.storage.update("R32NnDoc", MatchExp.atom({ key: "id", value: ["=", doc.id] }), { title: null }).catch(error => { violation = error; });
+        expect(violation).toBeInstanceOf(ConstraintViolationError);
+        expect((violation as ConstraintViolationError).constraintName).toBe("r32_doc_title_not_null");
+        expect(((violation as any).context ?? (violation as any)).kind ?? (violation as any).context?.kind).toBeDefined();
+        expect(String((violation as Error).message)).toMatch(/non-null/i);
+        // 合法写不受扰
+        await system.storage.update("R32NnDoc", MatchExp.atom({ key: "id", value: ["=", doc.id] }), { title: "t2" });
+        expect((await system.storage.findOne("R32NnDoc", MatchExp.atom({ key: "id", value: ["=", doc.id] }), undefined, ["title"])).title).toBe("t2");
+        await system.destroy();
+    });
+
+    // ---------- E｜r28 记录项：同名 Dictionary 的声明期报错质量 ----------
+
+    test("E: duplicate Dictionary names fail at Controller construction with an actionable message (was: distant 'Migration identity is ambiguous')", () => {
+        const mkDict = () => new Dictionary({ name: "r32DupDict", type: "number", collection: false }, {});
+        expect(() => new Controller({
+            system: new MonoSystem(new PGLiteDB()),
+            entities: [], relations: [],
+            dict: [mkDict(), mkDict()],
+        })).toThrow(/Duplicate Dictionary name "r32DupDict"[\s\S]*Rename one/);
     });
 });
