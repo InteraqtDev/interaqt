@@ -326,10 +326,15 @@ export class QueryExecutor {
                     const linkRecordReverseAttributeName = linkRecordAttributeInfo.getReverseInfo()?.attributeName
 
                     for (let record of records) {
+                        // CAUTION 结果按 alias 挂载（filtered relation 的对外名与 base 属性名不同），
+                        //  读取也必须按 alias——否则 filtered x:1 属性上的 link x:n 数据永远补不出来
+                        //  （按 base 名读到 undefined 而静默跳过）。alias 对非 filtered 关系恒等于
+                        //  attributeName，此改动对普通关系无行为差异。
+                        const subResultKey = subEntityQuery.alias || subEntityQuery.attributeName!
                         // 可空 x:1：关联实体不存在时没有 link 数据，跳过（与 completeXToOneLeftoverRecords 的空守卫一致）。
-                        if (!record[subEntityQuery.attributeName!]?.[LINK_SYMBOL]) continue
+                        if (!record[subResultKey]?.[LINK_SYMBOL]) continue
                         // 限制 link.id
-                        const linkRecordId = record[subEntityQuery.attributeName!][LINK_SYMBOL].id
+                        const linkRecordId = record[subResultKey][LINK_SYMBOL].id
                         const queryOfThisRecord = subEntityQueryOfSubLink.derive({
                             matchExpression: subEntityQueryOfSubLink.matchExpression!.and({
                                 key: `${linkRecordReverseAttributeName}.id`,
@@ -561,18 +566,23 @@ export class QueryExecutor {
 
         // 2. 补全 x:1 的关联实体上的 x:n 关联查询
         for(let xToOneSubQuery of entityQuery.attributeQuery.xToOneRecords) {
+            // CAUTION x:1 结果按 alias 挂载（filtered relation 的对外名 ≠ base 属性名）。
+            //  补全枝干必须按同一 key 读取，否则 filtered x:1 属性下的 x:n / 深层 x:1
+            //  永远补不出来（按 base 名读到 undefined 而静默跳过）。alias 对非 filtered
+            //  关系恒等于 attributeName，此改动对普通关系无行为差异。
+            const subResultKey = xToOneSubQuery.alias || xToOneSubQuery.attributeName!
             for (let xToManySubSubQuery of xToOneSubQuery.attributeQuery.xToManyRecords) {
                 for(let record of records) {
-                    if (!record[xToOneSubQuery.attributeName!]) {
+                    if (!record[subResultKey]) {
                         // Skip this record if the x:1 relation is null
                         continue;
                     }
                     
                     const nextContext = entityQuery.label ? context.concat(record) : context
-                    record[xToOneSubQuery.attributeName!][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
+                    record[subResultKey][xToManySubSubQuery.attributeName!] = await this.findXToManyRelatedRecords(
                         xToManySubSubQuery.parentRecord!,
                         xToManySubSubQuery.attributeName!,
-                        record[xToOneSubQuery.attributeName!].id,
+                        record[subResultKey].id,
                         xToManySubSubQuery,
                         recordQueryRef,
                         nextContext
@@ -584,9 +594,9 @@ export class QueryExecutor {
             for(let xToOneSubSubQuery of xToOneSubQuery.attributeQuery.xToOneRecords) {
                 for(let record of records) {
                     // 可空 x:1：为 null 时 [].concat 会产生 [null] 传入递归导致崩溃，跳过。
-                    if (!record[xToOneSubQuery.attributeName!]) continue
+                    if (!record[subResultKey]) continue
                     const nextContext = entityQuery.label ? context.concat(record) : context
-                    await this.completeXToOneLeftoverRecords(xToOneSubSubQuery, [].concat(record[xToOneSubQuery.attributeName!]), recordQueryRef, nextContext)
+                    await this.completeXToOneLeftoverRecords(xToOneSubSubQuery, [].concat(record[subResultKey]), recordQueryRef, nextContext)
                 }
             }
         }
