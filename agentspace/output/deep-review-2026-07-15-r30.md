@@ -103,9 +103,16 @@
 
 ## 六、逃逸分析（为什么此前没抓到）
 
-完整方法见历轮 retrospective。本轮三个致命项的逃逸机理各不相同，恰好对应三种未覆盖侦测面：
+完整复盘见 `r30-test-blindness-retrospective.md`（含对本节初版归因的修正）。本轮三个致命项的逃逸机理各不相同，恰好对应三种未覆盖侦测面：
 
-1. **A（storage 查询）逃逸 = 生成域缺格**：r29 引入 combined x:1 的 prune 时，回归测试铺在「combined 直接读」上（全绿），但**没有铺 filtered relation 落在 combined base 上**这一格。r29 报告自己把 merged/filtered × 组合拓扑列为开放家族 EXT-1 并从 CI 生成域移除——移除止住了「no such column」的 fail-loud 面，却让**同一家族的静默面（prune 误删）**失去了守护。教训：**从生成域移除一个形状 = 把它移出所有预言机的辖区**，静默面比 fail-loud 面更需要移除前的显式风险评估。已把「filtered relation × combined/merged base 的读取一致性」列为 fuzzer 生成域回补的首要项。
+1. **A（storage 查询）逃逸 = 预言机读取面缺格（初版归因于生成域缺格，经敏感性实验修正）**：
+   事后实验证明 filtered-over-combined 的**形状自 r29 起就在 fuzzer 生成域里**（extended seed 2 即生成），
+   此前全绿是因为**没有任何预言机读过「经 filtered 属性名的实体嵌套读取面」**——第 6 条（配对读取
+   一致）只读 base 属性面，第 7 条（filtered 谓词一致）只读 relation-name 面。r30 新增预言机第 7b 条
+   （filtered 嵌套读取完备性：link 面可见的配对必须出现在 filtered 属性嵌套读取里），在未修复代码上
+   seed 2 当场变红、修复后 120 种子全绿。教训：**覆盖 = 生成域 × 预言机读取面的乘积**，登记册的
+   「名字形态」轴（base 名 / filtered 名 / merged input 名）此前只应用在生成侧（写入经 filtered 名），
+   从未应用在预言机的读取侧。
 2. **B（async 运行时）逃逸 = fuzzer 不生成计算声明 + 手写夹具只测单一路径**：既有 async 测试只覆盖「纯 async→apply」与「纯 resolved→apply」，从不构造「同一 freshnessKey 上 async 与 sync 交错」——因为手写夹具的路径想象力恒为单路径。这是 r28 复盘「状态历史深度是轴」在 async 维度的投影：**混合返回类型的时序交错**是一根未登记的轴。
 3. **D2（activity 层）逃逸 = 整层不在任何生成器辖区**：activity/interaction 层从未进入 fuzzer 生成域（r29 §1.5 明列）。手写活动测试只写「有意义的」图，不会写「transfer 指向 group 内嵌套节点」这种 taboo 形状——r27 命名的**夹具偏置**再次命中。fail-fast 守卫是对「类型系统接受但运行时不可用」死路径的标准收口（与 Gateway/program group 同族）。
 
