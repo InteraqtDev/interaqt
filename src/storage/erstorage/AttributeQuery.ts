@@ -226,26 +226,6 @@ export class AttributeQuery {
                 let relatedAttributeName = attributeName
                 let relatedSubQueryData = subQueryData as RecordQueryData
 
-                // CAUTION combined（三表合一）x:1 的嵌套读取按「同物理行」编译，本身无法区分
-                //  「真实配对」与「偶然同住」（orphan co-tenant / 多 combined 关系装配出的同住，
-                //  r28 幻影配对家族）——配对真实性的唯一真相源是 link id 列。这里为 combined x:1
-                //  读取自动附带 `&` 的 id（同行列，零 JOIN 开销），结果结构化后由
-                //  QueryExecutor.pruneUnpairedCombinedReads 以它为准剪除幻影；用户未请求 `&` 时
-                //  该标记随后剥除（syntheticParentLink）。
-                // 虚拟 link（link record 自身的 source/target 端点）除外：端点的配对真实性
-                // 就是 link 行自身的存在，无需（也无法——虚拟 link 不是 record）以 `&` 判定。
-                let syntheticParentLink = false
-                if (attributeInfo.isXToOne && attributeInfo.isMergedWithParent() && !attributeInfo.isLinkSourceRelation()) {
-                    const hasLinkEntry = (relatedSubQueryData.attributeQuery || []).some(entry => Array.isArray(entry) && entry[0] === LINK_SYMBOL)
-                    if (!hasLinkEntry) {
-                        relatedSubQueryData = {
-                            ...relatedSubQueryData,
-                            attributeQuery: [...(relatedSubQueryData.attributeQuery || []), [LINK_SYMBOL, { attributeQuery: ['id'] }]]
-                        }
-                        syntheticParentLink = true
-                    }
-                }
-
                 // 在这里判断 filtered relation
                 if(attributeInfo.isLinkFiltered()) {
                     // filtered relation 的 attribute。这里需要重新构建 subQueryData，要加上基于关系的 MatchExp。
@@ -260,6 +240,33 @@ export class AttributeQuery {
                     relatedSubQueryData = {
                         ...subQueryData,
                         matchExpression: mergedMatchExp.data
+                    }
+                }
+
+                // CAUTION combined（三表合一）x:1 的嵌套读取按「同物理行」编译，本身无法区分
+                //  「真实配对」与「偶然同住」（orphan co-tenant / 多 combined 关系装配出的同住，
+                //  r28 幻影配对家族）——配对真实性的唯一真相源是 link id 列。这里为 combined x:1
+                //  读取自动附带 `&` 的 id（同行列，零 JOIN 开销），结果结构化后由
+                //  QueryExecutor.pruneUnpairedCombinedReads 以它为准剪除幻影；用户未请求 `&` 时
+                //  该标记随后剥除（syntheticParentLink）。
+                // 虚拟 link（link record 自身的 source/target 端点）除外：端点的配对真实性
+                // 就是 link 行自身的存在，无需（也无法——虚拟 link 不是 record）以 `&` 判定。
+                // CAUTION 配对真相源判定（combined + 非虚拟 link）必须按 **base 拓扑**求值：
+                //  filtered relation 的 link（createFilteredLink）没有 mergedTo，isMergedWithParent()
+                //  恒 false——但它落在 combined base 上，物理读取是同行读取，同样需要 `&` 判真。
+                //  QueryExecutor.pruneUnpairedCombinedReads 一侧以 relatedAttributeName（已解析为 base）
+                //  判 isCombined；两侧必须读同一 base 拓扑，否则 filtered × combined 的嵌套读取
+                //  被 prune 当作幻影整体删除（真实配对静默消失，r28 引入 prune 后的回归）。
+                const combinedHostInfo = attributeInfo.isLinkFiltered() ? attributeInfo.getBaseAttributeInfo() : attributeInfo
+                let syntheticParentLink = false
+                if (combinedHostInfo.isXToOne && combinedHostInfo.isMergedWithParent() && !combinedHostInfo.isLinkSourceRelation()) {
+                    const hasLinkEntry = (relatedSubQueryData.attributeQuery || []).some(entry => Array.isArray(entry) && entry[0] === LINK_SYMBOL)
+                    if (!hasLinkEntry) {
+                        relatedSubQueryData = {
+                            ...relatedSubQueryData,
+                            attributeQuery: [...(relatedSubQueryData.attributeQuery || []), [LINK_SYMBOL, { attributeQuery: ['id'] }]]
+                        }
+                        syntheticParentLink = true
                     }
                 }
 

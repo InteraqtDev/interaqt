@@ -260,12 +260,36 @@ export class ActivityCall {
         const candidateStart = new Set<InteractionInstance|ActivityGroupInstance>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
         const candidateEnd = new Set<InteractionInstance|ActivityGroupInstance>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
 
+        // fail-fast: a transfer must connect two nodes declared at THIS activity level
+        //  (its own interactions / groups). `rawToNode`/`uuidToNode` are shared across the
+        //  whole recursion, so `rawToNode.get(nestedInteraction)` happily resolves a node that
+        //  lives inside a child activity of a group. Wiring `sourceNode.next` to such a nested
+        //  node crosses branch/group boundaries: at runtime `transferToNext` follows the polluted
+        //  pointer into the wrong subgraph, silently breaking ordering and every/any/race
+        //  semantics (a single-step nested source has `next===null`, so the multi-transfer guard
+        //  below never even fires). Branching must be modeled with ActivityGroup, never with a
+        //  parent transfer that reaches into a group's internals.
+        const levelNodes = new Set<InteractionInstance|ActivityGroupInstance>([...Object.values(activity.interactions!), ...Object.values(activity.groups!)])
+        const assertLevelNode = (endpoint: InteractionInstance|ActivityGroupInstance|GatewayInstance, role: 'source'|'target') => {
+            if (!levelNodes.has(endpoint as InteractionInstance|ActivityGroupInstance)) {
+                const name = (endpoint as { name?: string })?.name ?? '(unnamed)'
+                throw new ActivityError(
+                    `Activity "${activity.name}" declares a transfer whose ${role} "${name}" is not one of this activity's own interactions or groups. ` +
+                    `A transfer cannot reach into a group's nested activities (that would cross branch boundaries and corrupt the state machine). ` +
+                    `Model branching with ActivityGroup (type 'any'/'every'/'race') and connect only top-level nodes.`,
+                    { activityName: activity.name }
+                )
+            }
+        }
+
         activity.transfers?.forEach((transfer:TransferInstance) => {
             const sourceNode = this.rawToNode.get(transfer.source as InteractionInstance)! as InteractionNode|ActivityGroupNode
             const targetNode = this.rawToNode.get(transfer.target as InteractionInstance)! as InteractionNode|ActivityGroupNode
 
             assert(!!sourceNode, `cannot find source ${(transfer.source as InteractionInstance).name!}`)
             assert(!!targetNode, `cannot find target ${(transfer.target as InteractionInstance).name!}`)
+            assertLevelNode(transfer.source, 'source')
+            assertLevelNode(transfer.target, 'target')
             // fail-fast: each node holds a single `next` pointer, so a second transfer from
             // the same source would silently overwrite the first one — the built graph would
             // no longer match the declaration. Branching must be modeled with ActivityGroup.

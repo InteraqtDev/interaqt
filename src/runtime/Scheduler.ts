@@ -1328,6 +1328,33 @@ export class Scheduler {
         })
     }
 
+    /**
+     * 同步/resolved 路径产出新值后，作废同一 freshnessKey 上所有尚未 apply 的异步 task。
+     *
+     * 异步"最新性"由 isLatestAsyncTask 按 task 行 id 判定；同步路径不建 task 行，
+     * 于是旧的 pending/success task 完成时会被误判为最新并覆写新值（stale overwrite）。
+     * 源已变化才会触发本次重算，因此该 freshnessKey 上任何未应用的旧异步结果都必然陈旧。
+     * async→async 覆盖由新 task 的更大 id 处理（本方法只补同步/resolved 覆盖 async 的缺口）。
+     *
+     * CAUTION 必须**删除**而非标记 skipped：外部 worker 完成任务时会盲写 { result, status:'success' }，
+     *  把 skipped 标记覆盖回 success（复活陈旧任务）。删除后外部按 id 的 update 命中 0 行（no-op），
+     *  daemon 随后 handleAsyncReturn 读不到该 task → missing-task 跳过。删除对两种时序都收敛：
+     *  「先删后到货」→ update no-op；「先到货后删」→ 行连同 success 结果一并移除。
+     *
+     * CAUTION freshnessKey 的求值必须与 createAsyncTask 一致：默认按 record/context 派生。
+     *  自定义 args.freshnessKey（ComputationResult.async({ freshnessKey }) 显式指定）时，
+     *  resolved 路径的 args 若携带同一 key 则同样命中；纯同步（无 args）只能按默认键作废。
+     */
+    private async invalidateSupersededAsyncTasks(computation: DataBasedComputation, args: any, record?: any) {
+        const taskRecordName = this.getAsyncTaskRecordKey(computation)
+        const freshnessKey = this.getAsyncTaskFreshnessKey(computation, args, record)
+        await this.controller.system.storage.delete(
+            taskRecordName,
+            MatchExp.atom({key: 'freshnessKey', value: ['=', freshnessKey]})
+                .and({key: 'status', value: ['in', ['pending', 'success']]})
+        )
+    }
+
     private async markAsyncTaskStatus(taskRecordName: string, taskId: string, status: 'applied' | 'skipped') {
         await this.controller.system.storage.update(
             taskRecordName,
@@ -1463,7 +1490,19 @@ export class Scheduler {
             // 3. 结果处理阶段的错误处理
             try {
                 const result = computationResult instanceof ComputationResultResolved ? await computation.asyncReturn!(computationResult.result, computationResult.args) : computationResult
-                
+
+                // CAUTION 异步计算的"最新性"此前只按 task 行 id 排序判定（isLatestAsyncTask）。
+                //  但同一 freshnessKey 上一次经同步/resolved 路径（本分支）产出的新值**不创建 task 行**，
+                //  于是仍在 pending/success 的旧 task 完成时被判为"最新"，把已应用的更新值覆写回陈旧结果。
+                //  在应用同步结果前，把该 freshnessKey 上所有尚未 apply 的 task 作废（源已变，旧异步结果必陈旧）。
+                if (this.isAsyncComputation(computation)) {
+                    await this.invalidateSupersededAsyncTasks(
+                        computation as DataBasedComputation,
+                        computationResult instanceof ComputationResultResolved ? computationResult.args : undefined,
+                        record
+                    )
+                }
+
                 if (computationResultMode === 'patch') {
                     if (this.requiresSerializablePatchApply(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
                         throw new RequireSerializableRetry(`entity/relation patch from custom computation ${this.getComputationName(computation)}`)
