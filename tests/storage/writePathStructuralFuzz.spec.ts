@@ -155,6 +155,45 @@ async function assertStructuralInvariants(handle: EntityQueryHandle, schema: Fuz
             expect(nestedPairs.has(pair),
                 `${label} [filtered-nested-read] ${name}: pairing ${pair} visible on the link face but MISSING from the ${baseChoice.source}.${frSourceProperty} nested read`).toBe(true)
         }
+        // 7b-deep（r31-S1 收口：挂载深度是读取面的子维度）。同一 filtered 属性在
+        //    **x:1 主干之下**（completeXToOneLeftoverRecords 补全枝干）与在顶层（上方 7b）
+        //    是两个独立的实现点：r31-S1 中前者把结果挂到 base 属性名下（filtered 名整体缺失、
+        //    子集泄漏到 base 名），顶层面全绿。断言：经「parent --x:1--> host」进入的嵌套读取，
+        //    host 的 filtered 属性必须给出与 link 面一致的配对（对可达 host 而言）。
+        //    纯读取侧断言、零 rng 调用——决策流契约不受影响，既有种子池全部有效。
+        const parentEntries: Array<{ parent: string, parentAttr: string }> = []
+        for (const choice of schema.relationChoices) {
+            if (choice.symmetric) continue
+            if (choice.target === baseChoice.source && (choice.relType === 'n:1' || choice.relType === '1:1')) {
+                parentEntries.push({ parent: choice.source, parentAttr: choice.sourceProperty })
+            }
+            if (choice.source === baseChoice.source && (choice.relType === '1:n' || choice.relType === '1:1')) {
+                parentEntries.push({ parent: choice.target, parentAttr: choice.targetProperty })
+            }
+        }
+        for (const { parent, parentAttr } of parentEntries) {
+            const parentRows = await handle.find(parent, undefined, undefined,
+                ['id', [parentAttr, { attributeQuery: ['id', [frSourceProperty, { attributeQuery: ['id'] }]] }]])
+            const reachableHostIds = new Set<string>()
+            const deepPairs = new Set<string>()
+            for (const parentRow of parentRows) {
+                const host = parentRow[parentAttr] as Record<string, unknown> | undefined
+                if (!host || host.id === null || host.id === undefined) continue
+                reachableHostIds.add(String(host.id))
+                const related = host[frSourceProperty]
+                const items = Array.isArray(related) ? related : (related ? [related] : [])
+                for (const item of items as Record<string, unknown>[]) {
+                    if (item.id !== null && item.id !== undefined) deepPairs.add(`${host.id}->${item.id}`)
+                }
+            }
+            for (const link of filteredLinkRows) {
+                const hostId = (link.source as { id?: unknown })?.id
+                if (hostId === null || hostId === undefined || !reachableHostIds.has(String(hostId))) continue
+                const pair = `${hostId}->${(link.target as { id?: unknown })?.id}`
+                expect(deepPairs.has(pair),
+                    `${label} [filtered-nested-read-deep] ${name}: pairing ${pair} visible on the link face but MISSING from the ${parent}.${parentAttr}.${frSourceProperty} nested read (x:1-trunk mount face)`).toBe(true)
+            }
+        }
     }
     // 8. merged (union) 一致性（r29）：find(merged) 的 id 集合 = 各 input id 集合的不相交并
     for (const merged of schema.mergedEntities) {

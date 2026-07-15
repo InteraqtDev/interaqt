@@ -125,6 +125,14 @@ export class Dictionary implements DictionaryInstance {
         `Allowed types: ${ALLOWED_PROPERTY_TYPES.join(', ')}.`
       );
     }
+    // 与 Property.defaultValue 同族（r31）：非函数 defaultValue 在部分消费点被静默忽略、
+    //  在另一些消费点（迁移回填 declared.defaultValue()）直接抛裸 TypeError——声明期统一拒绝。
+    if (args.defaultValue !== undefined && typeof args.defaultValue !== 'function') {
+      throw new Error(
+        `Dictionary "${args.name}" declares a non-function defaultValue (${JSON.stringify(args.defaultValue)}). ` +
+        `defaultValue must be a function, e.g. defaultValue: () => ${JSON.stringify(args.defaultValue)}.`
+      );
+    }
 
     const instance = new Dictionary(args, options);
     

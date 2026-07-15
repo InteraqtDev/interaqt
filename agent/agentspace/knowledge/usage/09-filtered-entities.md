@@ -74,7 +74,7 @@ const Post = Entity.create({
     Property.create({ name: 'status', type: 'string' }),
     Property.create({ name: 'category', type: 'string' }),
     Property.create({ name: 'publishedAt', type: 'string' }),
-    Property.create({ name: 'viewCount', type: 'number', defaultValue: 0 })
+    Property.create({ name: 'viewCount', type: 'number', defaultValue: () => 0 })
   ]
 });
 
