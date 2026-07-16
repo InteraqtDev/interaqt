@@ -104,6 +104,24 @@ function validateAggregationArgs(args: AggregationArgs, dataContext: DataContext
     }
 }
 
+/**
+ * 聚合 callback 的返回值守卫：聚合贡献是同步计算（`!!value` / `Number(value)` 直接强转），
+ * thenable（Promise）会被静默强转成错误贡献（恒 true / NaN→0）并通过 increment 不可逆地
+ * 累积进聚合状态。async 函数已在声明期拒绝（klassValidation.assertSynchronousFunctionArg）；
+ * 这里兜底残余形态——同步函数返回 Promise、transpile 后逃过构造器名检测的 async 函数。
+ */
+export function assertSyncCallbackResult<V>(value: V, computationName: string, dataContext: DataContext): V {
+    if (value && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function') {
+        throw new ComputationError(
+            `${computationName} callback of ${describeDataContext(dataContext)} returned a Promise. ` +
+            `Aggregation callbacks are synchronous — the return value is coerced directly (a Promise would be counted as truthy / summed as NaN). ` +
+            `Compute the contribution synchronously, or derive the async value into a stored property first.`,
+            { computationName, dataContext }
+        )
+    }
+    return value
+}
+
 // fail fast：global（records 源）聚合缺 record 时，如果等到 createStates 才解引用
 //  `this.record.name` 会抛出与声明完全脱节的 "Cannot read properties of undefined"。
 function requireAggregationRecord(args: AggregationArgs, dataContext: DataContext, options: AggregationOptions): EntityInstance | RelationInstance {

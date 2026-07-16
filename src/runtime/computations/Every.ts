@@ -1,7 +1,7 @@
 import { Every, EveryInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { DataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
-import { GlobalRecordsAggregationHandle, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
+import { assertSyncCallbackResult, GlobalRecordsAggregationHandle, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
 
 export class GlobalEveryHandle extends GlobalRecordsAggregationHandle<boolean, boolean, EveryInstance> {
     static computationType = Every
@@ -27,7 +27,7 @@ export class GlobalEveryHandle extends GlobalRecordsAggregationHandle<boolean, b
     }
 
     protected computeItemValue(record: Record<string, unknown>, dataDeps: { [key: string]: unknown }): boolean {
-        return !!this.callback!.call(this.controller, record, dataDeps)
+        return !!assertSyncCallbackResult(this.callback!.call(this.controller, record, dataDeps), 'Every', this.dataContext)
     }
 
     protected async applyDelta(newValue: boolean | null, oldValue: boolean | null, presenceDelta: 1 | 0 | -1): Promise<boolean> {
@@ -82,7 +82,7 @@ export class PropertyEveryHandle extends PropertyRelationAggregationHandle<boole
     }
 
     protected computeItemValue(relatedItem: Record<string, unknown>, dataDeps: { [key: string]: unknown }): boolean {
-        return !!this.callback!.call(this.controller, relatedItem, dataDeps)
+        return !!assertSyncCallbackResult(this.callback!.call(this.controller, relatedItem, dataDeps), 'Every', this.dataContext)
     }
 
     protected async applyDelta(hostRecord: Record<string, unknown>, newValue: boolean | null, oldValue: boolean | null, presenceDelta: 1 | 0 | -1): Promise<boolean> {

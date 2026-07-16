@@ -146,7 +146,10 @@ const reviewerRelation = Relation.create({
             type: 'string',
             collection: false,
             // TODO 改 statemachine
-            computed: async function (this: Controller, relation: any) {
+            // CAUTION computed 是同步契约（r35 起声明期拒绝 async 函数）。此前这里写的是
+            //  async function：返回的 Promise 被静默序列化成 "{}" 落库——本 fixture 恰是
+            //  该缺陷类的活体样本（无断言读取 result 所以从未暴露）。
+            computed: function (this: Controller, relation: any) {
                 // 简化的逻辑，应该根据实际的审批逻辑来
                 return 'pending'
             }

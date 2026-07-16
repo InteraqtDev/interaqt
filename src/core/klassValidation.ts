@@ -19,6 +19,13 @@ export type PublicFieldDef = {
   defaultValue?: () => unknown
   options?: readonly unknown[]
   constraints?: Record<string, (args: never) => unknown>
+  /**
+   * 该 function 字段被**同步消费**（返回值不 await 直接参与运算/落库）。
+   * 传入 async 函数时返回的 Promise 会被静默强转成错误值（`!!promise === true`、
+   * `Number(promise) === NaN`、`JSON.stringify(promise) === '{}'`）——零告警的数据损坏，
+   * 声明期拒绝（r35）。同步函数返回 Promise 的残余形态由各消费点的 thenable 守卫兜底。
+   */
+  synchronous?: boolean
 }
 
 /**
@@ -45,6 +52,23 @@ export function validateAggregationTarget(
   }
 }
 
+/**
+ * 同步消费的 function 声明面拒绝 async 函数（r35）。
+ * 消费点不 await 返回值：async 函数返回的 Promise 会被静默强转成错误值
+ * （`!!promise === true`、`Number(promise) === NaN`、`JSON.stringify(promise) === '{}'`），
+ * 属于零告警的数据损坏。检测按构造器名——transpile 到 ES5 的 async 函数退化为普通函数
+ * 逃过此检测，该残余形态由消费点的 thenable 守卫兜底（如 aggregationTemplate）。
+ */
+export function assertSynchronousFunctionArg(owner: string, field: string, fn: unknown): void {
+  if (typeof fn === 'function' && fn.constructor?.name === 'AsyncFunction') {
+    throw new Error(
+      `${owner} got an async function for "${field}", but "${field}" is consumed synchronously — ` +
+      `its return value is used directly without await, so a Promise would be silently coerced into a wrong value ` +
+      `(e.g. counted as truthy, summed as NaN, or persisted as "{}"). Use a synchronous function.`
+    )
+  }
+}
+
 export function validateCreateArgs(
   klassName: string,
   publicDef: Record<string, PublicFieldDef>,
@@ -64,6 +88,10 @@ export function validateCreateArgs(
         `${klassName}.create() got invalid "${field}": ${JSON.stringify(value)}. ` +
         `Supported values: ${def.options.map(option => JSON.stringify(option)).join(', ')}.`
       )
+    }
+    // synchronous: true 的 function 字段拒绝 async 函数（见 PublicFieldDef.synchronous 头注）。
+    if (def.synchronous && typeof value === 'function') {
+      assertSynchronousFunctionArg(`${klassName}.create()`, field, value)
     }
     if (def.constraints) {
       for (const [constraintName, predicate] of Object.entries(def.constraints)) {

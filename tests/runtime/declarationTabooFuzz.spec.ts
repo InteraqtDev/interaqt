@@ -19,7 +19,7 @@
  */
 import { describe, expect, test } from "vitest";
 import {
-    Action, Activity, ActivityGroup, ActivityManager, Controller, Dictionary, Entity,
+    Action, Activity, ActivityGroup, ActivityManager, Controller, Count, Dictionary, Entity,
     Interaction, KlassByName, MonoSystem, Property, StateMachine,
     StateNode, StateTransfer, Transfer, Transform,
 } from 'interaqt';
@@ -258,6 +258,26 @@ const TABOO_CELLS: TabooCell[] = [
                 ],
             })
             return { phase: 'construct', action: () => new ActivityManager([activity]) }
+        },
+    },
+    {
+        // r35：同步契约回调面（聚合 callback / computed / defaultValue / nextRecomputeTime /
+        //  createState / planIncremental）拒绝 async 函数——Promise 会被 `!!` / `Number()` /
+        //  JSON 序列化静默强转成错误值落库。这里以 Count.callback 为代表格（同一收敛点
+        //  klassValidation.assertSynchronousFunctionArg / PublicFieldDef.synchronous），
+        //  全表面枚举见 reviewFixesR35.spec.ts。
+        name: 'async function on a synchronously-consumed callback surface (Count.callback)',
+        expectedError: /consumed synchronously/,
+        run: async (surrounding, rng, tag) => {
+            const host = mkEntity(`Tb${tag}AC`)
+            return {
+                phase: 'declare',
+                action: () => Count.create({
+                    record: host,
+                    attributeQuery: ['label'],
+                    callback: (async (item: { label?: string }) => item.label === 'x') as never,
+                }),
+            }
         },
     },
     {
