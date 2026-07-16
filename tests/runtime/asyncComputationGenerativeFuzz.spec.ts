@@ -41,7 +41,7 @@ import {
 } from 'interaqt';
 import { MatchExp } from '@storage';
 import { PGLiteDB } from '@drivers';
-import { mulberry32, chance, int, pick, type Rng } from "../storage/helpers/fuzzRandom.js";
+import { mulberry32, chance, int, pick } from "../storage/helpers/fuzzRandom.js";
 
 type Row = Record<string, unknown>
 

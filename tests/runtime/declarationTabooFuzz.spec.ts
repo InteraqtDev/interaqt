@@ -20,7 +20,7 @@
 import { describe, expect, test } from "vitest";
 import {
     Action, Activity, ActivityGroup, ActivityManager, Controller, Dictionary, Entity,
-    Interaction, KlassByName, MonoSystem, Payload, PayloadItem, Property, StateMachine,
+    Interaction, KlassByName, MonoSystem, Property, StateMachine,
     StateNode, StateTransfer, Transfer, Transform,
 } from 'interaqt';
 import { MatchExp } from '@storage';
