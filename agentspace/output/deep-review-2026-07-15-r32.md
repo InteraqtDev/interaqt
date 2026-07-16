@@ -25,11 +25,11 @@
 | r28 §四 #1 | SQLite/MySQL `_IDS_` 不自举 | **已修复**：`setupRecordSequences` 落地两驱动（MAX(id) 对账、只前进）。实测定谳比登记更严重：SQLite 逻辑 id 列无唯一索引，撞号是**静默**双行（非 fail-loud PK 冲突）。回归 r32-storage-C1 + MySQL env-gated 探针 |
 | r28 §四 #2 | 非空约束违规未映射 | **已修复**：`normalizeDatabaseError.isCheckViolation` + `mapConstraintError` 归一为 `ConstraintViolationError`（kind 'non-null'，仅框架声明的约束，用户自建 CHECK 不在辖区）。回归 r32-D |
 | r28 §四 #3 | 重复 Dictionary 名报错质量 | **已修复**：Controller 构造期 fail-fast（用户语言指出两个同名 Dictionary.create）。回归 r32-E |
-| r28 §四 #4 | Activity 跨层 Transfer 孤儿 group | **确认已由 r30-D2 收口**：跨层端点 build 期拒绝；同层孤儿 group 由 start/end 基数检查拒绝（复核，无缺口） |
-| r28 §四 #5 | NOT(combined 路径) 三值逻辑分歧 | **已定谳（契约决策）并文档化**：combined 路径按经典二值求值——未配对行满足否定（同行编码没有"关联行缺席"的 NULL 行形态）；与 LEFT JOIN 三值语义的差异是拓扑可见的既定行为。文档化于 `buildCombinedSegmentGates` 收敛点 |
+| r28 §四 #4 | Activity 跨层 Transfer 孤儿 group | **确认已由 r30-D2 收口**：跨层端点 build 期拒绝；同层孤儿 group 由 start/end 基数检查拒绝。复核以运行时探针钉住（r32-G，同层孤儿格） |
+| r28 §四 #5 | NOT(combined 路径) 三值逻辑分歧 | **已定谳（契约决策）并文档化 + 探针钉住**：combined 路径按经典二值求值——未配对行满足否定（同行编码没有"关联行缺席"的 NULL 行形态）；与 LEFT JOIN 三值语义的差异是拓扑可见的既定行为。文档化于 `buildCombinedSegmentGates` 收敛点；r32-storage-D 以补集律断言（positive ∪ negated = 全体行）钉住决策 |
 | r28 §四 #6 | MySQL 套件并行互扰 | **已修复**：`mysqlOpenIdempotency` 连接计数按本套件独占 database 过滤（各套件共用 MySQL 用户、库名唯一）。五套件并行实测绿 |
 | r27 §四 #7 | Property.public.type.options 函数形态 / Entity.commonProperties 谓词读错字段 | **已修复**：静态数组 + 谓词按 create args 契约读 commonProperties。兄弟面扫描：全 core 无其余函数形态 options；Relation 的实例命名谓词读的字段名恰与 args 同名（工作，仅命名误导） |
-| r30 §五 | deepMatch 空对象/空数组语义 | **已文档化**：partial-match 语义下空模式 vacuous 恒真（「是某个对象」而非「为空」），精确形状匹配不在声明面表达域。文档化于 deepPartialMatch（与 ComputationSourceMap.deepMatch 同语义） |
+| r30 §五 | deepMatch 空对象/空数组语义 | **已文档化 + 探针钉住**：partial-match 语义下空模式 vacuous 恒真（「是某个对象」而非「为空」），精确形状匹配不在声明面表达域。文档化于 deepPartialMatch（与 ComputationSourceMap.deepMatch 同语义）；r32-F 六向断言钉住（任意对象/数组值命中，null/原始值/键缺席不命中） |
 
 未在本轮处置（维持记录，理由如注）：RealTime 时间调度器（特性级缺口，需产品设计）、
 MySQL TIMESTAMP 列型（等 MySQL 驱动整体升级）、legacy operationKey 回退 / `#occurrence`

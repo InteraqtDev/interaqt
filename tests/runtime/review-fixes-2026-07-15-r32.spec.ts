@@ -22,7 +22,8 @@ import { KlassByName } from "interaqt";
 import { RetryableWriteConflict } from "../../src/runtime/transaction.js";
 import { MatchExp } from "@storage";
 import { PGLiteDB } from "@drivers";
-import { Custom, Dictionary, Entity, NonNullConstraint, Property, Summation, Transform } from "@core";
+import { Custom, Dictionary, Entity, NonNullConstraint, Property, StateMachine, StateNode, StateTransfer, Summation, Transform } from "@core";
+import { Action, Activity, ActivityGroup, Interaction, Payload, Transfer } from "../../src/builtins/index.js";
 import { approveGeneratedMigrationDiff, migrateWithApproval } from "./helpers/migrationApproval.js";
 
 describe("r32 — recorded items", () => {
@@ -404,5 +405,67 @@ describe("r32 — recorded items", () => {
             entities: [], relations: [],
             dict: [mkDict(), mkDict()],
         })).toThrow(/Duplicate Dictionary name "r32DupDict"[\s\S]*Rename one/);
+    });
+
+    // ---------- F｜r30 记录项定谳的运行时探针：deepMatch 空模式 vacuous 语义 ----------
+
+    test("F (contract pin): an empty object/array pattern in trigger.record matches any object value — not 'exactly empty'", async () => {
+        // 契约（r32 文档化，落点 TransitionFinder.deepPartialMatch）：partial-match 语义下
+        // `record: {tags: []}` 携带零个字段约束，读作「tags 是某个对象/数组」；
+        // 精确形状匹配（长度/全量相等）不在本声明面的表达域内。
+        const { TransitionFinder } = await import("../../src/runtime/computations/TransitionFinder.js");
+        const s1 = StateNode.create({ name: "s1" });
+        const s2 = StateNode.create({ name: "s2" });
+        const machine = StateMachine.create({
+            states: [s1, s2],
+            initialState: s1,
+            transfers: [StateTransfer.create({
+                current: s1, next: s2,
+                trigger: { recordName: "R32PinDoc", type: "update", record: { tags: [] } },
+            })],
+        });
+        const finder = new TransitionFinder(machine as any);
+        const update = (tags: unknown) => ({
+            recordName: "R32PinDoc", type: "update",
+            record: { id: 1, tags }, oldRecord: { id: 1, tags: null },
+        });
+        // 空数组模式匹配任何数组/对象值——包括非空数组与空数组
+        expect(finder.findNextState("s1", update(["a", "b"]))?.name).toBe("s2");
+        expect(finder.findNextState("s1", update([]))?.name).toBe("s2");
+        expect(finder.findNextState("s1", update({ nested: 1 }))?.name).toBe("s2");
+        // 但不是「匹配一切」：null / 原始值不是对象，不命中
+        expect(finder.findNextState("s1", update(null))).toBeNull();
+        expect(finder.findNextState("s1", update("not-an-object"))).toBeNull();
+        // 键缺席也不命中（partial match 要求模式声明的键在事件上存在）
+        expect(finder.findNextState("s1", {
+            recordName: "R32PinDoc", type: "update",
+            record: { id: 1 }, oldRecord: { id: 1 },
+        })).toBeNull();
+    });
+
+    // ---------- G｜r28 #4 复核的运行时探针：同层孤儿 group 在 build 期被拒绝 ----------
+
+    test("G (verification pin): a same-level ActivityGroup connected by no transfer fails graph construction (sibling cell of the r30-D2 cross-level rejection)", async () => {
+        const mkInteraction = (name: string) => Interaction.create({
+            name, action: Action.create({ name: `${name}Action` }),
+            payload: Payload.create({ items: [] }),
+        });
+        const a = mkInteraction("R32OrphanA");
+        const b = mkInteraction("R32OrphanB");
+        const child = mkInteraction("R32OrphanChild");
+        const group = ActivityGroup.create({
+            type: "any",
+            activities: [Activity.create({ name: "R32OrphanBranch", interactions: [child], groups: [], transfers: [], gateways: [], events: [] })],
+        });
+        // group 声明了却没有任何 transfer 接线：序列完整性不变量（恰好一个起点/终点）拒绝
+        const activity = Activity.create({
+            name: "R32OrphanActivity",
+            interactions: [a, b],
+            groups: [group],
+            transfers: [Transfer.create({ name: "ab", source: a, target: b })],
+            gateways: [], events: [],
+        });
+        const { ActivityManager } = await import("../../src/builtins/index.js");
+        expect(() => new ActivityManager([activity])).toThrow(/start node must one|end node must be one/);
     });
 });

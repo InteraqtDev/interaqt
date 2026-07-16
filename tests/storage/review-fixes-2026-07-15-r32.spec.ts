@@ -274,6 +274,38 @@ describe("r32 — recorded items (storage)", () => {
         await db.close();
     });
 
+    // ---------- D｜r28 #5 契约定谳的运行时探针：NOT(combined 路径) 经典二值语义 ----------
+
+    test("D (contract pin): NOT over a combined-path atom evaluates classically — an unpaired row satisfies the negation", async () => {
+        // 契约（r32 定谳，文档在 MatchExp.buildCombinedSegmentGates）：combined 的同行编码
+        // 没有「关联行缺席」的 NULL 行形态，谓词按经典二值求值——配对不存在 ⇒ 否定成立。
+        // 与 LEFT JOIN 拓扑的 SQL 三值语义（未配对 ⇒ UNKNOWN ⇒ NOT 后仍不命中）刻意不同，
+        // 是拓扑可见的既定行为。本测试钉住决策，防止未来把它当 bug「修」成不一致。
+        const Host = Entity.create({ name: "R32NotHost", properties: [Property.create({ name: "label", type: "string" })] });
+        const Dep = Entity.create({ name: "R32NotDep", properties: [Property.create({ name: "title", type: "string" })] });
+        const HostDep = Relation.create({ source: Host, sourceProperty: "dep", target: Dep, targetProperty: "host", type: "1:1", isTargetReliance: true });
+
+        const db = new SQLiteDB(":memory:");
+        await db.open();
+        const setup = new DBSetup([Host, Dep], [HostDep], db);
+        await setup.createTables();
+        const handle = new EntityQueryHandle(new EntityToTableMap(setup.map, setup.aliasManager), db);
+        // combined 拓扑前提确认（三表合一）：Host 与 Dep 同表
+        expect((setup.map.records as any).R32NotHost.table).toBe((setup.map.records as any).R32NotDep.table);
+
+        await handle.create("R32NotHost", { label: "h-x", dep: { title: "x" } });   // 配对且命中原子
+        await handle.create("R32NotHost", { label: "h-y", dep: { title: "y" } });   // 配对且不命中原子
+        await handle.create("R32NotHost", { label: "h-none" });                     // 未配对
+
+        const positive = await handle.find("R32NotHost", MatchExp.atom({ key: "dep.title", value: ["=", "x"] }), undefined, ["label"]);
+        expect(positive.map(row => row.label)).toEqual(["h-x"]);
+
+        const negated = await handle.find("R32NotHost", MatchExp.atom({ key: "dep.title", value: ["=", "x"] }).not(), undefined, ["label"]);
+        // 经典二值：补集律成立——positive ∪ negated = 全体行；未配对行 h-none 命中否定
+        expect(negated.map(row => row.label).sort()).toEqual(["h-none", "h-y"]);
+        await db.close();
+    });
+
     test("B2 (guard): plain filtered entity whose base gets table-combined keeps a live table pointer", async () => {
         // EXT-1 的同族普通面：filtered entity 的 base 被（非 merged 的）合表移动。
         const Host = Entity.create({ name: "R32GHost", properties: [Property.create({ name: "label", type: "string" })] });
