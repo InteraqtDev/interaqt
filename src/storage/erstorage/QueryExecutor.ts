@@ -390,7 +390,16 @@ export class QueryExecutor {
         //  超过驱动参数上限阈值（或 offset-only 无 limit，页本身无界）时退回
         //  「剥离 LIMIT + 内存切片」的旧路径（正确性同等，代价是全量拉取——r12-I-4
         //  的残余面，登记为诚实边界）。
+        // CAUTION forUpdate 强制走单语句旧路径（r35 防御）：两段式的第一段（选页）不加锁，
+        //  「无锁读选出页成员 → 第二段才对成员加锁」与「对全部命中行加锁后切片」的锁语义
+        //  不同（页成员可能在两段之间被并发改到不再命中）。当前 lock API 不携带分页
+        //  （见 EntityQueryHandle.lock），该守卫防未来调用方引入静默锁语义漂移。
+        // 诚实边界（r35 定谳，登记不改）：两段式是两条语句——READ COMMITTED 下并发写者可以
+        //  在两段之间让页成员不再满足业务谓词，第二段仍按 id 返回它（返回行内容与谓词
+        //  可能不自洽）。这是两段式分页的行业标准语义（select-ids-then-fetch）；
+        //  SERIALIZABLE 事务内两段共享同一快照，无此漂移。
         const usePagedRootIds = paginationOverFanOut
+            && !forUpdate
             && paginationModifier.limit !== undefined
             && paginationModifier.limit <= QueryExecutor.PAGED_ROOT_ID_MAX_LIMIT
         const needsPostPagination = paginationOverFanOut && !usePagedRootIds
