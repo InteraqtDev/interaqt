@@ -233,63 +233,9 @@ ${modifierClause}
         }
 
         if (orderBy.length) {
-            clauses.push(`ORDER BY ${orderBy.map(({ attribute, recordName, order }) => {
-                const normalizedOrder = String(order).toUpperCase()
-                if (normalizedOrder !== 'ASC' && normalizedOrder !== 'DESC') {
-                    throw new Error(`orderBy value must be 'ASC' or 'DESC', got: ${JSON.stringify(order)} for attribute ${attribute}`)
-                }
-                // 解析 attribute，支持路径（如 'leader.age'）
-                const pathParts = attribute.split('.')
-                
-                let namePath: string[]
-                let finalAttribute: string
-                
-                if (pathParts.length === 1) {
-                    // 简单字段：{ age: 'ASC' }
-                    namePath = [recordName]
-                    finalAttribute = attribute
-                } else {
-                    // 路径字段：{ 'leader.age': 'ASC' }
-                    namePath = [recordName, ...pathParts.slice(0, -1)]
-                    finalAttribute = pathParts[pathParts.length - 1]
-                }
-                
-                // 直接从 EntityToTableMap 获取真实的表别名和字段名
-                // 这样可以正确处理：
-                // 1. 长字段名（已在 Setup 阶段缩短）
-                // 2. 关联实体字段（通过多级路径）
-                // 3. Self-join 场景（每级关系有唯一表别名）
-                const [tableAlias, fieldName] = this.map.getTableAliasAndFieldName(
-                    namePath,
-                    finalAttribute
-                )
-                
-                const fullFieldRef = `${this.withPrefix(prefix)}${tableAlias}"."${fieldName}`
-
-                // CAUTION combined（三表合一）路径段按「同物理行」编译（无 JOIN 无 ON），
-                //  排序键会把偶然同住（orphan co-tenant）的幽灵列值当作关联值参与排序
-                //  （r28 幻影配对家族的 Modifier 面，r31 定谳：读取面 prune 为 null、排序面
-                //  仍按幽灵值排序）。与 match 面的 buildCombinedSegmentGates 同一真相源：
-                //  路径中每个 combined 段的 link id 列非空才取值，否则该排序键按 NULL 处理。
-                const combinedGateRefs: string[] = []
-                for (let i = 0; i < pathParts.length - 1; i++) {
-                    const segmentPath = [recordName, ...pathParts.slice(0, i + 1)]
-                    let segmentInfo
-                    try {
-                        segmentInfo = this.map.getInfoByPath(segmentPath)
-                    } catch {
-                        continue
-                    }
-                    if (!segmentInfo?.isRecord || !segmentInfo.isMergedWithParent()) continue
-                    if (segmentInfo.isLinkSourceRelation()) continue
-                    const [gateAlias, linkIdField] = this.map.getTableAliasAndFieldName([...segmentPath, LINK_SYMBOL], 'id')
-                    combinedGateRefs.push(`"${this.withPrefix(prefix)}${gateAlias}"."${linkIdField}" IS NOT NULL`)
-                }
-                if (combinedGateRefs.length) {
-                    return `CASE WHEN ${combinedGateRefs.join(' AND ')} THEN "${fullFieldRef}" ELSE NULL END ${normalizedOrder}`
-                }
-                return `"${fullFieldRef}" ${normalizedOrder}`
-            }).join(',')}`)
+            clauses.push(`ORDER BY ${this.buildOrderByExpressions(modifier, prefix).map(({ expression, order }) =>
+                `${expression} ${order}`
+            ).join(',')}`)
         }
 
         // CAUTION 不能用 truthy 判断：LIMIT 0（返回空集）是合法语义。
@@ -302,6 +248,152 @@ ${modifierClause}
 
         return clauses.join('\n')
     }
+
+    /**
+     * 构建 orderBy 的排序表达式列表（buildModifierClause 与 buildPagedRootIdQuery 共用——
+     * combined 幽灵值 CASE 门（r31）只在这一处实现，两个消费方不得分叉）。
+     */
+    buildOrderByExpressions(
+        modifier: Modifier,
+        prefix: string = ''
+    ): { expression: string, order: 'ASC' | 'DESC' }[] {
+        return modifier.orderBy.map(({ attribute, recordName, order }) => {
+            const normalizedOrder = String(order).toUpperCase()
+            if (normalizedOrder !== 'ASC' && normalizedOrder !== 'DESC') {
+                throw new Error(`orderBy value must be 'ASC' or 'DESC', got: ${JSON.stringify(order)} for attribute ${attribute}`)
+            }
+            // 解析 attribute，支持路径（如 'leader.age'）
+            const pathParts = attribute.split('.')
+
+            let namePath: string[]
+            let finalAttribute: string
+
+            if (pathParts.length === 1) {
+                // 简单字段：{ age: 'ASC' }
+                namePath = [recordName]
+                finalAttribute = attribute
+            } else {
+                // 路径字段：{ 'leader.age': 'ASC' }
+                namePath = [recordName, ...pathParts.slice(0, -1)]
+                finalAttribute = pathParts[pathParts.length - 1]
+            }
+
+            // 直接从 EntityToTableMap 获取真实的表别名和字段名
+            // 这样可以正确处理：
+            // 1. 长字段名（已在 Setup 阶段缩短）
+            // 2. 关联实体字段（通过多级路径）
+            // 3. Self-join 场景（每级关系有唯一表别名）
+            const [tableAlias, fieldName] = this.map.getTableAliasAndFieldName(
+                namePath,
+                finalAttribute
+            )
+
+            const fullFieldRef = `${this.withPrefix(prefix)}${tableAlias}"."${fieldName}`
+
+            // CAUTION combined（三表合一）路径段按「同物理行」编译（无 JOIN 无 ON），
+            //  排序键会把偶然同住（orphan co-tenant）的幽灵列值当作关联值参与排序
+            //  （r28 幻影配对家族的 Modifier 面，r31 定谳：读取面 prune 为 null、排序面
+            //  仍按幽灵值排序）。与 match 面的 buildCombinedSegmentGates 同一真相源：
+            //  路径中每个 combined 段的 link id 列非空才取值，否则该排序键按 NULL 处理。
+            const combinedGateRefs: string[] = []
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                const segmentPath = [recordName, ...pathParts.slice(0, i + 1)]
+                let segmentInfo
+                try {
+                    segmentInfo = this.map.getInfoByPath(segmentPath)
+                } catch {
+                    continue
+                }
+                if (!segmentInfo?.isRecord || !segmentInfo.isMergedWithParent()) continue
+                if (segmentInfo.isLinkSourceRelation()) continue
+                const [gateAlias, linkIdField] = this.map.getTableAliasAndFieldName([...segmentPath, LINK_SYMBOL], 'id')
+                combinedGateRefs.push(`"${this.withPrefix(prefix)}${gateAlias}"."${linkIdField}" IS NOT NULL`)
+            }
+            const expression = combinedGateRefs.length
+                ? `CASE WHEN ${combinedGateRefs.join(' AND ')} THEN "${fullFieldRef}" ELSE NULL END`
+                : `"${fullFieldRef}"`
+            return { expression, order: normalizedOrder as 'ASC' | 'DESC' }
+        })
+    }
+
+    /**
+     * 两段式分页的第一段：在 fan-out JOIN 之上直接分页**根记录 id**（B2/B4，
+     * performance-debt-plan §五 2.2；r12-I-4 offset-only 全量拉取、full-codebase-review
+     * F-4 记录的终局方向）。
+     *
+     * 形状：
+     *   SELECT DISTINCT root.id AS __paged_root_id, <orderExpr_i AS __paged_ord_i...>
+     *   FROM root <match/modifier 树的 JOIN>
+     *   WHERE <match>
+     *   ORDER BY __paged_ord_i... LIMIT/OFFSET
+     *
+     * 正确性依据：
+     *  - orderBy 路径已被 Modifier 限制为 x:1 段（x:n orderBy 声明期 fail-fast），
+     *    排序键对每个根记录恒定 → 每个根恰好贡献一个 DISTINCT (id, ord...) 行，
+     *    LIMIT/OFFSET 作用在根记录粒度上；
+     *  - 排序表达式必须进 SELECT 列表（SELECT DISTINCT + ORDER BY 的 SQL 约束），
+     *    以别名参与 ORDER BY（四方言均支持按输出列名排序）；
+     *  - 无 orderBy 时页成员为任意序（与 SQL 无 ORDER BY 分页的标准语义一致，
+     *    与旧 post-pagination 行为同级）。
+     */
+    buildPagedRootIdQuery(
+        recordQuery: RecordQuery,
+        prefix = ''
+    ): [string, unknown[]] {
+        const matchQueryTree = recordQuery.matchExpression.xToOneQueryTree
+        const modifierQueryTree = recordQuery.modifier.xToOneQueryTree
+        const finalQueryTree = matchQueryTree.merge(modifierQueryTree)
+        const joinTables = this.getJoinTables(finalQueryTree, [recordQuery.recordName])
+
+        const p = this.getPlaceholder()
+        const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(
+            p,
+            this.database,
+            (atomData) => this.parseFunctionMatchAtom(recordQuery.recordName, atomData, recordQuery.contextRootEntity, p)
+        )
+        const [whereClause, params] = this.buildWhereClause(fieldMatchExp, prefix, p)
+
+        const [rootAlias, rootIdField] = this.map.getTableAliasAndFieldName([recordQuery.recordName], 'id')
+        const selectColumns = [`"${this.withPrefix(prefix)}${rootAlias}"."${rootIdField}" AS "${SQLBuilder.PAGED_ROOT_ID_ALIAS}"`]
+        const orderClauses: string[] = []
+        this.buildOrderByExpressions(recordQuery.modifier, prefix).forEach(({ expression, order }, index) => {
+            const alias = `__paged_ord_${index}`
+            selectColumns.push(`${expression} AS "${alias}"`)
+            orderClauses.push(`"${alias}" ${order}`)
+        })
+
+        const fromClause = this.buildFromClause(recordQuery.recordName, prefix)
+        const joinClause = this.buildJoinClause(joinTables, prefix)
+        const paginationClauses: string[] = []
+        if (orderClauses.length) paginationClauses.push(`ORDER BY ${orderClauses.join(',')}`)
+        const { limit, offset } = recordQuery.modifier
+        if (limit !== undefined && limit !== null) {
+            if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0) {
+                throw new Error(`modifier.limit must be a non-negative integer, got: ${JSON.stringify(limit)}`)
+            }
+            paginationClauses.push(`LIMIT ${limit}`)
+        }
+        if (offset !== undefined && offset !== null && offset !== 0) {
+            if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) {
+                throw new Error(`modifier.offset must be a non-negative integer, got: ${JSON.stringify(offset)}`)
+            }
+            paginationClauses.push(`OFFSET ${offset}`)
+        }
+
+        return [`
+SELECT DISTINCT
+${selectColumns.join(',\n')}
+FROM
+${fromClause}
+${joinClause}
+WHERE
+${whereClause}
+
+${paginationClauses.join('\n')}
+`, params]
+    }
+
+    static PAGED_ROOT_ID_ALIAS = '__paged_root_id'
     
     /**
      * 获取需要 JOIN 的表信息

@@ -200,19 +200,28 @@ describe('EXIST atoms skip the outer JOIN tree (B1)', () => {
         // 与本收口无关）：见 r25#7 深嵌 EXIST 家族的记录项。此处不断言。
     })
 
-    test('control: direct x:n path match still uses join + post-pagination semantics', async () => {
+    test('control: direct x:n path match pages via the two-phase root-id query (B4)', async () => {
         await seed()
         statements.length = 0
 
-        // 直接 x:n 路径 match（非 EXIST）——外层 JOIN + LIMIT 剥离（post-pagination）语义保留
+        // 直接 x:n 路径 match（非 EXIST）——fan-out 真实存在，分页走两段式：
+        //  第一段 SELECT DISTINCT 根 id（携带 LIMIT，数据库端分页），
+        //  第二段 id IN (...) 主查询（无 fan-out JOIN）。
         const page = await handle.find('User',
             MatchExp.atom({ key: 'teams.title', value: ['like', 'A-%'] }),
             { limit: 2, orderBy: { name: 'ASC' } },
             ['name']
         )
         expect(page.map(u => u.name)).toEqual(['u1', 'u2'])
-        const rootSelect = statements.find(statement => statement.sql.trimStart().startsWith('SELECT') && statement.sql.includes('JOIN'))!
-        expect(rootSelect.sql, 'direct x:n match keeps join fan-out and strips LIMIT for post-pagination').not.toMatch(/LIMIT/i)
+        const pageQuery = statements.find(statement => statement.sql.includes('SELECT DISTINCT'))!
+        expect(pageQuery, 'two-phase paging must issue a DISTINCT root-id query').toBeTruthy()
+        expect(pageQuery.sql).toMatch(/LIMIT\s+2/i)
+        expect(pageQuery.sql).toMatch(/JOIN/i)
+        const mainQuery = statements.find(statement =>
+            statement.sql.trimStart().startsWith('SELECT') && !statement.sql.includes('SELECT DISTINCT') && statement.sql.includes('"User"')
+        )!
+        expect(mainQuery.sql, 'main query must not re-join the fan-out path (match replaced by id IN)').not.toMatch(/LEFT JOIN/i)
+        expect(mainQuery.sql).toMatch(/IN\s*\(/i)
     })
 
     test('offset-only EXIST paging works and pushes OFFSET down', async () => {
