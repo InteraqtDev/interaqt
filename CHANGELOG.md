@@ -1,5 +1,64 @@
 # Changelog
 
+## Unreleased
+
+Deep-review round r35 (`agentspace/output/deep-review-2026-07-16-r35.md`): five fatal fixes and
+two hardening changes, each with a red-green reproduction on the previous implementation.
+
+### Bug Fixes
+
+* **storage:** EXIST atom compilation gains a correlation-scope contract
+  (`MatchExp.existAtomCorrelation`, single decision shared by JOIN-tree pruning and subquery
+  correlation). Two defects fixed at that choke point:
+  * `NOT (path exist ...)` where the path crosses an x:n intermediate quantified per outer
+    fan-out row instead of per root record — a root with one intermediate lacking a matching
+    terminal was returned even when another intermediate satisfied the existential. The same
+    match selects update/delete victims. Such paths now fold entirely into the EXISTS subquery
+    (reverse-path correlation to the root; zero outer joins, LIMIT pushdown as a side effect).
+  * Nested EXIST (an exist atom inside an exist payload) correlated against the **outermost**
+    root's alias (the reference-path resolver only knows `contextRootEntity`), producing
+    cross-entity id comparisons that silently returned empty sets — the actual mechanism behind
+    the long-recorded r25#7 "nested EXIST does not work" gap. Correlation atoms are now
+    pre-resolved against the enclosing query's alias including its prefix chain
+    (`isResolvedFieldReference`), and nested subquery prefixes chain for global alias uniqueness.
+  * Registered boundaries: symmetric-segment and `&` (link record) paths keep the legacy
+    parent-correlated compilation; `NOT` over x:n **value** atoms keeps SQL three-valued per-row
+    semantics (contract decision recorded in the dimension registry).
+* **core/runtime:** synchronously-consumed callback surfaces reject `async` functions at
+  declaration time (`PublicFieldDef.synchronous` + `assertSynchronousFunctionArg`): aggregation
+  callbacks (Count/Every/Any/WeightedSummation), `Property.computed`, `Property.defaultValue`,
+  `Dictionary.defaultValue`, `RealTime.nextRecomputeTime`, `Custom.createState`,
+  `Custom.planIncremental`. A returned Promise was silently coerced (`!!promise === true` counts
+  every record; `Number(promise)` sums as 0; JSON serialization persists `"{}"`). A consumption-
+  time thenable guard in the aggregation template covers transpiled/sync-returning-Promise
+  residuals. The repository's own `leaveRequestSimple` fixture carried an async `computed` that
+  had been persisting `"{}"` unnoticed.
+* **runtime:** migration Transform rebuilds emit the storage event stream (with complete
+  before-images and derived filtered-membership events) instead of hand-synthesized bare events.
+  Previously a migration that shrank Transform outputs below a filtered view's predicate left
+  downstream aggregates holding the exited members' contributions while reporting success.
+  Converges the last remaining synthesized track onto the r32 "storage events are the truth
+  source" contract.
+* **runtime:** the migration deletion audit now enforces its documented `recordName` filter —
+  link-cascade and derived delete events no longer pollute a computation's destructive scope.
+  Previously the approval surface displayed foreign ids, and when the cascade-aware simulation
+  was unavailable the executed set could never match the analytically approved host-only set
+  (an unapprovable fail-closed migration loop).
+* **runtime:** `atomic.compareAndSet` routes `expected`/`next`/`defaultValue` through the same
+  write-parameter normalization as `replace` (r26 contract). Timestamp CAS with a `Date` threw a
+  binding error on SQLite; an ISO string never matched the INT millisecond column and returned a
+  `false` indistinguishable from losing a race.
+* **runtime:** `postCommit` hooks receive the committed attempt's args (the guard enriches the
+  per-attempt clone, e.g. activity head interactions fill in the created `activityId`; the
+  original caller args never see it).
+
+### Hardening
+
+* **storage:** the two-phase pagination path refuses `forUpdate` (falls back to the
+  single-statement path) so a future locking caller cannot silently get "lock rows chosen by an
+  unlocked read" semantics; the cross-statement read boundary of page-then-fetch under
+  READ COMMITTED is documented at the branch.
+
 ## [4.3.0](https://github.com/InteraqtDev/interaqt/compare/v4.2.0...v4.3.0) (2026-07-16)
 
 Performance-debt closure round, executed in recorded-importance order against the inventory in
