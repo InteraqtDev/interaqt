@@ -2,36 +2,44 @@
 
 ## [4.2.0](https://github.com/interaqtdev/interaqt/compare/v4.1.4...v4.2.0) (2026-07-16)
 
-### Features
+Two work streams ship in this release.
 
-* **runtime:** r32 batch 6 — NOT NULL violations map to ConstraintViolationError; duplicate Dictionary names fail fast at declaration ([c9941da](https://github.com/interaqtdev/interaqt/commit/c9941da789970cbbd7ffd7a8f91837344fceba79)), closes [#2](https://github.com/interaqtdev/interaqt/issues/2) [#3](https://github.com/interaqtdev/interaqt/issues/3)
-* **storage:** pillar II landings — explicit depth contract for getAttributeQueryDataForRecord; classification⇒consumption conservation audit ([8288815](https://github.com/interaqtdev/interaqt/commit/82888155617407134fd0776b2e087095cfed3e84))
-
-### Bug Fixes
-
-* **core:** r32 batch 7 — defuse the two latent public-metadata defects (r27 [#7](https://github.com/interaqtdev/interaqt/issues/7)) ([8abc3f1](https://github.com/interaqtdev/interaqt/commit/8abc3f1b8db06808df49b1fe7765e38a4b1af2c3))
-* **drivers,runtime:** r32 batch 5 — driver-round recorded items ([c95f036](https://github.com/interaqtdev/interaqt/commit/c95f03648931d8a675dfadb2d31688782f820f9f)), closes [#1](https://github.com/interaqtdev/interaqt/issues/1) [#6](https://github.com/interaqtdev/interaqt/issues/6)
-* r31 deep review — event-view reader split, filtered x:n under x:1 mount, payload guard fail-open, merged property type conflict ([21c0fdd](https://github.com/interaqtdev/interaqt/commit/21c0fdd94fb094c6dae90ad72f54c6a947a0730f))
-* **runtime:** async task invalidation scoped by data-context identity, not freshnessKey partition; orphaned-task delivery parks instead of poisoning — r34 probes of registered honest boundaries ([d74f1ae](https://github.com/interaqtdev/interaqt/commit/d74f1aef366a9cdb7fd0cbb7b3fa04869d0ba91c))
-* **runtime:** r31 H7 — trigger/eventDep pattern outer-field surface guard (silent dead-transfer / silent over-trigger family) ([0b246ce](https://github.com/interaqtdev/interaqt/commit/0b246ce44e62c9b67fa7a69495d2b041d2b29b1d))
-* **runtime:** r32 batch 2 — migration patch/result event streams use storage events as the single truth source; direct oldRecord-completeness e2e regression ([48976e4](https://github.com/interaqtdev/interaqt/commit/48976e4abfd6420e82691ff81b23328f075d6cc2))
-* **runtime:** r32 recorded items batch 1 — _System_ (concept,key) unique conservation law; r30-E Transform-chain migration dead-end via cascade-aware destructive scope ([b7ed5d5](https://github.com/interaqtdev/interaqt/commit/b7ed5d53d42fda48cc106a0377a879ef110c4137))
-* **storage:** r32 batch 4 — EXT-1 closed: view record table pointers follow the physical base through table combining ([d1fb6d7](https://github.com/interaqtdev/interaqt/commit/d1fb6d7015f16c1b51893b8042334bed86d22ee7))
-
-### Performance Improvements
-
-* **storage:** r32 batch 3 — enforceXToOnePredicates batches pure related-side predicate probes (r31 recorded item) ([b04cae5](https://github.com/interaqtdev/interaqt/commit/b04cae53a9fac78feb1d89c7abf75e89646bd06b))
-
-## Unreleased
-
-r32 recorded-items completion round: every deferred item from the r28–r31 review reports that was
-registered as "next round" work is closed — the two open fatal families (r30-E Transform-chain
-migration dead-end, r29 EXT-1 merged setup assembly), the r31 honest-boundary items (`_System_`
-uniqueness, migration oldRecord e2e proof, x:1 predicate probe batching), and the r28 driver-round
-items. Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
+1. **r32 recorded-items completion round** — every item deferred from the r28–r31 review reports
+   is closed: the two open fatal families (r30-E Transform-chain migration dead-end, r29 EXT-1
+   merged setup assembly), the r31 honest-boundary items, and the r28 driver-round items.
+   Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
+2. **r33/r34 quality-plan test-infrastructure expansion** — five previously unmachined subsystems
+   enter the generative-testing domain (event-driven computations, async computations, the
+   activity layer, destructive migrations, taboo declaration shapes), the driver differential
+   fuzzer gains real PostgreSQL/MySQL secondaries, and CI gains a PR test gate plus nightly
+   expanded seed pools. Directed probes of the registered honest boundaries surfaced and fixed
+   three async task-lifecycle defects. Full reports:
+   `agentspace/output/quality-infra-expansion-2026-07-16-r33.md` / `-r34.md`.
 
 ### Bug Fixes
 
+* **runtime:** async task invalidation is scoped by **data-context identity**, no longer by the
+  `freshnessKey` partition ([d74f1ae](https://github.com/interaqtdev/interaqt/commit/d74f1aef366a9cdb7fd0cbb7b3fa04869d0ba91c)).
+  `freshnessKey` serves two distinct purposes: it is the ordering partition that decides which of
+  several concurrent async tasks is newest, and it was also used as the deletion filter when a
+  synchronous/resolved computation produced a newer value. Because users may customize the key
+  (`ComputationResult.async({ freshnessKey })`), the cancellation — issued under the
+  default-derived key — missed custom-partition tasks; the surviving task later completed as the
+  "newest" member of its own partition and **silently overwrote the newer value** with a stale
+  result. Cancellation now targets everything belonging to the same data context: all unapplied
+  tasks of the host record (property computations) or of the computation's exclusive task table
+  (global/entity/relation computations).
+* **runtime:** a schema migration that rebuilds an async computation's output now invalidates the
+  computation's pre-migration pending/success tasks before rebuilding (same defect family as
+  above, third producer path: the migration engine writes results directly and bypasses the task
+  mechanism). Previously a task created before the migration could complete afterwards and
+  overwrite the migrated value with a result computed under the old declaration.
+* **runtime:** delivering a completed task whose host-record reference is absent no longer throws
+  a bare `TypeError` on every retry. Two legitimate situations detach a task from its record: the
+  host record was deleted, or a newer task for the same record replaced the reference (the
+  task↔record relation is one-to-one with exclusive replace semantics). `handleAsyncReturn` now
+  parks such tasks as `skipped` with reason `'orphaned-record'` before applying; redelivery
+  terminates via `'already-handled'` instead of crashing indefinitely.
 * **runtime:** migration of a Transform **chain** whose upstream change shrinks its output is now
   approvable and executes (was: `Migration refuses delete patch ... without explicit audited scope`,
   an unapprovable kill-resume dead loop — the 4.1.4 known issue). The destructive deletion scope is
@@ -42,23 +50,32 @@ items. Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
   approval round suffices. During execution deletions are performed optimistically, collected per
   computation, and reconciled bidirectionally against the approved scope before the SERIALIZABLE
   transaction commits: unapproved destruction still cannot commit, and the audit error lists the
-  complete id set for one-step re-approval.
+  complete id set for one-step re-approval ([b7ed5d5](https://github.com/interaqtdev/interaqt/commit/b7ed5d53d42fda48cc106a0377a879ef110c4137)).
 * **runtime:** migration patch/result events now flow the **storage event stream** (complete
   pre-state `oldRecord` plus derived events such as filtered-entity membership create/delete)
   instead of hand-synthesized single events — chained dependents during migration no longer go
-  blind on filtered-membership exits (silent aggregate corruption on the exit face).
+  blind on filtered-membership exits (silent aggregate corruption on the exit face)
+  ([48976e4](https://github.com/interaqtdev/interaqt/commit/48976e4abfd6420e82691ff81b23328f075d6cc2)).
 * **storage:** EXT-1 closed — filtered/merged-input view records keep a live `table` pointer when
   their physical base is moved by table combining (merged input as an x:1/combined relation
   endpoint). Previously the stale creation-time pointer compiled JOINs against a phantom table
   (`no such column`) and `buildTables` emitted an extra physical table. The fuzzer merged
-  generation domain is unlocked accordingly (`FUZZ_MERGED_FULL` gate removed).
+  generation domain is unlocked accordingly (`FUZZ_MERGED_FULL` gate removed)
+  ([d1fb6d7](https://github.com/interaqtdev/interaqt/commit/d1fb6d7015f16c1b51893b8042334bed86d22ee7)).
 * **runtime:** `_System_` carries a composite `(concept, key)` unique index and
   `storage.set(concept, key)` converts the find-then-create race conflict into a retryable write
   conflict — the `_Dictionary_` conservation law's sibling track (r31 registered item).
+* **runtime:** the r31 deep-review fixes are included — event-view reader split (matcher and
+  consumer of update events now share the merged record view), filtered x:n mounted under an x:1
+  trunk, payload guard fail-open on explicit `undefined`, merged same-name property type conflict
+  ([21c0fdd](https://github.com/interaqtdev/interaqt/commit/21c0fdd94fb094c6dae90ad72f54c6a947a0730f)),
+  plus the trigger/eventDep pattern outer-field surface guard (silent dead-transfer / silent
+  over-trigger family) ([0b246ce](https://github.com/interaqtdev/interaqt/commit/0b246ce44e62c9b67fa7a69495d2b041d2b29b1d)).
 * **drivers:** SQLite/MySQL `_IDS_` counters reconcile with `MAX(id)` per record at setup —
   attaching to existing data with lost/lagging counters re-issued ids from 1, a **silent**
   duplicate-logical-id corruption (the id column carries no unique index on these drivers).
-  Same forward-only contract as the PostgreSQL driver's sequence reconciliation.
+  Same forward-only contract as the PostgreSQL driver's sequence reconciliation
+  ([c95f036](https://github.com/interaqtdev/interaqt/commit/c95f03648931d8a675dfadb2d31688782f820f9f)).
 * **drivers:** MySQL `information_schema` reads alias their columns — MySQL 8 returns uppercase
   headers regardless of query case, so existing-table/column detection (manifest lookup,
   `hasExistingData`, additive DDL planning) read `undefined` on the whole MySQL attach/migration
@@ -69,7 +86,8 @@ items. Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
   User-declared constraints still fail fast.
 * **runtime:** runtime NOT NULL violations of framework-declared `NonNullConstraint`s (physical
   form `CHECK (field IS NOT NULL)`) map to `ConstraintViolationError` with kind `'non-null'`
-  (was: bare driver error; unique violations were already normalized).
+  (was: bare driver error; unique violations were already normalized)
+  ([c9941da](https://github.com/interaqtdev/interaqt/commit/c9941da789970cbbd7ffd7a8f91837344fceba79)).
 * **runtime:** duplicate `Dictionary` names are rejected at Controller construction with an
   actionable message (was: `Migration identity is ambiguous for dictionary:x` from deep inside
   manifest identity auditing).
@@ -77,18 +95,51 @@ items. Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
   `Property.public.type.options` is a static array (was a function, incompatible with the
   `validateCreateArgs` options contract) and `Entity.public.commonProperties.eachNameUnique`
   reads `commonProperties` from create args (was reading `properties`, making the predicate
-  vacuous for merged entities once wired).
+  vacuous for merged entities once wired)
+  ([8abc3f1](https://github.com/interaqtdev/interaqt/commit/8abc3f1b8db06808df49b1fe7765e38a4b1af2c3)).
 
-### Performance
+### Features
+
+* **storage:** the carry depth of `getAttributeQueryDataForRecord` — the semantic boundary of row
+  relocation, deletion cascades, and full update snapshots — is an explicit documented contract;
+  all call sites declare their intent with named arguments. A conservation audit
+  (`tests/storage/newRecordDataConservation.spec.ts`) reconciles the `NewRecordData`
+  classification surface against a consumption registry, so a new classification bucket cannot be
+  added (nor a consumer removed) without an explicit decision; one dead bucket
+  (`sameRowEntityIdRefs`) was found and removed
+  ([8288815](https://github.com/interaqtdev/interaqt/commit/82888155617407134fd0776b2e087095cfed3e84)).
+* **tests/ci:** generative suites for event-driven computations (StateMachine trigger / Transform
+  eventDeps, including relation link create/delete events), async computations (return-type
+  interleavings × task lifecycle, custom freshnessKey partitions, host deletion), the activity
+  layer (random any/every/race graphs vs an independent workflow model), destructive migrations
+  (Transform shrink, `_isDeleted_` hard deletion, empty-fact removal, computation change,
+  fact→computed takeover, computation type change, kill-resume), and declaration-time guard
+  conformance under random surrounding schemas. The driver differential fuzzer accepts real
+  PostgreSQL and MySQL secondaries (env-gated). CI gains a PR test gate
+  (`.github/workflows/tests.yml`) and nightly expanded seed pools (`nightly-fuzz.yml`).
+
+### Performance Improvements
 
 * **storage:** x:1 nested-read predicate probes (`enforceXToOnePredicates`, r31) batch per
   parent-id set when every predicate atom stays on the related record (one probe per ≤500 parents
   instead of N+1). Pair-sensitive shapes (link-attribute predicates from the filtered-relation
   rebase, `&` paths, reference values, EXIST) keep per-parent probes — a set-level probe would
-  leak one parent's qualifying edge onto another parent sharing the same related record.
+  leak one parent's qualifying edge onto another parent sharing the same related record
+  ([b04cae5](https://github.com/interaqtdev/interaqt/commit/b04cae53a9fac78feb1d89c7abf75e89646bd06b)).
 
 ### Behavior changes (upgrade notes)
 
+* **Async invalidation scope**: a synchronous/resolved produce of an async computation now cancels
+  **all** unapplied (pending/success) tasks of the same data context — per host record for
+  property computations, the whole exclusive task table for global/entity/relation computations —
+  regardless of any custom `freshnessKey`. `freshnessKey` keeps its ordering role among concurrent
+  async tasks. Workers whose blind write-backs land after cancellation are no-ops.
+* **Orphaned task delivery**: `handleAsyncReturn` returns `{ skipped: true, reason:
+  'orphaned-record' }` and marks the task `skipped` when the task no longer references its host
+  record; previously this path threw. Daemons that matched on the exception should match on the
+  returned reason.
+* **Migration rebuild epoch**: migrating an async computation with `rebuildOutput` invalidates its
+  outstanding tasks; results computed under the pre-migration declaration can no longer apply.
 * **Cascade deletions during migration are approvable and audited by execution**: approve the
   `destructive-scope` decisions from the generated diff (now cascade-exact when the scope
   simulation is available). If the simulation is unavailable, the first migrate attempt fails
@@ -96,7 +147,7 @@ items. Full report: `agentspace/output/deep-review-2026-07-15-r32.md`.
   the listed ids can be approved directly.
 * `_System_` gains a composite unique index on `(concept, key)`; deployments that hit the
   historical race and hold duplicate rows must deduplicate them before upgrading (same audit as
-  the `_Dictionary_` unique index from the unreleased r31 round).
+  the `_Dictionary_` unique index from the r31 round).
 * `assertDestructiveScopeAllowed` accepts an optional exactness mode; `getDestructiveDeletionScope`
   remains the analytic first-order scope while the new `getCascadeAwareDeletionScope` is the
   simulation-backed entry used by diff generation and `migrate`.
