@@ -195,6 +195,25 @@ project/
 
 Never add implicit behavior, auto-completion, or magic defaults. All behavior must be explicitly declared.
 
+### Plain professional language
+
+Everything written for humans — documentation, code comments, error messages, commit
+messages, PR descriptions, review and analysis reports, and conversational replies —
+must use precise, established technical terminology and remain understandable to a
+competent engineer who did not take part in the work. This applies in whichever
+language the text is written.
+
+- Prefer standard terms of art (invalidation scope, staleness ordering, referential
+  integrity, idempotent retry, convergence, ...) over invented shorthand.
+- Never let insider slang, ad-hoc code names, or colloquialisms carry the meaning
+  ("poison pill", "resurrected", "zombie row"). A vivid phrase may illustrate a
+  mechanism that has already been named precisely; it must never replace the precise
+  name.
+- Define project-specific terms at first use, or link to where they are defined.
+- Present findings as symptom → mechanism → fix, in complete sentences. Do not
+  compress reasoning into fragments, bare arrow chains, or abbreviations that only
+  the author can decode.
+
 ### Klass pattern
 
 Core types use: interface → CreateArgs → `Entity.create(args)` → static registry (`instances`, `isKlass`, `displayName`) → `toData()` / `fromData()`.
@@ -211,11 +230,17 @@ Core types use: interface → CreateArgs → `Entity.create(args)` → static re
 - Always `await controller.setup(true)` before dispatching
 - When adding a test **matrix**, consult the dimension registry in `tests/runtime/WritingComputationTests.md` — every dimension (including degenerate values and the mechanism axes) must be explicitly decided
 - **Structural fuzzing**: `tests/storage/writePathStructuralFuzz.spec.ts` generates random schemas (all physical topologies emerge from declarations) × random nested write sequences, judged by the event-completeness oracle + structural invariants. When touching the storage write path, run it with an extended seed pool (`FUZZ_SEED_START=100 FUZZ_SEED_COUNT=100 FUZZ_OPS=40 npx vitest run tests/storage/writePathStructuralFuzz.spec.ts`); a failing seed prints its schema and full op log for deterministic reproduction (`FUZZ_SEED_START=<seed> FUZZ_SEED_COUNT=1 FUZZ_VERBOSE=1`). The extended mode (filtered/merged entities in the generation domain) uses `FUZZ_FILTERED_SEED_START/COUNT`; since r32 the merged generation domain includes x:1/combined endpoints by default (EXT-1 closed; only mergeLinks endpoints stay excluded). Historical finding families are tracked in `agentspace/output/quality-foundation-plan-r27.md` §1.4/§1.4b
-- **Generative suites (r29)** — expand the relevant pool when touching the corresponding subsystem:
-  - `tests/storage/driverDifferentialFuzz.spec.ts` — SQLite vs PGLite same-seed per-op reconciliation (`FUZZ_DIFF_SEED_START/COUNT`, `FUZZ_DIFF_OPS`); run when touching drivers or the storage write path
-  - `tests/runtime/computationGenerativeFuzz.spec.ts` — random aggregate declarations vs naive recompute (`FUZZ_COMP_SEED_START/COUNT`, `FUZZ_COMP_OPS`); run when touching computation handles or the scheduler
-  - `tests/runtime/migrationGenerativeFuzz.spec.ts` — random schema pairs + data → migrate vs fidelity/backfill oracles incl. kill-resume (`FUZZ_MIG_SEED_START/COUNT`, `FUZZ_MIG_OPS`); run when touching migration
-  - Shared generators live in `tests/storage/helpers/fuzzSchema.ts` / `fuzzOps.ts` — the rng call order is the decision-stream contract; changing it invalidates existing seed pools (re-verify the base pool 1–499 after any refactor)
+- **Generative suites (r29, expanded r33)** — expand the relevant pool when touching the corresponding subsystem:
+ - `tests/storage/driverDifferentialFuzz.spec.ts` — SQLite vs secondary same-seed per-op reconciliation (`FUZZ_DIFF_SEED_START/COUNT`, `FUZZ_DIFF_OPS`); secondaries: PGLite (always), real PostgreSQL / MySQL (env-gated, `FUZZ_DIFF_PG_*` / `FUZZ_DIFF_MYSQL_*`); run when touching drivers or the storage write path
+ - `tests/runtime/computationGenerativeFuzz.spec.ts` — random aggregate declarations vs naive recompute (`FUZZ_COMP_SEED_START/COUNT`, `FUZZ_COMP_OPS`); run when touching computation handles or the scheduler
+ - `tests/runtime/eventComputationGenerativeFuzz.spec.ts` — random StateMachine/event-Transform declarations × random write/dispatch streams vs an independent JS model (`FUZZ_EVENT_SEED_START/COUNT`, `FUZZ_EVENT_OPS`); run when touching event-driven computations, TransitionFinder, or the event pipeline
+ - `tests/runtime/asyncComputationGenerativeFuzz.spec.ts` — mixed sync/resolved/async/skip interleavings vs a task-lifecycle model (`FUZZ_ASYNC_SEED_START/COUNT`, `FUZZ_ASYNC_OPS`); run when touching async tasks, freshness, or handleAsyncReturn
+ - `tests/runtime/activityGenerativeFuzz.spec.ts` — random activity graphs (any/every/race, nested) × random dispatch sequences vs an independent workflow model (`FUZZ_ACT_SEED_START/COUNT`, `FUZZ_ACT_OPS`); run when touching the activity layer
+ - `tests/runtime/migrationGenerativeFuzz.spec.ts` — random schema pairs + data → migrate vs fidelity/backfill oracles incl. kill-resume (`FUZZ_MIG_SEED_START/COUNT`, `FUZZ_MIG_OPS`); run when touching migration
+ - `tests/runtime/migrationDestructiveFuzz.spec.ts` — destructive mutations (Transform shrink, `_isDeleted_`, empty-fact removal, computation changed/unchanged, blocked shapes) × kill-resume (`FUZZ_MIGD_SEED_START/COUNT`, `FUZZ_MIGD_OPS`); run when touching migration's destructive-scope machinery
+ - `tests/runtime/declarationTabooFuzz.spec.ts` — declaration-time guard conformance under random surrounding schemas + legal twins (`FUZZ_TABOO_SEEDS`); extend `TABOO_CELLS` when adding a declaration-time guard
+ - Shared generators live in `tests/storage/helpers/fuzzSchema.ts` / `fuzzOps.ts` — the rng call order is the decision-stream contract; changing it invalidates existing seed pools (re-verify the base pool 1–499 after any refactor)
+ - CI: PR runs each suite's fixed default pool via `npm test` (`.github/workflows/tests.yml`); nightly runs expanded pools + the real-driver differential matrix (`.github/workflows/nightly-fuzz.yml`). A failing seed is a regression case: reproduce with `FUZZ_*_SEED_START=<seed> FUZZ_*_SEED_COUNT=1 FUZZ_VERBOSE=1`, then pin it in the suite's deterministic regression group when fixed
 
 ### Bug fixing: fix the class, not the instance
 
@@ -441,7 +466,7 @@ A: Enable logging, listen to mutation events, write thorough dispatch-based test
 
 ## Agent output
 
-Place research documents, design proposals, and analysis reports in `agentspace/output/` by default.
+Place research documents, design proposals, and analysis reports in `agentspace/output/` by default. All agent-produced prose follows § "Plain professional language" — reports written in insider shorthand lose their value as the durable record other agents and humans rely on.
 
 ## Tool-specific configuration
 

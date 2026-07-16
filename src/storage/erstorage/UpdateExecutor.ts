@@ -44,7 +44,11 @@ export class UpdateExecutor {
         //  - 关系记录（reliance/合表/合并 link）只保留本次 update 实际涉及的 attribute：
         //    unlink 判断和 flash-out 只会用到 newEntityData 里出现的关系，其余的递归 JOIN 纯属浪费。
         //  - link record 自身的 source/target（managedRecordAttributes）始终保留，它们是同行字段，代价极小。
-        const fullAttributeQuery = AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map, true, true, true, true)
+        // 深度契约（见 getAttributeQueryDataForRecord 头注）：update 前态快照 = 最大深度
+        //  （事件 oldRecord 完备性 + flashOut 同 id 判定都从这份快照读）。
+        const fullAttributeQuery = AttributeQuery.getAttributeQueryDataForRecord(entityName, this.map,
+            /* includeSameTableReliance */ true, /* includeMergedRecordAttribute */ true,
+            /* includeManagedRecordAttributes */ true, /* includeNotRelianceCombined */ true)
         const recordInfo = this.map.getRecordInfo(this.map.getRecordInfo(entityName).resolvedBaseRecordName!)
         const involvedRecordAttributes = new Set(Object.keys(newEntityData.getData() || {}))
         recordInfo.managedRecordAttributes.forEach(info => involvedRecordAttributes.add(info.attributeName))

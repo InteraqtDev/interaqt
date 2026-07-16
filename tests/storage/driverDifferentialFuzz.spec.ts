@@ -4,11 +4,21 @@
  * 动机：r24 的 getAutoId id 型别分裂、r25 的 timestamp 形态分裂都属于「同一逻辑操作在
  * 不同驱动下产生不同可观察结果」——单库预言机结构上抓不到（每一侧各自自洽）。
  * 收口方式是把「跨驱动等价」本身升格为预言机：同一种子、同一操作意图流，
- * 在 SQLite（主）与 PGLite（副）上逐操作对账。
+ * 在 SQLite（主）与副库上逐操作对账。
+ *
+ * 副库矩阵（quality-plan §1.5 的「真实 PG/MySQL 差分接线」落地）：
+ * - PGLite：默认常跑（无外部依赖）；
+ * - 真实 PostgreSQL：INTERAQT_POSTGRES_DATABASE 门控（独占库 `${env}_difffuzz`，
+ *   每种子 forceDrop 重建——pg 客户端的参数序列化/类型解析路径是 PGLite 不可替代的面，
+ *   r24 getAutoId、r31-H5 Date 绑定都只在真实 pg 客户端现形）；
+ * - 真实 MySQL：INTERAQT_MYSQL_DATABASE 门控（独占库 `${env}_difffuzz`）——
+ *   surrogate-key 哈希、方言 SQL 生成只在 MySQL 路径执行（r27 I-3 的教训：
+ *   PGLite 上的绿测对 MySQL 分支证明力为零）。
  *
  * 机制：
  * - 决策流共享：schema 与操作意图由共享生成器产出（helpers/fuzzSchema / helpers/fuzzOps），
- *   意图以主库的具体 id 表达，经 **id 双射**翻译后在副库重放。
+ *   意图以主库的具体 id 表达，经 **id 双射**翻译后在副库重放。副库选择不参与决策流——
+ *   同一种子在全部副库矩阵上重放同一意图序列（种子池跨副库有效）。
  * - id 双射：两侧同一操作的 create 事件按 (type, recordName) 分组、组内按位置配对登记
  *   `recordName:主id ↔ 副id`。组尺寸失配 = 事件流结构分裂；组内位置配对若配错
  *   （仅当两条新记录值面完全同构时才可能），后续快照值面对账会当场戳穿——
@@ -25,13 +35,14 @@
  * - id 的 JS 形态（number vs string）**刻意不比较**：形态契约是记录中的开放决策
  *   （r27 F-3 数据面已收口到 sameRecordId）；本预言机比较 String 归一后的**身份**。
  *
- * 再现：FUZZ_DIFF_SEED_START / FUZZ_DIFF_SEED_COUNT / FUZZ_DIFF_OPS 扩池；
+ * 再现：FUZZ_DIFF_SEED_START / FUZZ_DIFF_SEED_COUNT / FUZZ_DIFF_OPS 扩池
+ * （真实驱动矩阵 FUZZ_DIFF_PG_* / FUZZ_DIFF_MYSQL_* 独立控制，默认较小）；
  * 失败信息带种子与操作日志（FUZZ_VERBOSE=1 全量）。
  */
 import { describe, expect, test } from "vitest";
 import { DBSetup, EntityToTableMap, EntityQueryHandle } from "@storage";
-import { SQLiteDB, PGLiteDB } from '@drivers';
-import { RecordMutationEvent } from "@runtime";
+import { SQLiteDB, PGLiteDB, PostgreSQLDB, MysqlDB } from '@drivers';
+import { RecordMutationEvent, type Database } from "@runtime";
 import { snapshotLogicalState, type EventCompletenessSchema, type LogicalSnapshot } from "./helpers/eventCompleteness.js";
 import { mulberry32, genSchema, isExpectedRejection, type FuzzSchema } from "./helpers/fuzzSchema.js";
 import { decideNextOp, executeOpIntent, type FuzzOpIntent, type IdPools } from "./helpers/fuzzOps.js";
@@ -156,9 +167,9 @@ function reconcileEventStreams(
     for (const key of allKeys) {
         const prims = primGroups.get(key) ?? [], secs = secGroups.get(key) ?? []
         if (prims.length !== secs.length) {
-            fail(`${context}: event group "${key}" size diverges (SQLite ${prims.length} vs PGLite ${secs.length})\n` +
+            fail(`${context}: event group "${key}" size diverges (SQLite ${prims.length} vs secondary ${secs.length})\n` +
                 `SQLite: ${JSON.stringify(primEvents.map(e => `${e.type} ${e.recordName}#${String(eventIdOf(e))}`))}\n` +
-                `PGLite: ${JSON.stringify(secEvents.map(e => `${e.type} ${e.recordName}#${String(eventIdOf(e))}`))}`)
+                `secondary: ${JSON.stringify(secEvents.map(e => `${e.type} ${e.recordName}#${String(eventIdOf(e))}`))}`)
         }
         const [type, recordName] = key.split('|')
         if (type === 'create') {
@@ -172,7 +183,7 @@ function reconcileEventStreams(
                 if (primId !== undefined) bijection.register(recordName, primId, secs[i].record!.id, `${context} ${key}#${i}`)
                 if (endpointPresence(prims[i]) !== endpointPresence(secs[i])) {
                     fail(`${context}: create ${recordName} event #${i} endpoint presence diverges ` +
-                        `(SQLite ${endpointPresence(prims[i])} vs PGLite ${endpointPresence(secs[i])})`)
+                        `(SQLite ${endpointPresence(prims[i])} vs secondary ${endpointPresence(secs[i])})`)
                 }
             }
         } else {
@@ -188,19 +199,19 @@ function reconcileEventStreams(
                 const identity = String(eventIdOf(prim))
                 const candidates = secByIdentity.get(identity)
                 if (!candidates?.length) {
-                    fail(`${context}: ${type} ${recordName}#${identity} present on SQLite but PGLite stream has no counterpart ` +
-                        `(PGLite identities: ${JSON.stringify(secs.map(e => String(bijection.toPrimary(recordName, eventIdOf(e)))))})`)
+                    fail(`${context}: ${type} ${recordName}#${identity} present on SQLite but the secondary stream has no counterpart ` +
+                        `(secondary identities: ${JSON.stringify(secs.map(e => String(bijection.toPrimary(recordName, eventIdOf(e)))))})`)
                 }
                 const sec = candidates.shift()!
                 if (type === 'update') {
                     const primKeys = [...(prim.keys ?? [])].sort(), secKeys = [...(sec.keys ?? [])].sort()
                     if (JSON.stringify(primKeys) !== JSON.stringify(secKeys)) {
-                        fail(`${context}: update ${recordName}#${identity} keys diverge (SQLite ${JSON.stringify(primKeys)} vs PGLite ${JSON.stringify(secKeys)})`)
+                        fail(`${context}: update ${recordName}#${identity} keys diverge (SQLite ${JSON.stringify(primKeys)} vs secondary ${JSON.stringify(secKeys)})`)
                     }
                 }
                 if (endpointPresence(prim) !== endpointPresence(sec)) {
                     fail(`${context}: ${type} ${recordName}#${identity} endpoint presence diverges ` +
-                        `(SQLite ${endpointPresence(prim)} vs PGLite ${endpointPresence(sec)})`)
+                        `(SQLite ${endpointPresence(prim)} vs secondary ${endpointPresence(sec)})`)
                 }
             }
         }
@@ -215,7 +226,7 @@ function normalizeSecondarySnapshot(snapshot: LogicalSnapshot, bijection: IdBije
         for (const [secId, row] of rows) {
             const primId = bijection.toPrimary(recordName, secId)
             if (primId === undefined) {
-                fail(`${context}: PGLite has ${recordName}#${secId} with no SQLite counterpart (never seen in a create event)`)
+                fail(`${context}: secondary has ${recordName}#${secId} with no SQLite counterpart (never seen in a create event)`)
             }
             const mappedRow: { [k: string]: unknown } = { ...row }
             for (const endpoint of ['source', 'target'] as const) {
@@ -249,7 +260,7 @@ function reconcileSnapshots(
         const secRows = mappedSec.get(recordName) ?? new Map()
         const primIds = [...primRows.keys()].sort(), secIds = [...secRows.keys()].sort()
         if (JSON.stringify(primIds) !== JSON.stringify(secIds)) {
-            fail(`${context}: ${recordName} id sets diverge\nSQLite: ${JSON.stringify(primIds)}\nPGLite(mapped): ${JSON.stringify(secIds)}`)
+            fail(`${context}: ${recordName} id sets diverge\nSQLite: ${JSON.stringify(primIds)}\nsecondary(mapped): ${JSON.stringify(secIds)}`)
         }
         const endpoints = endpointRecordNames.get(recordName)
         for (const [id, primRow] of primRows) {
@@ -262,12 +273,12 @@ function reconcileSnapshots(
                     const endpointRecord = field === 'source' ? endpoints.source : endpoints.target
                     const mappedBack = secValue === null ? null : bijection.toPrimary(endpointRecord, secValue)
                     if (String(primValue) !== String(mappedBack)) {
-                        fail(`${context}: ${recordName}#${id} ${field} endpoint diverges (SQLite ${String(primValue)}, PGLite maps to ${String(mappedBack)})`)
+                        fail(`${context}: ${recordName}#${id} ${field} endpoint diverges (SQLite ${String(primValue)}, secondary maps to ${String(mappedBack)})`)
                     }
                     continue
                 }
                 if (JSON.stringify(primValue) !== JSON.stringify(secValue)) {
-                    fail(`${context}: ${recordName}#${id} field "${field}" diverges (SQLite ${JSON.stringify(primValue)} vs PGLite ${JSON.stringify(secValue)})`)
+                    fail(`${context}: ${recordName}#${id} field "${field}" diverges (SQLite ${JSON.stringify(primValue)} vs secondary ${JSON.stringify(secValue)})`)
                 }
             }
         }
@@ -277,7 +288,14 @@ function reconcileSnapshots(
 // ---------- runner ----------
 type OpLog = { step: number, op: string, detail: unknown, outcome: string }
 
-async function runDifferentialCase(seed: number, opsCount: number) {
+/** 副库描述：label 进失败信息；forceDropOnOpen 供真实服务器库在种子间重建。 */
+type SecondaryDriver = {
+    label: string
+    make: () => Database
+    forceDropOnOpen?: boolean
+}
+
+async function runDifferentialCase(seed: number, opsCount: number, secondary: SecondaryDriver) {
     // 同一种子生成两份结构同构、实例独立的 schema（决策流逐位一致）
     const rngPrimary = mulberry32(seed)
     const rngSecondary = mulberry32(seed)
@@ -285,20 +303,32 @@ async function runDifferentialCase(seed: number, opsCount: number) {
     const schemaSecondary = genSchema(rngSecondary, `Dp${seed}_`, {})
 
     const primaryDb = new SQLiteDB(':memory:')
-    const secondaryDb = new PGLiteDB()
+    const secondaryDb = secondary.make()
     await primaryDb.open()
-    await secondaryDb.open()
-    let primary: EntityQueryHandle, secondary: EntityQueryHandle
+    await (secondaryDb as { open: (forceDrop?: boolean) => Promise<unknown> }).open(secondary.forceDropOnOpen ?? false)
+    // 与 MonoSystem.setup 同一契约：建表后初始化各记录的发号序列
+    // （PG 驱动没有这一步会在首个 create 上 fail-fast；SQLite/MySQL 是计数器对账）。
+    const setupRecordSequences = async (db: Database, setup: DBSetup) => {
+        if (!db.setupRecordSequences) return
+        const tableMap = new EntityToTableMap(setup.map, setup.aliasManager)
+        await db.setupRecordSequences(Object.keys(setup.map.records).map(recordName => {
+            const recordInfo = tableMap.getRecordInfo(recordName)
+            return { recordName, tableName: recordInfo.table, idField: recordInfo.idField! }
+        }))
+    }
+    let primary: EntityQueryHandle, secondaryHandle: EntityQueryHandle
     try {
         const primarySetup = new DBSetup(schema.entities, schema.relations, primaryDb, schema.mergeLinks.length ? schema.mergeLinks : undefined)
         await primarySetup.createTables()
+        await setupRecordSequences(primaryDb as unknown as Database, primarySetup)
         primary = new EntityQueryHandle(new EntityToTableMap(primarySetup.map, primarySetup.aliasManager), primaryDb)
-        const secondarySetup = new DBSetup(schemaSecondary.entities, schemaSecondary.relations, secondaryDb, schemaSecondary.mergeLinks.length ? schemaSecondary.mergeLinks : undefined)
+        const secondarySetup = new DBSetup(schemaSecondary.entities, schemaSecondary.relations, secondaryDb as any, schemaSecondary.mergeLinks.length ? schemaSecondary.mergeLinks : undefined)
         await secondarySetup.createTables()
-        secondary = new EntityQueryHandle(new EntityToTableMap(secondarySetup.map, secondarySetup.aliasManager), secondaryDb)
+        await setupRecordSequences(secondaryDb, secondarySetup)
+        secondaryHandle = new EntityQueryHandle(new EntityToTableMap(secondarySetup.map, secondarySetup.aliasManager), secondaryDb as any)
     } catch (error) {
         await primaryDb.close()
-        await secondaryDb.close()
+        await (secondaryDb as { close: () => Promise<unknown> }).close()
         return { seed, executed: 0, declarationRejected: true }
     }
 
@@ -314,7 +344,7 @@ async function runDifferentialCase(seed: number, opsCount: number) {
 
     const failWith = (message: string): never => {
         const logSlice = process.env.FUZZ_VERBOSE ? opLog : opLog.slice(-5)
-        throw new Error(`[diff-fuzz seed=${seed}] ${message}\nop log${process.env.FUZZ_VERBOSE ? '' : ' tail'}: ${JSON.stringify(logSlice, null, 2)}`)
+        throw new Error(`[diff-fuzz seed=${seed} secondary=${secondary.label}] ${message}\nop log${process.env.FUZZ_VERBOSE ? '' : ' tail'}: ${JSON.stringify(logSlice, null, 2)}`)
     }
 
     for (let step = 0; step < opsCount; step++) {
@@ -344,7 +374,7 @@ async function runDifferentialCase(seed: number, opsCount: number) {
             primError = error instanceof Error ? error : new Error(String(error))
         }
         try {
-            await executeOpIntent(secondary, secondaryIntent!, secEvents)
+            await executeOpIntent(secondaryHandle, secondaryIntent!, secEvents)
         } catch (error) {
             secError = error instanceof Error ? error : new Error(String(error))
         }
@@ -352,13 +382,13 @@ async function runDifferentialCase(seed: number, opsCount: number) {
         // 1. 错误语义对账
         if ((primError === null) !== (secError === null)) {
             failWith(`${context}: error semantics diverge — SQLite ${primError ? `threw: ${primError.message.slice(0, 140)}` : 'succeeded'}, ` +
-                `PGLite ${secError ? `threw: ${secError.message.slice(0, 140)}` : 'succeeded'}\ndetail: ${JSON.stringify(intent)}`)
+                `secondary ${secError ? `threw: ${secError.message.slice(0, 140)}` : 'succeeded'}\ndetail: ${JSON.stringify(intent)}`)
         }
         if (primError && secError) {
             const primExpected = isExpectedRejection(primError), secExpected = isExpectedRejection(secError)
             if (primExpected !== secExpected) {
                 failWith(`${context}: rejection classification diverges — SQLite ${primExpected ? 'expected' : `UNEXPECTED: ${primError.message.slice(0, 140)}`}, ` +
-                    `PGLite ${secExpected ? 'expected' : `UNEXPECTED: ${secError.message.slice(0, 140)}`}`)
+                    `secondary ${secExpected ? 'expected' : `UNEXPECTED: ${secError.message.slice(0, 140)}`}`)
             }
             if (!primExpected) {
                 failWith(`${context}: both drivers threw an UNEXPECTED error: ${primError.message.slice(0, 200)}\ndetail: ${JSON.stringify(intent)}`)
@@ -379,12 +409,12 @@ async function runDifferentialCase(seed: number, opsCount: number) {
 
         // 3. 逻辑状态快照对账
         const primSnapshot = await snapshotLogicalState(primary, eventSchema)
-        const secSnapshot = await snapshotLogicalState(secondary, eventSchema)
+        const secSnapshot = await snapshotLogicalState(secondaryHandle, eventSchema)
         reconcileSnapshots(primSnapshot, secSnapshot, schema, bijection, failWith, context)
     }
 
     await primaryDb.close()
-    await secondaryDb.close()
+    await (secondaryDb as { close: () => Promise<unknown> }).close()
     return { seed, executed, declarationRejected: false }
 }
 
@@ -393,12 +423,63 @@ const SEED_START = Number(process.env.FUZZ_DIFF_SEED_START ?? 1)
 const SEED_COUNT = Number(process.env.FUZZ_DIFF_SEED_COUNT ?? 6)
 const OPS = Number(process.env.FUZZ_DIFF_OPS ?? 25)
 
-describe('driver differential fuzz (SQLite vs PGLite, same seed, per-op reconciliation)', () => {
-    const seeds = Array.from({ length: SEED_COUNT }, (_, i) => SEED_START + i)
+const baseSeeds = Array.from({ length: SEED_COUNT }, (_, i) => SEED_START + i)
+;(baseSeeds.length ? describe : describe.skip)('driver differential fuzz (SQLite vs PGLite, same seed, per-op reconciliation)', () => {
+    const seeds = baseSeeds.length ? baseSeeds : [0]
     test.each(seeds.map(s => [s]))('seed %i: same intent stream yields identical events + logical state on both drivers', async (seed) => {
-        const result = await runDifferentialCase(seed, OPS)
+        const result = await runDifferentialCase(seed, OPS, { label: 'PGLite', make: () => new PGLiteDB() as unknown as Database })
         if (!result.declarationRejected) {
             expect(result.executed, `diff seed ${seed} executed no ops`).toBeGreaterThan(0)
+        }
+    }, 180000)
+})
+
+// ---------- 真实驱动矩阵（env-gated；同一种子池经同一意图流重放） ----------
+// CAUTION 独占库名派生（`_difffuzz` 后缀）：open(forceDrop=true) 每种子摧毁重建，
+//  绝不能指向有价值的库（与 postgresql* 套件同一约定）。
+const PG_SEED_START = Number(process.env.FUZZ_DIFF_PG_SEED_START ?? 1)
+const PG_SEED_COUNT = Number(process.env.FUZZ_DIFF_PG_SEED_COUNT ?? 4)
+const pgOptions = {
+    host: process.env.PGHOST,
+    port: process.env.PGPORT ? Number(process.env.PGPORT) : undefined,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+}
+
+const pgSeeds = Array.from({ length: PG_SEED_COUNT }, (_, i) => PG_SEED_START + i)
+describe.skipIf(!process.env.INTERAQT_POSTGRES_DATABASE || !pgSeeds.length)('driver differential fuzz (SQLite vs real PostgreSQL, env-gated)', () => {
+    const seeds = pgSeeds.length ? pgSeeds : [0]
+    test.each(seeds.map(s => [s]))('pg seed %i: same intent stream yields identical events + logical state on the real pg client', async (seed) => {
+        const result = await runDifferentialCase(seed, OPS, {
+            label: 'PostgreSQL',
+            make: () => new PostgreSQLDB(`${process.env.INTERAQT_POSTGRES_DATABASE!}_difffuzz`, pgOptions) as unknown as Database,
+            forceDropOnOpen: true,
+        })
+        if (!result.declarationRejected) {
+            expect(result.executed, `pg diff seed ${seed} executed no ops`).toBeGreaterThan(0)
+        }
+    }, 180000)
+})
+
+const MYSQL_SEED_START = Number(process.env.FUZZ_DIFF_MYSQL_SEED_START ?? 1)
+const MYSQL_SEED_COUNT = Number(process.env.FUZZ_DIFF_MYSQL_SEED_COUNT ?? 4)
+const mysqlOptions = {
+    host: process.env.MYSQL_HOST || '127.0.0.1',
+    user: process.env.MYSQL_USER || 'interaqt',
+    password: process.env.MYSQL_PASSWORD || 'interaqt',
+}
+
+const mysqlSeeds = Array.from({ length: MYSQL_SEED_COUNT }, (_, i) => MYSQL_SEED_START + i)
+describe.skipIf(!process.env.INTERAQT_MYSQL_DATABASE || !mysqlSeeds.length)('driver differential fuzz (SQLite vs real MySQL, env-gated)', () => {
+    const seeds = mysqlSeeds.length ? mysqlSeeds : [0]
+    test.each(seeds.map(s => [s]))('mysql seed %i: same intent stream yields identical events + logical state on the mysql dialect', async (seed) => {
+        const result = await runDifferentialCase(seed, OPS, {
+            label: 'MySQL',
+            make: () => new MysqlDB(`${process.env.INTERAQT_MYSQL_DATABASE!}_difffuzz`, mysqlOptions) as unknown as Database,
+            forceDropOnOpen: true,
+        })
+        if (!result.declarationRejected) {
+            expect(result.executed, `mysql diff seed ${seed} executed no ops`).toBeGreaterThan(0)
         }
     }, 180000)
 })

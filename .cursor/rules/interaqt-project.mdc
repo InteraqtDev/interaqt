@@ -12,6 +12,7 @@ interaqt is a **framework**, not an application. Every change carries amplified 
 - **Consider all consumers** — Every public type, method signature, and behavioral contract is a commitment. Think through edge cases, composability, and how the design scales before implementing.
 - **Minimal footprint** — Add no more surface area than necessary. Every export, parameter, and concept a user must learn is a cost.
 - **Robustness** — Framework code must handle unexpected inputs gracefully with clear error messages. Silent failures and obscure stack traces are unacceptable.
+- **Plain professional language** — Everything written for humans (docs, comments, error messages, commit/PR text, reports, replies) uses precise, established terminology and stays understandable to a competent engineer outside the immediate context, in whichever language the text is written. Insider slang, ad-hoc code names, and colloquialisms must never carry the meaning; define project-specific terms at first use. See `AGENTS.md` § "Plain professional language".
 
 ## Naming
 - Project name is always **interaqt** (all lowercase). Never InterAQT, interAQT, etc.

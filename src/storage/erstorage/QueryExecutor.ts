@@ -885,7 +885,11 @@ export class QueryExecutor {
             key: 'id',
             value: ['=', startRecordId]
         })
-        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(recordName, this.map, true, true, false, true)
+        // 深度契约（见 getAttributeQueryDataForRecord 头注）：路径搜索的节点快照 =
+        //  随行子树 + merged link + 一层同住（纯读取面，深度不承载搬迁/删除语义）。
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(recordName, this.map,
+            /* includeSameTableReliance */ true, /* includeMergedRecordAttribute */ true,
+            /* includeManagedRecordAttributes */ false, /* includeNotRelianceCombined */ true)
         const recursiveLabel = attributePathStr
         // 第一次使用路径先产生 label
         let base = attributeQuery

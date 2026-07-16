@@ -1,0 +1,27 @@
+# PR / push 主测试门（quality-plan §1.3 第 4 步「CI 编排」的 PR 面）：
+# npm test 跑全量套件，其中包含全部生成式套件的**固定默认种子池**（种子即测试用例）：
+#   storage 结构化 base 8 + extended 8、驱动差分 6（PGLite 副库）、计算生成 6、
+#   迁移生成 6、迁移破坏性 14、事件驱动计算 6、异步计算 6、活动层 6、taboo 声明面 3/格。
+# 扩展种子池与真实驱动差分矩阵在 nightly-fuzz.yml；真实 PG/MySQL 功能套件在
+# postgres-concurrency.yml。
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  unit-and-fuzz-fixed-seeds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test

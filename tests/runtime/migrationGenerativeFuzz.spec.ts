@@ -32,6 +32,7 @@ import { decideNextOp, executeOpIntent, type FuzzOpIntent, type IdPools } from "
 import type { FuzzSchema, RelationChoice } from "../storage/helpers/fuzzSchema.js";
 import { snapshotLogicalState, type EventCompletenessSchema, type LogicalSnapshot } from "../storage/helpers/eventCompleteness.js";
 import { approveGeneratedMigrationDiff } from "./helpers/migrationApproval.js";
+import { createFaultInjectedDb } from "./helpers/faultInjection.js";
 
 type Row = Record<string, unknown>
 
@@ -183,30 +184,6 @@ function genMigrationPair(rng: Rng, tag: string): {
     const v1Build = build(1)
     const v2Build = build(2)
     return { v1: v1Build.decls, v2: v2Build.decls, v1View: v1Build.v1View!, mutations: v2Build.mutations }
-}
-
-// ---------- 故障注入（kill-resume） ----------
-function createFaultInjectedDb(inner: Database, faultAtCall: number): Database & { arm: () => void } {
-    let armed = false
-    let calls = 0
-    const interceptable = new Set(['scheme', 'query', 'insert', 'update', 'delete'])
-    const wrapper = new Proxy(inner as object, {
-        get(target, prop, receiver) {
-            const value = Reflect.get(target, prop, receiver)
-            if (prop === 'arm') return () => { armed = true; calls = 0 }
-            if (typeof value === 'function' && interceptable.has(String(prop))) {
-                return (...args: unknown[]) => {
-                    if (armed && ++calls >= faultAtCall) {
-                        armed = false
-                        throw new Error(`[fault-injection] simulated crash at db call #${calls} (${String(prop)})`)
-                    }
-                    return (value as (...a: unknown[]) => unknown).apply(target, args)
-                }
-            }
-            return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value
-        }
-    })
-    return wrapper as Database & { arm: () => void }
 }
 
 // ---------- runner ----------

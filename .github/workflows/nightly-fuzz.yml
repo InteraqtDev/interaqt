@@ -1,0 +1,110 @@
+# Nightly 扩展种子池（quality-plan §1.3 第 4 步「CI 编排」的 nightly 面）：
+# PR 门只跑各套件的固定默认池（<1min）；本工作流每晚跑大种子池 + 长序列 +
+# 真实 PG/MySQL 差分矩阵。失败信息自带种子与完整操作日志——**失败种子即回归用例**：
+# 收口修复时把失败种子固化进对应套件的 deterministic regression 组（或用
+# FUZZ_*_SEED_START=<seed> FUZZ_*_SEED_COUNT=1 FUZZ_VERBOSE=1 本地复现）。
+name: Nightly Fuzz (expanded seed pools)
+
+on:
+  schedule:
+    - cron: '30 18 * * *'   # 每日 18:30 UTC
+  workflow_dispatch:
+    inputs:
+      seed_multiplier:
+        description: 'multiply default nightly pool sizes'
+        required: false
+        default: '1'
+
+jobs:
+  storage-write-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # base 池 1–200 × 40 ops + extended（filtered/merged 域）1–120 × 30 ops
+      - run: FUZZ_SEED_START=1 FUZZ_SEED_COUNT=200 FUZZ_OPS=40 FUZZ_FILTERED_SEED_START=1 FUZZ_FILTERED_SEED_COUNT=120 npx vitest run tests/storage/writePathStructuralFuzz.spec.ts
+
+  driver-differential:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: interaqt_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d interaqt_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: interaqt
+          MYSQL_PASSWORD: interaqt
+          MYSQL_DATABASE: interaqt_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      INTERAQT_POSTGRES_DATABASE: interaqt_test
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      INTERAQT_MYSQL_DATABASE: interaqt_mysql_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # PGLite 副库 1–120；真实 PG / MySQL 副库各 1–40（真实服务器建库较慢，池小于内嵌库）
+      - run: FUZZ_DIFF_SEED_START=1 FUZZ_DIFF_SEED_COUNT=120 FUZZ_DIFF_OPS=30 FUZZ_DIFF_PG_SEED_START=1 FUZZ_DIFF_PG_SEED_COUNT=40 FUZZ_DIFF_MYSQL_SEED_START=1 FUZZ_DIFF_MYSQL_SEED_COUNT=40 npx vitest run tests/storage/driverDifferentialFuzz.spec.ts
+
+  runtime-computations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: FUZZ_COMP_SEED_START=1 FUZZ_COMP_SEED_COUNT=100 FUZZ_COMP_OPS=25 npx vitest run tests/runtime/computationGenerativeFuzz.spec.ts
+      - run: FUZZ_EVENT_SEED_START=1 FUZZ_EVENT_SEED_COUNT=120 FUZZ_EVENT_OPS=25 npx vitest run tests/runtime/eventComputationGenerativeFuzz.spec.ts
+      - run: FUZZ_ASYNC_SEED_START=1 FUZZ_ASYNC_SEED_COUNT=120 FUZZ_ASYNC_OPS=30 npx vitest run tests/runtime/asyncComputationGenerativeFuzz.spec.ts
+      - run: FUZZ_ACT_SEED_START=1 FUZZ_ACT_SEED_COUNT=120 FUZZ_ACT_OPS=40 npx vitest run tests/runtime/activityGenerativeFuzz.spec.ts
+      - run: FUZZ_TABOO_SEEDS=6 npx vitest run tests/runtime/declarationTabooFuzz.spec.ts
+
+  migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: FUZZ_MIG_SEED_START=1 FUZZ_MIG_SEED_COUNT=60 FUZZ_MIG_OPS=14 npx vitest run tests/runtime/migrationGenerativeFuzz.spec.ts
+      - run: FUZZ_MIGD_SEED_START=1 FUZZ_MIGD_SEED_COUNT=60 FUZZ_MIGD_OPS=12 npx vitest run tests/runtime/migrationDestructiveFuzz.spec.ts
