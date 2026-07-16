@@ -706,6 +706,8 @@ export class Scheduler {
 
         return dirtyDataDepRecords
     }
+    /** global dep 扇出的宿主分批拉取大小（keyset 分页，防止单条无界查询物化整表）。 */
+    static GLOBAL_DEP_FANOUT_BATCH_SIZE = 1000
     async computeDataBasedDirtyRecordsAndEvents(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
@@ -715,17 +717,38 @@ export class Scheduler {
             // 如果是 property 级别的 dataContext，需要找到所有实体记录，就是记录都受影响了
             if (source.computation.dataContext.type === 'property') {
                 const propertyContext = source.computation.dataContext as PropertyDataContext
-                const allRecords = await this.controller.system.storage.find(propertyContext.host.name!, MatchExp.atom({key:'id', value:['not', null]}), {}, ['*'])
-                dirtyRecordsAndEvents = allRecords.map(record => [record, {
-                    dataDep: source.dataDep,
-                    type: 'update',
-                    recordName: propertyContext.host.name!,
-                    record: record,
-                    // 变化发生在 global dict 上，宿主记录自身没有变：old/new 快照内容相同是语义事实，
-                    // 但必须是独立副本，避免消费方原地修改 record 时污染 oldRecord。
-                    oldRecord: {...record},
-                    relatedMutationEvent: mutationEvent
-                }])
+                // CAUTION S3（~15 轮记录项）的收口是 keyset 分批（orderBy id ASC + id > cursor + limit）：
+                //  此前单条无界 find 在事务内一次性物化整张宿主表，大表下是延迟与内存悬崖。
+                //  同列 keyset 比较跨 int（SQLite/PG/MySQL）与 uuid 文本（PGLite）id 都成立。
+                //  列面必须保持 ['*']——事件 record 是消费契约：用户计算的 compute(deps, record)
+                //  可读宿主任意字段（globalDataDependency.spec 固化 `context.price` 用法），
+                //  retrieveLastValue 快路径也读 record[输出属性]。列裁剪是违约，不做。
+                const hostName = propertyContext.host.name!
+                const fanoutAttributeQuery = ['*']
+                const batchSize = Scheduler.GLOBAL_DEP_FANOUT_BATCH_SIZE
+                let cursor: unknown = undefined
+                while (true) {
+                    const match = cursor === undefined
+                        ? MatchExp.atom({key: 'id', value: ['not', null]})
+                        : MatchExp.atom({key: 'id', value: ['>', cursor]})
+                    const batch = await this.controller.system.storage.find(
+                        hostName, match, {limit: batchSize, orderBy: {id: 'ASC'}}, fanoutAttributeQuery
+                    )
+                    for (const record of batch) {
+                        dirtyRecordsAndEvents.push([record, {
+                            dataDep: source.dataDep,
+                            type: 'update',
+                            recordName: hostName,
+                            record: record,
+                            // 变化发生在 global dict 上，宿主记录自身没有变：old/new 快照内容相同是语义事实，
+                            // 但必须是独立副本，避免消费方原地修改 record 时污染 oldRecord。
+                            oldRecord: {...record},
+                            relatedMutationEvent: mutationEvent
+                        }])
+                    }
+                    if (batch.length < batchSize) break
+                    cursor = batch[batch.length - 1].id
+                }
             } else if (source.computation.dataContext.type === 'global') {
                 // 对于 global 级别的计算，不需要具体的记录
                 dirtyRecordsAndEvents = [[null, {

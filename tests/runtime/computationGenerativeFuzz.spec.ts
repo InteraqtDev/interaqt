@@ -19,13 +19,17 @@
  * 事件驱动计算（需 InteractionEvent 轨道）、async 计算、activity 层。
  *
  * 再现：FUZZ_COMP_SEED_START / FUZZ_COMP_SEED_COUNT / FUZZ_COMP_OPS；FUZZ_VERBOSE=1。
+ * 驱动轴：FUZZ_COMP_DRIVER=sqlite 切换到 SQLiteDB（默认 PGLite）。
+ * CAUTION 该轴的动机是 escape 教训：聚合 update 分支的宿主约束缺陷在 PGLite 上被
+ * MVCC 行移动的扫描序"轮转"掩蔽、仅 SQLite（稳定 rowid 序）确定性现形——扫描序
+ * 敏感的缺陷必须在两种行序模型上都跑过才算覆盖（nightly 跑 sqlite 变体）。
  */
 import { describe, expect, test } from "vitest";
 import {
     Any, Average, Controller, Count, Dictionary, Every, KlassByName, MonoSystem,
     Property, Summation, WeightedSummation,
 } from 'interaqt';
-import { PGLiteDB } from '@drivers';
+import { PGLiteDB, SQLiteDB } from '@drivers';
 import { mulberry32, chance, int, pick, genSchema, isExpectedRejection, type FuzzSchema, type Rng } from "../storage/helpers/fuzzSchema.js";
 import { decideNextOp, executeOpIntent, type FuzzOpIntent, type IdPools } from "../storage/helpers/fuzzOps.js";
 
@@ -127,6 +131,12 @@ type PropertyCell = {
     relationProperty: string
     hasWeight: boolean
     naive: (relatedRows: Row[], empty: unknown) => unknown
+    /**
+     * filtered relation 格：预言机从 base 属性读全量行 + JS 谓词独立过滤
+     * （不依赖被测的 filtered 查询重写）。readProperty = base 侧属性名。
+     */
+    readProperty?: string
+    linkPredicate?: (linkRow: Row) => boolean
 }
 
 function genComputationCells(rng: Rng, schema: FuzzSchema) {
@@ -175,12 +185,39 @@ function genComputationCells(rng: Rng, schema: FuzzSchema) {
         }
     }
 
-    // property 级：1..3 个 (关系一侧 × 聚合)，宿主属性由计算维护
-    const roleMenu = schema.relationChoices.flatMap(choice => {
-        const roles = [{ host: choice.source, relationProperty: choice.sourceProperty, choice }]
+    // property 级：1..3 个 (关系一侧 × 聚合)，宿主属性由计算维护。
+    // 菜单 = 普通关系两侧 ∪ filtered relation 的宿主侧（A1 收口回填：property 聚合 ×
+    // filtered relation 是全量重算风暴的记录形态，此前生成域缺格——performance-debt-plan §四 1.1）。
+    type PropertyRole = {
+        host: string
+        relationProperty: string
+        choice: (typeof schema.relationChoices)[number]
+        /** filtered 格：预言机从 base 属性读行 + 谓词独立过滤 */
+        readProperty?: string
+        linkPredicate?: (linkRow: Row) => boolean
+    }
+    const roleMenu: PropertyRole[] = schema.relationChoices.flatMap(choice => {
+        const roles: PropertyRole[] = [{ host: choice.source, relationProperty: choice.sourceProperty, choice }]
         if (!choice.symmetric) roles.push({ host: choice.target, relationProperty: choice.targetProperty, choice })
         return roles
     })
+    for (const filtered of schema.filteredRelations) {
+        const base = filtered.baseChoice
+        const filteredSourceProperty = (filtered.relation as { sourceProperty?: string }).sourceProperty
+        const filteredTargetProperty = (filtered.relation as { targetProperty?: string }).targetProperty
+        if (filteredSourceProperty) {
+            roleMenu.push({
+                host: base.source, relationProperty: filteredSourceProperty, choice: base,
+                readProperty: base.sourceProperty, linkPredicate: filtered.predicate,
+            })
+        }
+        if (!base.symmetric && filteredTargetProperty) {
+            roleMenu.push({
+                host: base.target, relationProperty: filteredTargetProperty, choice: base,
+                readProperty: base.targetProperty, linkPredicate: filtered.predicate,
+            })
+        }
+    }
     const propertyCount = 1 + int(rng, 3)
     for (let i = 0; i < propertyCount && roleMenu.length; i++) {
         const role = pick(rng, roleMenu)
@@ -200,6 +237,8 @@ function genComputationCells(rng: Rng, schema: FuzzSchema) {
                 hostEntity: role.host, propertyName,
                 relationProperty: role.relationProperty, hasWeight,
                 naive,
+                readProperty: role.readProperty,
+                linkPredicate: role.linkPredicate,
             })
         } catch (error) {
             declarationErrors.push(`${role.host}.${role.relationProperty}/${agg.name}: ${error instanceof Error ? error.message : String(error)}`)
@@ -226,7 +265,7 @@ async function runComputationFuzzCase(seed: number, opsCount: number) {
     const schema = genSchema(rng, `C${seed}_`, { includeFiltered: true })
     const { dictionaries, globalCells, propertyCells, declarationErrors } = genComputationCells(rng, schema)
 
-    const system = new MonoSystem(new PGLiteDB())
+    const system = new MonoSystem(process.env.FUZZ_COMP_DRIVER === 'sqlite' ? new SQLiteDB() : new PGLiteDB())
     system.conceptClass = KlassByName
     let controller: Controller
     try {
@@ -285,14 +324,21 @@ async function runComputationFuzzCase(seed: number, opsCount: number) {
                 failWith(`${context}: global cell ${cell.cell} (dict ${cell.dictName}) diverges from naive recompute — expected ${JSON.stringify(expected)}, actual ${JSON.stringify(actual)}`)
             }
         }
-        // property 格：每个宿主的值 = 朴素重算(该宿主的关联行)
+        // property 格：每个宿主的值 = 朴素重算(该宿主的关联行)。
+        // filtered relation 格的真值独立于被测查询重写：从 **base** 属性读全量关联行
+        // （恒取 & 数据供谓词求值）+ JS 谓词过滤，再交给 naive。
         for (const cell of propertyCells) {
+            const readProperty = cell.readProperty ?? cell.relationProperty
+            const needsLinkData = cell.hasWeight || !!cell.linkPredicate
             const hosts = await storage.find(cell.hostEntity, undefined, undefined,
                 ['id', cell.propertyName,
-                    [cell.relationProperty, { attributeQuery: ['id', 'score', ...(cell.hasWeight ? [['&', { attributeQuery: ['weight'] }]] as any[] : [])] }]]) as Row[]
+                    [readProperty, { attributeQuery: ['id', 'score', ...(needsLinkData ? [['&', { attributeQuery: ['weight'] }]] as any[] : [])] }]]) as Row[]
             for (const host of hosts) {
-                const related = host[cell.relationProperty]
-                const relatedRows = (Array.isArray(related) ? related : (related ? [related] : [])) as Row[]
+                const related = host[readProperty]
+                let relatedRows = (Array.isArray(related) ? related : (related ? [related] : [])) as Row[]
+                if (cell.linkPredicate) {
+                    relatedRows = relatedRows.filter(row => cell.linkPredicate!((row['&'] ?? {}) as Row))
+                }
                 const expected = cell.naive(relatedRows, PROPERTY_EMPTY[cell.cell.split('/')[1]])
                 const actual = host[cell.propertyName]
                 if (!near(actual, expected)) {

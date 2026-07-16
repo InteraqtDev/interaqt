@@ -427,6 +427,33 @@ export const RelationSimilarityHandles = [RelationSimilarityComputation];
 
 ## Best Practices for Async Computations
 
+### Task Table Retention
+
+Every async computation owns a dedicated task table. Task rows in terminal states
+(`applied` / `skipped`) are audit records — the framework never deletes them
+automatically (explicit control). Long-running deployments should reclaim them
+periodically:
+
+```typescript
+// Removes applied/skipped task rows across all async computations.
+// Returns per-table counts: [{ taskRecordName, removed }]
+const summary = await controller.cleanupAsyncTasks();
+
+// Restrict to one terminal status if you want to keep the other as audit trail
+await controller.cleanupAsyncTasks({ statuses: ['skipped'] });
+```
+
+Rules enforced by the API:
+
+- `pending` / `success` rows are **live delivery-protocol state** (a worker has not
+  reported back yet / the daemon has not delivered yet). Passing them to
+  `statuses` throws — deleting them would break the latest-output-wins invariant.
+- A freshness partition that still contains an undelivered task keeps **all** its
+  rows: staleness of an old `pending` task is judged against the newest task row
+  in its partition, so removing a newer terminal row could resurrect a stale
+  result. Such partitions are skipped and reclaimed on a later cleanup, after
+  the pending task is delivered.
+
 ### Error Handling
 
 ```typescript

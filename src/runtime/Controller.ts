@@ -338,6 +338,57 @@ export class Controller {
         this.scheduler.teardown()
     }
 
+    /**
+     * async 计算 task 表的保留清理（C1：task 表只增不减，r2-I-6）。
+     *
+     * task 行的终态（applied / skipped）是审计痕迹，框架从不自动清理（显式控制原则）；
+     * 长期运行的部署应周期性调用本方法回收。协议态（pending / success）是投递机制的
+     * 活跃状态，**不可清理**——pending 的 worker 尚未回填，success 等待 daemon 投递，
+     * 删除它们会破坏「最后产出胜出」不变量。
+     *
+     * 陈旧复活防护：同一 freshnessKey 分区内 id 更小的 pending/success 行，其"陈旧"
+     * 判定（isLatestAsyncTask 取分区内最大 id）依赖后来的终态行存在。分区里还有未投递
+     * 行时整个分区跳过清理，投递语义不受影响。
+     *
+     * @returns 每张 task 表的清理计数（recordName = 内部 task 表名）。
+     */
+    async cleanupAsyncTasks(options?: { statuses?: Array<'applied' | 'skipped'> }): Promise<Array<{ taskRecordName: string, removed: number }>> {
+        const statuses = options?.statuses ?? ['applied', 'skipped']
+        const illegal = statuses.filter(status => status !== 'applied' && status !== 'skipped')
+        if (illegal.length) {
+            throw new Error(
+                `cleanupAsyncTasks can only remove terminal task rows ('applied' | 'skipped'); got: ${JSON.stringify(illegal)}. ` +
+                `'pending' and 'success' rows are live delivery-protocol state — removing them would break the latest-output-wins invariant.`
+            )
+        }
+        const results: Array<{ taskRecordName: string, removed: number }> = []
+        for (const computation of this.scheduler.computationsHandles.values()) {
+            if (!this.scheduler.isAsyncComputation(computation)) continue
+            const taskRecordName = this.scheduler.getAsyncTaskRecordKey(computation)
+            const removed = await this.system.storage.runInTransaction(
+                { name: `cleanupAsyncTasks:${taskRecordName}` },
+                async () => {
+                    // 快照未投递行占用的 freshnessKey 分区（通常极少：pending/success 是瞬态）。
+                    const unappliedRows = await this.system.storage.find(
+                        taskRecordName,
+                        BoolExp.atom({ key: 'status', value: ['in', ['pending', 'success']] }),
+                        undefined,
+                        ['freshnessKey']
+                    ) as Array<{ freshnessKey?: unknown }>
+                    const liveKeys = [...new Set(unappliedRows.map(row => row.freshnessKey).filter(key => key !== undefined && key !== null))]
+                    let terminalMatch = BoolExp.atom({ key: 'status', value: ['in', statuses] })
+                    if (liveKeys.length) {
+                        terminalMatch = terminalMatch.and({ key: 'freshnessKey', value: ['not in', liveKeys] })
+                    }
+                    const deleted = await this.system.storage.delete(taskRecordName, terminalMatch) as unknown as unknown[]
+                    return Array.isArray(deleted) ? deleted.length : 0
+                }
+            ) as number
+            results.push({ taskRecordName, removed })
+        }
+        return results
+    }
+
     // Recovery path for a migration process that died without releasing the
     // bookkeeping lock. Only call after confirming no migration is running.
     async forceReleaseMigrationLock() {

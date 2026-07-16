@@ -59,6 +59,13 @@ export class RecordQueryRef {
  * 3. 事件处理
  */
 export class QueryExecutor {
+    /**
+     * 两段式分页（fan-out match × limit）的第二段以 id IN (页 id 集合) 改写主查询，
+     * IN 列表长度 = limit。超过该阈值（驱动占位符上限风险，SQLite 历史默认 999）
+     * 或 offset-only 无 limit（页本身无界）时退回「剥离 LIMIT + 内存切片」旧路径。
+     */
+    static PAGED_ROOT_ID_MAX_LIMIT = 500
+
     constructor(
         private map: EntityToTableMap,
         private database: Database,
@@ -360,12 +367,18 @@ export class QueryExecutor {
         //  这个 x:1 是递归的，把一次性能通过 join 查到的都查了。
         // x:n 的查询是通过二次查询获取的。
 
-        // CAUTION match/orderBy 走 x:n 路径时 LEFT JOIN 会 fan-out：SQL 的 LIMIT/OFFSET 限制的是
+        // CAUTION match 走 x:n 路径时 LEFT JOIN 会 fan-out：SQL 的 LIMIT/OFFSET 限制的是
         //  原始行数而不是去重后的根记录数，直接下推会导致分页结果错误（返回数量不足 / 跳过记录）。
-        //  这里把 LIMIT/OFFSET 从 SQL 中剥离，改在 dedupe 之后按根记录应用。
-        //  例外：limit === 1 且无 offset（findOne 热路径）时首条原始行必然对应第一条根记录，可以安全下推。
+        //  两段式分页（B2/B4 收口，此前是「剥离 LIMIT + 全量拉取 + 内存切片」）：
+        //   1. buildPagedRootIdQuery 在 fan-out 之上 SELECT DISTINCT 根 id + 排序键，
+        //      LIMIT/OFFSET 在数据库端作用于根记录粒度（orderBy 已被 Modifier 限制为
+        //      x:1 路径，排序键对每个根恒定 → 每根恰好一个 DISTINCT 行）；
+        //   2. 主查询改写为 id IN (页内 id 集合)：match 的 fan-out JOIN 树整个消失
+        //      （语义已被 id 集合编码），orderBy 保留供页内排序。
+        //  例外：limit === 1 且无 offset（findOne 热路径）时首条原始行必然对应第一条根记录，
+        //  单条 SQL 直接下推更省一次往返。
         const paginationModifier = entityQuery.modifier
-        const needsPostPagination = (
+        const paginationOverFanOut = (
             (paginationModifier.limit !== undefined || paginationModifier.offset !== undefined) &&
             !(paginationModifier.limit === 1 && !paginationModifier.offset) &&
             (
@@ -373,15 +386,44 @@ export class QueryExecutor {
                 this.queryTreeHasXToManyPath(entityQuery.modifier.xToOneQueryTree)
             )
         )
-        const sqlEntityQuery = needsPostPagination
-            ? entityQuery.derive({
+        // 两段式的第二段用 id IN (页 id 集合) 改写，IN 列表长度 = limit：
+        //  超过驱动参数上限阈值（或 offset-only 无 limit，页本身无界）时退回
+        //  「剥离 LIMIT + 内存切片」的旧路径（正确性同等，代价是全量拉取——r12-I-4
+        //  的残余面，登记为诚实边界）。
+        const usePagedRootIds = paginationOverFanOut
+            && paginationModifier.limit !== undefined
+            && paginationModifier.limit <= QueryExecutor.PAGED_ROOT_ID_MAX_LIMIT
+        const needsPostPagination = paginationOverFanOut && !usePagedRootIds
+
+        let sqlEntityQuery = entityQuery
+        if (usePagedRootIds) {
+            const [pageSQL, pageParams] = this.sqlBuilder.buildPagedRootIdQuery(entityQuery, '')
+            const pageRows: { [k: string]: unknown }[] = await this.database.query(pageSQL, pageParams, `${queryName} (page root ids)`)
+            const pageIds = pageRows.map(row => row[SQLBuilder.PAGED_ROOT_ID_ALIAS])
+            if (!pageIds.length) return []
+            sqlEntityQuery = entityQuery.derive({
+                // 页内 id 集合已编码 match 语义；替换 match 让 fan-out JOIN 树整个消失。
+                matchExpression: new MatchExp(
+                    entityQuery.recordName,
+                    this.map,
+                    MatchExp.atom({ key: 'id', value: ['in', pageIds] }),
+                    entityQuery.contextRootEntity
+                ),
                 modifier: new Modifier(paginationModifier.recordName, this.map, {
                     ...(paginationModifier.data || {}),
                     limit: undefined,
                     offset: undefined,
                 })
             })
-            : entityQuery
+        } else if (needsPostPagination) {
+            sqlEntityQuery = entityQuery.derive({
+                modifier: new Modifier(paginationModifier.recordName, this.map, {
+                    ...(paginationModifier.data || {}),
+                    limit: undefined,
+                    offset: undefined,
+                })
+            })
+        }
 
         const [querySQL, params, fieldAliasMap] = this.sqlBuilder.buildXToOneFindQuery(sqlEntityQuery, '')
         // CAUTION 能力判断优先使用 driver 的显式声明，仅在未声明时退回旧的启发式判断（兼容外部 driver）。
@@ -394,7 +436,9 @@ export class QueryExecutor {
             queryName
         )
         // CAUTION 通过 x:n 路径做 match 时，LEFT JOIN 会让同一条根记录产生多行完全相同的结果（fan-out）。
-        //  这里按"整行完全相同"去重（等价于 SQL DISTINCT 的语义）。
+        //  这里按"整行完全相同"去重（等价于 SQL DISTINCT 的语义）。两段式分页的主查询已无
+        //  fan-out JOIN（match 被 id IN 替换），此处对其恒为 no-op；仍保留以覆盖
+        //  无分页 fan-out match 与超阈值回退路径。
         //  不会误伤合法数据：SELECT 永远包含各级记录（含关系记录）的 id 字段，真正不同的行必然有字段差异。
         let dedupedRawReturns = this.dedupeIdenticalRows(rawReturns)
         if (needsPostPagination) {
@@ -711,6 +755,30 @@ export class QueryExecutor {
                 //  按 base 名挂载会让 filtered 名下的结果整体缺失、且过滤后的子集泄漏到 base 名下，
                 //  与请求 base 属性的结果互相覆盖）。alias 对非 filtered 关系恒等于 attributeName。
                 const xToManyResultKey = xToManySubSubQuery.alias || xToManySubSubQuery.attributeName!
+                // B5（performance-debt-plan §五 2.3）：x:1 主干上的 x:n 枝干优先按父 id 集合批量
+                //  （IN + 反向分组，与顶层 findXToManyRelatedRecordsBatched 同构），消掉「每根记录
+                //  一次枝干查询」的 N+1。批量前置条件在 canBatchXToManyQuery 之上追加两条：
+                //  - 根查询无 label（label 需要 per-record 递归上下文）；
+                //  - 挂载的 x:1 目标 id 互不相同（n:1 主干共享目标时，批量会让多个根记录共享
+                //    同一批子记录对象——对象别名泄漏改变公开契约，保持逐条查询，登记为边界）。
+                const mountedParents = records
+                    .map(record => record[subResultKey])
+                    .filter((parent): parent is Record => !!parent)
+                const parentIdsUnique = new Set(mountedParents.map(parent => String(parent.id))).size === mountedParents.length
+                if (
+                    !entityQuery.label && parentIdsUnique &&
+                    this.canBatchXToManyQuery(xToOneSubQuery, xToManySubSubQuery, mountedParents)
+                ) {
+                    await this.findXToManyRelatedRecordsBatched(
+                        xToOneSubQuery.recordName,
+                        xToManySubSubQuery.attributeName!,
+                        mountedParents,
+                        xToManySubSubQuery,
+                        recordQueryRef,
+                        context
+                    )
+                    continue
+                }
                 for(let record of records) {
                     if (!record[subResultKey]) {
                         // Skip this record if the x:1 relation is null
