@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.3.0](https://github.com/InteraqtDev/interaqt/compare/v4.2.0...v4.3.0) (2026-07-16)
+
+### Features
+
+* **runtime): C1 — Controller.cleanupAsyncTasks retention API; test(storage:** C2 re-verdict — cascade depth boundaries pinned as regressions ([7388acf](https://github.com/InteraqtDev/interaqt/commit/7388acfe89018c1b838701c3c615dcfedb712ec5))
+
+### Bug Fixes
+
+* **runtime:** A1 — host-constrained incremental re-lookup in aggregation update branch; execution-path probes prove filtered-relation aggregations run incrementally ([6bae5e8](https://github.com/InteraqtDev/interaqt/commit/6bae5e81117a6ea3a7200000c7b7f888d3abf583))
+
+### Performance Improvements
+
+* **runtime:** A2/S3 — global-dep host fan-out uses keyset-batched fetch instead of one unbounded whole-table query ([77ed45f](https://github.com/InteraqtDev/interaqt/commit/77ed45fee7e008e85de3211471e3077c68f1c811))
+* **storage:** B1 — EXIST atoms no longer join their terminal x:n path into the outer query tree ([04c1b2a](https://github.com/InteraqtDev/interaqt/commit/04c1b2adedb6334bff056a85845cff557fc1e0af)), closes [r20#3](https://github.com/InteraqtDev/r20/issues/3) [r25#7](https://github.com/InteraqtDev/r25/issues/7)
+* **storage:** B2/B4 — two-phase root-id pagination for fan-out matches replaces whole-result post-pagination ([bee0625](https://github.com/InteraqtDev/interaqt/commit/bee0625efae8b212c09a628a565d3d8c2f0bcdc1))
+* **storage:** B5 — batch x:n branch completion under x:1 trunks (completeXToOneLeftoverRecords step 2) ([3634272](https://github.com/InteraqtDev/interaqt/commit/3634272f0ea4386402e9f6ec535e6b148b5efb09))
+
 ## Unreleased
 
 Performance-debt closure round, executed in recorded-importance order against the inventory in
