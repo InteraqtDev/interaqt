@@ -13,7 +13,12 @@ import {PlaceholderGen} from "./SQLBuilder.js";
 //  相关引用必须绑定到**直接外层查询**的别名（含其 prefix）；路径解析只认识 contextRootEntity
 //  （最外层根）的作用域，嵌套 EXISTS 下会把关联绑到错误的表（r25#7 的机制真相）。
 //  公开查询面绝不设置该标记。
-export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean, physicalRowMatch?: boolean, isResolvedFieldReference?: boolean }
+// hasRebasedPathPredicate：内部标记（convertFilteredRelation 产物）——路径中的非终段
+//  filtered relation 段把 link 谓词 rebase 后 AND 到了外层 match（谓词与路径原子共享外层
+//  JOIN 别名才成立「同一条边」语义）。带该标记的 exist 原子必须维持父关联编译
+//  （existAtomCorrelation='parent'）：root 折叠会把量化域扩大到全部 base 边、谓词落在
+//  独立扇出行上（不同的边分别成立 ⇒ 幻影命中）。公开查询面绝不设置该标记。
+export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean, physicalRowMatch?: boolean, isResolvedFieldReference?: boolean, hasRebasedPathPredicate?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
 
 export type FieldMatchAtom = MatchAtom & {
@@ -138,6 +143,8 @@ export class MatchExp {
                     const linkInfo = currentPathInfo.getLinkInfo()
                     const linkMatchExp = new MatchExp(linkInfo.getResolvedBaseRecordName()!, this.map, linkInfo.getResolvedMatchExpression())
                     if (isExistMatch && partIndex === matchAttributePath.length - 1) {
+                        // （终段 filtered × EXIST：谓词折叠进 EXISTS 载荷内层，量化域在子查询
+                        //  内部就被谓词约束，与关联锚点无关——不需要 hasRebasedPathPredicate。）
                         // CAUTION 终段 filtered relation × EXIST：link 谓词不能 AND 在外层（r25 F-2）。
                         //  EXIST 子查询按反向端点 id 独立关联，外层的 rebased 谓词落在**另一条** JOIN
                         //  行上——两个原子对「不同的边」分别成立时整体误判为真（幻影多行）。谓词必须
@@ -185,7 +192,17 @@ export class MatchExp {
                 finalValue = ['exist', innerExp ? innerExp.and(existInnerFold) : existInnerFold]
             }
 
-            const baseMatchExpAtom = MatchExp.atom({...matchData.data, key:resolvedPath.slice(1).join('.'), value: finalValue})
+            // 中段 filtered relation 的 rebased link 谓词 AND 在外层（matchExpressionInPath）：
+            //  「同一条边」语义依赖谓词原子与路径原子共享外层 JOIN 别名。exist 原子带该标记时
+            //  必须维持父关联编译（existAtomCorrelation 消费，r35）——root 折叠会让 EXISTS
+            //  的量化域覆盖全部 base 边、rebased 谓词落在独立扇出行上，不同的边分别成立
+            //  ⇒ 幻影命中（与 r25 F-2 终段家族同机制、不同段位）。
+            const baseMatchExpAtom = MatchExp.atom({
+                ...matchData.data,
+                key: resolvedPath.slice(1).join('.'),
+                value: finalValue,
+                ...(isExistMatch && matchExpressionInPath ? { hasRebasedPathPredicate: true } : {})
+            })
             return matchExpressionInPath ? baseMatchExpAtom.and(matchExpressionInPath.data) : baseMatchExpAtom
         }
     }
@@ -248,7 +265,7 @@ export class MatchExp {
                     // CAUTION 对称路径对 EXIST 原子也保持入树（保守）：对称段的别名/方向变体语义
                     //  与 EXISTS 相关子查询的交互未定谳，维持既有行为（代价只是保守 post-pagination）。
                     manyToManySymmetricPaths.forEach(variantPath => recordQueryTree.addRecord(variantPath.slice(1, Infinity)))
-                } else if (isExistAtom && MatchExp.existAtomCorrelation(this.map, namePath) === 'root') {
+                } else if (isExistAtom && MatchExp.existAtomCorrelation(this.map, namePath, matchData.data) === 'root') {
                     // 父路径含 x:n 段的 EXIST 原子（r35）：整条路径折叠进 EXISTS（反向路径关联到根），
                     //  外层不 JOIN 任何段。此前父路径入树 + EXISTS 关联直接父别名：外层 x:n JOIN 的
                     //  每个扇出行各自求值 EXISTS，NOT(exist) 被量化成「∃ 中间行使 ¬∃ 终端」——
@@ -351,10 +368,14 @@ export class MatchExp {
      *   根记录量化（¬∃ 可达终端），而不是按外层扇出行量化（∃ 中间行使 ¬∃ 终端——r35 修复的
      *   误报族：一条不含匹配终端的中间行会让本应排除的根记录整体通过）。
      * - 'parent'：父路径全为 x:1，或路径含 '&'（link 记录段，getReversePath 不支持）/
-     *   对称 n:n 段（方向变体与反向折叠的交互未定谳）——沿用「父路径入树 + EXISTS 关联
-     *   直接父别名」的既有编译。x:1 父路径无扇出，NOT 语义本就按根记录成立。
+     *   对称 n:n 段（方向变体与反向折叠的交互未定谳）/ **中段 filtered relation 的
+     *   rebased link 谓词**（hasRebasedPathPredicate——谓词 AND 在外层、与路径原子共享
+     *   JOIN 别名才有「同一条边」语义；root 折叠会把量化域扩大到全部 base 边）——
+     *   沿用「父路径入树 + EXISTS 关联直接父别名」的既有编译。x:1 父路径无扇出，
+     *   NOT 语义本就按根记录成立；filtered 中段 × NOT 维持扇出行量化（登记边界）。
      */
-    static existAtomCorrelation(map: EntityToTableMap, namePath: string[]): 'root' | 'parent' {
+    static existAtomCorrelation(map: EntityToTableMap, namePath: string[], atom?: MatchAtom): 'root' | 'parent' {
+        if (atom?.hasRebasedPathPredicate) return 'parent'
         if (namePath.some(segment => segment === LINK_SYMBOL || segment.includes(':'))) return 'parent'
         if (map.spawnManyToManySymmetricPath(namePath)) return 'parent'
         for (let i = 1; i < namePath.length - 1; i++) {

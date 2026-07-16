@@ -550,7 +550,7 @@ ${paginationClauses.join('\n')}
 
         let correlationKey: string
         let correlationAnchorPath: string[]
-        if (MatchExp.existAtomCorrelation(this.map, atomData.namePath!) === 'root') {
+        if (MatchExp.existAtomCorrelation(this.map, atomData.namePath!, atomData) === 'root') {
             // 反向路径把「根可达终端」编码在子查询内部：EXISTS 直接关联根记录。
             const reversePath = this.map.getReversePath(atomData.namePath!)
             correlationKey = reversePath.slice(1).concat('id').join('.')

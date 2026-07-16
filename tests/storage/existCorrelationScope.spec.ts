@@ -213,6 +213,57 @@ describe.each([['pglite'], ['sqlite']] as const)('EXIST correlation scope (%s)',
         await destroy()
     })
 
+    test('filtered relation as the INTERMEDIATE segment keeps parent correlation (same-edge semantics)', async () => {
+        // 中段 filtered relation 的 rebased link 谓词 AND 在外层，与路径原子共享 JOIN 别名
+        //  才有「同一条边」语义（r25 F-2 的中段同族）。exist 原子带 hasRebasedPathPredicate
+        //  时必须维持父关联编译：root 折叠会把 EXISTS 的量化域扩大到全部 base 边、谓词落在
+        //  独立扇出行上——orgA 的 cold 组有 admin、hot 组没有，root 折叠形态会幻影命中 orgA
+        //  （r35 收口自身的邻域探针当场抓获）。NOT 在该形态维持扇出行量化（登记边界）。
+        const Org = Entity.create({ name: `OrgFM${dbKind}`, properties: [Property.create({ name: 'name', type: 'string' })] })
+        const Group = Entity.create({ name: `GroupFM${dbKind}`, properties: [Property.create({ name: 'name', type: 'string' })] })
+        const Member = Entity.create({ name: `MemberFM${dbKind}`, properties: [Property.create({ name: 'role', type: 'string' })] })
+        const baseRel = Relation.create({
+            source: Org, sourceProperty: 'groups', target: Group, targetProperty: 'org', type: '1:n',
+            properties: [Property.create({ name: 'kind', type: 'string' })]
+        })
+        const membersRel = Relation.create({ source: Group, sourceProperty: 'members', target: Member, targetProperty: 'group', type: '1:n' })
+        const hotRel = Relation.create({
+            name: `OrgHotGroups${dbKind}`,
+            baseRelation: baseRel,
+            sourceProperty: 'hotGroups',
+            targetProperty: 'hotOrg',
+            matchExpression: MatchExp.atom({ key: 'kind', value: ['=', 'hot'] })
+        })
+        const db = dbKind === 'pglite' ? new PGLiteDB() : new SQLiteDB(':memory:')
+        const system = new MonoSystem(db)
+        system.conceptClass = KlassByName
+        const controller = new Controller({
+            system, entities: [Org, Group, Member], relations: [baseRel, membersRel, hotRel], eventSources: []
+        })
+        await controller.setup(true)
+        await system.storage.create(`OrgFM${dbKind}`, {
+            name: 'orgA',
+            groups: [
+                { name: 'G1', members: [{ role: 'user' }], '&': { kind: 'hot' } },
+                { name: 'G2', members: [{ role: 'admin' }], '&': { kind: 'cold' } },
+            ]
+        })
+        await system.storage.create(`OrgFM${dbKind}`, {
+            name: 'orgB',
+            groups: [{ name: 'G3', members: [{ role: 'admin' }], '&': { kind: 'hot' } }]
+        })
+        const positive = await system.storage.find(`OrgFM${dbKind}`,
+            MatchExp.atom({ key: 'hotGroups.members', value: ['exist', adminExistPayload] }),
+            undefined, ['name'])
+        // orgA 的 admin 在 cold 组：hot 边的量化域内没有 admin ⇒ 只有 orgB 命中
+        expect([...new Set(positive.map(o => o.name))].sort()).toEqual(['orgB'])
+        const negated = await system.storage.find(`OrgFM${dbKind}`,
+            MatchExp.atom({ key: 'hotGroups.members', value: ['exist', adminExistPayload] }).not(),
+            undefined, ['name'])
+        expect([...new Set(negated.map(o => o.name))].sort()).toEqual(['orgA'])
+        await system.destroy()
+    })
+
     test('update and delete victim selection honor per-root NOT exist semantics', async () => {
         const { system, destroy } = await setupWorld(dbKind, `I${dbKind}`)
         const notHasAdminGroup = () => MatchExp.atom({ key: 'groups.members', value: ['exist', adminExistPayload] }).not()
