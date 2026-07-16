@@ -1,5 +1,27 @@
 # Changelog
 
+## [4.2.0](https://github.com/interaqtdev/interaqt/compare/v4.1.4...v4.2.0) (2026-07-16)
+
+### Features
+
+* **runtime:** r32 batch 6 — NOT NULL violations map to ConstraintViolationError; duplicate Dictionary names fail fast at declaration ([c9941da](https://github.com/interaqtdev/interaqt/commit/c9941da789970cbbd7ffd7a8f91837344fceba79)), closes [#2](https://github.com/interaqtdev/interaqt/issues/2) [#3](https://github.com/interaqtdev/interaqt/issues/3)
+* **storage:** pillar II landings — explicit depth contract for getAttributeQueryDataForRecord; classification⇒consumption conservation audit ([8288815](https://github.com/interaqtdev/interaqt/commit/82888155617407134fd0776b2e087095cfed3e84))
+
+### Bug Fixes
+
+* **core:** r32 batch 7 — defuse the two latent public-metadata defects (r27 [#7](https://github.com/interaqtdev/interaqt/issues/7)) ([8abc3f1](https://github.com/interaqtdev/interaqt/commit/8abc3f1b8db06808df49b1fe7765e38a4b1af2c3))
+* **drivers,runtime:** r32 batch 5 — driver-round recorded items ([c95f036](https://github.com/interaqtdev/interaqt/commit/c95f03648931d8a675dfadb2d31688782f820f9f)), closes [#1](https://github.com/interaqtdev/interaqt/issues/1) [#6](https://github.com/interaqtdev/interaqt/issues/6)
+* r31 deep review — event-view reader split, filtered x:n under x:1 mount, payload guard fail-open, merged property type conflict ([21c0fdd](https://github.com/interaqtdev/interaqt/commit/21c0fdd94fb094c6dae90ad72f54c6a947a0730f))
+* **runtime:** async task invalidation scoped by data-context identity, not freshnessKey partition; orphaned-task delivery parks instead of poisoning — r34 probes of registered honest boundaries ([d74f1ae](https://github.com/interaqtdev/interaqt/commit/d74f1aef366a9cdb7fd0cbb7b3fa04869d0ba91c))
+* **runtime:** r31 H7 — trigger/eventDep pattern outer-field surface guard (silent dead-transfer / silent over-trigger family) ([0b246ce](https://github.com/interaqtdev/interaqt/commit/0b246ce44e62c9b67fa7a69495d2b041d2b29b1d))
+* **runtime:** r32 batch 2 — migration patch/result event streams use storage events as the single truth source; direct oldRecord-completeness e2e regression ([48976e4](https://github.com/interaqtdev/interaqt/commit/48976e4abfd6420e82691ff81b23328f075d6cc2))
+* **runtime:** r32 recorded items batch 1 — _System_ (concept,key) unique conservation law; r30-E Transform-chain migration dead-end via cascade-aware destructive scope ([b7ed5d5](https://github.com/interaqtdev/interaqt/commit/b7ed5d53d42fda48cc106a0377a879ef110c4137))
+* **storage:** r32 batch 4 — EXT-1 closed: view record table pointers follow the physical base through table combining ([d1fb6d7](https://github.com/interaqtdev/interaqt/commit/d1fb6d7015f16c1b51893b8042334bed86d22ee7))
+
+### Performance Improvements
+
+* **storage:** r32 batch 3 — enforceXToOnePredicates batches pure related-side predicate probes (r31 recorded item) ([b04cae5](https://github.com/interaqtdev/interaqt/commit/b04cae53a9fac78feb1d89c7abf75e89646bd06b))
+
 ## Unreleased
 
 r32 recorded-items completion round: every deferred item from the r28–r31 review reports that was
