@@ -3588,6 +3588,16 @@ class MigrationScheduler {
             continue;
         }
 
+        // r34-A5：迁移重建是一次「绕过 task 代理的产出纪元」（与 live 的同步/resolved 直出
+        //  同族，见 Scheduler.invalidateUnappliedAsyncTasks 头注）。旧纪元遗留的 pending/success
+        //  task 在迁移后完成时仍是自己 freshnessKey 分区的"最新"，会把旧声明下的结果覆写在
+        //  迁移产出之上。重建前按数据上下文整表作废（simulate 模式同样执行——整个模拟事务
+        //  会回滚；kill-resume 下随 SERIALIZABLE 回滚/重放收敛）。state-only 重建不产出输出，
+        //  不作废（旧 task 仍属当前输出纪元）。
+        if (this.controller.scheduler.isAsyncComputation(computation)) {
+            await this.controller.scheduler.invalidateUnappliedAsyncTasks(computation as DataBasedComputation, 'all');
+        }
+
         const pendingEvents = this.pendingEventsByComputation.get(item.computationId) || [];
         const events = pendingEvents.length && !item.isSeed
             ? await this.runIncrementalRecompute(computation, pendingEvents)

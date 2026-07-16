@@ -1297,7 +1297,24 @@ export class Scheduler {
                 if (taskRecord.status === 'applied' || taskRecord.status === 'skipped') {
                     return { skipped: true, reason: 'already-handled' }
                 }
-                
+
+                // r34-B: record link 缺席的 task 是毒丸——不拦截则 apply 在 record.id 上抛
+                //  裸 TypeError，task 停在 success，daemon 每次重投递都再抛（永不收敛）。
+                //  record link 缺席有两个合法来路（对投递而言等价——都永远无法 apply）：
+                //  1. 宿主已被删除（级联解除 link）；
+                //  2. 同宿主的更新 task 抢走了 link——task↔record 关系声明为 1:1，宿主侧排他，
+                //     新 task 建立 link 时旧 task 的 link 被置换删除（写路径 replace 语义）。
+                //     这也是 invalidateUnappliedAsyncTasks 按 record.id 只删得到「持链最新 task」
+                //     的原因：被置换的旧 task 由本守卫在投递时中和（skipped），两个机制合起来
+                //     保证「非 task 轨产出之后无陈旧 apply」。
+                //  按 skipped 停放：重投递经 already-handled 短路；晚到的 worker 盲写把状态
+                //  复活成 success 也无害——本守卫先于 apply，再次投递仍落回 orphaned-record
+                //  （与 stale-task 同用「标记而非删除」语义）。
+                if (computation.dataContext.type === 'property' && ((taskRecord.record as {id?: unknown} | undefined)?.id === undefined || (taskRecord.record as {id?: unknown} | null)?.id === null)) {
+                    await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
+                    return { skipped: true, reason: 'orphaned-record' }
+                }
+
                 if (!(await this.isLatestAsyncTask(computation, taskRecord))) {
                     await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
                     return { skipped: true, reason: 'stale-task' }
@@ -1338,30 +1355,44 @@ export class Scheduler {
     }
 
     /**
-     * 同步/resolved 路径产出新值后，作废同一 freshnessKey 上所有尚未 apply 的异步 task。
+     * 非 task 轨产出新值后，作废本**数据上下文**上所有尚未 apply 的异步 task。
      *
-     * 异步"最新性"由 isLatestAsyncTask 按 task 行 id 判定；同步路径不建 task 行，
-     * 于是旧的 pending/success task 完成时会被误判为最新并覆写新值（stale overwrite）。
-     * 源已变化才会触发本次重算，因此该 freshnessKey 上任何未应用的旧异步结果都必然陈旧。
-     * async→async 覆盖由新 task 的更大 id 处理（本方法只补同步/resolved 覆盖 async 的缺口）。
+     * 异步"最新性"由 isLatestAsyncTask 按 task 行 id 判定；绕过 task 代理的产出轨
+     * （live 的同步 compute 直出 / resolved 短路，迁移的 writeComputationResult/Patch 直写）
+     * 不建 task 行，于是旧的 pending/success task 完成时会被误判为最新并覆写新值
+     * （stale overwrite）。这些产出发生时本上下文上任何未应用的旧异步结果都必然陈旧
+     * （live：源已变化才触发重算；迁移：旧 task 是旧声明下的计算意图）。
+     * async→async 覆盖由新 task 的更大 id 处理（本方法只补「绕过代理的产出」这一缺口）。
+     *
+     * CAUTION 作废范围 = 数据上下文身份（property ⇒ 宿主记录；global/entity/relation ⇒
+     *  本计算独占的整张 task 表），**与 freshnessKey 解耦**（r34-A）。freshnessKey 是并发
+     *  async task 之间的排序分区（可被 args.freshnessKey 自定义，声明相互独立的新鲜度流，
+     *  见 getAsyncTaskFreshnessKey 的契约）——按分区作废时，自定义分区里的旧 task 匹配
+     *  不中默认键而存活，完成后在自己的分区里仍是"最新"，把陈旧结果覆写在更新的同步值
+     *  之上（r30-B 经自定义分区的还魂形态）。两个概念各管一半：分区回答「并发 async
+     *  之间谁更新」，上下文身份回答「非 task 轨产出之后谁都不许再写」。
      *
      * CAUTION 必须**删除**而非标记 skipped：外部 worker 完成任务时会盲写 { result, status:'success' }，
      *  把 skipped 标记覆盖回 success（复活陈旧任务）。删除后外部按 id 的 update 命中 0 行（no-op），
      *  daemon 随后 handleAsyncReturn 读不到该 task → missing-task 跳过。删除对两种时序都收敛：
      *  「先删后到货」→ update no-op；「先到货后删」→ 行连同 success 结果一并移除。
-     *
-     * CAUTION freshnessKey 的求值必须与 createAsyncTask 一致：默认按 record/context 派生。
-     *  自定义 args.freshnessKey（ComputationResult.async({ freshnessKey }) 显式指定）时，
-     *  resolved 路径的 args 若携带同一 key 则同样命中；纯同步（无 args）只能按默认键作废。
      */
-    private async invalidateSupersededAsyncTasks(computation: DataBasedComputation, args: any, record?: any) {
+    async invalidateUnappliedAsyncTasks(computation: DataBasedComputation, scope: { record: unknown } | 'all') {
         const taskRecordName = this.getAsyncTaskRecordKey(computation)
-        const freshnessKey = this.getAsyncTaskFreshnessKey(computation, args, record)
-        await this.controller.system.storage.delete(
-            taskRecordName,
-            MatchExp.atom({key: 'freshnessKey', value: ['=', freshnessKey]})
-                .and({key: 'status', value: ['in', ['pending', 'success']]})
-        )
+        const unappliedMatch = MatchExp.atom({key: 'status', value: ['in', ['pending', 'success']]})
+        if (scope !== 'all' && computation.dataContext.type === 'property') {
+            const record = scope.record as { id?: unknown } | undefined
+            // 防御：property 轨的逐记录产出必带宿主身份（runComputation 调用契约）；
+            // 缺席时宁可不作废（保持既有值语义），不可按垃圾键误删别的记录的 task。
+            if (record?.id === undefined || record?.id === null) return
+            await this.controller.system.storage.delete(
+                taskRecordName,
+                unappliedMatch.and({key: 'record.id', value: ['=', record.id]})
+            )
+        } else {
+            // 'all'（迁移重建纪元）或 global/entity/relation（task 表按计算独占）：整表作废
+            await this.controller.system.storage.delete(taskRecordName, unappliedMatch)
+        }
     }
 
     private async markAsyncTaskStatus(taskRecordName: string, taskId: string, status: 'applied' | 'skipped') {
@@ -1500,16 +1531,13 @@ export class Scheduler {
             try {
                 const result = computationResult instanceof ComputationResultResolved ? await computation.asyncReturn!(computationResult.result, computationResult.args) : computationResult
 
-                // CAUTION 异步计算的"最新性"此前只按 task 行 id 排序判定（isLatestAsyncTask）。
-                //  但同一 freshnessKey 上一次经同步/resolved 路径（本分支）产出的新值**不创建 task 行**，
+                // CAUTION 异步计算的"最新性"只按 task 行判定（isLatestAsyncTask）。
+                //  同步/resolved 路径（本分支）产出的新值**不创建 task 行**，
                 //  于是仍在 pending/success 的旧 task 完成时被判为"最新"，把已应用的更新值覆写回陈旧结果。
-                //  在应用同步结果前，把该 freshnessKey 上所有尚未 apply 的 task 作废（源已变，旧异步结果必陈旧）。
+                //  在应用同步结果前，把本数据上下文上所有尚未 apply 的 task 作废
+                //  （源已变，旧异步结果必陈旧；作废范围与 freshnessKey 分区解耦，见方法头注 r34-A）。
                 if (this.isAsyncComputation(computation)) {
-                    await this.invalidateSupersededAsyncTasks(
-                        computation as DataBasedComputation,
-                        computationResult instanceof ComputationResultResolved ? computationResult.args : undefined,
-                        record
-                    )
+                    await this.invalidateUnappliedAsyncTasks(computation as DataBasedComputation, { record })
                 }
 
                 if (computationResultMode === 'patch') {
