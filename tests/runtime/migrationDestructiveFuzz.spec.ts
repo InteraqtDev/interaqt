@@ -19,7 +19,11 @@
  *   4. countChange：Count 加 callback 过滤（changed / unchanged 两个决策分支——
  *      changed = 按新声明重算；unchanged = 冻结旧值、增量继续走新代码）；
  *   5. blockedRemoveNonEmptyEntity：删除非空实体+关系——必须整体拒绝且数据无损；
- *   6. blockedTypeChange：值属性 string→number——必须整体拒绝且数据无损。
+ *   6. blockedTypeChange：值属性 string→number——必须整体拒绝且数据无损；
+ *   7. computationTypeChange（r34）：cntA 的计算种类 Count→Summation（manifest id 变化
+ *      = removed+added 双决策）——值 = 新声明朴素重算，增量走新代码；
+ *   8. takeover（r34）：A.tag 从存量事实属性→computed（computation-takeover 决策，
+ *      discard-and-rebuild）——旧手工值全部废弃、按新计算重算，迁移后新建行同样计算。
  * - kill-resume（偶数种子 × 非阻塞变异）：首跑注入 DB 调用故障 → 从头重新
  *   生成/批准/迁移必须收敛到同一终态（SERIALIZABLE 回滚保证无半迁移状态）。
  * - 预言机：无关面存量保真（逐字段快照对账）+ 变异特定终态（朴素重算对照）+
@@ -28,7 +32,8 @@
  * 再现：FUZZ_MIGD_SEED_START / FUZZ_MIGD_SEED_COUNT / FUZZ_MIGD_OPS；FUZZ_VERBOSE=1。
  */
 import { describe, expect, test } from "vitest";
-import { Controller, Count, Custom, Dictionary, Entity, KlassByName, MonoSystem, Property, Relation, Transform } from 'interaqt';
+import { Controller, Count, Custom, Dictionary, Entity, KlassByName, MonoSystem, Property, Relation, Summation, Transform } from 'interaqt';
+import { MatchExp } from '@storage';
 import type { Database } from '@runtime';
 import { PGLiteDB } from '@drivers';
 import { mulberry32, chance, int, pick, isExpectedRejection, type Rng } from "../storage/helpers/fuzzSchema.js";
@@ -47,10 +52,13 @@ type DestructiveMutation =
     | { kind: 'countChange', decision: 'changed' | 'unchanged' }
     | { kind: 'blockedRemoveNonEmptyEntity' }
     | { kind: 'blockedTypeChange' }
+    | { kind: 'computationTypeChange' }
+    | { kind: 'takeover' }
 
 const MUTATION_MENU: DestructiveMutation['kind'][] = [
     'transformShrink', 'hardDeletion', 'removeEmptyEntity', 'countChange',
     'blockedRemoveNonEmptyEntity', 'blockedTypeChange',
+    'computationTypeChange', 'takeover',
 ]
 
 // CAUTION 两版共用代码路径的回调必须字面量相同（函数哈希参与 changed 判定），
@@ -65,7 +73,20 @@ function buildVersion(tag: string, version: 1 | 2, mutation: DestructiveMutation
         new Property({ name: 'label', type: labelType }, { uuid: uuid(`${entity}-label`) }),
         new Property({ name: 'score', type: 'number', defaultValue: () => 7 }, { uuid: uuid(`${entity}-score`) }),
     ]
-    const A = new Entity({ name: `MigD${tag}A`, properties: mkValueProps('a', 'string') }, { uuid: uuid('a') })
+    const aProps = mkValueProps('a', 'string')
+    if (mutation.kind === 'takeover') {
+        aProps.push(version === 1
+            ? new Property({ name: 'tag', type: 'string' }, { uuid: uuid('a-tag') })
+            : new Property({
+                name: 'tag', type: 'string',
+                computation: new Custom({
+                    name: `MigD${tag}TagComputed`,
+                    dataDeps: { current: { type: 'property', attributeQuery: ['label'] } },
+                    compute: async (_deps: unknown, record: Row) => `t:${record.label}`,
+                }, { uuid: uuid('a-tag-computation') }),
+            }, { uuid: uuid('a-tag') }))
+    }
+    const A = new Entity({ name: `MigD${tag}A`, properties: aProps }, { uuid: uuid('a') })
     const bLabelType = mutation.kind === 'blockedTypeChange' && version === 2 ? 'number' : 'string'
     const bProps = mkValueProps('b', bLabelType as 'string')
     if (mutation.kind === 'hardDeletion' && version === 2) {
@@ -96,7 +117,9 @@ function buildVersion(tag: string, version: 1 | 2, mutation: DestructiveMutation
         name: `migd${tag}CntA`, type: 'number', collection: false,
         computation: mutation.kind === 'countChange' && version === 2
             ? new Count({ record: A, attributeQuery: ['score'], callback: COUNT_CALLBACK_V2 } as any, { uuid: uuid('cnta-computation') })
-            : new Count({ record: A } as any, { uuid: uuid('cnta-computation') }),
+            : mutation.kind === 'computationTypeChange' && version === 2
+                ? new Summation({ record: A, attributeQuery: ['score'] } as any, { uuid: uuid('cnta-sum-computation') })
+                : new Count({ record: A } as any, { uuid: uuid('cnta-computation') }),
     } as any, { uuid: uuid('cnta') })
     const cntB = removeB ? null : new Dictionary({
         name: `migd${tag}CntB`, type: 'number', collection: false,
@@ -167,7 +190,11 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
         entityNames: [v1.names.A, v1.names.B],
         relationChoices: v1.relationChoice ? [v1.relationChoice as RelationChoice] : [],
         valueProps: new Map([
-            [v1.names.A, [{ name: 'label', type: 'string' }, { name: 'score', type: 'number' }]],
+            [v1.names.A, [
+                { name: 'label', type: 'string' }, { name: 'score', type: 'number' },
+                // takeover 面：存量数据必须有手工事实值可被废弃（expectedExistingCount > 0）
+                ...(mutation.kind === 'takeover' ? [{ name: 'tag', type: 'string' as const }] : []),
+            ]],
             [v1.names.B, [{ name: 'label', type: 'string' }, { name: 'score', type: 'number' }]],
         ]),
         filteredEntities: [], filteredRelations: [], mergedEntities: [],
@@ -198,8 +225,8 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
     // 确定性覆盖：变异命中面必须非空（'gone' 标签、阈值两侧 score、关系连到 gone 行）
     const bGone = await storageV1.create(v1.names.B, { label: 'gone', score: int(rng, 100) }) as Row
     await storageV1.create(v1.names.B, { label: 'keep', score: int(rng, 100) })
-    const aLow = await storageV1.create(v1.names.A, { label: 'low', score: 10 }) as Row
-    await storageV1.create(v1.names.A, { label: 'high', score: 80 })
+    const aLow = await storageV1.create(v1.names.A, { label: 'low', score: 10, ...(mutation.kind === 'takeover' ? { tag: 'manual-low' } : {}) }) as Row
+    await storageV1.create(v1.names.A, { label: 'high', score: 80, ...(mutation.kind === 'takeover' ? { tag: 'manual-high' } : {}) })
     if (v1.relationChoice) {
         try {
             await storageV1.addRelationByNameById(v1.names.relation!, String(aLow.id), String(bGone.id), {})
@@ -211,11 +238,13 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
     executed += 4
 
     // ---- 迁移前快照 ----
-    // 计算绑定状态列（如 _cntA_bound_isItemMatch）随计算变更合法重建，不属于存量保真面
+    // 计算绑定状态列（如 _cntA_bound_isItemMatch）随计算变更合法重建，不属于存量保真面；
+    // takeover 面的 tag 值合法废弃重算，同样豁免（其正确性由变异特定预言机断言）
     const snapshotSchema: EventCompletenessSchema = {
         entities: [v1.names.A, v1.names.B],
         relations: v1.names.relation ? [v1.names.relation] : [],
-        ignoreField: isComputationInternalField,
+        ignoreField: (fieldName: string) => isComputationInternalField(fieldName)
+            || (mutation.kind === 'takeover' && fieldName === 'tag'),
     }
     const beforeSnapshot = await snapshotLogicalState(storageV1, snapshotSchema)
     const beforeCntA = await storageV1.dict.get(v1.names.cntA)
@@ -360,16 +389,38 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
                 failWith(`countChange(unchanged): ${v1.names.cntA} = ${JSON.stringify(cntA)}, must stay frozen at pre-migration ${JSON.stringify(beforeCntA)}`)
             }
         }
+    } else if (mutation.kind === 'computationTypeChange') {
+        // Count→Summation：manifest id 变化（removed+added），值 = 新声明朴素重算
+        const cntA = await storageV2.dict.get(v1.names.cntA)
+        const expected = aRows.reduce((acc, r) => acc + (r.score as number), 0)
+        if (cntA !== expected) {
+            failWith(`computationTypeChange: ${v1.names.cntA} = ${JSON.stringify(cntA)}, naive Summation recompute = ${expected}`)
+        }
+    } else if (mutation.kind === 'takeover') {
+        // discard-and-rebuild：全部手工事实值废弃、按新计算重算
+        const tagged = await storageV2.find(v1.names.A, undefined, undefined, ['id', 'label', 'tag']) as Row[]
+        for (const row of tagged) {
+            if (row.tag !== `t:${row.label}`) {
+                failWith(`takeover: A#${row.id}.tag = ${JSON.stringify(row.tag)}, computed takeover expects ${JSON.stringify(`t:${row.label}`)}`)
+            }
+        }
     }
 
     // ---- 预言机 3：迁移后可写冒烟（增量维护接线：新代码生效） ----
     const cntABefore = await storageV2.dict.get(v1.names.cntA) as number
     const derivedBefore = (await storageV2.find(v1.names.Derived, undefined, undefined, ['id']) as Row[]).length
-    await storageV2.create(v1.names.A, { label: 'post', score: 80 })
+    const smokeRow = await storageV2.create(v1.names.A, { label: 'post', score: 80 }) as Row
     const cntAAfter = await storageV2.dict.get(v1.names.cntA) as number
-    const expectedIncrement = 1 // score 80 通过两个版本的全部 callback（>0、>50、无 callback）
+    // score 80 通过两个版本的全部 callback（>0、>50、无 callback）；Summation 面 +score
+    const expectedIncrement = mutation.kind === 'computationTypeChange' ? 80 : 1
     if (cntAAfter !== cntABefore + expectedIncrement) {
         failWith(`post-migration smoke: ${v1.names.cntA} ${cntABefore} -> ${cntAAfter}, expected +${expectedIncrement} (incremental maintenance not wired to the new code)`)
+    }
+    if (mutation.kind === 'takeover') {
+        const smokeRead = await storageV2.findOne(v1.names.A, MatchExp.atom({ key: 'id', value: ['=', smokeRow.id] }), undefined, ['tag']) as Row
+        if (smokeRead.tag !== 't:post') {
+            failWith(`post-migration smoke: takeover computation not wired for new rows — tag = ${JSON.stringify(smokeRead.tag)}`)
+        }
     }
     const derivedAfter = (await storageV2.find(v1.names.Derived, undefined, undefined, ['id']) as Row[]).length
     if (derivedAfter !== derivedBefore + 1) {
@@ -419,11 +470,13 @@ function assertSnapshotEqual(
 }
 
 // ---------- 入口 ----------
-// 默认池 1–14：恰好覆盖全部变异种类各至少一次 + 每个破坏性种类的 kill-resume 变体
-// （seed 8 transformShrink+fault / 12 hardDeletion+fault / 14 removeEmptyEntity+fault /
-//  6 countChange(changed)+fault / 10 countChange(unchanged)+fault）。
+// 默认池 1–24（r34 菜单扩到 8 种后重派生）：覆盖全部变异种类各至少一次 + 破坏性种类的
+// kill-resume 变体（4 takeover+fault / 8 hardDeletion+fault / 12,24 removeEmptyEntity+fault /
+// 14 countChange(changed)+fault / 18 countChange(unchanged)+fault / 20 computationTypeChange+fault；
+// 非 fault：7,19,23 transformShrink / 9,15 hardDeletion / 21 countChange(changed)）。
+// CAUTION 决策流契约（r34 版）：菜单扩容重派了 seed→mutation 映射，r33 默认池编号失效。
 const SEED_START = Number(process.env.FUZZ_MIGD_SEED_START ?? 1)
-const SEED_COUNT = Number(process.env.FUZZ_MIGD_SEED_COUNT ?? 14)
+const SEED_COUNT = Number(process.env.FUZZ_MIGD_SEED_COUNT ?? 24)
 const OPS = Number(process.env.FUZZ_MIGD_OPS ?? 10)
 
 describe('migration destructive-mutation generative fuzz (random data × destructive mutation × approval decisions × kill-resume)', () => {
