@@ -63,7 +63,10 @@ export class Property implements PropertyInstance {
     type: {
       type: 'string' as const,
       required: true as const,
-      options: () => [...ALLOWED_PROPERTY_TYPES]
+      // CAUTION 必须是静态数组（r27 记录的潜伏元数据缺陷，r32 修正）：validateCreateArgs 的
+      //  options 契约是 readonly unknown[]（def.options.includes）——函数形态在未来接线时
+      //  会静默判失败/崩溃。当前 create() 的手写白名单是执行面，此元数据是声明面，两者同源。
+      options: [...ALLOWED_PROPERTY_TYPES] as readonly string[]
     },
     collection: {
       type: 'boolean' as const,

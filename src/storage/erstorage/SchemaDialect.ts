@@ -27,6 +27,31 @@ export type ConstraintSchemaStatement = {
     sql: string,
 }
 
+/**
+ * 框架内部 kv 实体（_System_ / _Dictionary_，声明于 @runtime System.ts）的唯一约束是
+ * find-then-create 守恒律的数据库面（r31/r32）。unique 能力缺失的方言（MySQL：TEXT 列
+ * 不可整列索引，dialect.constraints.unique=false）上必须**跳过建索引**而不是让整个
+ * setup 失败——否则框架在该方言上完全不可用（r31 引入 _Dictionary_ 约束后 MySQL setup
+ * 全量崩溃，env-gated 套件静默跳过未暴露）。跳过意味着该方言回到约束前的乐观并发
+ * （并发 find-then-create 竞态窗口存在），写路径的 RetryableWriteConflict 转换保持惰性。
+ * 用户自己声明的约束不在此列：能力缺失时依旧 fail-fast（explicit control）。
+ * 判定按「内部记录名 + interaqt_ 约束名前缀」双条件，用户声明不可能意外命中
+ * （内部实体名与用户实体重名会在 setup 早期以 duplicate name 拒绝）。
+ */
+export function isBestEffortInternalConstraint(item: ConstraintSchemaItem): boolean {
+    return (item.recordName === '_System_' || item.recordName === '_Dictionary_')
+        && item.constraintName.startsWith('interaqt_')
+}
+
+/** 内部 best-effort 约束在能力缺失方言上跳过（不建索引、不验证、不阻塞 setup/迁移）。 */
+export function shouldSkipConstraintForDialect(item: ConstraintSchemaItem, dialect: SchemaDialect): boolean {
+    if (!isBestEffortInternalConstraint(item)) return false
+    if (item.kind === 'unique') {
+        return !dialect.constraints.unique || (!!item.where && !dialect.constraints.filteredUnique)
+    }
+    return dialect.constraints.nonNull !== true
+}
+
 export const DEFAULT_SCHEMA_DIALECT: SchemaDialect = {
     name: 'postgres',
     maxIdentifierLength: 63,

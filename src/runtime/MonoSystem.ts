@@ -41,7 +41,7 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, timestampParamForDialect } from "@storage";
+import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
@@ -354,7 +354,18 @@ class MonoStorage implements Storage{
         if (origin) {
             return this.callWithEvents(this.queryHandle!.update.bind(this.queryHandle), [SYSTEM_RECORD, match, { concept, key: key.toString(), value: JSONStringify(value)}], events)
         } else {
-            return this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: JSONStringify(value)}], events)
+            try {
+                return await this.callWithEvents(this.queryHandle!.create.bind(this.queryHandle), [SYSTEM_RECORD, { concept, key: key.toString(), value: JSONStringify(value)}], events)
+            } catch (error) {
+                // CAUTION find-then-create 的并发竞态（r12-I-1 的 _System_ 兄弟轨，r31 登记本轮收口）：
+                //  与 setDictionaryValue 同一契约——(concept, key) 唯一索引把静默双行变成数据库冲突，
+                //  这里转成可重试事务错误让调用方重跑；重试后 findOne 命中已提交行、走上方 update 轨。
+                //  PG 系事务在错误后即 aborted，不能在本事务内改道 update，必须经重试路径。
+                if (normalizeDatabaseError(error, this.db).isUniqueViolation) {
+                    throw new RetryableWriteConflict(`concurrent create of system record "${concept}"/"${key}"`, { cause: error })
+                }
+                throw error
+            }
         }
     }
     private requiresScopedSequenceState(options?: SystemSchemaOptions) {
@@ -617,18 +628,22 @@ class MonoStorage implements Storage{
 
     private createPostRecomputeSchemaPlan(dbSetup: DBSetup): { verificationDDL: AdditiveDDLOperation[], postRecomputeDDL: AdditiveDDLOperation[] } {
         const dialect = getSchemaDialect(this.db)
-        if (dbSetup.constraintSchemaItems.length && dialect.constraints?.unique !== true) {
-            const hasUnique = dbSetup.constraintSchemaItems.some(item => item.kind === 'unique')
+        // 框架内部 kv 约束（_System_/_Dictionary_）在能力缺失方言上跳过（与 setup 面的
+        //  createConstraintSQL 同一契约，见 shouldSkipConstraintForDialect）；只对用户声明的
+        //  约束做能力 fail-fast。
+        const constraintSchemaItems = dbSetup.constraintSchemaItems.filter(item => !shouldSkipConstraintForDialect(item, dialect))
+        if (constraintSchemaItems.length && dialect.constraints?.unique !== true) {
+            const hasUnique = constraintSchemaItems.some(item => item.kind === 'unique')
             if (hasUnique) throw new ConstraintSetupError(`Migration post-recompute unique constraints are not supported by ${dialect.name}`, {
                 driver: this.db.constructor?.name,
             })
         }
-        if (dbSetup.constraintSchemaItems.some(item => item.kind === 'non-null') && dialect.constraints?.nonNull !== true) {
+        if (constraintSchemaItems.some(item => item.kind === 'non-null') && dialect.constraints?.nonNull !== true) {
             throw new ConstraintSetupError(`Migration post-recompute non-null constraints are not supported by ${dialect.name}`, {
                 driver: this.db.constructor?.name,
             })
         }
-        const verificationDDL = dbSetup.constraintSchemaItems.map(item => ({
+        const verificationDDL = constraintSchemaItems.map(item => ({
             kind: 'verify' as const,
             sql: item.kind === 'unique' ? this.createUniqueVerificationSQL(item) : this.createNonNullVerificationSQL(item),
             tableName: item.tableName,
@@ -705,8 +720,11 @@ class MonoStorage implements Storage{
             )
             return new Set(rows.map(row => row.name))
         }
+        // CAUTION MySQL 8.0 的 information_schema 视图返回**大写**列头（TABLE_NAME），
+        //  与查询书写的大小写无关——必须显式 alias，否则 row.table_name 恒 undefined，
+        //  返回的表集合全是 undefined（manifest 判存失效、hasExistingData 裸 TypeError）。
         const rows = await this.db.query<{ table_name: string }>(
-            `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()`,
+            `SELECT table_name AS \`table_name\` FROM information_schema.tables WHERE table_schema = DATABASE()`,
             [],
             'migration list tables'
         )
@@ -732,8 +750,9 @@ class MonoStorage implements Storage{
             )
             return new Set(rows.map(row => row.name))
         }
+        // 同 getExistingTables：MySQL information_schema 列头大写，必须显式 alias。
         const rows = await this.db.query<{ column_name: string }>(
-            `SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?`,
+            `SELECT column_name AS \`column_name\` FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?`,
             [tableName],
             `migration list columns ${tableName}`
         )
@@ -1396,21 +1415,44 @@ RETURNING "lastValue" AS value`,
         const existing = findConstraintViolationError(error)
         if (existing) return existing
         const normalized = normalizeDatabaseError(error, this.db)
-        if (!normalized.isUniqueViolation) return error
-        const item = this.findConstraintForError(error)
-        return new ConstraintViolationError(
-            item ? `Unique constraint "${item.constraintName}" was violated` : 'Unique constraint was violated',
-            {
-                kind: 'unique',
-                constraintName: item?.constraintName,
-                recordName: item?.recordName,
-                properties: item?.kind === 'unique' ? item.properties : item ? [item.property] : undefined,
-                violationCode: item?.violationCode,
-                driver: normalized.driver,
-                rawCode: normalized.rawCode,
-                causedBy: error instanceof Error ? error : undefined,
+        if (normalized.isUniqueViolation) {
+            const item = this.findConstraintForError(error)
+            return new ConstraintViolationError(
+                item ? `Unique constraint "${item.constraintName}" was violated` : 'Unique constraint was violated',
+                {
+                    kind: 'unique',
+                    constraintName: item?.constraintName,
+                    recordName: item?.recordName,
+                    properties: item?.kind === 'unique' ? item.properties : item ? [item.property] : undefined,
+                    violationCode: item?.violationCode,
+                    driver: normalized.driver,
+                    rawCode: normalized.rawCode,
+                    causedBy: error instanceof Error ? error : undefined,
+                }
+            )
+        }
+        // NonNullConstraint 的运行期命中（物理形态 CHECK (field IS NOT NULL)）此前返回裸驱动
+        //  错误（r28 记录项）：只在能定位到本框架声明的 non-null 约束时归一——用户自建的
+        //  CHECK 约束不在辖区，保持原错误。
+        if (normalized.isCheckViolation) {
+            const item = this.findConstraintForError(error)
+            if (item?.kind === 'non-null') {
+                return new ConstraintViolationError(
+                    `Non-null constraint "${item.constraintName}" was violated`,
+                    {
+                        kind: 'non-null',
+                        constraintName: item.constraintName,
+                        recordName: item.recordName,
+                        properties: [item.property],
+                        violationCode: item.violationCode,
+                        driver: normalized.driver,
+                        rawCode: normalized.rawCode,
+                        causedBy: error instanceof Error ? error : undefined,
+                    }
+                )
             }
-        )
+        }
+        return error
     }
     async callWithEvents<T extends unknown[]>(method: (...arg: [...T, RecordMutationEvent[]]) => unknown, args: T, events: RecordMutationEvent[] = [], shouldDispatch?: (event: RecordMutationEvent) => boolean): Promise<unknown> {
         if (!this.isInTransaction()) {

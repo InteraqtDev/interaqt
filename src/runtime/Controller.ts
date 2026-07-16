@@ -39,7 +39,7 @@ import {
     getApprovedEmptyFactRecordRemovals,
     getChangedComputationsFromApprovedDiff,
     backfillNewFactPropertyDefaults,
-    getDestructiveDeletionScope,
+    getCascadeAwareDeletionScope,
     getNewFactPropertyBackfills,
     getNewFilteredDataContexts,
     getRecomputeBlockingChanges,
@@ -200,6 +200,21 @@ export class Controller {
                 this.eventSourcesByName.set(es.name, es)
             }
             this.eventSourcesByUUID.set(es.uuid, es)
+        }
+
+        // CAUTION fail fast（r28 记录的报错质量项，r32 收口）：同名 Dictionary 此前要到
+        //  createMigrationManifest 的身份唯一性审计才被拒绝，错误信息
+        //  （"Migration identity is ambiguous for dictionary:x"）与用户的实际操作
+        //  （两个同名 Dictionary.create）距离太远。在声明入口用用户语言直接指出。
+        const dictNames = new Set<string>()
+        for (const dictionary of this.dict) {
+            if (dictNames.has(dictionary.name)) {
+                throw new Error(
+                    `Duplicate Dictionary name "${dictionary.name}". Dictionary names must be unique within a Controller — ` +
+                    `both declarations would read and write the same global value. Rename one of the Dictionary.create({ name: '${dictionary.name}' }) declarations.`
+                )
+            }
+            dictNames.add(dictionary.name)
         }
 
         const entitiesByName = new Map(this.entities.map(e => [e.name, e]))
@@ -388,8 +403,15 @@ export class Controller {
         )
         const storageBlockingChanges = getStorageBlockingChanges(previousManifest, nextManifest)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
+        // r30-E：级联感知——优先以「回滚事务内真实执行 rebuildPlan」收集精确删除集
+        //  （含链式依赖计算对上游收缩的级联删除），审批面从此可以一轮给出精确 ids。
+        //  模拟不可行（MySQL / 缺 handler 等）时回退分析性一阶 scope。
         const destructiveScopes = options.includeDestructiveScope === true
-            ? await getDestructiveDeletionScope(this, provisionalRebuildPlan, previousManifest, readHandle)
+            ? (await getCascadeAwareDeletionScope(this, provisionalRebuildPlan, previousManifest, readHandle, {
+                schemaPlan,
+                previousManifest,
+                nextManifest,
+            })).entries
             : []
         const safety = {
             blockingChanges: [
@@ -464,8 +486,16 @@ export class Controller {
         ]
         const blockingChanges = createPlanBlockingMessages(allBlockingChanges)
         const readHandle = createMigrationReadHandle(this, schemaPlan)
-        const deletionScope = await getDestructiveDeletionScope(this, rebuildPlan, previousManifest, readHandle)
-        assertDestructiveScopeAllowed(migrationOptions, deletionScope)
+        // r30-E：入口断言用级联感知 scope（模拟成功 ⇒ ids 双向精确对账，dryRun 即可发现差异；
+        //  模拟不可行 ⇒ 只查存在性，ids 精确性由重算事务内的执行期对账兜底——一阶分析对
+        //  链式依赖计算的 ids 必然失真，不能作为精确断言的依据）。
+        const { entries: deletionScope, exact: deletionScopeExact } = await getCascadeAwareDeletionScope(this, rebuildPlan, previousManifest, readHandle, {
+            schemaPlan,
+            previousManifest,
+            nextManifest,
+            options: migrationOptions,
+        })
+        assertDestructiveScopeAllowed(migrationOptions, deletionScope, { idExactness: deletionScopeExact })
         await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest, readHandle)
         await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, previousManifest, readHandle)
         const factPropertyBackfills = getNewFactPropertyBackfills(this, previousManifest, nextManifest)
@@ -598,7 +628,11 @@ export class Controller {
             return item[propertyDataContext.id.name]
         }
     }
-    async applyResult(dataContext: DataContext, result: unknown, record?: Record<string, unknown>) {
+    // storageEvents（可选）：调用方需要读取本次写入实际产生的 storage 事件（含派生事件，
+    //  如 filtered entity 成员资格 create/delete）时传入。live 轨不传——事件经 mutation
+    //  callbacks 派发；迁移轨（监听已 teardown）必须捕获并入合成事件流，否则依赖计算
+    //  对成员资格退出等派生事实失明。
+    async applyResult(dataContext: DataContext, result: unknown, record?: Record<string, unknown>, storageEvents?: RecordMutationEvent[]) {
         if (result instanceof ComputationResultSkip) return
         // CAUTION undefined 统一视为"无值可写"（与 entity/relation 分支及 incrementalPatchCompute
         //  的 undefined 语义一致）。此前 global/property 分支会把 undefined 写穿——compute/
@@ -619,10 +653,10 @@ export class Controller {
                 throw new RequireSerializableRetry('entity replace result')
             }
             const entityContext = dataContext as EntityDataContext
-            await this.system.storage.delete(entityContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
+            await this.system.storage.delete(entityContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}), storageEvents)
             const items = Array.isArray(result) ? result : [result]
             for (const item of items) {
-                await this.system.storage.create(entityContext.id.name!, item)
+                await this.system.storage.create(entityContext.id.name!, item, storageEvents)
             }
         } else if (dataContext.type === 'relation') {
             if (result === null) return
@@ -630,17 +664,17 @@ export class Controller {
                 throw new RequireSerializableRetry('relation replace result')
             }
             const relationContext = dataContext as RelationDataContext
-            await this.system.storage.delete(relationContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}))
+            await this.system.storage.delete(relationContext.id.name!, BoolExp.atom({key: 'id', value: ['not', null]}), storageEvents)
             const items = Array.isArray(result) ? result : [result]
             for (const item of items) {
-                await this.system.storage.create(relationContext.id.name!, item)
+                await this.system.storage.create(relationContext.id.name!, item, storageEvents)
             }
         } else {
             const propertyDataContext = dataContext as PropertyDataContext
             if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
-                await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}))
+                await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), storageEvents)
             } else {
-                await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: result})
+                await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: result}, storageEvents)
             }
         }   
     }
@@ -685,7 +719,8 @@ export class Controller {
             }
         }
     }
-    async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: Record<string, unknown>) {
+    // storageEvents（可选）语义同 applyResult：迁移轨捕获派生事件用。
+    async applyResultPatch(dataContext: DataContext, patch: ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined, record?: Record<string, unknown>, storageEvents?: RecordMutationEvent[]) {
         if (patch instanceof ComputationResultSkip||patch === undefined) return
 
         const patches = Array.isArray(patch) ? patch : [patch]
@@ -722,27 +757,27 @@ export class Controller {
             } else if (dataContext.type === 'entity'||dataContext.type === 'relation') {
                 const erDataContext = dataContext as EntityDataContext|RelationDataContext
                 if (patch.type === 'insert') {  
-                    await this.system.storage.create(erDataContext.id.name!, patch.data)
+                    await this.system.storage.create(erDataContext.id.name!, patch.data, storageEvents)
                 } else if (patch.type === 'update') {
                     const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
-                    await this.system.storage.update(erDataContext.id.name!, match, patch.data)
+                    await this.system.storage.update(erDataContext.id.name!, match, patch.data, storageEvents)
                 } else if (patch.type === 'delete') {
                     const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
-                    await this.system.storage.delete(erDataContext.id.name!, match)
+                    await this.system.storage.delete(erDataContext.id.name!, match, storageEvents)
                 }
             } else {
                 const propertyDataContext = dataContext as PropertyDataContext
 
                 if (propertyDataContext.id.name === HARD_DELETION_PROPERTY_NAME && patch.data) {
                     assert(patch.type !== 'delete', 'Hard deletion property cannot be deleted')
-                    await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}))
+                    await this.system.storage.delete(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), storageEvents)
                 } else {
                     if (patch.type === 'insert') {
-                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: patch.data})
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: patch.data}, storageEvents)
                     } else if (patch.type === 'update') {
-                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: patch.data})
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: patch.data}, storageEvents)
                     } else if (patch.type === 'delete') {
-                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: null})
+                        await this.system.storage.update(propertyDataContext.host.name!, BoolExp.atom({key: 'id', value: ['=', record!.id]}), {[propertyDataContext.id.name]: null}, storageEvents)
                     }
                 }
 

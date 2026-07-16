@@ -138,6 +138,14 @@
 |------|------|---------|------|
 | EXT-1 | merged input 作为 x:1 / combined 关系端点时 Setup 字段-表装配错位 → 查询期 `no such column`（fail-loud） | extended 2/10/50/71/72/81（`FUZZ_MERGED_FULL=1`） | rebase 后 link FK 字段/属性字段落错表——需要专门一轮走 Setup 装配审计；CI 生成域暂把 merged pair 限制在仅 n:n/无关系实体（`fuzzSchema.ts` 有 CAUTION 注释） |
 
+> **【r32 收口纪要】EXT-1 已修复并解除生成域限制**：根因不是 rebase 的字段落错表，而是
+> filtered/merged-input 视图记录的 `record.table` 指针停在创建期快照——对视图端点的合表
+> 移动整个物理 base 之后，视图指针失联（查询 JOIN 落在幽灵表 + buildTables 建出多余物理表）。
+> 收敛修复：`Setup.assignTableAndField` 对**所有** recordToTableMap 注册记录（含视图名）统一
+> 以其为 table 真相源。`FUZZ_MERGED_FULL` 门移除（x:1/combined 端点回归默认生成域；
+> mergeLinks 端点仍排除——以视图名寻址的显式 mergeLinks 是未定谳面）。
+> 回归：`tests/storage/review-fixes-2026-07-15-r32.spec.ts` B1/B2；full-domain 种子 1–90 绿。
+
 ### 1.5 诚实的边界
 
 - fuzzer 的强度 = 预言机的强度 × 生成器的表达域。r29 后生成器已产出：filtered

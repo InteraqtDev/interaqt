@@ -8,6 +8,7 @@ export type NormalizedDatabaseError = {
     tableName?: string,
     fields?: string[],
     isUniqueViolation: boolean,
+    isCheckViolation: boolean,
     raw: unknown,
 }
 
@@ -46,6 +47,16 @@ export function normalizeDatabaseError(error: unknown, database?: Database): Nor
         || message.includes('duplicate key value violates unique constraint')
         || message.includes('Duplicate entry')
 
+    // CHECK 违规（NonNullConstraint 的物理形态是 CHECK (field IS NOT NULL)，PG 系专有能力）。
+    //  与 unique 同一识别纪律：PG 标准码 23514 或明确的消息文本；SQLite/MySQL 形态一并识别
+    //  （用户经原生 SQL 建的 CHECK 也能得到结构化归一）。通用 SQLITE_CONSTRAINT 不判入。
+    const isCheckViolation = rawCode === '23514'
+        || rawCode === 'SQLITE_CONSTRAINT_CHECK'
+        || rawCode === 3819
+        || message.includes('violates check constraint')
+        || message.includes('CHECK constraint failed')
+        || message.includes('Check constraint')
+
     return {
         driver: database?.constructor?.name,
         message,
@@ -54,6 +65,7 @@ export function normalizeDatabaseError(error: unknown, database?: Database): Nor
         tableName: sqliteFields?.tableName,
         fields: sqliteFields?.fields,
         isUniqueViolation,
+        isCheckViolation,
         raw: error,
     }
 }

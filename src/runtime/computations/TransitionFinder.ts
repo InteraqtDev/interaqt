@@ -162,6 +162,10 @@ function deepPartialMatch(event: unknown, pattern: unknown): boolean {
     //  null pattern 是精确匹配（trigger 里写 {clearedAt: null} 的意图是"该字段必须为 null"）。
     //  此前 null 也被当成"匹配任何值"，与 ComputationSourceMap.deepMatch 的精确语义相悖，
     //  声明了 null 约束的 transfer 会被任何值静默触发。
+    // 语义澄清（r30 记录项，r32 文档化）：**空对象/空数组模式匹配任何对象**——partial-match
+    //  语义下 `record: {tags: []}` 读作「tags 是某个对象/数组」（零个字段约束 vacuous 恒真），
+    //  不是「tags 为空数组」。精确形状匹配（长度/全量相等）不在本声明面的表达域内，
+    //  需要时在 computeValue/callback 内自行判断。ComputationSourceMap.deepMatch 同语义。
     if (pattern === undefined) return true;
     if (event === pattern) return true;
     

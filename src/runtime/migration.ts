@@ -2954,7 +2954,13 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
     return scope;
 }
 
-export function assertDestructiveScopeAllowed(options: MigrationOptions, actualScope: Array<{ dataContext: string; recordName?: string; ids?: string[] }>) {
+export function assertDestructiveScopeAllowed(options: MigrationOptions, actualScope: Array<{ dataContext: string; recordName?: string; ids?: string[] }>, mode: { idExactness?: boolean } = {}) {
+    // idExactness=false（级联模拟不可用、actual 只有分析性一阶 scope 时）：一阶 scope 对
+    //  级联依赖计算给出的 ids 可能是陈旧值（按迁移前数据求值），此时只做「存在性」检查
+    //  （每个 actual 条目必须有已批准的决策），ids 精确性与「批准了但没有对应 actual」的
+    //  方向都推迟到执行期的 assertExecutedDeletionsApproved（同一 SERIALIZABLE 事务内、
+    //  以真实执行的删除对账——最强的检查点）。
+    const idExactness = mode.idExactness !== false;
     const expected = (options.approvedDiff?.decisions || [])
         .filter((decision): decision is Extract<MigrationDecision, { kind: "destructive-scope" }> => decision.kind === "destructive-scope");
     const takeoverContexts = new Set((options.approvedDiff?.decisions || [])
@@ -2964,17 +2970,97 @@ export function assertDestructiveScopeAllowed(options: MigrationOptions, actualS
     const key = (item: { dataContext: string; recordName?: string }) => `${item.dataContext}:${item.recordName || ""}`;
     const expectedByKey = new Map(expected.map(item => [key(item), [...(item.ids || [])].sort().join(",")]));
     const actualKeys = new Set(actualScope.map(key));
-    for (const item of expected) {
-        if (takeoverContexts.has(item.dataContext)) continue;
-        if (!actualKeys.has(key(item))) {
-            throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
+    if (idExactness) {
+        for (const item of expected) {
+            if (takeoverContexts.has(item.dataContext)) continue;
+            if (!actualKeys.has(key(item))) {
+                throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
+            }
         }
     }
     for (const item of actualScope) {
+        if (!idExactness) {
+            if (!expectedByKey.has(key(item))) {
+                throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}: no approved destructive-scope decision`);
+            }
+            continue;
+        }
         const actualIds = [...(item.ids || [])].sort().join(",");
         if (expectedByKey.get(key(item)) !== actualIds) {
-            throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
+            throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}: approved ids [${expectedByKey.get(key(item)) ?? "<missing decision>"}] != expected deletions [${actualIds}]`);
         }
+    }
+}
+
+/**
+ * 迁移删除审计（r30-E 收口）：迁移重算期间对「计算输出记录的删除」的收集与执行期对账。
+ *
+ * - mode='simulate'：scope 发现（级联感知）——在将被回滚的事务内真实执行 rebuildPlan，
+ *   收集每个计算实际执行的删除（含链式依赖对上游收缩的级联删除），不做审批检查。
+ * - mode='enforce'：真实迁移——同样收集，重算结束后 assertExecutedDeletionsApproved
+ *   以「实际执行的删除 == 已批准的 destructive-scope」双向对账；不一致则抛错，
+ *   外层 SERIALIZABLE 事务回滚（任何未经审计的销毁都无法提交）。
+ *
+ * 辖区：实体/关系计算输出的 record 删除 + 硬删除属性（_isDeleted_）的宿主删除。
+ *  经 event-rebuild-handler 的全量替换（applyResult 的 delete-all + recreate）不在
+ *  本审计辖区——该路径的授权模型是人工批准的 handler 决策本身。
+ */
+export type MigrationDeletionAudit = {
+    mode: "simulate" | "enforce";
+    collected: Map<string, { dataContext: string; recordName: string; ids: string[] }>;
+};
+
+export function createMigrationDeletionAudit(mode: MigrationDeletionAudit["mode"]): MigrationDeletionAudit {
+    return { mode, collected: new Map() };
+}
+
+function collectAuditedDeletions(audit: MigrationDeletionAudit, computation: Computation, events: RecordMutationEvent[]) {
+    const context = computation.dataContext;
+    const collectible = context.type === "entity" || context.type === "relation" ||
+        (context.type === "property" && context.id.name === HARD_DELETION_PROPERTY_NAME);
+    if (!collectible) return;
+    for (const event of events) {
+        if (event.type !== "delete") continue;
+        const recordName = context.type === "property" ? context.host.name! : context.id.name!;
+        // 只有 recordName 与计算输出（或硬删除宿主）一致的 delete 计入本计算的删除足迹。
+        //  事件流是 storage 的完整产出（r32）：关系 link 级联、filtered 视图成员资格 delete
+        //  等派生事件也在流里——它们随宿主删除守恒发生，不是独立的销毁决策，刻意不入审计
+        //  （与 destructive-scope 审批面的辖区一致：审计的是计算输出记录的删除）。
+        const id = (event.record as { id?: unknown } | undefined)?.id;
+        if (id === undefined || id === null) continue;
+        const key = `${dataContextPath(context)}:${recordName}`;
+        if (!audit.collected.has(key)) {
+            audit.collected.set(key, { dataContext: dataContextPath(context), recordName, ids: [] });
+        }
+        audit.collected.get(key)!.ids.push(String(id));
+    }
+}
+
+export function assertExecutedDeletionsApproved(options: MigrationOptions, audit: MigrationDeletionAudit) {
+    const approved = new Map<string, { dataContext: string; recordName?: string; ids: string[] }>();
+    for (const decision of options.approvedDiff?.decisions || []) {
+        if (decision.kind !== "destructive-scope") continue;
+        approved.set(`${decision.dataContext}:${decision.recordName || ""}`, {
+            dataContext: decision.dataContext,
+            recordName: decision.recordName,
+            ids: decision.ids || [],
+        });
+    }
+    const mismatches: string[] = [];
+    for (const key of new Set([...approved.keys(), ...audit.collected.keys()])) {
+        const approvedIds = [...(approved.get(key)?.ids || [])].map(String).sort();
+        const executedIds = [...(audit.collected.get(key)?.ids || [])].sort();
+        if (approvedIds.join(",") !== executedIds.join(",")) {
+            const entry = audit.collected.get(key) || approved.get(key)!;
+            mismatches.push(`${entry.dataContext} (${entry.recordName || "?"}): executed deletions [${executedIds.join(", ")}] != approved ids [${approvedIds.join(", ")}]`);
+        }
+    }
+    if (mismatches.length) {
+        throw new DestructiveComputedOutputError(
+            `Destructive migration scope mismatch between executed and approved deletions; the migration transaction is rolled back (no data was destroyed).\n` +
+            mismatches.map(item => `  - ${item}`).join("\n") +
+            `\nApprove exactly these deletions via 'destructive-scope' decisions (generateMigrationDiff({ includeDestructiveScope: true }) or migrate({ dryRun: true }).deletionScope reports the cascade-aware ids when the scope simulation is available; otherwise use the executed ids listed above).`
+        );
     }
 }
 
@@ -3096,9 +3182,9 @@ async function writeComputationResult(
     record?: Record<string, unknown>,
     options: MigrationOptions = {},
     writeOptions: { forceMutationEvent?: boolean; skipAsNull?: boolean } = {},
-) {
+): Promise<RecordMutationEvent[]> {
     if (result instanceof ComputationResultSkip) {
-        if (!writeOptions.skipAsNull || computation.dataContext.type !== "property") return undefined;
+        if (!writeOptions.skipAsNull || computation.dataContext.type !== "property") return [];
         const propertyContext = computation.dataContext;
         const nonNull = controller.system.storage.schema.constraints.some(constraint =>
             constraint.kind === "non-null" &&
@@ -3117,11 +3203,27 @@ async function writeComputationResult(
         throw new AsyncMigrationComputationError(`Migration requires direct final output, not asyncReturn resolution, for ${dataContextPath(computation.dataContext)}`);
     }
     const previous = await controller.retrieveLastValue(computation.dataContext, record);
-    if (!writeOptions.forceMutationEvent && isEqualValue(previous, result)) return undefined;
-    if (!isEqualValue(previous, result)) {
-        await controller.applyResult(computation.dataContext, result, record);
+    if (!writeOptions.forceMutationEvent && isEqualValue(previous, result)) return [];
+    if (isEqualValue(previous, result)) {
+        // forceMutationEvent 且值未变（takeover 接管既有事实值）：没有 storage 写入可捕获，
+        //  合成事件让依赖计算仍然 rebuild。
+        const forced = createMutationEventForOutput(computation.dataContext, result, previous, record);
+        return forced ? [forced] : [];
     }
-    return createMutationEventForOutput(computation.dataContext, result, previous, record);
+    // CAUTION property 写入以 storage 事件为真相源（r32，与 writeComputationPatch 同一契约）：
+    //  applyResult 的宿主 update / 硬删除 delete 会连带派生事件（filtered entity 成员资格
+    //  create/delete、级联删除）——手工合成的单一事件会让链式依赖对成员资格退出等派生事实失明。
+    //  entity/relation（eventRebuildHandler 的全量替换）刻意不流事件：其授权模型是人工批准的
+    //  handler 决策，依赖计算经 rebuildPlan 走全量重算（增量流会引入派生行 id 翻搅与
+    //  destructive-scope 噪声）。global 的 dict 写路径无派生事件，保持合成。
+    if (computation.dataContext.type === "property") {
+        const storageEvents: RecordMutationEvent[] = [];
+        await controller.applyResult(computation.dataContext, result, record, storageEvents);
+        return storageEvents;
+    }
+    await controller.applyResult(computation.dataContext, result, record);
+    const event = createMutationEventForOutput(computation.dataContext, result, previous, record);
+    return event ? [event] : [];
 }
 
 async function writeComputationPatch(controller: Controller, computation: Computation, patch: ComputationResultPatch | ComputationResultPatch[] | unknown, record?: Record<string, unknown>, options: MigrationOptions = {}) {
@@ -3136,48 +3238,32 @@ async function writeComputationPatch(controller: Controller, computation: Comput
     const events: RecordMutationEvent[] = [];
     for (const item of patches) {
         if (!item || typeof item !== "object" || !("type" in item)) {
-            const event = await writeComputationResult(controller, computation, item, record, options);
-            if (event) events.push(event);
+            events.push(...await writeComputationResult(controller, computation, item, record, options));
             continue;
         }
         const typedPatch = item as ComputationResultPatch;
-        if ((typedPatch.type === "delete") && (computation.dataContext.type === "entity" || computation.dataContext.type === "relation")) {
-            throw new DestructiveComputedOutputError(`Migration refuses delete patch for ${dataContextPath(computation.dataContext)} without explicit audited scope`);
-        }
-        // CAUTION 合成事件的 oldRecord/previous 必须在 apply **之前**读取真实前态（r31）：
-        //  这些事件经 MigrationScheduler.queueEvents 喂给链式依赖计算——增量分支读
-        //  event.oldRecord 的字段、eventDep/trigger 的合并视图匹配（{...oldRecord, ...record}）
-        //  都依赖前态完备。此前 update/delete 只带 {id}、property patch 强制 previous=undefined，
-        //  迁移链上的事件契约与 live 轨分裂（依赖计算静默拿错前态）。
+        // r30-E：entity/relation delete patch 不再无条件拒绝（链式依赖计算对上游收缩的级联
+        //  删除只能在这里产生，拒绝即 kill-resume 死循环）。删除乐观执行并以 delete 事件出账，
+        //  由 MigrationScheduler 的删除审计在重算结束时与已批准 scope 精确对账——不一致则
+        //  抛错回滚，未经审计的销毁依然无法提交。
+        // CAUTION 链式依赖喂食的事件流以 storage 产出为唯一真相源（r32）：storage 的 update/
+        //  delete 事件天然携带完整前态（写前 matched-entities 快照——r31「前态完备」契约的
+        //  收敛实现），且包含**派生事件**（filtered entity 成员资格 create/delete、级联删除）。
+        //  此前手工合成单一事件：成员资格退出对下游聚合完全不可见（exit 面静默失真——
+        //  与 live 轨分裂）。
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
-            const outputRecordName = computation.dataContext.id.name!;
-            let previousRecord: Record<string, unknown> | undefined;
-            if (typedPatch.type === "update" || typedPatch.type === "delete") {
-                previousRecord = await controller.system.storage.findOne(
-                    outputRecordName,
-                    MatchExp.atom({ key: "id", value: ["=", typedPatch.affectedId] }),
-                    undefined,
-                    ["*"]
-                ) ?? undefined;
-            }
-            await controller.applyResultPatch(computation.dataContext, typedPatch, record);
-            events.push({
-                recordName: outputRecordName,
-                type: typedPatch.type === "insert" ? "create" : typedPatch.type,
-                record: typedPatch.type === "delete"
-                    ? (previousRecord ?? { id: String(typedPatch.affectedId) }) as any
-                    : (typedPatch.type === "update"
-                        ? { ...(typedPatch.data as Record<string, unknown>), id: previousRecord?.id ?? typedPatch.affectedId } as any
-                        : typedPatch.data as any),
-                oldRecord: typedPatch.type === "update" || typedPatch.type === "delete"
-                    ? (previousRecord ?? { id: String(typedPatch.affectedId) }) as any
-                    : undefined,
-                keys: typedPatch.data && typeof typedPatch.data === "object" ? Object.keys(typedPatch.data as Record<string, unknown>) : undefined,
-            });
+            const storageEvents: RecordMutationEvent[] = [];
+            await controller.applyResultPatch(computation.dataContext, typedPatch, record, storageEvents);
+            events.push(...storageEvents);
+        } else if (computation.dataContext.type === "property") {
+            // property patch 同样以 storage 事件为真相源（含硬删除的 delete 事件与
+            //  filtered 成员资格派生事件）。
+            const storageEvents: RecordMutationEvent[] = [];
+            await controller.applyResultPatch(computation.dataContext, typedPatch, record, storageEvents);
+            events.push(...storageEvents);
         } else {
-            const previous = computation.dataContext.type === "property" || computation.dataContext.type === "global"
-                ? await controller.retrieveLastValue(computation.dataContext, record)
-                : undefined;
+            // global：dict 写路径无事件捕获面（也没有派生事件），保持合成。
+            const previous = await controller.retrieveLastValue(computation.dataContext, record);
             await controller.applyResultPatch(computation.dataContext, typedPatch, record);
             const event = createMutationEventForOutput(computation.dataContext, (typedPatch as any).data, previous, record);
             if (event) events.push(event);
@@ -3293,14 +3379,9 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
         }
     }
     for (const stale of existingByKey.values()) {
-        const decision = getDecision(options.approvedDiff, item =>
-            item.kind === "destructive-scope" &&
-            item.dataContext === dataContextPath(computation.dataContext) &&
-            item.recordName === recordName
-        ) as Extract<MigrationDecision, { kind: "destructive-scope" }> | undefined;
-        if (!decision?.ids.map(String).includes(String(stale.id))) {
-            throw new DestructiveComputedOutputError(`Migration would delete stale derived ${recordName} record ${stale.id}; approve destructive scope before executing`);
-        }
+        // r30-E：stale 删除乐观执行并以 delete 事件出账；逐 id 审批检查收敛到重算结束时的
+        //  执行期对账（assertExecutedDeletionsApproved）——一次性报告全部差异并回滚，
+        //  取代此前的逐 id fail-fast（对链式依赖计算该检查在批准侧无法先验满足）。
         await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", stale.id] }));
         events.push({ recordName, type: "delete", record: stale });
     }
@@ -3308,9 +3389,169 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
 }
 
 export async function recomputeChangedComputations(controller: Controller, rebuildPlan: ComputationRebuildItem[], options: MigrationOptions = {}, initialEvents: RecordMutationEvent[] = [], oldManifest?: MigrationManifest) {
-    assertDestructiveScopeAllowed(options, await getDestructiveDeletionScope(controller, rebuildPlan, oldManifest));
-    const scheduler = new MigrationScheduler(controller, rebuildPlan, options, initialEvents);
-    return scheduler.run();
+    // r30-E：执行期审计取代此前的「入口处按迁移前数据重算一阶 scope」断言——链式依赖计算的
+    //  删除取决于上游迁移后状态，一阶 scope 对它们必然失真（此前无条件拒绝 delete patch ⇒
+    //  kill-resume 死循环）。现在删除乐观执行、逐计算收集，结束时与已批准 scope 双向精确对账；
+    //  不一致则抛错，外层 SERIALIZABLE 事务回滚——未经审计的销毁仍然无法提交，且错误一次性
+    //  给出全部差异（含级联删除的精确 id），批准后单次重试收敛。
+    const audit = createMigrationDeletionAudit("enforce");
+    const scheduler = new MigrationScheduler(controller, rebuildPlan, options, initialEvents, audit);
+    const events = await scheduler.run();
+    assertExecutedDeletionsApproved(options, audit);
+    return events;
+}
+
+// 让 simulateCascadeDeletionScope 的「回滚」哨兵不与真实错误混淆。
+class DeletionScopeSimulationRollback extends Error {
+    constructor() {
+        super("migration deletion-scope simulation rollback (internal sentinel)");
+        this.name = "DeletionScopeSimulationRollback";
+    }
+}
+
+export type CascadeDeletionScopeSimulation = {
+    schemaPlan: MigrationSchemaPlan;
+    previousManifest?: MigrationManifest;
+    nextManifest?: MigrationManifest;
+    options?: MigrationOptions;
+};
+
+/**
+ * r30-E：级联感知的破坏性删除 scope——按 rebuildPlan 依赖序在「将被回滚的事务」内真实
+ * 执行迁移重算，收集每个计算实际执行的删除。链式 Transform / 硬删除属性对上游收缩的
+ * 级联删除只有真实执行才能给出精确 id 集（依赖计算的输入是上游**迁移后**的状态）。
+ *
+ * 忠实性来源：与真实迁移共用同一 MigrationScheduler / 同一写路径；preRecomputeDDL 在
+ * 事务内先行应用（要求方言支持事务性 DDL——MySQL 不支持，直接回退分析性 scope）。
+ * 模拟不可行（缺 handler、新实体序列未初始化等）时返回 undefined，调用方回退分析性
+ * 一阶 scope；执行期的 assertExecutedDeletionsApproved 仍然兜底全部精确性。
+ *
+ * CAUTION 模拟期间临时注入 readHandle 为 storage.queryHandle 并清空 mutation callbacks
+ *  （事务回滚会撤销全部写入，但监听者的内存状态无法回滚——不能让它们观测到幻影事件）。
+ */
+async function simulateCascadeDeletionScope(
+    controller: Controller,
+    rebuildPlan: ComputationRebuildItem[],
+    simulation: CascadeDeletionScopeSimulation,
+    readHandle?: MigrationReadHandle,
+): Promise<Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }> | undefined> {
+    const storage = controller.system.storage as unknown as {
+        queryHandle?: unknown;
+        map?: unknown;
+        schema?: unknown;
+        callbacks?: Set<unknown>;
+        db?: { scheme?: (sql: string, name?: string) => Promise<unknown> };
+        runInTransaction: Controller["system"]["storage"]["runInTransaction"];
+    };
+    const db = storage.db || (controller.system as unknown as { db?: { scheme?: (sql: string, name?: string) => Promise<unknown> } }).db;
+    if (!db?.scheme) return undefined;
+    // 事务性 DDL 是模拟安全性的前提（回滚必须撤销 DDL）；MySQL 的 DDL 隐式提交。
+    try {
+        if (getSchemaDialect(db as Parameters<typeof getSchemaDialect>[0]).name === "mysql") return undefined;
+    } catch {
+        return undefined;
+    }
+    if (!storage.queryHandle && !readHandle) return undefined;
+
+    const audit = createMigrationDeletionAudit("simulate");
+    const sentinel = new DeletionScopeSimulationRollback();
+    const originalQueryHandle = storage.queryHandle;
+    const originalMap = storage.map;
+    const originalSchema = storage.schema;
+    const originalCallbacks = storage.callbacks ? [...storage.callbacks] : undefined;
+    try {
+        await storage.runInTransaction({ name: "migration deletion-scope simulation", isolation: "SERIALIZABLE" }, async () => {
+            for (const operation of simulation.schemaPlan.preRecomputeDDL) {
+                const sql = "sql" in operation ? operation.sql : undefined;
+                if (sql) await db.scheme!(sql, `simulate ${operation.description}`);
+            }
+            // 新代码版本的 controller 在 storage setup 之前生成 diff / migrate 是标准流程——
+            //  以迁移计划自带的新 schema 编译结果临时装配 storage 读写面（applyMigrationSchema
+            //  在真实迁移里设置的同一批字段），模拟结束后恢复。queryHandle 的存在即 storage
+            //  已 setup 的判据（schema/map 与之同批赋值）。
+            if (!originalQueryHandle) {
+                storage.queryHandle = readHandle;
+                storage.schema = simulation.schemaPlan.schema;
+                storage.map = (simulation.schemaPlan.internal as { dbSetup?: { map?: unknown } } | undefined)?.dbSetup?.map;
+            }
+            storage.callbacks?.clear();
+            const initialEvents = simulation.previousManifest && simulation.nextManifest
+                ? await recomputeFilteredMemberships(controller, simulation.previousManifest, simulation.nextManifest)
+                : [];
+            const scheduler = new MigrationScheduler(controller, rebuildPlan, simulation.options || {}, initialEvents, audit);
+            await scheduler.run();
+            throw sentinel;
+        });
+        return undefined;
+    } catch (error) {
+        if (error !== sentinel) {
+            if (process.env.INTERAQT_DEBUG_MIGRATION_SIMULATION) console.error("[simulateCascadeDeletionScope] infeasible:", error);
+            return undefined;
+        }
+    } finally {
+        storage.queryHandle = originalQueryHandle;
+        storage.map = originalMap;
+        storage.schema = originalSchema;
+        if (originalCallbacks && storage.callbacks) {
+            storage.callbacks.clear();
+            for (const callback of originalCallbacks) storage.callbacks.add(callback);
+        }
+    }
+    return [...audit.collected.values()].map(entry => ({
+        dataContext: entry.dataContext,
+        recordName: entry.recordName,
+        ids: [...entry.ids].sort(),
+        count: entry.ids.length,
+        reason: "cascade-aware deletion scope (collected by executing the rebuild plan in a rolled-back transaction)",
+    }));
+}
+
+/**
+ * 级联感知的破坏性 scope 入口：优先以模拟执行给出精确（含链式级联）的删除集；
+ * 模拟不可行时回退到分析性一阶 scope（getDestructiveDeletionScope），并以 exact=false
+ * 告知调用方 ids 精确性只能由执行期对账保证。
+ * 硬删除属性的条目在两种模式下都保证存在（审批「存在性」门槛依赖它，即使 ids 为空）。
+ */
+export async function getCascadeAwareDeletionScope(
+    controller: Controller,
+    rebuildPlan: ComputationRebuildItem[],
+    oldManifest?: MigrationManifest,
+    readHandle?: MigrationReadHandle,
+    simulation?: CascadeDeletionScopeSimulation,
+): Promise<{ entries: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>; exact: boolean }> {
+    const handles = computationById(controller);
+    const mayDelete = rebuildPlan.some(item => {
+        if (!item.rebuildOutput) return false;
+        const computation = handles.get(item.computationId);
+        if (!computation) return false;
+        return computation.dataContext.type === "entity" || computation.dataContext.type === "relation" ||
+            (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME);
+    });
+    if (!mayDelete) return { entries: [], exact: true };
+    if (simulation) {
+        const simulated = await simulateCascadeDeletionScope(controller, rebuildPlan, simulation, readHandle);
+        if (simulated) {
+            // 硬删除属性即使本次删除数为 0 也要有条目（审批存在性门槛 + 审查面可见性）。
+            const byKey = new Map(simulated.map(entry => [`${entry.dataContext}:${entry.recordName || ""}`, entry]));
+            for (const item of rebuildPlan) {
+                const computation = handles.get(item.computationId);
+                if (!item.rebuildOutput || computation?.dataContext.type !== "property" || computation.dataContext.id.name !== HARD_DELETION_PROPERTY_NAME) continue;
+                const hostName = computation.dataContext.host.name!;
+                const key = `${dataContextPath(computation.dataContext)}:${hostName}`;
+                if (!byKey.has(key)) {
+                    byKey.set(key, {
+                        dataContext: dataContextPath(computation.dataContext),
+                        recordName: hostName,
+                        ids: [],
+                        count: 0,
+                        reason: "hard deletion computed property may delete host records whose recomputed value is true (cascade-aware simulation found none)",
+                    });
+                }
+            }
+            return { entries: [...byKey.values()], exact: true };
+        }
+    }
+    return { entries: await getDestructiveDeletionScope(controller, rebuildPlan, oldManifest, readHandle), exact: false };
 }
 
 class MigrationScheduler {
@@ -3319,7 +3560,7 @@ class MigrationScheduler {
     private affectedIds = new Set(this.rebuildPlan.map(item => item.computationId));
     private pendingEventsByComputation = new Map<string, RecordMutationEvent[]>();
 
-    constructor(private controller: Controller, private rebuildPlan: ComputationRebuildItem[], private options: MigrationOptions = {}, private initialEvents: RecordMutationEvent[] = []) {
+    constructor(private controller: Controller, private rebuildPlan: ComputationRebuildItem[], private options: MigrationOptions = {}, private initialEvents: RecordMutationEvent[] = [], private audit: MigrationDeletionAudit = createMigrationDeletionAudit("enforce")) {
         this.sourceMapManager.initialize(new Set(
             Array.from(this.handles.entries())
                 .filter(([id]) => this.affectedIds.has(id))
@@ -3334,7 +3575,8 @@ class MigrationScheduler {
         const computation = this.handles.get(item.computationId);
         if (!computation) continue;
 
-        if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
+        // 硬删除属性的「审批存在性」门槛：模拟模式（scope 发现本身）没有审批可查，跳过。
+        if (this.audit.mode !== "simulate" && computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
             throw new DestructiveComputedOutputError(`Migration refuses to recompute destructive property ${dataContextPath(computation.dataContext)} without approved destructive scope`);
         }
         if (typeof (computation as DataBasedComputation).compute !== "function" && !getEventRebuildHandler(this.options, dataContextPath(computation.dataContext))) {
@@ -3350,6 +3592,9 @@ class MigrationScheduler {
         const events = pendingEvents.length && !item.isSeed
             ? await this.runIncrementalRecompute(computation, pendingEvents)
             : await this.runFullRecompute(computation);
+        // r30-E：本计算实际执行的输出删除进入审计足迹（收敛收集点——三条删除来路
+        //  stale 清理 / takeover 清空 / delete patch / 硬删除重算都以 delete 事件出账）。
+        collectAuditedDeletions(this.audit, computation, events);
         emittedEvents.push(...events);
         if (item.propagateOutputEvents) {
             this.queueEvents(events, item.computationId);
@@ -3396,19 +3641,16 @@ class MigrationScheduler {
                         ? stripPropertyFromInput(record, computation.dataContext.id.name)
                         : record;
                     const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, record: handlerRecord });
-                    const event = await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions);
-                    if (event) events.push(event);
+                    events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions));
                 }
                 return events;
             }
             const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext });
-            const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);
-            return event ? [event] : [];
+            return writeComputationResult(this.controller, computation, result, undefined, this.options);
         }
         if (computation.dataContext.type === "global") {
             const dataDeps = await this.controller.scheduler.resolveDataDeps(computation as DataBasedComputation);
-            const event = await writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute!(dataDeps), undefined, this.options);
-            return event ? [event] : [];
+            return writeComputationResult(this.controller, computation, await (computation as DataBasedComputation).compute!(dataDeps), undefined, this.options);
         }
         if (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") {
             return recomputeTransformOutput(this.controller, computation as DataBasedComputation, this.options);
@@ -3429,8 +3671,7 @@ class MigrationScheduler {
                 computeDeps,
                 computeRecord,
             );
-            const event = await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions);
-            if (event) events.push(event);
+            events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions));
         }
         return events;
     }
@@ -3488,8 +3729,7 @@ class MigrationScheduler {
                         continue;
                     }
                     const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, mutationEvent });
-                    const event = await writeComputationResult(this.controller, computation, result, undefined, this.options);
-                    if (event) events.push(event);
+                    events.push(...await writeComputationResult(this.controller, computation, result, undefined, this.options));
                     continue;
                 }
                 // 与 live Scheduler 的事件路由保持同一守卫：filtered 源的 update 监听挂在物理 base 名上，
@@ -3512,8 +3752,7 @@ class MigrationScheduler {
         if (executionResult.mode === "patch") {
             return writeComputationPatch(this.controller, computation, executionResult.result, record, this.options);
         }
-        const event = await writeComputationResult(this.controller, computation, executionResult.result, record, this.options);
-        return event ? [event] : [];
+        return writeComputationResult(this.controller, computation, executionResult.result, record, this.options);
     }
 }
 

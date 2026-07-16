@@ -562,6 +562,12 @@ export class MatchExp {
             //  非 combined 段的关联性由 JOIN 的 ON 条件保证；combined 段的等价物就是
             //  「link id 列非空」。这里对路径中每个 combined 段追加 IS NOT NULL 守卫原子，
             //  与原子 AND 组合（对称变体各自按变体路径求 link 字段）。
+            // 契约决策（r28 记录项，r32 定谳）：NOT(combined 路径原子) 对**未配对**行求值为
+            //  TRUE——守卫原子与路径原子先 AND 再被 NOT 取反，「配对不存在 ⇒ 否定命题成立」。
+            //  这与 LEFT JOIN 编译面的三值语义（未配对 ⇒ 原子为 UNKNOWN ⇒ NOT 后仍不命中）
+            //  刻意不同：combined 的同行编码没有"关联行缺席"的 NULL 行形态，谓词面按经典
+            //  二值逻辑（配对存在且满足 P / 其余）求值语义自洽且可解释。跨拓扑（isolated vs
+            //  combined）迁移 NOT 查询的用户需按此差异自查——这是拓扑可见的既定行为差异。
             const buildCombinedSegmentGates = (variantAttributePath: string[]): FieldMatchAtom[] => {
                 // 物理行匹配（flashOut 行认领等内部消费方）刻意按「同住」寻址——不加逻辑配对守卫。
                 if (exp.data.physicalRowMatch) return []

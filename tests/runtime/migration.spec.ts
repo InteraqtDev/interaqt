@@ -906,18 +906,30 @@ describe("Data migration phase 1", () => {
         const systemV2 = new MonoSystem(db);
         systemV2.conceptClass = KlassByName;
         const controllerV2 = new Controller({ system: systemV2, entities: [ProductV2, OutputV2], relations: [] });
-        await expect(migrateWithApproval(controllerV2)).rejects.toThrow(/scope mismatch|delete stale derived/);
+        // r30-E 收口后：diff 的 destructive scope 经模拟执行携带精确 stale ids——审批即知情
+        //  opt-in。守住的性质不变：没有（或错误的）destructive-scope 决策仍然拒绝执行。
         const approvedDiff = await approveGeneratedMigrationDiff(controllerV2);
+        const withoutOptIn = {
+            ...approvedDiff,
+            decisions: approvedDiff.decisions.filter(decision => decision.kind !== "destructive-scope"),
+        };
+        await expect(migrateWithApproval(controllerV2, { approvedDiff: withoutOptIn })).rejects.toThrow(/scope mismatch/);
+        const wrongIds = {
+            ...approvedDiff,
+            decisions: approvedDiff.decisions.map(decision => decision.kind === "destructive-scope"
+                ? { ...decision, ids: ["999999"] }
+                : decision),
+        };
+        await expect(migrateWithApproval(controllerV2, { approvedDiff: wrongIds })).rejects.toThrow(/scope mismatch/);
+        // 拒绝路径整体回滚：存量输出未被销毁（经 V1 storage 读取——V2 的 queryHandle 在失败前未初始化）
+        expect(await systemV1.storage.find("MigrationTransformDeleteOutput", undefined, undefined, ["id"])).toHaveLength(2);
+        // 生成的 diff 自带精确 stale ids（dryRun 的 deletionScope 与之一致）
         const dryRunPlan = await controllerV2.migrate({ approvedDiff, dryRun: true });
-        const approvedScope = dryRunPlan.deletionScope.find(scope => scope.dataContext === "entity:MigrationTransformDeleteOutput");
-        await migrateWithApproval(controllerV2, {
-            approvedDiff: {
-                ...approvedDiff,
-                decisions: approvedDiff.decisions.map(decision => decision.kind === "destructive-scope" && decision.dataContext === "entity:MigrationTransformDeleteOutput"
-                    ? { ...decision, ids: approvedScope?.ids || [], reason: "approved stale transform cleanup" }
-                    : decision),
-            },
-        });
+        const generatedScope = approvedDiff.decisions.find(decision => decision.kind === "destructive-scope" && decision.dataContext === "entity:MigrationTransformDeleteOutput") as { ids: string[] } | undefined;
+        const dryRunScope = dryRunPlan.deletionScope.find(scope => scope.dataContext === "entity:MigrationTransformDeleteOutput");
+        expect(generatedScope?.ids?.length).toBe(1);
+        expect([...(dryRunScope?.ids || [])].sort()).toEqual([...(generatedScope?.ids || [])].sort());
+        await migrateWithApproval(controllerV2, { approvedDiff });
 
         const outputs = await systemV2.storage.find("MigrationTransformDeleteOutput", undefined, undefined, ["value"]);
         expect(outputs.map(output => output.value)).toEqual([20]);

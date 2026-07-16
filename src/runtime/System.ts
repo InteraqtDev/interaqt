@@ -317,6 +317,13 @@ export const SystemEntity = Entity.create({
             type: 'string',
             collection: false,
         })
+    ],
+    // CAUTION (concept, key) 唯一是 kv 语义的守恒律（r12-I-1 的 _Dictionary_ 兄弟轨，r31 登记）：
+    //  set(concept, key) 的 find-then-create 竞态会写出同键双行——之后 findOne 非确定、
+    //  update 只改一行留幽灵。唯一索引把静默双行变成数据库层冲突；写路径（MonoSystem.set）
+    //  把该冲突转成可重试事务错误，重试后 findOne 命中已提交行并走 update 轨（收敛）。
+    constraints: [
+        UniqueConstraint.create({ name: 'interaqt_system_concept_key_unique', properties: ['concept', 'key'] })
     ]
 })
 

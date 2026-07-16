@@ -10,6 +10,33 @@ class IDSystem {
         // 原子 UPSERT 依赖 name 上的唯一索引；IF NOT EXISTS 同时兼容旧版建出的无约束 _IDS_ 表。
         await this.db.scheme(`CREATE UNIQUE INDEX IF NOT EXISTS "_IDS__name_unique" ON _IDS_ (name)`)
     }
+    /**
+     * 计数器与存量数据对账（r28 记录项，r32 收口；与 PG 驱动 setupSequences 同一契约）：
+     * setup(false) attach 到已有数据而 _IDS_ 计数器缺失/落后（手工导入、备份恢复、跨库
+     * 搬迁）时，getAutoId 会从 1 重发号——SQLite 的逻辑 id 列没有唯一索引，重复 id 是
+     * **静默**数据损坏（同一逻辑 id 两行），不是 PK 冲突。
+     * 只向前推进（MAX(last, 存量最大 id)），绝不回拨。
+     */
+    async setupSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
+        const quote = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`
+        for (const record of records) {
+            const rows = await this.db.query<{ max: number | null }>(
+                `SELECT COALESCE(MAX(${quote(record.idField)}), 0) AS max FROM ${quote(record.tableName)}`,
+                [],
+                `read max id for ${record.recordName}`
+            )
+            const maxExistingId = Number(rows[0]?.max ?? 0)
+            if (maxExistingId >= 1) {
+                await this.db.query(
+                    `INSERT INTO _IDS_ (name, last) VALUES (?, ?)
+ON CONFLICT(name) DO UPDATE SET last = MAX(last, excluded.last)
+RETURNING last`,
+                    [record.recordName, maxExistingId],
+                    `reconcile id counter for ${record.recordName}`
+                )
+            }
+        }
+    }
     async getAutoId(recordName: string) {
         // CAUTION 原子 UPSERT：此前的「SELECT 再 INSERT/UPDATE」读-改-写在并发下会分配重复 id；
         //  recordName 一律走参数绑定（与 PostgreSQL 驱动的参数化路径一致）。
@@ -193,6 +220,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
+    }
+    async setupRecordSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
+        return this.idSystem.setupSequences(records)
     }
     parseMatchExpression(key: string, value:[string, string], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue: (v: string) => string, p: () => string) {
         // CAUTION 方言必须识别自己 mapToDBFieldType 产出的全部 json fieldType 形态（r25 I-1）：

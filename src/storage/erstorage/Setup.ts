@@ -8,7 +8,7 @@ import { Entity, Property, Relation } from "@core";
 import { BoolExp } from "@core";
 import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
-import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, getSchemaDialect } from "./SchemaDialect.js";
+import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, getSchemaDialect, shouldSkipConstraintForDialect } from "./SchemaDialect.js";
 
 // Define the types we need
 
@@ -1175,10 +1175,16 @@ export class DBSetup {
         // 2. 给所有 record 分配 table，给 value 字段分配 field
         // First pass: generate field names for base entities/relations only
         Object.entries(this.map.records).forEach(([recordName, record]) => {
-            // 对于 filtered entities，不要覆盖它们的 table
-            // 因为它们不在 recordToTableMap 中
-            if (!record.isFilteredEntity && !record.isFilteredRelation) {
-                record.table = this.recordToTableMap.get(recordName)!
+            // CAUTION record.table 的唯一真相源是 recordToTableMap（r32 EXT-1 收口）：
+            //  joinTables / renameTableWithJoinedEntities 全程维护它，**包括 filtered /
+            //  merged-input 视图名**（buildEntityRecords 就已注册）。此前 filtered 记录被跳过、
+            //  保留 createRecord 时快照的 base 表名——base 表随后被合表移动（merged input 作为
+            //  x:1/combined 关系端点时，对视图端点的合并实际移动整个物理 base）时视图的 table
+            //  指针失联：查询编译的 JOIN 落在幽灵表上（no such column），buildTables 还会按
+            //  幽灵指针建出一张多余的物理表。
+            const assignedTable = this.recordToTableMap.get(recordName)
+            if (assignedTable) {
+                record.table = assignedTable
             }
             
             // Only generate field names for base entities/relations
@@ -1468,7 +1474,9 @@ ${Object.values(this.tables[tableName].columns).map(column => {
 
     createConstraintSQL(): ConstraintSchemaStatement[] {
         const dialect = getSchemaDialect(this.database)
-        return this.constraintSchemaItems.map(item => {
+        // 框架内部 kv 约束在能力缺失方言（MySQL）上跳过而非让 setup 崩溃；
+        //  用户声明的约束依旧 fail-fast（见 shouldSkipConstraintForDialect 的契约注释）。
+        return this.constraintSchemaItems.filter(item => !shouldSkipConstraintForDialect(item, dialect)).map(item => {
             if (item.kind === 'unique') {
                 return createUniqueConstraintStatement(
                     item,
