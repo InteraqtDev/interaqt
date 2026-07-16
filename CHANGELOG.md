@@ -21,8 +21,10 @@ two hardening changes, each with a red-green reproduction on the previous implem
     the long-recorded r25#7 "nested EXIST does not work" gap. Correlation atoms are now
     pre-resolved against the enclosing query's alias including its prefix chain
     (`isResolvedFieldReference`), and nested subquery prefixes chain for global alias uniqueness.
-  * Registered boundaries: symmetric-segment and `&` (link record) paths keep the legacy
-    parent-correlated compilation; `NOT` over x:n **value** atoms keeps SQL three-valued per-row
+  * Registered boundaries: symmetric-segment, `&` (link record) and **filtered-relation
+    intermediate** paths keep the legacy parent-correlated compilation (the rebased link
+    predicate must share the outer JOIN alias with the path atom for same-edge semantics —
+    `hasRebasedPathPredicate`); `NOT` over x:n **value** atoms keeps SQL three-valued per-row
     semantics (contract decision recorded in the dimension registry).
 * **core/runtime:** synchronously-consumed callback surfaces reject `async` functions at
   declaration time (`PublicFieldDef.synchronous` + `assertSynchronousFunctionArg`): aggregation
