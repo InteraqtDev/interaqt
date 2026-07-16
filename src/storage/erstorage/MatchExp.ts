@@ -229,16 +229,30 @@ export class MatchExp {
             }
 
             // 直接就是 value 的情况不用管，没有 query 其他的实体。
-            //  CAUTION 还有最后路径是 entity 但是  match 值是 EXIST 的不用管，因为会生成 exist 子句。只不过这里也不用特别处理，join 的表没用到会自动数据库忽略。
             if ((matchAttributePath.length === 1 && attributeInfo.isValue)) {
                 return
             }
 
             const manyToManySymmetricPaths = this.map.spawnManyToManySymmetricPath(namePath)
+            const isExistAtom = Array.isArray(matchData.data.value)
+                && typeof matchData.data.value[0] === 'string'
+                && (matchData.data.value[0] as string).toLowerCase() === 'exist'
             if (attributeInfo.isRecord) {
                 if (manyToManySymmetricPaths) {
                     // 所有方向变体（多段对称是笛卡尔积）都要加入查询树，缺一个就少 JOIN 一侧。
+                    // CAUTION 对称路径对 EXIST 原子也保持入树（保守）：对称段的别名/方向变体语义
+                    //  与 EXISTS 相关子查询的交互未定谳，维持既有行为（代价只是保守 post-pagination）。
                     manyToManySymmetricPaths.forEach(variantPath => recordQueryTree.addRecord(variantPath.slice(1, Infinity)))
+                } else if (isExistAtom && attributeInfo.isXToMany) {
+                    // EXIST 原子的终段 x:n 不入外层 JOIN 树（r12-I-5 → r20#3 源头修法）：
+                    //  谓词完全由 EXISTS 相关子查询表达（见 SQLBuilder.buildFunctionMatchAtom——
+                    //  子查询自带 FROM，相关条件 reverseAttr.id = <父路径>.id 只引用**父路径**的
+                    //  外层别名，终段别名仅用作子查询内部表的命名前缀）。终段入树只贡献
+                    //  LEFT JOIN fan-out 行，并让 queryTreeHasXToManyPath 误判触发 post-pagination
+                    //  （LIMIT/OFFSET 剥离 + 全量拉取内存分页）。父路径（若有）仍须入树。
+                    if (matchAttributePath.length > 1) {
+                        recordQueryTree.addRecord(matchAttributePath.slice(0, -1))
+                    }
                 } else {
                     recordQueryTree.addRecord(matchAttributePath)
                 }
