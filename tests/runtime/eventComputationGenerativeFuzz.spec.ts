@@ -8,35 +8,45 @@
  * 全部是「声明组合 × 事件序列」空间里的格子，夹具枚举不出没想到的组合。本 fuzzer 把
  * 声明与驱动序列同时放进生成域：
  *
- * - schema：2 实体（value props: label/kind/score+default）+ User + 2..3 带 isRef payload
- *   的 Interaction + 0..1 无 payload Interaction（全部 rng 决定）；
+ * - schema：2 实体（value props: label/kind/score+default）+ **A—B n:n 关系（r34 扩域）** +
+ *   User + 2..3 带 isRef payload 的 Interaction + 0..1 无 payload Interaction（全部 rng 决定）；
  * - 计算声明：1..2 个 property 级 StateMachine + 0..1 个全局（Dictionary）StateMachine +
  *   0..2 个事件驱动 Transform（派生实体）+ 各 50% 概率在派生实体上叠一个全局 Count（链式）。
  *   trigger/eventDep 菜单：InteractionEvent create（record.interactionName 模式）/
  *   宿主 create（可带 record 模式）/ 宿主 update（keys 锚定 + 可带 record 模式）/
- *   宿主 delete（Transform）。SM 两种取值流派：状态名（string）与 computeValue 计数器
- *   （number，覆盖 lastValue 传递）。Transform 轴：重叠 eventDep（r28 去重契约）、
- *   数组返回（transformIndex）、条件 null 返回（skip 插入）。
- * - 驱动序列：storage 直写（create/update/delete）与 controller.dispatch（合法 ref /
- *   bogus ref 守卫拒绝 / 无 payload）混合；ref id 两种形态（驱动原生 + 字符串）。
- * - 预言机：**独立 JS 模型**从操作意图推导事件流（无关系 schema 下事件构造是确定的：
- *   create ⇒ 全字段含默认值；update ⇒ keys=写入字段、record 按合并视图=行终态；
- *   dispatch ⇒ InteractionEvent create），并按框架契约独立实现匹配语义
+ *   宿主 delete（Transform/global SM）/ **link create / link delete（r34：recordName=关系名，
+ *   computeTarget/输出读事件端点 source.id/target.id——r26 端点完备性契约的消费面）**。
+ *   SM 两种取值流派：状态名（string）与 computeValue 计数器（number，覆盖 lastValue 传递）。
+ *   Transform 轴：重叠 eventDep（r28 去重契约）、数组返回（transformIndex）、条件 null 返回。
+ * - 驱动序列：storage 直写（create/update/delete）+ **addRelation / removeRelation（r34）** +
+ *   controller.dispatch（合法 ref / bogus ref 守卫拒绝 / 无 payload）混合；ref id 两种形态。
+ * - 预言机：**独立 JS 模型**从操作意图推导事件流（事件构造确定：create ⇒ 全字段含默认值；
+ *   update ⇒ keys=写入字段、record 按合并视图=行终态；dispatch ⇒ InteractionEvent create；
+ *   addRelation ⇒ link create（携端点）；removeRelation ⇒ link delete（携端点）；
+ *   **宿主删除 ⇒ 级联 link delete + 宿主 delete**），并按框架契约独立实现匹配语义
  *   （deepPartialMatch 合并视图 + keys 子集 + 每 (计算,事件) 恰好一跳/一跑）。
- *   每步断言：全部 SM 属性值 / 全局 dict 值 / Transform 派生行多重集 / 链式 Count。
+ *   每步断言：全部 SM 属性值 / 全局 dict 值 / Transform 派生行多重集 / 链式 Count / link 面。
  *
- * 生成域刻意未含（登记为后续扩张点）：关系事件 trigger（combined/link 事件名维度）、
- * oldRecord 模式、record 模式嵌套 payload 匹配、SM 输出属性回声触发（echo 域——update
- * trigger 全部 keys 锚定在 value prop 上）、activity 层（独立套件）。
+ * 生成域约束（模型的顺序无关性由生成侧保证）：同一 SM 的 transfers 不混用 hostDelete 族
+ * 与 link 族——宿主删除级联出的 link delete 与宿主 delete 事件的相对顺序是实现细节，
+ * 混用会让模型依赖事件顺序（不同族的计算之间无此问题：每计算独立消费自己的事件）。
  *
- * 预言机敏感性已验证（开发期）：模型转移逻辑注入偏移后 6/6 种子当场变红。
+ * 生成域刻意未含（登记为后续扩张点）：combined（1:1）关系 link 事件名维度、link 属性
+ * update 事件、嵌套 payload 建链、oldRecord 模式、record 模式嵌套 payload 匹配、
+ * SM 输出属性回声触发（echo 域——update trigger 全部 keys 锚定在 value prop 上）、
+ * activity 层（独立套件）。
+ *
+ * 预言机敏感性已验证（开发期）：模型转移逻辑注入偏移后 6/6 种子当场变红；
+ * r34 扩域后以「link 族模型吞掉转移」坏真值复验当场变红。
  *
  * 再现：FUZZ_EVENT_SEED_START / FUZZ_EVENT_SEED_COUNT / FUZZ_EVENT_OPS；FUZZ_VERBOSE=1。
+ * CAUTION 决策流契约（r34 版）：关系声明 + link trigger 菜单 + addRelation/removeRelation
+ *  入菜单改变了 rng 消耗序——r33 种子池已整体失效并以新池（1–100）重验。
  */
 import { describe, expect, test } from "vitest";
 import {
     Action, Controller, Count, Dictionary, Entity, InteractionEventEntity, Interaction,
-    KlassByName, MonoSystem, Payload, PayloadItem, Property, StateMachine, StateNode,
+    KlassByName, MonoSystem, Payload, PayloadItem, Property, Relation, StateMachine, StateNode,
     StateTransfer, Transform,
 } from 'interaqt';
 import { MatchExp } from '@storage';
@@ -51,6 +61,8 @@ type TriggerDescriptor =
     | { family: 'hostCreate', recordPattern?: { kind: string } }
     | { family: 'hostUpdate', keys: string[], recordPattern?: { kind: string } }
     | { family: 'hostDelete' }
+    | { family: 'linkCreate' }
+    | { family: 'linkDelete' }
 
 type SmDescriptor = {
     cell: string
@@ -71,17 +83,22 @@ type TransformDescriptor = {
     arrayReturn: boolean          // 返回 [via:'a', via:'b'] 两行
     nullOnCold: boolean           // 合并视图 kind==='cold' 时返回 null（仅宿主族）
     chainedCountDict?: string     // 派生实体上的全局 Count（链式）
-    hostEntity?: string           // 宿主族 dep 的宿主（interaction 族为 undefined）
+    hostEntity?: string           // 宿主族 dep 的宿主（interaction/link 族为 undefined）
+    linkFamily?: boolean          // link 族：输出读事件端点 source.id>target.id
 }
 
 type FuzzDeclarations = {
     entityNames: string[]
     userEntityName: string
+    relationName: string          // A--n:n-->B（link 事件族的 recordName）
+    relationSource: string        // = entityNames[0]
+    relationTarget: string        // = entityNames[1]
     payloadInteractions: { name: string, baseEntity: string }[]
     plainInteractions: { name: string }[]
     sms: SmDescriptor[]
     transforms: TransformDescriptor[]
     entities: unknown[]
+    relations: unknown[]
     dictionaries: unknown[]
     eventSources: unknown[]
 }
@@ -104,9 +121,15 @@ function genTrigger(
         return { family, recordPattern: chance(rng, 0.5) ? { kind: 'hot' } : undefined }
     } else if (family === 'hostUpdate') {
         return { family, keys: ['kind'], recordPattern: chance(rng, 0.5) ? { kind: 'hot' } : undefined }
+    } else if (family === 'linkCreate') {
+        return { family }
+    } else if (family === 'linkDelete') {
+        return { family }
     }
     return { family: 'hostDelete' }
 }
+
+const isLinkFamily = (trigger: TriggerDescriptor) => trigger.family === 'linkCreate' || trigger.family === 'linkDelete'
 
 function triggerFamilyKey(trigger: TriggerDescriptor): string {
     return trigger.family === 'interaction' ? `interaction:${trigger.interactionName}` : trigger.family
@@ -127,6 +150,15 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
         }))
     }
     const userEntity = Entity.create({ name: userEntityName, properties: [Property.create({ name: 'name', type: 'string' })] })
+    // A--n:n-->B（isolated 拓扑；combined 的 link 事件名维度登记为后续扩张点）
+    const relation = Relation.create({
+        source: entityByName.get(entityNames[0])!,
+        sourceProperty: 'rout',
+        target: entityByName.get(entityNames[1])!,
+        targetProperty: 'rin',
+        type: 'n:n',
+    })
+    const relationName = relation.name!
 
     // interactions：2..3 个带 isRef payload（base 随机）+ 0..1 个无 payload
     const payloadInteractions: { name: string, baseEntity: string }[] = []
@@ -172,7 +204,14 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
                     ? { recordName: descriptor.hostEntity, type: 'create' as const, ...(trigger.recordPattern ? { record: trigger.recordPattern } : {}) }
                     : trigger.family === 'hostUpdate'
                         ? { recordName: descriptor.hostEntity, type: 'update' as const, keys: trigger.keys, ...(trigger.recordPattern ? { record: trigger.recordPattern } : {}) }
-                        : { recordName: descriptor.hostEntity, type: 'delete' as const }
+                        : trigger.family === 'linkCreate'
+                            ? { recordName: relationName, type: 'create' as const }
+                            : trigger.family === 'linkDelete'
+                                ? { recordName: relationName, type: 'delete' as const }
+                                : { recordName: descriptor.hostEntity, type: 'delete' as const }
+            // link 族的 computeTarget 读事件端点（r26 端点完备性契约的消费面）：
+            // 宿主在关系 source 侧读 source.id，target 侧读 target.id
+            const hostSideEndpoint = descriptor.hostEntity === entityNames[0] ? 'source' : 'target'
             return StateTransfer.create({
                 current: nodeByName.get(transfer.current)!,
                 next: nodeByName.get(transfer.next)!,
@@ -180,7 +219,9 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
                 ...(descriptor.scope === 'property' ? {
                     computeTarget: trigger.family === 'interaction'
                         ? (event: any) => ({ id: event.record.payload!.target.id })
-                        : (event: any) => ({ id: event.record.id }),
+                        : isLinkFamily(trigger)
+                            ? (event: any) => ({ id: event.record[hostSideEndpoint].id })
+                            : (event: any) => ({ id: event.record.id }),
                 } : {}),
             })
         })
@@ -204,7 +245,7 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
         for (let t = 0; t < transferCount; t++) {
             const current = pick(rng, stateNames)
             const next = pick(rng, stateNames.filter(s => s !== current))
-            const trigger = genTrigger(rng, ['interaction', 'hostCreate', 'hostUpdate'],
+            const trigger = genTrigger(rng, ['interaction', 'hostCreate', 'hostUpdate', 'linkCreate', 'linkDelete'],
                 { hostEntity, interactions: payloadInteractions, plainInteractions: [], allowPlainInteraction: false })
             if (!trigger) continue
             const familyKey = triggerFamilyKey(trigger)
@@ -239,9 +280,14 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
         for (let t = 0; t < transferCount; t++) {
             const current = pick(rng, stateNames)
             const next = stateNames.find(s => s !== current)!
-            const trigger = genTrigger(rng, ['interaction', 'hostCreate', 'hostDelete'],
+            const trigger = genTrigger(rng, ['interaction', 'hostCreate', 'hostDelete', 'linkCreate', 'linkDelete'],
                 { hostEntity, interactions: payloadInteractions, plainInteractions, allowPlainInteraction: true })
             if (!trigger) continue
+            // 顺序无关性约束（见头注）：同一 SM 不混用 hostDelete 族与 link 族——
+            // 宿主删除级联 link delete 时两类事件的相对顺序是实现细节
+            const mixesDeleteCascade = (trigger.family === 'hostDelete' && transfers.some(x => isLinkFamily(x.trigger)))
+                || (isLinkFamily(trigger) && transfers.some(x => x.trigger.family === 'hostDelete'))
+            if (mixesDeleteCascade) continue
             const familyKey = triggerFamilyKey(trigger)
             if (!usedFamilies.has(current)) usedFamilies.set(current, new Set())
             if (usedFamilies.get(current)!.has(familyKey)) continue
@@ -270,7 +316,7 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
     const transformCount = int(rng, 3) // 0..2
     for (let i = 0; i < transformCount; i++) {
         const hostEntity = pick(rng, entityNames)
-        const primary = genTrigger(rng, ['interaction', 'hostCreate', 'hostUpdate', 'hostDelete'],
+        const primary = genTrigger(rng, ['interaction', 'hostCreate', 'hostUpdate', 'hostDelete', 'linkCreate', 'linkDelete'],
             { hostEntity, interactions: payloadInteractions, plainInteractions, allowPlainInteraction: true })
         if (!primary) continue
         const deps: TriggerDescriptor[] = [primary]
@@ -278,13 +324,15 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
         const overlap = primary.family === 'hostCreate' && primary.recordPattern !== undefined && chance(rng, 0.5)
         if (overlap) deps.push({ family: 'hostCreate' })
         const derivedEntity = `FzE${tag}T${i}`
-        const isHostFamily = primary.family !== 'interaction'
+        const isHostFamily = primary.family !== 'interaction' && !isLinkFamily(primary)
+        const isLinkTransform = isLinkFamily(primary)
         const descriptor: TransformDescriptor = {
             cell: `transform:${derivedEntity}(${deps.map(triggerFamilyKey).join('+')})`,
             derivedEntity, deps,
             arrayReturn: chance(rng, 0.3),
             nullOnCold: isHostFamily && chance(rng, 0.4),
             hostEntity: isHostFamily ? hostEntity : undefined,
+            linkFamily: isLinkTransform,
         }
         const eventDeps: Record<string, unknown> = {}
         deps.forEach((dep, depIndex) => {
@@ -295,12 +343,19 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
                     ? { recordName: hostEntity, type: 'create', ...(dep.recordPattern ? { record: dep.recordPattern } : {}) }
                     : dep.family === 'hostUpdate'
                         ? { recordName: hostEntity, type: 'update', keys: dep.keys, ...(dep.recordPattern ? { record: dep.recordPattern } : {}) }
-                        : { recordName: hostEntity, type: 'delete' }
+                        : dep.family === 'linkCreate'
+                            ? { recordName: relationName, type: 'create' }
+                            : dep.family === 'linkDelete'
+                                ? { recordName: relationName, type: 'delete' }
+                                : { recordName: hostEntity, type: 'delete' }
         })
         const callback = function (event: any) {
             const record = event.record ?? {}
             if (descriptor.nullOnCold && record.kind === 'cold') return null
-            const srcLabel = descriptor.hostEntity ? String(record.label ?? '') : String(record.interactionName ?? '')
+            // link 族输出读事件端点 id（r26 端点完备性契约的消费面）
+            const srcLabel = descriptor.linkFamily
+                ? `${String(record.source?.id ?? '')}>${String(record.target?.id ?? '')}`
+                : descriptor.hostEntity ? String(record.label ?? '') : String(record.interactionName ?? '')
             if (descriptor.arrayReturn) return [{ srcLabel, via: 'a' }, { srcLabel, via: 'b' }]
             return { srcLabel, via: 'single' }
         }
@@ -325,8 +380,11 @@ function genDeclarations(rng: Rng, tag: string): FuzzDeclarations {
     }
 
     return {
-        entityNames, userEntityName, payloadInteractions, plainInteractions, sms, transforms,
+        entityNames, userEntityName,
+        relationName, relationSource: entityNames[0], relationTarget: entityNames[1],
+        payloadInteractions, plainInteractions, sms, transforms,
         entities: [...entityByName.values(), userEntity],
+        relations: [relation],
         dictionaries,
         eventSources,
     }
@@ -344,6 +402,7 @@ type ModelEvent = { type: 'create' | 'update' | 'delete', recordName: string, ke
 
 class NaiveEventModel {
     rows = new Map<string, Map<string, Row>>()             // entity -> id -> full row
+    links = new Map<string, { source: string, target: string }>() // link id -> endpoints
     smStates = new Map<string, Map<string, string>>()      // property sm cell -> id -> state name
     smValues = new Map<string, Map<string, unknown>>()     // property sm cell -> id -> visible value
     globalSmState = new Map<string, string>()              // global sm cell -> state name
@@ -369,6 +428,12 @@ class NaiveEventModel {
             return event.recordName === InteractionEventEntity.name && event.type === 'create'
                 && event.record.interactionName === trigger.interactionName
         }
+        if (trigger.family === 'linkCreate') {
+            return event.recordName === this.declarations.relationName && event.type === 'create'
+        }
+        if (trigger.family === 'linkDelete') {
+            return event.recordName === this.declarations.relationName && event.type === 'delete'
+        }
         if (event.recordName !== hostEntity) return false
         if (trigger.family === 'hostCreate') {
             return event.type === 'create' && (!trigger.recordPattern || event.record.kind === trigger.recordPattern.kind)
@@ -392,12 +457,15 @@ class NaiveEventModel {
             const host = sm.hostEntity!
             // 每 (计算, 事件, 记录) 恰好一跳：找当前状态的首个命中 transfer（生成域保证无歧义）
             if (sm.scope === 'property') {
+                const hostSideEndpoint = host === this.declarations.relationSource ? 'source' : 'target'
                 for (const transfer of sm.transfers) {
                     if (!this.matchTrigger(transfer.trigger, event, host)) continue
-                    // computeTarget：interaction 族取 payload.target.id；宿主族取 event.record.id
+                    // computeTarget：interaction 族取 payload.target.id；link 族取宿主侧端点；宿主族取 event.record.id
                     const targetId = transfer.trigger.family === 'interaction'
                         ? String((event.record.payload as Row | undefined)?.target && ((event.record.payload as Row).target as Row).id)
-                        : String(event.record.id)
+                        : (transfer.trigger.family === 'linkCreate' || transfer.trigger.family === 'linkDelete')
+                            ? String((event.record[hostSideEndpoint] as Row).id)
+                            : String(event.record.id)
                     const states = this.smStates.get(sm.cell)!
                     const currentState = states.get(targetId)
                     if (currentState === undefined) continue // 记录不存在/已删除 ⇒ lock 失败 skip
@@ -423,7 +491,9 @@ class NaiveEventModel {
             if (!hit) continue
             const record = event.record
             if (transform.nullOnCold && record.kind === 'cold') continue
-            const srcLabel = transform.hostEntity ? String(record.label ?? '') : String(record.interactionName ?? '')
+            const srcLabel = transform.linkFamily
+                ? `${String((record.source as Row | undefined)?.id ?? '')}>${String((record.target as Row | undefined)?.id ?? '')}`
+                : transform.hostEntity ? String(record.label ?? '') : String(record.interactionName ?? '')
             const outputs = this.transformOutputs.get(transform.cell)!
             if (transform.arrayReturn) outputs.push(`${srcLabel}|a`, `${srcLabel}|b`)
             else outputs.push(`${srcLabel}|single`)
@@ -468,7 +538,39 @@ class NaiveEventModel {
             this.smStates.get(sm.cell)!.delete(idKey)
             this.smValues.get(sm.cell)!.delete(idKey)
         }
+        // 级联：宿主的 link 一并删除并发 link delete 事件（与宿主 delete 的相对顺序
+        // 由生成域约束保证无关——同一 SM 不混用 hostDelete 与 link 族）
+        const isSourceSide = entityName === this.declarations.relationSource
+        for (const [linkId, endpoints] of [...this.links]) {
+            const touchesHost = isSourceSide ? endpoints.source === idKey : endpoints.target === idKey
+            if (!touchesHost) continue
+            this.links.delete(linkId)
+            this.applyEvent({
+                type: 'delete', recordName: this.declarations.relationName,
+                record: { id: linkId, source: { id: endpoints.source }, target: { id: endpoints.target } },
+            })
+        }
         this.applyEvent({ type: 'delete', recordName: entityName, record: { ...row } })
+    }
+
+    registerAddRelation(linkId: unknown, sourceId: unknown, targetId: unknown) {
+        const linkKey = String(linkId)
+        this.links.set(linkKey, { source: String(sourceId), target: String(targetId) })
+        this.applyEvent({
+            type: 'create', recordName: this.declarations.relationName,
+            record: { id: linkKey, source: { id: String(sourceId) }, target: { id: String(targetId) } },
+        })
+    }
+
+    registerRemoveRelation(linkId: unknown) {
+        const linkKey = String(linkId)
+        const endpoints = this.links.get(linkKey)
+        if (!endpoints) return
+        this.links.delete(linkKey)
+        this.applyEvent({
+            type: 'delete', recordName: this.declarations.relationName,
+            record: { id: linkKey, source: { id: endpoints.source }, target: { id: endpoints.target } },
+        })
     }
 
     registerDispatch(interactionName: string, payload: Row | undefined) {
@@ -490,7 +592,7 @@ async function runEventComputationFuzzCase(seed: number, opsCount: number) {
     const controller = new Controller({
         system,
         entities: declarations.entities as any,
-        relations: [],
+        relations: declarations.relations as any,
         eventSources: declarations.eventSources as any,
         dict: declarations.dictionaries as any,
     })
@@ -511,6 +613,22 @@ async function runEventComputationFuzzCase(seed: number, opsCount: number) {
     }
 
     const assertAllCells = async (context: string) => {
+        // link 面模型自证：真实 link (id, source, target) 集合 = 模型
+        {
+            const linkRows = await storage.findRelationByName(declarations.relationName, undefined, undefined,
+                ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]) as Row[]
+            if (linkRows.length !== model.links.size) {
+                failWith(`${context}: link count ${linkRows.length} != model ${model.links.size}`)
+            }
+            for (const link of linkRows) {
+                const expected = model.links.get(String(link.id))
+                const source = String((link.source as Row | undefined)?.id)
+                const target = String((link.target as Row | undefined)?.id)
+                if (!expected || expected.source !== source || expected.target !== target) {
+                    failWith(`${context}: link #${link.id} (${source}->${target}) diverges from model ${JSON.stringify(expected)}`)
+                }
+            }
+        }
         // 模型-实况行一致性（模型自证：意图推导的行终态必须与真实行一致，防模型漂移误归因）
         for (const entityName of declarations.entityNames) {
             const rows = await storage.find(entityName, undefined, undefined, ['id', 'label', 'kind', 'score']) as Row[]
@@ -571,7 +689,7 @@ async function runEventComputationFuzzCase(seed: number, opsCount: number) {
     await assertAllCells('after setup')
 
     const idForm = (id: unknown) => chance(rng, 0.4) ? String(id) : id
-    const OP_MENU = ['create', 'create', 'update', 'update', 'dispatchRef', 'dispatchRef', 'dispatchRef', 'dispatchPlain', 'dispatchBogus', 'delete'] as const
+    const OP_MENU = ['create', 'create', 'update', 'update', 'dispatchRef', 'dispatchRef', 'dispatchPlain', 'dispatchBogus', 'delete', 'addRelation', 'addRelation', 'removeRelation'] as const
     let executed = 0
 
     for (let step = 0; step < opsCount; step++) {
@@ -634,6 +752,31 @@ async function runEventComputationFuzzCase(seed: number, opsCount: number) {
             }
             model.registerDispatch(interaction.name, undefined)
             opLog.push({ step, op, detail: { interaction: interaction.name }, outcome: 'ok' })
+            executed++
+        } else if (op === 'addRelation') {
+            const sourcePool = [...model.rows.get(declarations.relationSource)!.keys()]
+            const targetPool = [...model.rows.get(declarations.relationTarget)!.keys()]
+            if (!sourcePool.length || !targetPool.length) { opLog.push({ step, op, detail: {}, outcome: 'skipped: empty pool' }); continue }
+            const sourceId = pick(rng, sourcePool)
+            const targetId = pick(rng, targetPool)
+            const exists = [...model.links.values()].some(l => l.source === sourceId && l.target === targetId)
+            if (exists) { opLog.push({ step, op, detail: { sourceId, targetId }, outcome: 'skipped: link exists' }); continue }
+            await storage.addRelationByNameById(declarations.relationName, idForm(sourceId) as string, idForm(targetId) as string, {})
+            // 学习新 link 的真实 id（模型持有 link 池的唯一来源）
+            const links = await storage.findRelationByName(declarations.relationName, undefined, undefined,
+                ['id', ['source', { attributeQuery: ['id'] }], ['target', { attributeQuery: ['id'] }]]) as Row[]
+            const newLink = links.find(l => !model.links.has(String(l.id)))
+            if (!newLink) failWith(`step ${step} addRelation: no new link row appeared`)
+            model.registerAddRelation(newLink!.id, (newLink!.source as Row).id, (newLink!.target as Row).id)
+            opLog.push({ step, op, detail: { sourceId, targetId }, outcome: 'ok' })
+            executed++
+        } else if (op === 'removeRelation') {
+            const pool = [...model.links.keys()]
+            if (!pool.length) { opLog.push({ step, op, detail: {}, outcome: 'skipped: no links' }); continue }
+            const linkId = pick(rng, pool)
+            await storage.removeRelationByName(declarations.relationName, MatchExp.atom({ key: 'id', value: ['=', linkId] }))
+            model.registerRemoveRelation(linkId)
+            opLog.push({ step, op, detail: { linkId }, outcome: 'ok' })
             executed++
         } else {
             // dispatchBogus：isRef 守卫必须拒绝不存在的 id，且不产生任何事件/转移
