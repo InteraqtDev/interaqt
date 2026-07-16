@@ -2,71 +2,62 @@
 
 ## [4.3.0](https://github.com/InteraqtDev/interaqt/compare/v4.2.0...v4.3.0) (2026-07-16)
 
-### Features
-
-* **runtime): C1 — Controller.cleanupAsyncTasks retention API; test(storage:** C2 re-verdict — cascade depth boundaries pinned as regressions ([7388acf](https://github.com/InteraqtDev/interaqt/commit/7388acfe89018c1b838701c3c615dcfedb712ec5))
-
-### Bug Fixes
-
-* **runtime:** A1 — host-constrained incremental re-lookup in aggregation update branch; execution-path probes prove filtered-relation aggregations run incrementally ([6bae5e8](https://github.com/InteraqtDev/interaqt/commit/6bae5e81117a6ea3a7200000c7b7f888d3abf583))
-
-### Performance Improvements
-
-* **runtime:** A2/S3 — global-dep host fan-out uses keyset-batched fetch instead of one unbounded whole-table query ([77ed45f](https://github.com/InteraqtDev/interaqt/commit/77ed45fee7e008e85de3211471e3077c68f1c811))
-* **storage:** B1 — EXIST atoms no longer join their terminal x:n path into the outer query tree ([04c1b2a](https://github.com/InteraqtDev/interaqt/commit/04c1b2adedb6334bff056a85845cff557fc1e0af)), closes [r20#3](https://github.com/InteraqtDev/r20/issues/3) [r25#7](https://github.com/InteraqtDev/r25/issues/7)
-* **storage:** B2/B4 — two-phase root-id pagination for fan-out matches replaces whole-result post-pagination ([bee0625](https://github.com/InteraqtDev/interaqt/commit/bee0625efae8b212c09a628a565d3d8c2f0bcdc1))
-* **storage:** B5 — batch x:n branch completion under x:1 trunks (completeXToOneLeftoverRecords step 2) ([3634272](https://github.com/InteraqtDev/interaqt/commit/3634272f0ea4386402e9f6ec535e6b148b5efb09))
-
-## Unreleased
-
 Performance-debt closure round, executed in recorded-importance order against the inventory in
 `agentspace/output/performance-debt-plan-2026-07-16.md` (every performance item recorded across
-review rounds r2–r34, verified against current code). The plan's Phase-0 principle — "no
-performance closure without a deterministic red-green criterion" — is implemented as
-execution-path probes (full-recompute counts with reasons, SERIALIZABLE-attempt counts, SQL
-statement recording) in `tests/runtime/helpers/perfProbe.ts`; each closure below carries a
-probe-based regression that fails on the previous implementation.
+review rounds r2-r34, verified against current code; execution ledger in the plan's section 9).
+The plan's Phase-0 principle - "no performance closure without a deterministic red-green
+criterion" - is implemented as execution-path probes (full-recompute counts with reasons,
+SERIALIZABLE-attempt counts, SQL statement recording) in `tests/runtime/helpers/perfProbe.ts`;
+each closure below carries a probe-based regression that fails on the previous implementation.
 
 ### Bug Fixes
 
 * **runtime:** property-level aggregation update branches now constrain their relation re-lookup
-  by the **host endpoint**. Previously the lookup was "any link pointing at the updated related
-  entity": with a shared target (n:n, or several hosts sharing one related record) every host's
-  incremental contribution read and wrote the first matching link's bound state, silently
-  corrupting aggregate values. Deterministic on SQLite; masked on PGLite/PostgreSQL by MVCC
-  row-order rotation — which is why the PGLite-only computation fuzzer never saw it. The
-  computation fuzzer gains a `FUZZ_COMP_DRIVER=sqlite` axis and filtered-relation property cells
+  by the **host endpoint** ([6bae5e8](https://github.com/InteraqtDev/interaqt/commit/6bae5e81117a6ea3a7200000c7b7f888d3abf583)).
+  Previously the lookup was "any link pointing at the updated related entity": with a shared
+  target (n:n, or several hosts sharing one related record) every host's incremental contribution
+  read and wrote the first matching link's bound state, silently corrupting aggregate values.
+  Deterministic on SQLite; masked on PGLite/PostgreSQL by MVCC row-order rotation - which is why
+  the PGLite-only computation fuzzer never saw it. The computation fuzzer gains a
+  `FUZZ_COMP_DRIVER=sqlite` axis and filtered-relation property cells
   (`tests/runtime/aggregationSharedTargetUpdate.spec.ts`, both drivers).
 
 ### Performance Improvements
 
 * **runtime:** a global dictionary change no longer materializes the entire host table in one
   unbounded in-transaction query per dependent property computation (S3, recorded since the first
-  review round). The fan-out now pages with keyset batches (`Scheduler.GLOBAL_DEP_FANOUT_BATCH_SIZE`,
-  default 1000). The event `record` payload deliberately stays `['*']` — property computations may
-  read arbitrary host fields off `compute(deps, record)`, which is pinned as public contract.
+  review round; [77ed45f](https://github.com/InteraqtDev/interaqt/commit/77ed45fee7e008e85de3211471e3077c68f1c811)).
+  The fan-out now pages with keyset batches (`Scheduler.GLOBAL_DEP_FANOUT_BATCH_SIZE`, default
+  1000). The event `record` payload deliberately stays `['*']` - property computations may read
+  arbitrary host fields off `compute(deps, record)`, which is pinned as public contract.
 * **storage:** EXIST atoms no longer join their terminal x:n path into the outer query tree
-  (r12-I-5): the predicate is fully expressed by the correlated subquery, so the outer LEFT JOIN
-  contributed only fan-out rows and forced pure-EXIST queries into whole-result post-pagination.
-  LIMIT/OFFSET now push down to SQL for pure-EXIST matches and raw result rows equal root records.
+  (r12-I-5; [04c1b2a](https://github.com/InteraqtDev/interaqt/commit/04c1b2adedb6334bff056a85845cff557fc1e0af)):
+  the predicate is fully expressed by the correlated subquery, so the outer LEFT JOIN contributed
+  only fan-out rows and forced pure-EXIST queries into whole-result post-pagination. LIMIT/OFFSET
+  now push down to SQL for pure-EXIST matches and raw result rows equal root records.
 * **storage:** pagination over fan-out matches (match traversing an x:n path + limit) is now
-  two-phase (r12-I-4 / F-4 end-state): phase 1 pages root ids in the database
-  (`SELECT DISTINCT root.id + order keys` with root-granularity LIMIT/OFFSET), phase 2 rewrites
-  the match to `id IN (page ids)` so the fan-out JOIN tree disappears. Previously LIMIT/OFFSET
-  were stripped from SQL and every fan-out row was fetched and sliced in memory. Honest
-  boundaries kept on the old path: offset-only (unbounded page) and
-  `limit > QueryExecutor.PAGED_ROOT_ID_MAX_LIMIT` (500); `findOne` keeps its single-SQL hot path.
+  two-phase (r12-I-4 / F-4 end-state; [bee0625](https://github.com/InteraqtDev/interaqt/commit/bee0625efae8b212c09a628a565d3d8c2f0bcdc1)):
+  phase 1 pages root ids in the database (`SELECT DISTINCT root.id + order keys` with
+  root-granularity LIMIT/OFFSET), phase 2 rewrites the match to `id IN (page ids)` so the fan-out
+  JOIN tree disappears. Previously LIMIT/OFFSET were stripped from SQL and every fan-out row was
+  fetched and sliced in memory. Honest boundaries kept on the old path: offset-only (unbounded
+  page) and `limit > QueryExecutor.PAGED_ROOT_ID_MAX_LIMIT` (500); `findOne` keeps its single-SQL
+  hot path. Verified on PGLite, SQLite and real MySQL.
 * **storage:** x:n branches under x:1 trunks (`root -> profile -> badges` reads) batch by parent
-  id set instead of one query per root record. Shared n:1 trunk targets keep the per-record path
-  (batching would alias child objects across roots' subtrees — a public-contract change).
+  id set instead of one query per root record
+  ([3634272](https://github.com/InteraqtDev/interaqt/commit/3634272f0ea4386402e9f6ec535e6b148b5efb09)).
+  Shared n:1 trunk targets keep the per-record path (batching would alias child objects across
+  roots' subtrees - a public-contract change).
 
 ### Features
 
-* **runtime:** `Controller.cleanupAsyncTasks({ statuses? })` — explicit-control retention API for
-  async task tables (r2-I-6, "task tables only grow"). Removes terminal rows (`applied`/`skipped`)
-  across every async computation's task table and returns per-table counts. Protocol states
-  (`pending`/`success`) are rejected; freshness partitions still holding an undelivered task are
-  skipped entirely so an older pending task can never be resurrected as "latest".
+* **runtime:** `Controller.cleanupAsyncTasks({ statuses? })` - explicit-control retention API for
+  async task tables (r2-I-6, "task tables only grow";
+  [7388acf](https://github.com/InteraqtDev/interaqt/commit/7388acfe89018c1b838701c3c615dcfedb712ec5)).
+  Removes terminal rows (`applied`/`skipped`) across every async computation's task table and
+  returns per-table counts. Protocol states (`pending`/`success`) are rejected; freshness
+  partitions still holding an undelivered task are skipped entirely so an older pending task can
+  never be resurrected as "latest".
 
 ### Re-verdicts
 
@@ -75,10 +66,18 @@ probe-based regression that fails on the previous implementation.
   reliance cycles delete terminally, and a 300-deep self-reliance chain cascades in under a second
   (async recursion does not grow the native stack). A depth breaker would only false-positive on
   legitimate deep chains; the boundaries are pinned as `tests/storage/cascadeDeletionBoundaries.spec.ts`.
-* The r19–r32 "filtered targetPath full-recompute storm" record is **stale**: the storm shapes run
-  incrementally on current code. What was missing was a criterion that could prove it — now pinned
+* The r19-r32 "filtered targetPath full-recompute storm" record is **stale**: the storm shapes run
+  incrementally on current code. What was missing was a criterion that could prove it - now pinned
   by `tests/runtime/filteredRelationAggregationIncrementality.spec.ts` (zero full recomputes, zero
-  isolation upgrades across the membership × operation × aggregation matrix).
+  isolation upgrades across the membership x operation x aggregation matrix).
+
+### Test Infrastructure
+
+* vitest default timeout raised 5s -> 30s: since the r33/r34 generative suites joined `npm test`,
+  the 5s default randomly failed ordinary `controller.setup` tests under CI parallel load (the
+  Tests workflow was probabilistically red on main itself, including the v4.2.0 release commit's
+  own run; a different victim each run). 30s still fail-fasts real hangs; suites that legitimately
+  need longer carry explicit per-test timeouts.
 
 ## [4.2.0](https://github.com/interaqtdev/interaqt/compare/v4.1.4...v4.2.0) (2026-07-16)
 
