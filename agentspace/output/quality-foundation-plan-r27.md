@@ -174,15 +174,19 @@
 
 ### 1.5 诚实的边界
 
-- fuzzer 的强度 = 预言机的强度 × 生成器的表达域。r33 后生成器已产出：filtered
+- fuzzer 的强度 = 预言机的强度 × 生成器的表达域。r34 后生成器已产出：filtered
   entity/relation（嵌套链）、merged (union) entity、数据驱动聚合声明（全局/property 级）、
-  **事件驱动计算（StateMachine trigger / Transform eventDeps × InteractionEvent 轨）、
-  async 计算（返回类型交错 × task 生命周期）、activity 层（any/every/race × 嵌套 ×
-  非法 dispatch）、迁移加法 + 破坏性变异、taboo 声明形态（守卫一致性）**。
-  仍不产出（各套件头注有逐项登记）：**事务并发交错**（真实 PG 并发套件承担）、
-  关系事件 trigger / oldRecord 模式 / SM 回声触发（事件域）、自定义 freshnessKey /
-  宿主删除悬挂 task / entity 级 async（异步域）、group-as-root 实例分叉 footgun
-  （活动域）、计算类型变更（remove+add 形态）/ 共享表退役（迁移域）。
+  事件驱动计算（StateMachine trigger / Transform eventDeps × InteractionEvent 轨 +
+  **关系 link create/delete 轨（r34：端点消费面 + 宿主删除级联）**）、async 计算
+  （返回类型交错 × task 生命周期 + **自定义 freshnessKey 分区 × 宿主删除悬挂/脱链 task
+  （r34——定向探针先出货三个 bug 再入域，见 r34 报告）**）、activity 层（any/every/race ×
+  嵌套 × 非法 dispatch）、迁移加法 + 破坏性变异（**+ r34：fact→computed takeover、
+  计算类型变更 Count→Summation**）、taboo 声明形态（守卫一致性）。
+  仍不产出（各套件头注有逐项登记）：**事务并发交错**（真实 PG 并发套件承担；纳入需要
+  per-op 多连接调度器，独立专项）、combined（1:1）关系的 link 事件名维度 / link 属性
+  update / oldRecord 模式 / SM 回声触发（事件域）、entity/relation 级 async × 并发
+  daemon 投递（异步域）、group-as-root 实例分叉 footgun（活动域）、共享物理表退役
+  （迁移域）。
 - 驱动差分副库矩阵：PGLite（常跑）+ 真实 PostgreSQL / MySQL（env-gated；nightly 工作流
   已接线，`_difffuzz` 独占库每种子重建）。
 - 随机化不证明不存在 bug，只把「逃逸概率」变成种子数量的函数——这正是对指数空间唯一
@@ -198,18 +202,22 @@
 > **每一个可以到达实现的输入，要么被完整正确地处理，要么被清晰地拒绝。
 > 不存在第三种状态（静默半处理）。**
 
-落地形态（部分已在 r27 完成）：
+落地形态（r27 起步，r34 全部收口）：
 
 1. **写入面守卫清单**（已落地 4 个）：combined 子记录嵌套结构（F-1）、原地 ref 异 id 嵌套（F-1）、
    reliance 置换（F-4）、跨关系同住认领（F-5）。每个守卫的错误信息都给出 workaround。
-2. **守恒律候选**（下一轮落地）：
-   - 「凡被 NewRecordData 分类的必须被消费或被拒绝」——分类树与执行者消费面的差集断言
-     （dev-mode 或 setup 期静态审计）；
-   - 「行搬迁必须保全行上全部逻辑记录与 link」——搬迁前后按 recordName 逐一 count 对账
-     （可作为 fuzzer 预言机第 8 条先落地，再决定是否进运行时 debug 模式）。
-3. **实现深度的显式声明**：`getAttributeQueryDataForRecord` 的递归深度参数目前隐式决定了
-   行搬迁/删除/flashOut 的语义边界——把「本查询的深度契约」写成参数注释 + 每个调用点
-   声明自己需要的深度，深度不足处要么补齐要么守卫。
+2. **守恒律候选**：
+   - 「凡被 NewRecordData 分类的必须被消费或被拒绝」——✅ r34：结构面由
+     `tests/storage/newRecordDataConservation.spec.ts` 机器对账（运行时反射分类桶面 ⟺
+     消费登记册双向差集为空 + 消费锚点存在性 + 原料面不可被执行者直接消费）；行为面
+     由写路径 fuzzer 事件完备性预言机承担。落地当场清出一个死桶（`sameRowEntityIdRefs`，
+     自引入起零生产零消费）。
+   - 「行搬迁必须保全行上全部逻辑记录与 link」——✅ r29 已升格为预言机第 8 条
+     （配对读取一致性）+ r28 守卫组。
+3. **实现深度的显式声明**——✅ r34：`getAttributeQueryDataForRecord` 方法头注写明四开关
+   的包含面与递归界（sameTableReliance 传递 = 搬运子树定义；notRelianceCombined 只下钻
+   一层 = 同住不随行，守卫兜底），全部 6 个调用点以命名参数注释声明各自的深度意图
+   （flashOut 认领读 / relocate 读 / 删除快照 / update 前态 / 级联富化 / findPath）。
 
 ## 三、支柱 III：声明-实现一致性的机器化
 
@@ -231,9 +239,10 @@ r27 的 I-1/I-3/I-5 与 fuzzer 的 F-3 都是「声明与实现分叉」：
 2. 驱动差分 fuzz（SQLite vs PGLite）——✅ r29；真实 PG/MySQL 副库 ✅ r33；
 3. 行搬迁 count 对账升格为 fuzzer 预言机第 8 条——✅ r29（配对读取一致性）；
 4. 计算层生成 + 执行计数 spy 夹具——✅ r29；事件驱动/async/activity 域 ✅ r33；
-5. 「分类⇒消费」守恒律 setup 期审计——**未落**（支柱 II 框架代码项，非测试基建；
-   与 `getAttributeQueryDataForRecord` 深度契约显式化一同保持登记）；
-6. 迁移生成测试——✅ r29；破坏性变异轨 ✅ r33；
+   关系事件轨 / 自定义 freshnessKey / takeover / 类型变更 ✅ r34；
+5. 「分类⇒消费」守恒律审计——✅ r34（结构面机器对账 + 死桶清除，见 §二.2）；
+   `getAttributeQueryDataForRecord` 深度契约显式化 ✅ r34（见 §二.3）；
+6. 迁移生成测试——✅ r29；破坏性变异轨 ✅ r33；takeover/类型变更格 ✅ r34；
 7. 主动轴审计（实现分支点 vs 登记册求差集）作为每轮 review 的固定前置步骤——
    方法论项，进 review 轮工作流。
 
