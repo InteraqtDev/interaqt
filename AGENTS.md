@@ -195,6 +195,25 @@ project/
 
 Never add implicit behavior, auto-completion, or magic defaults. All behavior must be explicitly declared.
 
+### Plain professional language
+
+Everything written for humans — documentation, code comments, error messages, commit
+messages, PR descriptions, review and analysis reports, and conversational replies —
+must use precise, established technical terminology and remain understandable to a
+competent engineer who did not take part in the work. This applies in whichever
+language the text is written.
+
+- Prefer standard terms of art (invalidation scope, staleness ordering, referential
+  integrity, idempotent retry, convergence, ...) over invented shorthand.
+- Never let insider slang, ad-hoc code names, or colloquialisms carry the meaning
+  ("poison pill", "resurrected", "zombie row"). A vivid phrase may illustrate a
+  mechanism that has already been named precisely; it must never replace the precise
+  name.
+- Define project-specific terms at first use, or link to where they are defined.
+- Present findings as symptom → mechanism → fix, in complete sentences. Do not
+  compress reasoning into fragments, bare arrow chains, or abbreviations that only
+  the author can decode.
+
 ### Klass pattern
 
 Core types use: interface → CreateArgs → `Entity.create(args)` → static registry (`instances`, `isKlass`, `displayName`) → `toData()` / `fromData()`.
@@ -447,7 +466,7 @@ A: Enable logging, listen to mutation events, write thorough dispatch-based test
 
 ## Agent output
 
-Place research documents, design proposals, and analysis reports in `agentspace/output/` by default.
+Place research documents, design proposals, and analysis reports in `agentspace/output/` by default. All agent-produced prose follows § "Plain professional language" — reports written in insider shorthand lose their value as the durable record other agents and humans rely on.
 
 ## Tool-specific configuration
 

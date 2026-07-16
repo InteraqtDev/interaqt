@@ -42,6 +42,7 @@ Apply learned conventions in every task:
 - Use interaqt + Axii reactive patterns in example apps
 - Match existing code style and structure
 - Apply documented best practices
+- Write all prose (docs, comments, reports, replies) in plain professional language — see `AGENTS.md` § "Plain professional language"
 
 ### 5. Knowledge refresh
 
