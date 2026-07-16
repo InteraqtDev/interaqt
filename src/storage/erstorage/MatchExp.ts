@@ -8,7 +8,12 @@ import {PlaceholderGen} from "./SQLBuilder.js";
 
 // physicalRowMatch：内部行寻址标记（flashOut 行认领等）——combined 路径按「物理同住」匹配，
 //  不追加逻辑配对（link id 非空）守卫。公开查询面绝不设置该标记。
-export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean, physicalRowMatch?: boolean }
+// isResolvedFieldReference：内部标记（EXISTS 相关子查询的关联原子）——value[1] 已是预解析的
+//  "表别名.物理列" 字符串，编译时直接嵌入，不再走 getReferenceFieldValue 的路径解析。
+//  相关引用必须绑定到**直接外层查询**的别名（含其 prefix）；路径解析只认识 contextRootEntity
+//  （最外层根）的作用域，嵌套 EXISTS 下会把关联绑到错误的表（r25#7 的机制真相）。
+//  公开查询面绝不设置该标记。
+export type MatchAtom = { key: string, value: [string, any], isReferenceValue?: boolean, physicalRowMatch?: boolean, isResolvedFieldReference?: boolean }
 export type MatchExpressionData = BoolExp<MatchAtom>
 
 export type FieldMatchAtom = MatchAtom & {
@@ -243,13 +248,20 @@ export class MatchExp {
                     // CAUTION 对称路径对 EXIST 原子也保持入树（保守）：对称段的别名/方向变体语义
                     //  与 EXISTS 相关子查询的交互未定谳，维持既有行为（代价只是保守 post-pagination）。
                     manyToManySymmetricPaths.forEach(variantPath => recordQueryTree.addRecord(variantPath.slice(1, Infinity)))
+                } else if (isExistAtom && MatchExp.existAtomCorrelation(this.map, namePath) === 'root') {
+                    // 父路径含 x:n 段的 EXIST 原子（r35）：整条路径折叠进 EXISTS（反向路径关联到根），
+                    //  外层不 JOIN 任何段。此前父路径入树 + EXISTS 关联直接父别名：外层 x:n JOIN 的
+                    //  每个扇出行各自求值 EXISTS，NOT(exist) 被量化成「∃ 中间行使 ¬∃ 终端」——
+                    //  按根记录应为 ¬∃（一个中间行满足就该整体排除），静默多返回根记录，
+                    //  且同一 match 驱动 update/delete 的受害行选择。关联锚点的选择与
+                    //  SQLBuilder.parseFunctionMatchAtom 必须一致（同一 existAtomCorrelation 判定）。
                 } else if (isExistAtom && attributeInfo.isXToMany) {
                     // EXIST 原子的终段 x:n 不入外层 JOIN 树（r12-I-5 → r20#3 源头修法）：
-                    //  谓词完全由 EXISTS 相关子查询表达（见 SQLBuilder.buildFunctionMatchAtom——
+                    //  谓词完全由 EXISTS 相关子查询表达（见 SQLBuilder.parseFunctionMatchAtom——
                     //  子查询自带 FROM，相关条件 reverseAttr.id = <父路径>.id 只引用**父路径**的
                     //  外层别名，终段别名仅用作子查询内部表的命名前缀）。终段入树只贡献
                     //  LEFT JOIN fan-out 行，并让 queryTreeHasXToManyPath 误判触发 post-pagination
-                    //  （LIMIT/OFFSET 剥离 + 全量拉取内存分页）。父路径（若有）仍须入树。
+                    //  （LIMIT/OFFSET 剥离 + 全量拉取内存分页）。父路径（全 x:1，若有）仍须入树。
                     if (matchAttributePath.length > 1) {
                         recordQueryTree.addRecord(matchAttributePath.slice(0, -1))
                     }
@@ -278,6 +290,8 @@ export class MatchExp {
     //  仅返回跨关联的多段路径（length>1）；单段的是根实体自己的列，无需额外 JOIN。
     private static collectAtomReferencePaths(atom: MatchAtom): string[][] {
         if (!atom.isReferenceValue || !Array.isArray(atom.value)) return []
+        // 预解析引用（EXISTS 关联原子）不是路径形态，不参与 JOIN 树收集。
+        if (atom.isResolvedFieldReference) return []
         const paths: string[][] = []
         const pushIfCrossRelation = (ref: unknown) => {
             if (typeof ref !== 'string') return
@@ -327,6 +341,29 @@ export class MatchExp {
         return paths
     }
 
+    /**
+     * EXIST 原子的关联锚点分类。buildQueryTree 的剪枝决策与 SQLBuilder.parseFunctionMatchAtom
+     * 的关联条件必须一致，收敛在这一个判定——两处分叉会产生「剪了 JOIN 却仍引用其别名」的
+     * 裸 SQL 错误，或「JOIN 了却按根量化」的语义漂移。
+     *
+     * - 'root'：父路径含（非对称）x:n 段。整条路径折叠进 EXISTS：子查询以反向路径
+     *   （getReversePath）直接关联根记录 id，外层不 JOIN 任何路径段。NOT(exist) 因此按
+     *   根记录量化（¬∃ 可达终端），而不是按外层扇出行量化（∃ 中间行使 ¬∃ 终端——r35 修复的
+     *   误报族：一条不含匹配终端的中间行会让本应排除的根记录整体通过）。
+     * - 'parent'：父路径全为 x:1，或路径含 '&'（link 记录段，getReversePath 不支持）/
+     *   对称 n:n 段（方向变体与反向折叠的交互未定谳）——沿用「父路径入树 + EXISTS 关联
+     *   直接父别名」的既有编译。x:1 父路径无扇出，NOT 语义本就按根记录成立。
+     */
+    static existAtomCorrelation(map: EntityToTableMap, namePath: string[]): 'root' | 'parent' {
+        if (namePath.some(segment => segment === LINK_SYMBOL || segment.includes(':'))) return 'parent'
+        if (map.spawnManyToManySymmetricPath(namePath)) return 'parent'
+        for (let i = 1; i < namePath.length - 1; i++) {
+            const info = map.getInfoByPath(namePath.slice(0, i + 1))
+            if (info?.isRecord && info.isXToMany) return 'root'
+        }
+        return 'parent'
+    }
+
     getFinalFieldName(matchAttributePath: string[]): [string, string] {
         const namePath = [this.entityName].concat(matchAttributePath.slice(0, -1))
         return this.map.getTableAliasAndFieldName(namePath, matchAttributePath.at(-1)!).slice(0, 2) as [string, string]
@@ -370,7 +407,7 @@ export class MatchExp {
         }
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database, valueType?: string): [string, unknown[]] {
+    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database, valueType?: string, isResolvedFieldReference?: boolean): [string, unknown[]] {
         // timestamp（r26）：匹配参数与写路径同一契约（Date|ms|ISO → 方言可绑定形态）。
         //  语义类型判定（SQLite 的 timestamp 列 fieldType 是 'INT'）。
         const prepareTimestampParam = (raw: unknown): unknown => {
@@ -387,8 +424,10 @@ export class MatchExp {
         //  否则大写写法落入末尾的 unknown-expression assert，抛出与用户写法脱节的内部错误。
         if (simpleOp.includes(lowerOp)) {
             if (isReferenceValue) {
-                // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL，不使用占位符
-                const referenceField = this.getReferenceFieldValue(value[1])
+                // 当 isReferenceValue 为 true 时，直接将列引用嵌入 SQL，不使用占位符。
+                // isResolvedFieldReference（内部 EXISTS 关联原子）：value[1] 已是预解析的
+                //  "表别名.物理列"，跳过路径解析（见 MatchAtom 头注）。
+                const referenceField = isResolvedFieldReference ? (value[1] as string) : this.getReferenceFieldValue(value[1])
                 fieldValue = `${value[0]} "${referenceField.split('.')[0]}"."${referenceField.split('.')[1]}"`
                 fieldParams = []
             } else if (value[1] === null) {
@@ -648,7 +687,7 @@ export class MatchExp {
 
                 const buildValueAtom = (fieldNamePath: [string, string]): BoolExp<FieldMatchAtom> | FieldMatchAtom => {
                     if (!nullSplit) {
-                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type)
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type, exp.data.isResolvedFieldReference)
                         return {
                             ...exp.data,
                             fieldName: fieldNamePath,
@@ -658,7 +697,7 @@ export class MatchExp {
                     }
                     let combinedParts: BoolExp<FieldMatchAtom> | undefined
                     for (const partValue of nullSplit.parts) {
-                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type)
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type, exp.data.isResolvedFieldReference)
                         const atomData = {
                             ...exp.data,
                             value: partValue,
