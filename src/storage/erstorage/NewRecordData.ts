@@ -17,6 +17,15 @@ export type FieldAndValue = {
     valueType?: string
 }
 
+/**
+ * 写载荷的分类树（「分类⇒消费」守恒律的分类面，quality-plan §二.2）。
+ *
+ * CAUTION 每个分类桶都是一份消费承诺：凡被分类的载荷要么被执行者消费、要么被守卫拒绝，
+ *  不存在第三种状态（静默半处理，r27 F-1 的损坏形态）。分类面与消费面的差集由
+ *  tests/storage/newRecordDataConservation.spec.ts 机器对账——新增/删除分类桶、
+ *  或移除某个桶的执行者消费点，都会在该套件红灯下强制显式决策（登记消费者或登记守卫）。
+ *  行为面的「消费正确性」由写路径 fuzzer 的事件完备性预言机承担（数据 diff ⟺ 事件流）。
+ */
 export class NewRecordData {
     // 关系往自身合并的异表新 record
     public mergedLinkTargetNewRecords: NewRecordData[] = []
@@ -46,8 +55,6 @@ export class NewRecordData {
     public relatedEntitiesData: NewRecordData[] = []
     public valueAttributes: AttributeInfo[] = []
     public recordName: string
-    // 和当前合表并且是  id 的。说明我们的需要的 row 已经有了，只要update 相应 column 就行了
-    public sameRowEntityIdRefs: NewRecordData[] = []
     // recordName 是自己的 recordName，  info 是自己作为父亲的 attribute 的 info.
     public defaultValues: { [k: string]: any } = {}
     constructor(public map: EntityToTableMap, public originalRecordName: string, public rawData: RawEntityData, public info?: AttributeInfo, ) {

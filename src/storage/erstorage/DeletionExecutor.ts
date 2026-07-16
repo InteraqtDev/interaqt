@@ -43,13 +43,16 @@ export class DeletionExecutor {
     async deleteRecord(recordName: string, matchExp: MatchExpressionData, events?: RecordMutationEvent[], inSameRowDataOp = false): Promise<Record[]> {
         const deleteQuery = RecordQuery.create(recordName, this.map, {
             matchExpression: matchExp,
+            // 深度契约（见 getAttributeQueryDataForRecord 头注）：删除快照 = 最大深度
+            //  （随行子树级联删除 + merged link 端点 + link source/target 端点完备性 +
+            //   一层同住配对——combinedLinkFields 清列与级联判定都从这份快照读）。
             attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(
                 recordName,
                 this.map,
-                true,
-                true,
-                true,
-                true
+                /* includeSameTableReliance */ true,
+                /* includeMergedRecordAttribute */ true,
+                /* includeManagedRecordAttributes */ true,
+                /* includeNotRelianceCombined */ true
             )
         })
         const records = await this.agent.findRecords(deleteQuery, `find record for deleting ${recordName}`)
@@ -165,6 +168,7 @@ export class DeletionExecutor {
                 && member[info.attributeName] === undefined)
             if (pairingAttrs.length) {
                 const pairingAttributeQuery: AttributeQueryData = ['id', ...pairingAttrs.map(info => [info.attributeName, {
+                    // 深度契约：级联事件富化只需 link 行自身值字段（四开关全关——最浅快照）
                     attributeQuery: ['id', [LINK_SYMBOL, { attributeQuery: AttributeQuery.getAttributeQueryDataForRecord(info.linkName!, this.map) }]]
                 }] as AttributeQueryDataItem)]
                 const loaded = (await this.agent.findRecords(RecordQuery.create(memberInfo.name, this.map, {

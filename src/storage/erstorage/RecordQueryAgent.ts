@@ -123,7 +123,11 @@ export class RecordQueryAgent implements RecordOperationAgent {
         // CAUTION 这里是从 newEntityData 里读，不是从 newEntityDataWithIds，那里面是刚分配id 的，还没数据。
         let match: MatchExpressionData | undefined
         // 这里的目的是抢夺 combined record 上的所有数据，那么一定穷尽 combined record 的同表数据才行。
-        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map, true, true, false, true)
+        // 深度契约（见 getAttributeQueryDataForRecord 头注）：行认领读 = 随行子树（reliance 递归）
+        //  + merged link + 一层同住配对（供 assertNoNonRelianceCoTenant 守卫判定，不随行搬运）。
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(newEntityData.recordName, this.map,
+            /* includeSameTableReliance */ true, /* includeMergedRecordAttribute */ true,
+            /* includeManagedRecordAttributes */ false, /* includeNotRelianceCombined */ true)
         for (let combinedRecordIdRef of combinedRecordIdRefsToFlash) {
             // CAUTION 行认领按**物理同住**寻址（physicalRowMatch）：被认领记录可能独居
             //  （尚无任何配对，宿主槽位为空的 allowNull 行），逻辑配对守卫（r28 幻影配对
@@ -616,7 +620,11 @@ export class RecordQueryAgent implements RecordOperationAgent {
      *  即目前只有 DBSetup 的 mergeLinks 配置能触达。
      */
     async relocateCombinedRecordDataForLink(linkName: string, matchExpressionData: MatchExpressionData, moveSource = false, events?: RecordMutationEvent[]): Promise<Record[]> {
-        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(linkName, this.map, true, true, true, true)
+        // 深度契约（见 getAttributeQueryDataForRecord 头注）：搬迁读 = link 全快照
+        //  （端点 id + 随行子树 + merged link + 一层同住配对供双端冲突守卫判定）。
+        const attributeQuery: AttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(linkName, this.map,
+            /* includeSameTableReliance */ true, /* includeMergedRecordAttribute */ true,
+            /* includeManagedRecordAttributes */ true, /* includeNotRelianceCombined */ true)
         const moveAttribute = moveSource ? 'source' : 'target'
 
         const records = await this.queryExecutor.findRecords(RecordQuery.create(linkName, this.map, {

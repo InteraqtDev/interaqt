@@ -75,6 +75,28 @@ export class AttributeQuery {
             )
         ]
     }
+    /**
+     * 生成「一条记录的自我快照」attributeQuery——四个开关共同定义快照的**携带深度**，
+     * 这个深度就是行搬迁（flashOut/relocate）、删除级联与全量 update 快照的语义边界
+     * （quality-plan §二.3 的显式深度契约；此前该边界只隐式存在于布尔组合里）。
+     *
+     * 各开关的包含面与递归深度：
+     * - includeSameTableReliance：同表 reliance 子树（宿主的 sameTableReliance 槽位）。
+     *   **递归传递**（依赖的依赖一并携带），且非 relation 宿主时连同各层 link 行数据。
+     *   —— 这是行搬迁「随行搬运」的子树定义：搬迁语义 = 本开关能看见的都随行走。
+     * - includeNotRelianceCombined：非 reliance 的 combined 同住配对（1:1 合表非依赖）。
+     *   **只下钻一层**（子查询内部退回 includeSameTableReliance 深度、不再含
+     *   notRelianceCombined）——同住 ≠ 子树成员，行搬迁不携带跨关系同住配对。
+     *   深度不足之处由守卫兜底（fail-fast 而非静默半搬）：见 RecordQueryAgent 的
+     *   assertNoNonRelianceCoTenant / relocate 的双端冲突守卫（r27 F-5 / r28 子树扩展）。
+     * - includeMergedRecordAttribute：merged link（FK 并入本行的 x:1 关系）端点 id + link
+     *   行数据（link 子查询按 includeSameTableReliance 深度）。
+     * - includeManagedRecordAttributes：link record 自身的 source/target 端点 id
+     *   （delete/update 事件端点完备性契约的数据来源，r26）。
+     *
+     * CAUTION 调用点必须以命名注释声明各开关取值（声明自己的携带/快照意图）；
+     *  需要更深的携带面时，先补齐对应守卫或实现完整深度搬运，再放宽此契约。
+     */
     public static getAttributeQueryDataForRecord(
         recordName:string, 
         map: EntityToTableMap,
@@ -89,7 +111,7 @@ export class AttributeQuery {
         const recordInfo = map.getRecordInfo(inputRecordInfo.resolvedBaseRecordName!)
         let result: AttributeQueryData = recordInfo.valueAttributes.map(info => info.attributeName)
 
-        // FIXME 再想想以下几个参数的递归查询，特别是关系上的数据。
+        // sameTableReliance：递归传递（含各层 link）——行搬迁子树的定义面（见方法头注）
         if(includeSameTableReliance) {
             recordInfo.sameTableReliance.forEach(info =>{
                 const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute)
@@ -110,18 +132,9 @@ export class AttributeQuery {
         }
 
         if (includeNotRelianceCombined){
+            // notRelianceCombined：只下钻一层（子查询不再含 notRelianceCombined）——
+            // 同住 ≠ 子树成员；跨关系同住配对刻意不进快照深度，由调用点守卫兜底（见方法头注）
             recordInfo.notRelianceCombined.forEach(info =>{
-                // const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute, true)
-                // const relianceRelationAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.linkName, map, true, includeMergedRecordAttribute, true)
-                // result.push(
-                //     [
-                //         info.attributeName,
-                //         {
-                //             attributeQuery: [...relianceAttributeQueryData, [LINK_SYMBOL, { attributeQuery: relianceRelationAttributeQueryData }]]
-                //         }
-                //     ]
-                // )
-
                 const relianceAttributeQueryData = AttributeQuery.getAttributeQueryDataForRecord(info.recordName, map, true, includeMergedRecordAttribute)
                 const attributeQueryItem:AttributeQueryDataItem  = [
                     info.attributeName,
