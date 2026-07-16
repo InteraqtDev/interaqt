@@ -755,6 +755,30 @@ export class QueryExecutor {
                 //  按 base 名挂载会让 filtered 名下的结果整体缺失、且过滤后的子集泄漏到 base 名下，
                 //  与请求 base 属性的结果互相覆盖）。alias 对非 filtered 关系恒等于 attributeName。
                 const xToManyResultKey = xToManySubSubQuery.alias || xToManySubSubQuery.attributeName!
+                // B5（performance-debt-plan §五 2.3）：x:1 主干上的 x:n 枝干优先按父 id 集合批量
+                //  （IN + 反向分组，与顶层 findXToManyRelatedRecordsBatched 同构），消掉「每根记录
+                //  一次枝干查询」的 N+1。批量前置条件在 canBatchXToManyQuery 之上追加两条：
+                //  - 根查询无 label（label 需要 per-record 递归上下文）；
+                //  - 挂载的 x:1 目标 id 互不相同（n:1 主干共享目标时，批量会让多个根记录共享
+                //    同一批子记录对象——对象别名泄漏改变公开契约，保持逐条查询，登记为边界）。
+                const mountedParents = records
+                    .map(record => record[subResultKey])
+                    .filter((parent): parent is Record => !!parent)
+                const parentIdsUnique = new Set(mountedParents.map(parent => String(parent.id))).size === mountedParents.length
+                if (
+                    !entityQuery.label && parentIdsUnique &&
+                    this.canBatchXToManyQuery(xToOneSubQuery, xToManySubSubQuery, mountedParents)
+                ) {
+                    await this.findXToManyRelatedRecordsBatched(
+                        xToOneSubQuery.recordName,
+                        xToManySubSubQuery.attributeName!,
+                        mountedParents,
+                        xToManySubSubQuery,
+                        recordQueryRef,
+                        context
+                    )
+                    continue
+                }
                 for(let record of records) {
                     if (!record[subResultKey]) {
                         // Skip this record if the x:1 relation is null
