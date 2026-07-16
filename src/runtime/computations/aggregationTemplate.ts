@@ -480,27 +480,40 @@ export abstract class PropertyRelationAggregationHandle<V extends AggregationIte
                 return this.applyDelta(hostRecord, this.presenceItemValue(), this.presenceItemValue(), 0)
             }
             // relatedAttribute 是从当前 dataContext 出发，转换成从关联关系出发的 match key 反查关系记录。
+            // CAUTION 反查必须带宿主端约束：关联实体可能被多个宿主共享（n:n / n:1 / 深路径共享），
+            //  无宿主约束的 findOne 拿到的是"第一条指向该实体的任意 link"——每个宿主的增量
+            //  读写同一条 link 的贡献状态（错误聚合值静默落库）。掩蔽机理：PGLite/PG 的
+            //  MVCC 行更新会把该行移到扫描序末尾，逐宿主处理恰好"旋转"到各自正确的 link，
+            //  只在 SQLite（稳定 rowid 序）上确定性出错——计算层 fuzz 仅跑 PGLite 因此失明。
+            //  同一宿主经深路径（relatedAttribute 长度 >1）共享同一深层记录时会有多条 link
+            //  命中，贡献全部失效，必须 find + 逐条重算（单条命中时行为与旧 findOne 一致）。
+            const hostSide = this.isSource ? 'source' : 'target'
             const relationMatchKey = buildRelationSideMatchKey(mutationEvent.relatedAttribute, this.relationSide)
-            const relationWithEntity = await this.controller.system.storage.findOne(
+            const relationsWithEntity = await this.controller.system.storage.find(
                 this.relation.name!,
-                MatchExp.atom({ key: relationMatchKey, value: ['=', relatedMutationEvent.oldRecord!.id] }),
+                MatchExp.atom({ key: relationMatchKey, value: ['=', relatedMutationEvent.oldRecord!.id] })
+                    .and({ key: `${hostSide}.id`, value: ['=', hostRecord.id] }),
                 undefined,
                 this.relationAttributeQuery
             )
             // 关系记录已不可见（被删除/filtered 成员资格变化竞态）时退回全量重算。
-            if (!relationWithEntity) {
+            if (!relationsWithEntity.length) {
                 return ComputationResult.fullRecompute(`relation record not found by ${relationMatchKey} for ${describeDataContext(this.dataContext)}`)
             }
-            const relatedRecord = relationWithEntity[this.relationSide]
-            // 同 create 路径：端点缺失退回全量重算。
-            if (!relatedRecord) {
-                return ComputationResult.fullRecompute(`relation ${this.relationSide} endpoint missing for ${describeDataContext(this.dataContext)}`)
+            let aggregateResult: TResult | undefined
+            for (const relationWithEntity of relationsWithEntity) {
+                const relatedRecord = relationWithEntity[this.relationSide]
+                // 同 create 路径：端点缺失退回全量重算。
+                if (!relatedRecord) {
+                    return ComputationResult.fullRecompute(`relation ${this.relationSide} endpoint missing for ${describeDataContext(this.dataContext)}`)
+                }
+                relatedRecord[LINK_SYMBOL] = relationWithEntity
+                const value = this.computeItemValue(relatedRecord, dataDeps)
+                const replaced = await this.replaceItemState(relationWithEntity, value)
+                if (replaced instanceof ComputationResult) return replaced
+                aggregateResult = await this.applyDelta(hostRecord, value, replaced.oldValue, 0)
             }
-            relatedRecord[LINK_SYMBOL] = relationWithEntity
-            const value = this.computeItemValue(relatedRecord, dataDeps)
-            const replaced = await this.replaceItemState(relationWithEntity, value)
-            if (replaced instanceof ComputationResult) return replaced
-            return this.applyDelta(hostRecord, value, replaced.oldValue, 0)
+            return aggregateResult!
         }
 
         // 未知的 related 事件形态必须退回全量重算，静默 delta=0 会让聚合悄悄停滞。
