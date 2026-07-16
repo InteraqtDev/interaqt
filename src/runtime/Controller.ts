@@ -885,9 +885,14 @@ export class Controller {
             }
         }
         let result: DispatchResponse
+        // postCommit 必须拿到**已提交尝试**的 args（guard 会就地补全 activityId 等派生输入；
+        //  外层 args 每次尝试前克隆、从不回写）。此前传原始 args：activity 头交互创建的
+        //  activityId 对 postCommit 不可见（r35）。
+        let committedAttemptArgs: TArgs = args
         try {
             result = await asyncInteractionContext.run(interactionContext, () => runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
                 const attemptArgs = this.cloneDispatchArgs(args)
+                committedAttemptArgs = attemptArgs
                 const effectsContext = { effects: [] as RecordMutationEvent[] }
                 return asyncEffectsContext.run(effectsContext, async () => {
                     return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
@@ -934,7 +939,7 @@ export class Controller {
         }
 
         if (!result.error) {
-            await this.runPostCommitHook(eventSource, args, result, this.system.logger)
+            await this.runPostCommitHook(eventSource, committedAttemptArgs, result, this.system.logger)
             await this.runRecordChangeSideEffects(result, this.system.logger)
         }
 

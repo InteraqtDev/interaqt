@@ -1130,9 +1130,19 @@ RETURNING "numberValue" AS value`,
                     const idPlaceholder = p()
                     const defaultPlaceholder = p()
                     const expectedPlaceholder = p()
+                    // CAUTION 与 replace 同一契约（r26 写参归一化的兄弟读者，r35 收口）：
+                    //  next/expected/defaultValue 必须过 normalizeRecordFieldParam。
+                    //  此前裸绑定：timestamp 字段传 Date 在 SQLite 直接抛绑定错误、
+                    //  传 ISO 字符串则与 INT 毫秒列恒不相等——静默返回 false，
+                    //  调用方误判为并发竞争失败。
                     const rows = await this.db.query<Record<string, unknown>>(
                         `UPDATE "${tableName}" SET "${fieldName}" = ${nextPlaceholder} WHERE "${idField}" = ${idPlaceholder} AND COALESCE("${fieldName}", ${defaultPlaceholder}) = ${expectedPlaceholder} RETURNING "${fieldName}" AS value`,
-                        [next, target.id, defaultValue, expected],
+                        [
+                            this.normalizeRecordFieldParam(next, valueType),
+                            target.id,
+                            this.normalizeRecordFieldParam(defaultValue, valueType),
+                            this.normalizeRecordFieldParam(expected, valueType)
+                        ],
                         `atomic compareAndSet ${target.recordName}.${target.field}`
                     )
                     return rows.length > 0
