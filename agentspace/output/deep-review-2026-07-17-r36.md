@@ -68,8 +68,11 @@
 
 ## 四、验证证据链
 
-- ✅ `npm run check`；`npm test` 全量 2422 passed / 49 skipped
+- ✅ `npm run check`；`npm test` 全量 2422 passed / 49 skipped；`npm run build`（vite 库构建 + prod 类型检查）
 - ✅ 真实 PostgreSQL 16 七套件 33 passed
+- ✅ 真实 MySQL 8.0.46（发版前补验，r35/r36 轮的诚实边界收口）：env-gated 四套件
+  （idSequenceReconcile / migrationOperationKey / openIdempotency / closeIdempotency）全绿；
+  驱动差分 MySQL 轨 20 种子全绿（SQLite vs 真实 MySQL 逐操作对账）
 - ✅ match 语义 fuzz：默认 25 + 扩池 75（新生成域）
 - ✅ 迁移破坏性 fuzz：新宇宙 1–44 全绿；基线敏感性 seed 43 红（F-4 签名）
 - ✅ storage 结构 fuzz base 100 种子 ×40 ops + extended 60、驱动差分 60（真实 PG 次驱动）
