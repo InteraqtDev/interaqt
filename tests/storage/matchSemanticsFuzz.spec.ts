@@ -26,8 +26,17 @@
  *  - AND/OR/NOT 任意嵌套（NOT 可包裹任何子树）；
  *  - 恒定不变量：find 结果无重复根 id——SELECT 列全部来自根/x:1 路径（对根恒定），
  *    扇出行必然整行相同、dedupe 必然完全（对 r25#6「dedupe 少去重风险」的机器化定谳）。
- * 刻意排除（登记边界）：对称关系 / filtered 中段（existAtomCorrelation 维持 legacy 编译）、
- *  引用值、like、between。
+ *  - **between（r36 扩域）**：数值字段、非 null 边界（null 边界声明期 fail-fast 契约），
+ *    NULL 值三值；
+ *  - **引用值（r36 扩域，isReferenceValue）**：根/x:1 数值路径对比（rank vs dept.budget），
+ *    任一侧 NULL ⇒ UNKNOWN（SQL `NULL = NULL` 是 UNKNOWN——模型不得按 JS 相等处理）；
+ *    跨关联引用路径的 JOIN 树收集（collectAtomReferencePaths，r19/r20 家族）随之进入生成域；
+ *  - **filtered 实体作为查询根（r36 扩域）**：resolvedMatchExpression 与用户 match 的
+ *    AND 合并面——naive = 过滤谓词 AND 用户表达式；
+ *  - **对称单段 exist（r36 扩域）**：friends（source===target 同名属性），语义 = ∃ 邻居
+ *    （两个方向的并集）满足载荷。
+ * 刻意排除（登记边界）：对称**中段**路径 / filtered 中段（existAtomCorrelation 维持
+ *  legacy 编译，NOT 语义见 existCorrelationScope 的 pin）、like（方言大小写敏感性分裂）。
  *
  * 复现：FUZZ_MATCH_SEED_START=<seed> FUZZ_MATCH_SEED_COUNT=1 FUZZ_MATCH_VERBOSE=1
  */
@@ -44,13 +53,13 @@ const andTV = (a: TV, b: TV): TV => (a === false || b === false) ? false : (a ==
 const orTV = (a: TV, b: TV): TV => (a === true || b === true) ? true : (a === 'U' || b === 'U') ? 'U' : false
 
 // ---------- 内存数据模型 ----------
-type DeptRow = { id: string, region: string | null }
+type DeptRow = { id: string, region: string | null, budget: number | null }
 type MemberRow = { id: string, role: string, level: number | null }
 type TeamRow = { id: string, kind: string, size: number | null, members: MemberRow[] }
 type UserRow = { id: string, name: string, rank: number | null, dept: DeptRow | null, teams: TeamRow[], collabs: MemberRow[] }
 
 // ---------- 表达式形态 ----------
-type ValueAtomSpec = { type: 'value', key: string, op: string, value: unknown }
+type ValueAtomSpec = { type: 'value', key: string, op: string, value: unknown, isRef?: boolean }
 type ExistAtomSpec = { type: 'exist', path: string, payload: ExprNode }
 type ExprNode =
     | { node: 'atom', atom: ValueAtomSpec | ExistAtomSpec }
@@ -78,7 +87,23 @@ function evalValueAtomTV(pathValue: unknown, op: string, value: unknown): TV {
         case '<': return (pathValue as number) < (value as number)
         case 'in': return (value as unknown[]).includes(pathValue)
         case 'not in': return !(value as unknown[]).includes(pathValue)
+        case 'between': {
+            const [lo, hi] = value as [number, number]
+            return (pathValue as number) >= lo && (pathValue as number) <= hi
+        }
         default: throw new Error(`naive evaluator: unknown op ${op}`)
+    }
+}
+
+// 引用值原子：两侧都是列（SQL `col op col`），任一侧 NULL ⇒ UNKNOWN（含 `NULL = NULL`）。
+function evalReferenceAtomTV(leftValue: unknown, op: string, rightValue: unknown): TV {
+    if (leftValue === null || leftValue === undefined || rightValue === null || rightValue === undefined) return 'U'
+    switch (op) {
+        case '=': return leftValue === rightValue
+        case '!=': return leftValue !== rightValue
+        case '>': return (leftValue as number) > (rightValue as number)
+        case '<': return (leftValue as number) < (rightValue as number)
+        default: throw new Error(`naive evaluator: unknown reference op ${op}`)
     }
 }
 
@@ -113,7 +138,10 @@ function evalTreeTV(node: ExprNode, scope: Record<string, unknown>): TV {
     if (node.node === 'and') return andTV(evalTreeTV(node.left, scope), evalTreeTV(node.right, scope))
     if (node.node === 'or') return orTV(evalTreeTV(node.left, scope), evalTreeTV(node.right, scope))
     const atom = node.atom
-    if (atom.type === 'value') return evalValueAtomTV(resolvePathValue(scope, atom.key), atom.op, atom.value)
+    if (atom.type === 'value') {
+        if (atom.isRef) return evalReferenceAtomTV(resolvePathValue(scope, atom.key), atom.op, resolvePathValue(scope, atom.value as string))
+        return evalValueAtomTV(resolvePathValue(scope, atom.key), atom.op, atom.value)
+    }
     const terminals = resolveChain(scope, atom.path.split('.'))
     return terminals.some(terminal => evalTreeTV(atom.payload, terminal) === true)
 }
@@ -139,6 +167,7 @@ function evalRootAtomTV(atom: ValueAtomSpec | ExistAtomSpec, rootScope: Record<s
     else if (key.startsWith('teams.')) pathValue = readFrom(assignment.team, key.slice('teams.'.length))
     else if (key.startsWith('collabs.')) pathValue = readFrom(assignment.collab, key.slice('collabs.'.length))
     else pathValue = resolvePathValue(rootScope, key)
+    if (atom.isRef) return evalReferenceAtomTV(pathValue, atom.op, resolvePathValue(rootScope, atom.value as string))
     return evalValueAtomTV(pathValue, atom.op, atom.value)
 }
 
@@ -173,6 +202,9 @@ function toMatchData(node: ExprNode): MatchExpressionData {
     if (node.node === 'or') return toMatchData(node.left).or(toMatchData(node.right))
     const atom = node.atom
     if (atom.type === 'value') {
+        if (atom.isRef) {
+            return MatchExp.atom({ key: atom.key, value: [atom.op, atom.value] as [string, unknown], isReferenceValue: true })
+        }
         return MatchExp.atom({ key: atom.key, value: [atom.op, atom.value] as [string, unknown] })
     }
     return MatchExp.atom({ key: atom.path, value: ['exist', toMatchData(atom.payload)] })
@@ -183,7 +215,7 @@ function describeExpr(node: ExprNode): string {
     if (node.node === 'and') return `(${describeExpr(node.left)} AND ${describeExpr(node.right)})`
     if (node.node === 'or') return `(${describeExpr(node.left)} OR ${describeExpr(node.right)})`
     const atom = node.atom
-    if (atom.type === 'value') return `${atom.key} ${atom.op} ${JSON.stringify(atom.value)}`
+    if (atom.type === 'value') return atom.isRef ? `${atom.key} ${atom.op} ref(${atom.value})` : `${atom.key} ${atom.op} ${JSON.stringify(atom.value)}`
     return `${atom.path} EXIST (${describeExpr(atom.payload)})`
 }
 
@@ -211,8 +243,20 @@ function genValueAtom(rng: Rng, fields: FieldSpec[]): ExprNode {
         const list = Array.from({ length: listLength }, () => genScalar(rng, field.kind))
         return { node: 'atom', atom: { type: 'value', key: field.key, op: pick(rng, ['in', 'not in']), value: list } }
     }
+    if (field.numeric && roll < 0.5) {
+        const lo = Math.floor(rng() * 4)
+        return { node: 'atom', atom: { type: 'value', key: field.key, op: 'between', value: [lo, lo + Math.floor(rng() * 3)] } }
+    }
     const op = field.numeric ? pick(rng, ['=', '!=', '>', '<']) : pick(rng, ['=', '!='])
     return { node: 'atom', atom: { type: 'value', key: field.key, op, value: genScalar(rng, field.kind) } }
+}
+
+// 引用值原子（根作用域内的两条数值路径对比；跨关联引用路径入 JOIN 树是 r19/r20 家族的消费面）
+function genReferenceAtom(rng: Rng): ExprNode {
+    const pair = pick(rng, [
+        ['rank', 'dept.budget'], ['dept.budget', 'rank'],
+    ] as const)
+    return { node: 'atom', atom: { type: 'value', key: pair[0], op: pick(rng, ['=', '!=', '>', '<']), value: pair[1], isRef: true } }
 }
 
 const TEAM_FIELDS: FieldSpec[] = [
@@ -254,7 +298,7 @@ function genBoolTree(rng: Rng, depth: number, genLeaf: (rng: Rng) => ExprNode): 
 
 // exist 原子菜单：路径 × 载荷（载荷可含嵌套 exist）
 function genExistAtom(rng: Rng): ExprNode {
-    const shape = pick(rng, ['teams', 'teams.members', 'collabs', 'collabs.team', 'dept.staff', 'teamsNested'] as const)
+    const shape = pick(rng, ['teams', 'teams.members', 'collabs', 'collabs.team', 'dept.staff', 'teamsNested', 'friends'] as const)
     if (shape === 'teams') {
         return { node: 'atom', atom: { type: 'exist', path: 'teams', payload: genBoolTree(rng, 1, r => genValueAtom(r, TEAM_FIELDS)) } }
     }
@@ -263,6 +307,10 @@ function genExistAtom(rng: Rng): ExprNode {
     }
     if (shape === 'collabs') {
         return { node: 'atom', atom: { type: 'exist', path: 'collabs', payload: genBoolTree(rng, 1, r => genValueAtom(r, MEMBER_FIELDS)) } }
+    }
+    if (shape === 'friends') {
+        // 对称单段 exist：∃ 邻居（两个方向的并集）满足载荷（existCorrelationScope 的 pin 已定谳正/反极性都按根量化）
+        return { node: 'atom', atom: { type: 'exist', path: 'friends', payload: genBoolTree(rng, 0, r => genValueAtom(r, USER_FIELDS.slice(0, 2))) } }
     }
     if (shape === 'collabs.team') {
         // n:n 中段 → x:1 终段
@@ -289,7 +337,8 @@ function genExistAtom(rng: Rng): ExprNode {
 function genRootExpr(rng: Rng): ExprNode {
     return genBoolTree(rng, 2, r => {
         const roll = r()
-        if (roll < 0.4) return genValueAtom(r, USER_FIELDS)
+        if (roll < 0.35) return genValueAtom(r, USER_FIELDS)
+        if (roll < 0.45) return genReferenceAtom(r)
         if (roll < 0.65) return genValueAtom(r, USER_XN_FIELDS)
         return genExistAtom(r)
     })
@@ -297,7 +346,7 @@ function genRootExpr(rng: Rng): ExprNode {
 
 // ---------- 世界构建 ----------
 async function buildWorld(rng: Rng, tag: string) {
-    const Dept = Entity.create({ name: `MsDept${tag}`, properties: [Property.create({ name: 'region', type: 'string' })] })
+    const Dept = Entity.create({ name: `MsDept${tag}`, properties: [Property.create({ name: 'region', type: 'string' }), Property.create({ name: 'budget', type: 'number' })] })
     const User = Entity.create({
         name: `MsUser${tag}`,
         properties: [Property.create({ name: 'name', type: 'string' }), Property.create({ name: 'rank', type: 'number' })]
@@ -314,11 +363,18 @@ async function buildWorld(rng: Rng, tag: string) {
     Relation.create({ name: `MsUserTeams${tag}`, source: User, sourceProperty: 'teams', target: Team, targetProperty: 'owner', type: '1:n' })
     Relation.create({ name: `MsTeamMembers${tag}`, source: Team, sourceProperty: 'members', target: Member, targetProperty: 'team', type: '1:n' })
     Relation.create({ name: `MsUserCollabs${tag}`, source: User, sourceProperty: 'collabs', target: Member, targetProperty: 'collabUsers', type: 'n:n' })
+    Relation.create({ name: `MsUserFriends${tag}`, source: User, sourceProperty: 'friends', target: User, targetProperty: 'friends', type: 'n:n' })
+    // filtered 根（r36）：resolvedMatchExpression 与用户 match 的 AND 合并面
+    const Active = Entity.create({
+        name: `MsActive${tag}`,
+        baseEntity: User,
+        matchExpression: MatchExp.atom({ key: 'rank', value: ['>', 0] }),
+    })
 
     const db = new PGLiteDB()
     const system = new MonoSystem(db)
     system.conceptClass = KlassByName
-    const entities = [Dept, User, Team, Member]
+    const entities = [Dept, User, Team, Member, Active]
     const controller = new Controller({
         system, entities,
         relations: Relation.instances.filter(r => (r.name as string | undefined)?.endsWith(tag)),
@@ -330,8 +386,9 @@ async function buildWorld(rng: Rng, tag: string) {
     const depts: DeptRow[] = []
     for (let i = 0; i < 3; i++) {
         const region = chance(rng, 0.15) ? null : pick(rng, REGIONS.slice(0, 3))
-        const created = await system.storage.create(`MsDept${tag}`, { region })
-        depts.push({ id: String(created.id), region })
+        const budget = chance(rng, 0.25) ? null : Math.floor(rng() * 5)
+        const created = await system.storage.create(`MsDept${tag}`, { region, budget })
+        depts.push({ id: String(created.id), region, budget })
     }
     const members: MemberRow[] = []
     for (let i = 0; i < 8; i++) {
@@ -382,6 +439,17 @@ async function buildWorld(rng: Rng, tag: string) {
         })
         users.push({ id: String(created.id), name, rank, dept, teams: userTeams, collabs })
     }
+    // 对称 friends 边（无向；镜像进双方邻居集）
+    const friendsByUserId = new Map<string, UserRow[]>(users.map(u => [u.id, []]))
+    for (let i = 0; i < 4; i++) {
+        const a = pick(rng, users)
+        const b = pick(rng, users)
+        if (a.id === b.id) continue
+        if (friendsByUserId.get(a.id)!.some(f => f.id === b.id)) continue
+        await system.storage.addRelationByNameById(`MsUserFriends${tag}`, a.id, b.id, {})
+        friendsByUserId.get(a.id)!.push(b)
+        friendsByUserId.get(b.id)!.push(a)
+    }
 
     // 内存模型的求值视图（exist 链会走 dept.staff 反向、collabs.team 反向，需要补反查引用）
     const teamByMemberId = new Map<string, TeamRow>()
@@ -405,10 +473,12 @@ async function buildWorld(rng: Rng, tag: string) {
         name: user.name, rank: user.rank,
         dept: user.dept ? {
             region: user.dept.region,
+            budget: user.dept.budget,
             staff: (staffByDeptId.get(user.dept.id) || []).map(u => ({ name: u.name, rank: u.rank })),
         } : null,
         teams: user.teams.map(scopeOfTeam),
         collabs: user.collabs.map(scopeOfMember),
+        friends: (friendsByUserId.get(user.id) || []).map(f => ({ name: f.name, rank: f.rank })),
     })
 
     return { system, users, scopeOfUser, tag }
@@ -443,6 +513,20 @@ describe('match semantics differential fuzz (SQL compilation vs independent thre
                     throw new Error(`[match-fuzz seed=${seed} expr=${exprIndex}] find returned DUPLICATE roots (dedupe incomplete): ${JSON.stringify(rawIds)}\nexpression: ${describeExpr(expr)}`)
                 }
                 const actual = [...rawIds].sort()
+
+                // filtered 根（r36）：同一表达式经 filtered 实体查询，naive = 过滤谓词(rank>0) AND 表达式
+                const filteredRows = await world.system.storage.find(`MsActive${world.tag}`, toMatchData(expr), undefined, ['id'])
+                const filteredActual = [...new Set(filteredRows.map((row: { id: unknown }) => String(row.id)))].sort()
+                const filteredExpected = world.users
+                    .filter(user => (user.rank ?? null) !== null && (user.rank as number) > 0 && rootMatches(expr, world.scopeOfUser(user)))
+                    .map(user => user.id).sort()
+                if (JSON.stringify(filteredActual) !== JSON.stringify(filteredExpected)) {
+                    throw new Error(
+                        `[match-fuzz seed=${seed} expr=${exprIndex}] FILTERED-root result diverges\n` +
+                        `expression: ${describeExpr(expr)}\n` +
+                        `expected: ${JSON.stringify(filteredExpected)}\nactual:   ${JSON.stringify(filteredActual)}`
+                    )
+                }
                 if (process.env.FUZZ_MATCH_VERBOSE) {
                     console.log(`seed=${seed} expr=${exprIndex}: ${describeExpr(expr)}\n  expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`)
                 }
