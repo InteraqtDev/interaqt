@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.4.0](https://github.com/interaqtdev/interaqt/compare/v4.3.0...v4.4.0) (2026-07-17)
+
+### Bug Fixes
+
+* **core,runtime:** reject async functions on synchronously-consumed callback surfaces; thenable guard at aggregation consumption ([c1984d1](https://github.com/interaqtdev/interaqt/commit/c1984d15d6c9d8e484138b3665f72d293ed996e8))
+* **runtime:** atomic.compareAndSet normalizes timestamp/json write params like replace; postCommit receives committed attempt args ([eb4deac](https://github.com/interaqtdev/interaqt/commit/eb4deaca83784699f884fc053b2e8629fdc0f615))
+* **runtime:** global json compareAndSet compares canonical forms under a row lock ([27927eb](https://github.com/interaqtdev/interaqt/commit/27927eb3886ff97387e6734a4de9f6544c59685e))
+* **runtime:** migration Transform rebuild emits storage-truth events; deletion audit filters by recordName ([59ee27a](https://github.com/interaqtdev/interaqt/commit/59ee27a0bc176af8885f7d996acca0c931d191ce))
+* **storage:** EXIST atom correlation scope — root-anchored nested EXISTS for x:n intermediates; pre-resolved correlation references ([b84b0fd](https://github.com/interaqtdev/interaqt/commit/b84b0fdd47c45edfa7e338d19524090d989b463d)), closes [r25#7](https://github.com/interaqtdev/r25/issues/7)
+* **storage:** exist atoms carrying a rebased filtered-relation path predicate keep parent correlation ([7242e03](https://github.com/interaqtdev/interaqt/commit/7242e03799b0095f8341802936e169aa81337949))
+* **storage:** tokenize nested-EXISTS subquery prefixes — identifiers stay within PostgreSQL's 63-byte limit ([0599fd0](https://github.com/interaqtdev/interaqt/commit/0599fd0ff737907f48df71d23aae4e4ece77c0fe))
+* **storage:** two-phase pagination — forUpdate forces the single-statement path; document the cross-statement read boundary ([006f829](https://github.com/interaqtdev/interaqt/commit/006f829e4900b8c7183b682bb6903fe53742e08c))
+
 ## Unreleased
 
 Deep-review round r35 (`agentspace/output/deep-review-2026-07-16-r35.md`): five fatal fixes and
