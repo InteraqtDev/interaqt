@@ -1157,6 +1157,35 @@ RETURNING "numberValue" AS value`,
                 }
 
                 const column = this.resolveGlobalColumn(target, next)
+                // CAUTION global 目标的 json CAS 与 record 目标同一契约（r25 修 record、r36 收兄弟格）：
+                //  单语句 `COALESCE("jsonValue", ?) = ?` 在 PG 系直接抛 "operator does not exist:
+                //  json = unknown"（json 类型无等值操作符），SQLite 按存储文本比较——写路径是
+                //  非规范 JSON.stringify，键序不同的语义相等对象恒不相等（静默 false，
+                //  与并发竞争失败不可区分）。改走「锁定读 → 规范形比较 → 条件写」事务路径。
+                if (column === 'jsonValue') {
+                    return this.withAtomicTransaction(`atomic compareAndSet ${target.key}`, async () => {
+                        await this.ensureGlobalStateRow(target, column, defaultValue)
+                        const lockP = this.getPlaceholder()
+                        const rows = await this.db.query<Record<string, unknown>>(
+                            `SELECT "${column}" AS value FROM "_ComputationState_" WHERE "key" = ${lockP()}${this.supportsForUpdate() ? ' FOR UPDATE' : ''}`,
+                            [target.key],
+                            `atomic compareAndSet lock ${target.key}`
+                        )
+                        const current = this.parseGlobalValue<T>(rows[0]?.value, column)
+                        const currentForCompare = current === null ? (defaultValue ?? null) : current
+                        if (canonicalJSONStringify(currentForCompare) !== canonicalJSONStringify(expected ?? null)) return false
+                        const updateP = this.getPlaceholder()
+                        const valuePlaceholder = updateP()
+                        const keyPlaceholder = updateP()
+                        await this.db.update(
+                            `UPDATE "_ComputationState_" SET "${column}" = ${valuePlaceholder} WHERE "key" = ${keyPlaceholder}`,
+                            [this.normalizeGlobalValue(next, column), target.key],
+                            undefined,
+                            `atomic compareAndSet ${target.key}`
+                        )
+                        return true
+                    })
+                }
                 const storedNext = this.normalizeGlobalValue(next, column)
                 const storedDefault = this.normalizeGlobalValue(defaultValue, column)
                 const storedExpected = this.normalizeGlobalValue(expected, column)
