@@ -84,6 +84,31 @@ recorded r35 boundaries: two more fixes and three oracle-domain expansions.
   serialized as `"{}"` into string/json columns. Promises have no legal persisted form, so
   rejection is strictly safer than the silent corruption.
 
+### Behavior changes (upgrade notes)
+
+* **Async functions on synchronously-consumed callback surfaces now fail at declaration time.**
+  `Count`/`Every`/`Any`/`WeightedSummation` `callback`, `Property.computed`,
+  `Property.defaultValue`, `Dictionary.defaultValue`, `RealTime.nextRecomputeTime`,
+  `Custom.createState` and `Custom.planIncremental` reject `async` functions in `create()`.
+  Applications that declared them previously did not work — they silently persisted coerced
+  garbage (`true`, `0`, `"{}"`) — but they did *start*; after upgrading they throw at declaration
+  with an error naming the field. Make the callback synchronous (derive async values into stored
+  properties first). Awaited surfaces (`Transform.callback`, `Custom.compute`,
+  `RealTime.callback`, `StateNode.computeValue`, `StateTransfer.computeTarget`,
+  `Condition.content`, `SideEffect.handle`) keep accepting async functions.
+* **`NOT` over `exist` matches with to-many intermediates now quantifies per root record.**
+  Queries (and update/delete victim selections) that negate an exist atom whose path crosses a
+  to-many segment previously used per-fan-out-row quantification and could return roots that do
+  have a matching terminal; they now return the set-semantics complement (¬∃). Positive exist
+  results are unchanged. Nested exist atoms (an exist inside an exist payload) previously
+  returned empty sets and now work. `NOT` over plain to-many **value** atoms keeps its
+  documented per-row three-valued semantics — see the new "matching through to-many paths"
+  section in the querying guide.
+* **Promise-valued writes and stale timestamp/json compare-and-set forms that previously
+  "succeeded" silently now fail loudly** (see Hardening and Bug Fixes). Code paths relying on
+  the silent behavior should await values before writing and pass canonical comparable values
+  to `atomic.compareAndSet`.
+
 ## [4.3.0](https://github.com/InteraqtDev/interaqt/compare/v4.2.0...v4.3.0) (2026-07-16)
 
 Performance-debt closure round, executed in recorded-importance order against the inventory in
