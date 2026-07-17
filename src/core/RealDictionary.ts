@@ -107,6 +107,8 @@ export class Dictionary implements DictionaryInstance {
       type: 'function' as const,
       required: false as const,
       collection: false as const,
+      // setup/迁移回填同步求值直接落库（create() 内 assertSynchronousFunctionArg 执行拒绝）。
+      synchronous: true as const,
     },
     computation: {
       collection: false as const,

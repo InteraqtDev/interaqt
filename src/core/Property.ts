@@ -75,11 +75,15 @@ export class Property implements PropertyInstance {
     },
     defaultValue: {
       type: 'function' as const,
-      required: false as const
+      required: false as const,
+      // storage 写路径同步求值直接落库（create() 内 assertSynchronousFunctionArg 执行拒绝）。
+      synchronous: true as const
     },
     computed: {
       type: 'function' as const,
-      required: false as const
+      required: false as const,
+      // storage 写路径同步求值直接落库（create() 内 assertSynchronousFunctionArg 执行拒绝）。
+      synchronous: true as const
     },
     computation: {
       type: [] as const,

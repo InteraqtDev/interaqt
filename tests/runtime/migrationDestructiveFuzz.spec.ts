@@ -272,7 +272,32 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
                 }
             }
         }
-        return approveGeneratedMigrationDiff(controller, { computationDecisions })
+        const approvedDiff = await approveGeneratedMigrationDiff(controller, { computationDecisions })
+        await assertScopeIdsAreExistingRows(approvedDiff)
+        return approvedDiff
+    }
+
+    // 预言机 0（r35 复盘：审批面的绝对下界）：destructive-scope 的 ids 必须是该 recordName
+    //  迁移前**存量行 id 的无重复子集**。此前唯一的 scope 检查是「批准集合 == 执行集合」——
+    //  模拟与执行共用同一收集器（collectAuditedDeletions），共享实现里的污染（r35 F-5：
+    //  link 级联 id 记入宿主 scope）在两侧同源出现并相互抵消，相对对账永远绿。
+    //  绝对断言以独立事实（迁移前该表的行集合）为地面真值，对共享收集器缺陷不失明。
+    const assertScopeIdsAreExistingRows = async (approvedDiff: { decisions: unknown[] }) => {
+        const scopeDecisions = (approvedDiff.decisions as Array<{ kind: string, recordName?: string, ids?: unknown[], dataContext?: string }>)
+            .filter(decision => decision.kind === 'destructive-scope')
+        for (const decision of scopeDecisions) {
+            const ids = (decision.ids || []).map(String)
+            if (new Set(ids).size !== ids.length) {
+                failWith(`destructive-scope ${decision.dataContext} (${decision.recordName}) carries duplicate ids: ${JSON.stringify(ids)} — a foreign-id pollution signature (r35 F-5)`)
+            }
+            if (!decision.recordName || !ids.length) continue
+            const existing = new Set(
+                (await storageV1.find(decision.recordName, undefined, undefined, ['id']) as Row[]).map(row => String(row.id)))
+            const foreign = ids.filter(id => !existing.has(id))
+            if (foreign.length) {
+                failWith(`destructive-scope ${decision.dataContext} (${decision.recordName}) lists ids that are not pre-migration rows of that record: ${JSON.stringify(foreign)} (existing: ${JSON.stringify([...existing])})`)
+            }
+        }
     }
 
     if (blocked) {
