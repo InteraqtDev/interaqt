@@ -884,6 +884,14 @@ class MonoStorage implements Storage{
      * 崩溃，且键序不定的存储文本会让规范化比较失效。boolean 由各驱动的 query() 统一转换。
      */
     private normalizeRecordFieldParam(value: unknown, valueType: string | undefined): unknown {
+        // thenable fail-fast（r35c，与 SQLBuilder.prepareFieldValue 同一契约的兄弟归一化器）：
+        //  Promise 没有合法落库形态，静默序列化成 "{}" 是零告警数据损坏。
+        if (value && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function') {
+            throw new Error(
+                `atomic write received a Promise (thenable) as the field value. ` +
+                `Promises cannot be persisted — await the value before writing.`
+            )
+        }
         if (valueType === 'json' && value !== null && value !== undefined && typeof value !== 'string') {
             return canonicalJSONStringify(value)
         }

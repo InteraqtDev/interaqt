@@ -264,6 +264,53 @@ describe.each([['pglite'], ['sqlite']] as const)('EXIST correlation scope (%s)',
         await system.destroy()
     })
 
+    test('symmetric paths: positive semantics pinned; NOT over symmetric intermediate stays per-fan-out-row (registered boundary)', async () => {
+        // existAtomCorrelation 对含对称段的路径维持 'parent'（legacy）编译（方向变体 × 反向
+        //  折叠的交互未定谳）。本格是该登记边界的**可执行 pin**（r35 复盘规则：登记项必须
+        //  携带编码机制假设的可执行断言，纯文字登记的机制假设十轮无从被证伪——r25#7 教训）：
+        //  - 单段对称 exist 的正向与 NOT 都正确（终段剪枝后关联到根，无外层扇出）；
+        //  - 对称中段 exist 的正向正确（逐行 ∃ ≡ 链式 ∃）；
+        //  - 对称中段 × NOT 是**扇出行量化**：b 的好友 a（有 hot-post）+ c（无帖子）——
+        //    ¬∃ 语义应排除 b，当前编译经 c 的扇出行放行 b。该行为变化即本 pin 变红，
+        //    改动时按契约决策处理（同步更新维度登记册「隐式量化算子的否定语义」轴）。
+        const User = Entity.create({ name: `SyUser${dbKind}`, properties: [Property.create({ name: 'name', type: 'string' })] })
+        const Post = Entity.create({ name: `SyPost${dbKind}`, properties: [Property.create({ name: 'title', type: 'string' })] })
+        Relation.create({ source: User, sourceProperty: 'friends', target: User, targetProperty: 'friends', type: 'n:n' })
+        Relation.create({ source: User, sourceProperty: 'posts', target: Post, targetProperty: 'author', type: '1:n' })
+        const db = dbKind === 'pglite' ? new PGLiteDB() : new SQLiteDB(':memory:')
+        const system = new MonoSystem(db)
+        system.conceptClass = KlassByName
+        const controller = new Controller({
+            system, entities: [User, Post],
+            relations: Relation.instances.filter(r => (r.source as { name?: string }).name?.endsWith(`User${dbKind}`)),
+            eventSources: []
+        })
+        await controller.setup(true)
+        const a = await system.storage.create(`SyUser${dbKind}`, { name: 'a', posts: [{ title: 'hot-post' }] })
+        const b = await system.storage.create(`SyUser${dbKind}`, { name: 'b', friends: [{ id: a.id }] })
+        const c = await system.storage.create(`SyUser${dbKind}`, { name: 'c' })
+        await system.storage.addRelationByNameById(`SyUser${dbKind}_friends_friends_SyUser${dbKind}`, b.id, c.id, {})
+
+        // 单段对称 exist：正向 + NOT 都按根量化（friends 现为 a-b、b-c）
+        const hasFriendA = await system.storage.find(`SyUser${dbKind}`,
+            MatchExp.atom({ key: 'friends', value: ['exist', { key: 'name', value: ['=', 'a'] }] }), undefined, ['name'])
+        expect([...new Set(hasFriendA.map(u => u.name))].sort()).toEqual(['b'])
+        const noFriendA = await system.storage.find(`SyUser${dbKind}`,
+            MatchExp.atom({ key: 'friends', value: ['exist', { key: 'name', value: ['=', 'a'] }] }).not(), undefined, ['name'])
+        expect([...new Set(noFriendA.map(u => u.name))].sort()).toEqual(['a', 'c'])
+
+        // 对称中段：正向正确
+        const friendHasHotPost = await system.storage.find(`SyUser${dbKind}`,
+            MatchExp.atom({ key: 'friends.posts', value: ['exist', { key: 'title', value: ['=', 'hot-post'] }] }), undefined, ['name'])
+        expect([...new Set(friendHasHotPost.map(u => u.name))].sort()).toEqual(['b'])
+
+        // 对称中段 × NOT：pin 当前扇出行量化行为（¬∃ 语义 = ['a','c']；per-row 经 c 放行 b）
+        const negated = await system.storage.find(`SyUser${dbKind}`,
+            MatchExp.atom({ key: 'friends.posts', value: ['exist', { key: 'title', value: ['=', 'hot-post'] }] }).not(), undefined, ['name'])
+        expect([...new Set(negated.map(u => u.name))].sort()).toEqual(['a', 'b', 'c'])
+        await system.destroy()
+    })
+
     test('update and delete victim selection honor per-root NOT exist semantics', async () => {
         const { system, destroy } = await setupWorld(dbKind, `I${dbKind}`)
         const notHasAdminGroup = () => MatchExp.atom({ key: 'groups.members', value: ['exist', adminExistPayload] }).not()

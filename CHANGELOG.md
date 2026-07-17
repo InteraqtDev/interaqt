@@ -60,6 +60,13 @@ two hardening changes, each with a red-green reproduction on the previous implem
   single-statement path) so a future locking caller cannot silently get "lock rows chosen by an
   unlocked read" semantics; the cross-statement read boundary of page-then-fetch under
   READ COMMITTED is documented at the branch.
+* **storage/runtime:** thenable (Promise) field values are rejected at the write-parameter
+  normalizers (`SQLBuilder.prepareFieldValue` and its atomic sibling
+  `MonoSystem.normalizeRecordFieldParam`) with an error naming the property. Previously a
+  payload containing an un-awaited async result (`create('X', { note: someAsync() })`) — or an
+  async `defaultValue`/`computed` transpiled past the declaration-time check — was silently
+  serialized as `"{}"` into string/json columns. Promises have no legal persisted form, so
+  rejection is strictly safer than the silent corruption.
 
 ## [4.3.0](https://github.com/InteraqtDev/interaqt/compare/v4.2.0...v4.3.0) (2026-07-16)
 

@@ -11,16 +11,23 @@
  * 机制：与 SQL 编译**完全独立**的内存求值器（Kleene 三值逻辑 + 链式存在量化），
  * 对随机数据 × 随机布尔表达式树逐条对拍 `find()` 的 id 集合。
  *
- * 生成域 = 契约干净子集（语义有唯一正确答案的形态）：
- *  - 值原子只在 x:1 路径上（根字段 / dept.region）——LEFT JOIN 缺席行按 NULL 参与
- *    三值求值（['=',null]/['not',null] 翻译 IS NULL/IS NOT NULL，其余操作符对 NULL 产出
- *    UNKNOWN），根命中 iff 整树求值 TRUE；
+ * 生成域与各族的契约模型：
+ *  - x:1 路径值原子（根字段 / dept.region）：LEFT JOIN 缺席行按 NULL 参与三值求值
+ *    （['=',null]/['not',null] 翻译 IS NULL/IS NOT NULL，其余操作符对 NULL 产出 UNKNOWN）；
+ *  - **x:n 路径值原子（r35c 扩域）**：按「赋值枚举」模型——LEFT JOIN 树的每个 x:n 节点
+ *    独立选择一行（集合为空时选择 NULL 行；子节点选择受父选择约束），整树按三值逻辑
+ *    对每个赋值求值，根命中 iff ∃ 赋值求得 TRUE。这**机器化钉住**了登记的契约决策：
+ *    正极性 = 存在量化；NOT 不与量化子对易（∃ 不满足行 ⇒ 命中）；无关联行的根在
+ *    正反两集之外（NULL 行三值）。改变该语义是契约决策，改动时同步更新本模型
+ *    （敏感性实验：把模型换成「先 ∃ 后 NOT」的集合语义，25 种子全红——本预言机能区分
+ *    两种量化语义，正是 F-1 类缺陷所在的轴）；
  *  - exist 原子按根记录链式存在量化（r35 契约）：单段 1:n / 单段 n:n / 多段 1:n→1:n /
  *    n:n 中段→x:1 终段 / x:1 前缀→x:n 终段 / 嵌套 exist 载荷；
- *  - AND/OR/NOT 任意嵌套（NOT 可包裹任何子树）。
- * 刻意排除（登记边界，见维度登记册「隐式量化算子的否定语义」轴）：
- *  x:n 路径上的**值原子**（量化语义未显式声明，NOT 下是 SQL 三值逐行行为）、
- *  对称关系 / filtered 中段（existAtomCorrelation 维持 legacy 编译）、引用值、like。
+ *  - AND/OR/NOT 任意嵌套（NOT 可包裹任何子树）；
+ *  - 恒定不变量：find 结果无重复根 id——SELECT 列全部来自根/x:1 路径（对根恒定），
+ *    扇出行必然整行相同、dedupe 必然完全（对 r25#6「dedupe 少去重风险」的机器化定谳）。
+ * 刻意排除（登记边界）：对称关系 / filtered 中段（existAtomCorrelation 维持 legacy 编译）、
+ *  引用值、like、between。
  *
  * 复现：FUZZ_MATCH_SEED_START=<seed> FUZZ_MATCH_SEED_COUNT=1 FUZZ_MATCH_VERBOSE=1
  */
@@ -111,6 +118,54 @@ function evalTreeTV(node: ExprNode, scope: Record<string, unknown>): TV {
     return terminals.some(terminal => evalTreeTV(atom.payload, terminal) === true)
 }
 
+/**
+ * 根级求值 = LEFT JOIN 赋值枚举模型：
+ * match JOIN 树的每个 x:n 节点选择一行（空集合选择 NULL 行；members 选择受 team 选择约束），
+ * 值原子按所选赋值三值求值（NULL 组件 ⇒ 除 IS NULL 形态外产出 UNKNOWN）；
+ * exist 原子关联到根（r35 编译契约），对赋值恒定。根命中 iff ∃ 赋值使整树为 TRUE。
+ */
+type XnAssignment = { team: Record<string, unknown> | null, member: Record<string, unknown> | null, collab: Record<string, unknown> | null }
+
+function evalRootAtomTV(atom: ValueAtomSpec | ExistAtomSpec, rootScope: Record<string, unknown>, assignment: XnAssignment): TV {
+    if (atom.type === 'exist') {
+        const terminals = resolveChain(rootScope, atom.path.split('.'))
+        return terminals.some(terminal => evalTreeTV(atom.payload, terminal) === true)
+    }
+    const key = atom.key
+    const readFrom = (component: Record<string, unknown> | null, rest: string) =>
+        component === null ? null : resolvePathValue(component, rest)
+    let pathValue: unknown
+    if (key.startsWith('teams.members.')) pathValue = readFrom(assignment.member, key.slice('teams.members.'.length))
+    else if (key.startsWith('teams.')) pathValue = readFrom(assignment.team, key.slice('teams.'.length))
+    else if (key.startsWith('collabs.')) pathValue = readFrom(assignment.collab, key.slice('collabs.'.length))
+    else pathValue = resolvePathValue(rootScope, key)
+    return evalValueAtomTV(pathValue, atom.op, atom.value)
+}
+
+function evalRootTreeTV(node: ExprNode, rootScope: Record<string, unknown>, assignment: XnAssignment): TV {
+    if (node.node === 'not') return notTV(evalRootTreeTV(node.left, rootScope, assignment))
+    if (node.node === 'and') return andTV(evalRootTreeTV(node.left, rootScope, assignment), evalRootTreeTV(node.right, rootScope, assignment))
+    if (node.node === 'or') return orTV(evalRootTreeTV(node.left, rootScope, assignment), evalRootTreeTV(node.right, rootScope, assignment))
+    return evalRootAtomTV(node.atom, rootScope, assignment)
+}
+
+function rootMatches(node: ExprNode, rootScope: Record<string, unknown>): boolean {
+    const teams = (rootScope.teams as Record<string, unknown>[] | undefined) ?? []
+    const collabs = (rootScope.collabs as Record<string, unknown>[] | undefined) ?? []
+    const teamChoices: Array<Record<string, unknown> | null> = teams.length ? teams : [null]
+    const collabChoices: Array<Record<string, unknown> | null> = collabs.length ? collabs : [null]
+    for (const team of teamChoices) {
+        const members = (team?.members as Record<string, unknown>[] | undefined) ?? []
+        const memberChoices: Array<Record<string, unknown> | null> = members.length ? members : [null]
+        for (const member of memberChoices) {
+            for (const collab of collabChoices) {
+                if (evalRootTreeTV(node, rootScope, { team, member, collab }) === true) return true
+            }
+        }
+    }
+    return false
+}
+
 // ---------- 表达式 → MatchExpressionData ----------
 function toMatchData(node: ExprNode): MatchExpressionData {
     if (node.node === 'not') return toMatchData(node.left).not()
@@ -173,6 +228,15 @@ const USER_FIELDS: FieldSpec[] = [
     { key: 'rank', kind: 'rank', nullable: true, numeric: true },
     { key: 'dept.region', kind: 'region', nullable: true, numeric: false },
 ]
+// x:n 路径值原子（赋值枚举模型；nullable=true——LEFT JOIN 的 NULL 行形态天然存在）
+const USER_XN_FIELDS: FieldSpec[] = [
+    { key: 'teams.kind', kind: 'kind', nullable: true, numeric: false },
+    { key: 'teams.size', kind: 'size', nullable: true, numeric: true },
+    { key: 'teams.members.role', kind: 'role', nullable: true, numeric: false },
+    { key: 'teams.members.level', kind: 'level', nullable: true, numeric: true },
+    { key: 'collabs.role', kind: 'role', nullable: true, numeric: false },
+    { key: 'collabs.level', kind: 'level', nullable: true, numeric: true },
+]
 
 function genBoolTree(rng: Rng, depth: number, genLeaf: (rng: Rng) => ExprNode): ExprNode {
     if (depth <= 0 || chance(rng, 0.45)) {
@@ -223,7 +287,12 @@ function genExistAtom(rng: Rng): ExprNode {
 }
 
 function genRootExpr(rng: Rng): ExprNode {
-    return genBoolTree(rng, 2, r => chance(r, 0.5) ? genValueAtom(r, USER_FIELDS) : genExistAtom(r))
+    return genBoolTree(rng, 2, r => {
+        const roll = r()
+        if (roll < 0.4) return genValueAtom(r, USER_FIELDS)
+        if (roll < 0.65) return genValueAtom(r, USER_XN_FIELDS)
+        return genExistAtom(r)
+    })
 }
 
 // ---------- 世界构建 ----------
@@ -359,7 +428,7 @@ describe('match semantics differential fuzz (SQL compilation vs independent thre
             for (let exprIndex = 0; exprIndex < EXPRS_PER_SEED; exprIndex++) {
                 const expr = genRootExpr(rng)
                 const expected = world.users
-                    .filter(user => evalTreeTV(expr, world.scopeOfUser(user)) === true)
+                    .filter(user => rootMatches(expr, world.scopeOfUser(user)))
                     .map(user => user.id).sort()
                 let matchData: MatchExpressionData
                 try {
@@ -368,7 +437,12 @@ describe('match semantics differential fuzz (SQL compilation vs independent thre
                     throw new Error(`[match-fuzz seed=${seed} expr=${exprIndex}] expression build failed for ${describeExpr(expr)}: ${error instanceof Error ? error.message : String(error)}`)
                 }
                 const rows = await world.system.storage.find(`MsUser${world.tag}`, matchData, undefined, ['id'])
-                const actual = [...new Set(rows.map((row: { id: unknown }) => String(row.id)))].sort()
+                const rawIds = rows.map((row: { id: unknown }) => String(row.id))
+                // 恒定不变量（r25#6 定谳）：find 结果无重复根——扇出行整行相同、dedupe 必然完全
+                if (new Set(rawIds).size !== rawIds.length) {
+                    throw new Error(`[match-fuzz seed=${seed} expr=${exprIndex}] find returned DUPLICATE roots (dedupe incomplete): ${JSON.stringify(rawIds)}\nexpression: ${describeExpr(expr)}`)
+                }
+                const actual = [...rawIds].sort()
                 if (process.env.FUZZ_MATCH_VERBOSE) {
                     console.log(`seed=${seed} expr=${exprIndex}: ${describeExpr(expr)}\n  expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`)
                 }

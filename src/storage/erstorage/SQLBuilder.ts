@@ -626,7 +626,7 @@ ${innerQuerySQL}
      */
     buildInsertSQL(
         recordName: string,
-        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string }>
+        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string }>
     ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
@@ -637,7 +637,7 @@ INSERT INTO "${recordInfo.table}"
 VALUES
 (${fieldAndValues.map(() => p()).join(',')}) 
 `
-        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType))
+        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType, f.name || f.field))
         
         return [sql, params]
     }
@@ -651,7 +651,7 @@ VALUES
     buildUpdateSQL(
         entityName: string,
         idRef: { id: string | number },
-        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string }>
+        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string }>
     ): [string, unknown[]] {
         if (!columnAndValue.length) {
             return ['', []]
@@ -665,7 +665,7 @@ UPDATE "${entityInfo.table}"
 SET ${columnAndValue.map(({ field }) => `"${field}" = ${p()}`).join(',')}
 WHERE "${entityInfo.idField}" = (${p()})
 `
-        const params = [...columnAndValue.map(({ value, fieldType, valueType }) => this.prepareFieldValue(value, fieldType, valueType)), idRef.id]
+        const params = [...columnAndValue.map(({ field, name, value, fieldType, valueType }) => this.prepareFieldValue(value, fieldType, valueType, name || field)), idRef.id]
         
         return [sql, params]
     }
@@ -723,8 +723,20 @@ WHERE "${recordInfo.idField}" = ${p()}
      * 准备字段值（处理 JSON 等特殊类型）。
      * CAUTION json 用规范序列化（键排序）：等值匹配的文本比较回退路径（MatchExp）
      *  依赖写入与匹配两侧的序列化一致，非规范形会让键序不同的等价对象匹配失败。
+     * CAUTION thenable（Promise）字段值 fail-fast（r35c）：`create('X', {note: someAsync()})`
+     *  忘 await 的载荷（以及声明期构造器名检测覆盖不到的 async defaultValue/computed 残余）
+     *  会被 JSON.stringify 静默序列化成 "{}" 落库（数值列则抛与用户写法脱节的裸驱动错误）。
+     *  Promise 没有任何合法落库形态；带 then **函数**的 json 对象同样无法经 JSON 序列化
+     *  存活（函数键被丢弃），拒绝严格优于静默丢数据。
      */
-    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string): unknown {
+    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string, field?: string): unknown {
+        if (value && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function') {
+            throw new Error(
+                `field ${field ? `"${field}" ` : ''}received a Promise (thenable) as its value. ` +
+                `Promises cannot be persisted — they would be silently serialized as "{}". ` +
+                `Await the value before writing (a common cause is calling an async function in the payload or in defaultValue/computed without await).`
+            )
+        }
         if (fieldType?.toLowerCase() === 'json') {
             return canonicalJSONStringify(value)
         }
