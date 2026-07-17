@@ -4,8 +4,24 @@
 
 Deep-review round r35 (`agentspace/output/deep-review-2026-07-16-r35.md`): five fatal fixes and
 two hardening changes, each with a red-green reproduction on the previous implementation.
+Follow-up closure round r36 (`agentspace/output/deep-review-2026-07-17-r36.md`) settled the
+recorded r35 boundaries: two more fixes and three oracle-domain expansions.
 
 ### Bug Fixes
+
+* **storage:** deeply nested EXISTS subqueries no longer exceed PostgreSQL's 63-byte identifier
+  limit (r36). Subquery alias prefixes chain per nesting level; PostgreSQL silently truncates
+  long identifiers, and because each level's alias is a prefix of the next, the truncated inner
+  FROM alias shadowed the outer alias — correlated references resolved to the wrong table
+  (`column ... does not exist` from three nesting levels with long entity names). Prefixes are
+  now tokenized (`AliasManager.registerSubqueryPrefix`) and table-path aliases reserve a prefix
+  budget, keeping every identifier within 63 bytes at any nesting depth.
+* **runtime:** `atomic.compareAndSet` on **global** json targets compares canonical forms inside
+  a locked transaction (the sibling of the r25 record-target fix): the single-statement
+  `COALESCE("jsonValue", ?) = ?` threw `operator does not exist: json = unknown` on
+  PostgreSQL-family drivers, and on SQLite compared non-canonical stored text so key-order-
+  different but semantically equal objects silently returned `false` — indistinguishable from
+  losing a race.
 
 * **storage:** EXIST atom compilation gains a correlation-scope contract
   (`MatchExp.existAtomCorrelation`, single decision shared by JOIN-tree pruning and subquery

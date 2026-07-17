@@ -215,6 +215,22 @@ const usersWithTags = await system.storage.find(
 
 ### 11.2.4 Nested Conditions
 
+Matching through a to-many path is implicitly **existential**: a parent matches when
+*some* related record satisfies the condition. There are two ways to write it, and they
+differ under negation:
+
+- `exist` atoms quantify **per parent record**. `NOT (posts exist P)` means "has no post
+  satisfying P" — parents without any posts are included. **Use `exist` whenever you
+  negate a to-many condition.**
+- Plain value atoms over a to-many path (`{ key: 'posts.status', value: ['=', 'published'] }`)
+  are evaluated per joined row (SQL LEFT JOIN semantics). Positively they behave the same
+  as `exist`. Under `.not()` they mean "has *some* post that does NOT satisfy the
+  condition" — a parent with both matching and non-matching posts is still returned, and
+  a parent with **no posts at all** is in *neither* the positive nor the negated result
+  (three-valued NULL-row semantics). Negation does not commute with the implicit
+  existential quantifier, so avoid `.not()` over to-many value atoms unless you
+  specifically want the per-row reading.
+
 ```typescript
 // Existence query (EXIST)
 const usersWithPosts = await system.storage.find(
@@ -222,6 +238,29 @@ const usersWithPosts = await system.storage.find(
   MatchExp.atom({ 
     key: 'posts', 
     value: ['exist', { key: 'status', value: ['=', 'published'] }] 
+  }),
+  {},
+  ['id', 'username']
+);
+
+// Set-semantics negation: users with NO published post (including users with no posts)
+const usersWithoutPublishedPosts = await system.storage.find(
+  'User',
+  MatchExp.atom({ 
+    key: 'posts', 
+    value: ['exist', { key: 'status', value: ['=', 'published'] }] 
+  }).not(),
+  {},
+  ['id', 'username']
+);
+
+// exist paths may traverse intermediate to-many segments and nest further exists;
+// quantification stays per user ("some group has some admin member")
+const usersWithAdminGroupMember = await system.storage.find(
+  'User',
+  MatchExp.atom({
+    key: 'groups.members',
+    value: ['exist', { key: 'role', value: ['=', 'admin'] }]
   }),
   {},
   ['id', 'username']
