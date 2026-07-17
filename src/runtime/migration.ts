@@ -3019,13 +3019,18 @@ function collectAuditedDeletions(audit: MigrationDeletionAudit, computation: Com
     const collectible = context.type === "entity" || context.type === "relation" ||
         (context.type === "property" && context.id.name === HARD_DELETION_PROPERTY_NAME);
     if (!collectible) return;
+    const recordName = context.type === "property" ? context.host.name! : context.id.name!;
     for (const event of events) {
         if (event.type !== "delete") continue;
-        const recordName = context.type === "property" ? context.host.name! : context.id.name!;
         // 只有 recordName 与计算输出（或硬删除宿主）一致的 delete 计入本计算的删除足迹。
         //  事件流是 storage 的完整产出（r32）：关系 link 级联、filtered 视图成员资格 delete
         //  等派生事件也在流里——它们随宿主删除守恒发生，不是独立的销毁决策，刻意不入审计
         //  （与 destructive-scope 审批面的辖区一致：审计的是计算输出记录的删除）。
+        // CAUTION 该过滤此前只存在于注释而没有代码（r35）：link 级联/派生 delete 的 id 被
+        //  记到宿主 recordName 名下——模拟与执行两侧同源污染时互相抵消（scope 面呈现错误
+        //  id 却能通过对账），而模拟不可用回退分析性 scope（仅宿主 id）时，执行侧的污染
+        //  集合与批准集合永不相等，迁移进入无法批准的失败循环（fail-closed 死路）。
+        if (event.recordName !== recordName) continue;
         const id = (event.record as { id?: unknown } | undefined)?.id;
         if (id === undefined || id === null) continue;
         const key = `${dataContextPath(context)}:${recordName}`;
@@ -3350,19 +3355,24 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
         if (approvedIds.size !== actualIds.size || [...actualIds].some(id => !approvedIds.has(id))) {
             throw new DestructiveComputedOutputError(`Migration takeover destructive scope mismatch for ${dataContextPath(computation.dataContext)}`);
         }
+        // CAUTION 事件流以 storage 产出为唯一真相源（r32 契约，r35 收口本轨）：此前手工合成
+        //  裸 create/delete 事件——filtered 视图的成员资格派生事件（create/delete）不在合成流里，
+        //  链式依赖对成员资格变化面完全失明（增量轨静默丢弃退出/进入，聚合残留旧值）。
         const events: RecordMutationEvent[] = [];
         for (const record of existing) {
-            await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", record.id] }));
-            events.push({ recordName, type: "delete", record });
+            await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", record.id] }), events);
         }
         for (const item of result) {
-            const created = await controller.system.storage.create(recordName, item);
-            events.push({ recordName, type: "create", record: created });
+            await controller.system.storage.create(recordName, item, events);
         }
         return events;
     }
     const existing = await controller.system.storage.find(recordName, undefined, undefined, ["*"]);
     const existingByKey = new Map(existing.map(record => [`${record[sourceKey]}:${record[indexKey]}`, record]));
+    // CAUTION 同上：create/update/delete 一律以 storage 事件出账（含完整前态与 filtered
+    //  成员资格派生事件）。此前手工合成的 update 事件只有裸宿主 update——成员资格**退出**
+    //  （update 后不再满足视图谓词）的派生 delete 事件不存在，依赖 filtered 视图的下游
+    //  聚合在增量轨上把退出成员的旧贡献永久残留（r35 定谳：迁移成功报告 + 静默错值）。
     const events: RecordMutationEvent[] = [];
     for (const item of result) {
         const key = `${item[sourceKey]}:${item[indexKey]}`;
@@ -3370,20 +3380,17 @@ async function recomputeTransformOutput(controller: Controller, computation: Dat
         existingByKey.delete(key);
         if (oldRecord) {
             if (!isEqualValue({ ...oldRecord, id: undefined }, { ...item, id: undefined })) {
-                await controller.system.storage.update(recordName, MatchExp.atom({ key: "id", value: ["=", oldRecord.id] }), item);
-                events.push({ recordName, type: "update", record: { ...oldRecord, ...item }, oldRecord, keys: Object.keys(item) });
+                await controller.system.storage.update(recordName, MatchExp.atom({ key: "id", value: ["=", oldRecord.id] }), item, events);
             }
         } else {
-            const created = await controller.system.storage.create(recordName, item);
-            events.push({ recordName, type: "create", record: created });
+            await controller.system.storage.create(recordName, item, events);
         }
     }
     for (const stale of existingByKey.values()) {
         // r30-E：stale 删除乐观执行并以 delete 事件出账；逐 id 审批检查收敛到重算结束时的
         //  执行期对账（assertExecutedDeletionsApproved）——一次性报告全部差异并回滚，
         //  取代此前的逐 id fail-fast（对链式依赖计算该检查在批准侧无法先验满足）。
-        await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", stale.id] }));
-        events.push({ recordName, type: "delete", record: stale });
+        await controller.system.storage.delete(recordName, MatchExp.atom({ key: "id", value: ["=", stale.id] }), events);
     }
     return events;
 }

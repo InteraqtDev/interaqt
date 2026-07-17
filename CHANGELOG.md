@@ -1,5 +1,114 @@
 # Changelog
 
+## Unreleased
+
+Deep-review round r35 (`agentspace/output/deep-review-2026-07-16-r35.md`): five fatal fixes and
+two hardening changes, each with a red-green reproduction on the previous implementation.
+Follow-up closure round r36 (`agentspace/output/deep-review-2026-07-17-r36.md`) settled the
+recorded r35 boundaries: two more fixes and three oracle-domain expansions.
+
+### Bug Fixes
+
+* **storage:** deeply nested EXISTS subqueries no longer exceed PostgreSQL's 63-byte identifier
+  limit (r36). Subquery alias prefixes chain per nesting level; PostgreSQL silently truncates
+  long identifiers, and because each level's alias is a prefix of the next, the truncated inner
+  FROM alias shadowed the outer alias — correlated references resolved to the wrong table
+  (`column ... does not exist` from three nesting levels with long entity names). Prefixes are
+  now tokenized (`AliasManager.registerSubqueryPrefix`) and table-path aliases reserve a prefix
+  budget, keeping every identifier within 63 bytes at any nesting depth.
+* **runtime:** `atomic.compareAndSet` on **global** json targets compares canonical forms inside
+  a locked transaction (the sibling of the r25 record-target fix): the single-statement
+  `COALESCE("jsonValue", ?) = ?` threw `operator does not exist: json = unknown` on
+  PostgreSQL-family drivers, and on SQLite compared non-canonical stored text so key-order-
+  different but semantically equal objects silently returned `false` — indistinguishable from
+  losing a race.
+
+* **storage:** EXIST atom compilation gains a correlation-scope contract
+  (`MatchExp.existAtomCorrelation`, single decision shared by JOIN-tree pruning and subquery
+  correlation). Two defects fixed at that choke point:
+  * `NOT (path exist ...)` where the path crosses an x:n intermediate quantified per outer
+    fan-out row instead of per root record — a root with one intermediate lacking a matching
+    terminal was returned even when another intermediate satisfied the existential. The same
+    match selects update/delete victims. Such paths now fold entirely into the EXISTS subquery
+    (reverse-path correlation to the root; zero outer joins, LIMIT pushdown as a side effect).
+  * Nested EXIST (an exist atom inside an exist payload) correlated against the **outermost**
+    root's alias (the reference-path resolver only knows `contextRootEntity`), producing
+    cross-entity id comparisons that silently returned empty sets — the actual mechanism behind
+    the long-recorded r25#7 "nested EXIST does not work" gap. Correlation atoms are now
+    pre-resolved against the enclosing query's alias including its prefix chain
+    (`isResolvedFieldReference`), and nested subquery prefixes chain for global alias uniqueness.
+  * Registered boundaries: symmetric-segment, `&` (link record) and **filtered-relation
+    intermediate** paths keep the legacy parent-correlated compilation (the rebased link
+    predicate must share the outer JOIN alias with the path atom for same-edge semantics —
+    `hasRebasedPathPredicate`); `NOT` over x:n **value** atoms keeps SQL three-valued per-row
+    semantics (contract decision recorded in the dimension registry).
+* **core/runtime:** synchronously-consumed callback surfaces reject `async` functions at
+  declaration time (`PublicFieldDef.synchronous` + `assertSynchronousFunctionArg`): aggregation
+  callbacks (Count/Every/Any/WeightedSummation), `Property.computed`, `Property.defaultValue`,
+  `Dictionary.defaultValue`, `RealTime.nextRecomputeTime`, `Custom.createState`,
+  `Custom.planIncremental`. A returned Promise was silently coerced (`!!promise === true` counts
+  every record; `Number(promise)` sums as 0; JSON serialization persists `"{}"`). A consumption-
+  time thenable guard in the aggregation template covers transpiled/sync-returning-Promise
+  residuals. The repository's own `leaveRequestSimple` fixture carried an async `computed` that
+  had been persisting `"{}"` unnoticed.
+* **runtime:** migration Transform rebuilds emit the storage event stream (with complete
+  before-images and derived filtered-membership events) instead of hand-synthesized bare events.
+  Previously a migration that shrank Transform outputs below a filtered view's predicate left
+  downstream aggregates holding the exited members' contributions while reporting success.
+  Converges the last remaining synthesized track onto the r32 "storage events are the truth
+  source" contract.
+* **runtime:** the migration deletion audit now enforces its documented `recordName` filter —
+  link-cascade and derived delete events no longer pollute a computation's destructive scope.
+  Previously the approval surface displayed foreign ids, and when the cascade-aware simulation
+  was unavailable the executed set could never match the analytically approved host-only set
+  (an unapprovable fail-closed migration loop).
+* **runtime:** `atomic.compareAndSet` routes `expected`/`next`/`defaultValue` through the same
+  write-parameter normalization as `replace` (r26 contract). Timestamp CAS with a `Date` threw a
+  binding error on SQLite; an ISO string never matched the INT millisecond column and returned a
+  `false` indistinguishable from losing a race.
+* **runtime:** `postCommit` hooks receive the committed attempt's args (the guard enriches the
+  per-attempt clone, e.g. activity head interactions fill in the created `activityId`; the
+  original caller args never see it).
+
+### Hardening
+
+* **storage:** the two-phase pagination path refuses `forUpdate` (falls back to the
+  single-statement path) so a future locking caller cannot silently get "lock rows chosen by an
+  unlocked read" semantics; the cross-statement read boundary of page-then-fetch under
+  READ COMMITTED is documented at the branch.
+* **storage/runtime:** thenable (Promise) field values are rejected at the write-parameter
+  normalizers (`SQLBuilder.prepareFieldValue` and its atomic sibling
+  `MonoSystem.normalizeRecordFieldParam`) with an error naming the property. Previously a
+  payload containing an un-awaited async result (`create('X', { note: someAsync() })`) — or an
+  async `defaultValue`/`computed` transpiled past the declaration-time check — was silently
+  serialized as `"{}"` into string/json columns. Promises have no legal persisted form, so
+  rejection is strictly safer than the silent corruption.
+
+### Behavior changes (upgrade notes)
+
+* **Async functions on synchronously-consumed callback surfaces now fail at declaration time.**
+  `Count`/`Every`/`Any`/`WeightedSummation` `callback`, `Property.computed`,
+  `Property.defaultValue`, `Dictionary.defaultValue`, `RealTime.nextRecomputeTime`,
+  `Custom.createState` and `Custom.planIncremental` reject `async` functions in `create()`.
+  Applications that declared them previously did not work — they silently persisted coerced
+  garbage (`true`, `0`, `"{}"`) — but they did *start*; after upgrading they throw at declaration
+  with an error naming the field. Make the callback synchronous (derive async values into stored
+  properties first). Awaited surfaces (`Transform.callback`, `Custom.compute`,
+  `RealTime.callback`, `StateNode.computeValue`, `StateTransfer.computeTarget`,
+  `Condition.content`, `SideEffect.handle`) keep accepting async functions.
+* **`NOT` over `exist` matches with to-many intermediates now quantifies per root record.**
+  Queries (and update/delete victim selections) that negate an exist atom whose path crosses a
+  to-many segment previously used per-fan-out-row quantification and could return roots that do
+  have a matching terminal; they now return the set-semantics complement (¬∃). Positive exist
+  results are unchanged. Nested exist atoms (an exist inside an exist payload) previously
+  returned empty sets and now work. `NOT` over plain to-many **value** atoms keeps its
+  documented per-row three-valued semantics — see the new "matching through to-many paths"
+  section in the querying guide.
+* **Promise-valued writes and stale timestamp/json compare-and-set forms that previously
+  "succeeded" silently now fail loudly** (see Hardening and Bug Fixes). Code paths relying on
+  the silent behavior should await values before writing and pass canonical comparable values
+  to `atomic.compareAndSet`.
+
 ## [4.3.0](https://github.com/InteraqtDev/interaqt/compare/v4.2.0...v4.3.0) (2026-07-16)
 
 Performance-debt closure round, executed in recorded-importance order against the inventory in

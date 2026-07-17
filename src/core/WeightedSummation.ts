@@ -67,7 +67,9 @@ export class WeightedSummation implements WeightedSummationInstance {
     callback: {
       type: 'function' as const,
       collection: false as const,
-      required: true as const
+      required: true as const,
+      // 消费点 `Number(weight) * Number(value)` 不 await：async 函数的贡献恒为 0（见 klassValidation）。
+      synchronous: true as const
     },
     attributeQuery: {
       instanceType: {} as unknown as {[key: string]: unknown},

@@ -195,9 +195,11 @@ export class UpdateExecutor {
         // 2. 分配 id,处理需要 flash out 的数据等，事件也是这里面记录的。这里面会有抢夺关系，所以也可能会有删除事件。
         const newEntityDataWithIdsWithFlashOutRecords = await this.agent.preprocessSameRowData(newEntityDataWithDep, true, events, matchedEntity)
         const allSameRowData = newEntityDataWithIdsWithFlashOutRecords.getSameRowFieldAndValue(matchedEntity)
-        const columnAndValue = allSameRowData.map(({field, value, fieldType, valueType}: { field: string, value: string, fieldType?: string, valueType?: string }) => (
+        const columnAndValue = allSameRowData.map(({field, name, value, fieldType, valueType}: { field: string, name?: string, value: string, fieldType?: string, valueType?: string }) => (
             {
                 field,
+                // 逻辑属性名仅用于错误信息（thenable 拒绝等），物理列名对用户不可读。
+                name,
                 /// TODO value 要考虑引用自身或者 related entity 其他 field 的情况？例如 age+5
                 value: value,
                 // fieldType/valueType 让 buildUpdateSQL 走 prepareFieldValue（json 规范序列化、

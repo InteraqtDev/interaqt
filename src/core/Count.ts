@@ -69,7 +69,9 @@ export class Count implements CountInstance {
     callback: {
       type: 'function' as const,
       collection: false as const,
-      required: false as const
+      required: false as const,
+      // 消费点 `!!callback(...)` 不 await：async 函数会让所有记录恒计入（见 klassValidation）。
+      synchronous: true as const
     },
     attributeQuery: {
       instanceType: {} as unknown as {[key: string]: unknown},

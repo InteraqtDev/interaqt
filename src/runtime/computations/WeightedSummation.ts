@@ -1,7 +1,7 @@
 import { WeightedSummation, WeightedSummationInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { DataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
-import { GlobalRecordsAggregationHandle, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
+import { assertSyncCallbackResult, GlobalRecordsAggregationHandle, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
 
 // CAUTION 与 Summation.resolveSumField 的语义对齐：null/undefined/NaN/Infinity 一律按 0 计。
 //  否则一条脏记录产生的 NaN 会通过 increment 永久污染总和，且无法通过后续增量恢复。
@@ -33,7 +33,7 @@ export class GlobalWeightedSummationHandle extends GlobalRecordsAggregationHandl
     }
 
     protected computeItemValue(record: Record<string, unknown>, dataDeps: { [key: string]: unknown }): number {
-        return resolveWeightedResult(this.callback!.call(this.controller, record, dataDeps))
+        return resolveWeightedResult(assertSyncCallbackResult(this.callback!.call(this.controller, record, dataDeps), 'WeightedSummation', this.dataContext))
     }
 
     protected async applyDelta(newValue: number | null, oldValue: number | null): Promise<number> {
@@ -69,7 +69,7 @@ export class PropertyWeightedSummationHandle extends PropertyRelationAggregation
     }
 
     protected computeItemValue(relatedItem: Record<string, unknown>, dataDeps: { [key: string]: unknown }): number {
-        return resolveWeightedResult(this.callback!.call(this.controller, relatedItem, dataDeps))
+        return resolveWeightedResult(assertSyncCallbackResult(this.callback!.call(this.controller, relatedItem, dataDeps), 'WeightedSummation', this.dataContext))
     }
 
     protected async applyDelta(hostRecord: Record<string, unknown>, newValue: number | null, oldValue: number | null): Promise<number> {

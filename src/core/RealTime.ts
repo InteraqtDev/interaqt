@@ -54,7 +54,9 @@ export class RealTime implements RealTimeInstance {
     nextRecomputeTime: {
       type: 'function' as const,
       collection: false as const,
-      required: false as const
+      required: false as const,
+      // 消费点 `now + nextRecomputeTime(...)` 不 await：async 函数会让下次重算时间变成 NaN（见 klassValidation）。
+      synchronous: true as const
     },
     callback: {
       type: 'function' as const,

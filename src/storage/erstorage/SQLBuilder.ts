@@ -74,10 +74,12 @@ export class SQLBuilder {
         const p = parentP || this.getPlaceholder()
         // CAUTION EXIST 子查询必须在遍历原子的过程中"就地"构建（通过 fnMatchHandler），
         //  保证编号型占位符（$1/$2...）的分配顺序和 buildWhereClause 收集参数的树序一致。
+        //  prefix 必须传给 parseFunctionMatchAtom：EXISTS 关联原子要预解析成【本查询作用域】
+        //  的别名（含前缀），嵌套 EXIST 才能绑到正确的外层表（见其头注）。
         const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(
             p,
             this.database,
-            (atomData) => this.parseFunctionMatchAtom(recordQuery.recordName, atomData, recordQuery.contextRootEntity, p)
+            (atomData) => this.parseFunctionMatchAtom(recordQuery.recordName, atomData, recordQuery.contextRootEntity, p, prefix)
         )
 
         const [whereClause, params] = this.buildWhereClause(
@@ -349,7 +351,7 @@ ${modifierClause}
         const fieldMatchExp = recordQuery.matchExpression.buildFieldMatchExpression(
             p,
             this.database,
-            (atomData) => this.parseFunctionMatchAtom(recordQuery.recordName, atomData, recordQuery.contextRootEntity, p)
+            (atomData) => this.parseFunctionMatchAtom(recordQuery.recordName, atomData, recordQuery.contextRootEntity, p, prefix)
         )
         const [whereClause, params] = this.buildWhereClause(fieldMatchExp, prefix, p)
 
@@ -513,12 +515,27 @@ ${paginationClauses.join('\n')}
      * 解析单个函数匹配原子（EXIST 子查询）
      * CAUTION 必须在 buildFieldMatchExpression 遍历原子时就地调用，
      *  这样 EXIST 内层子查询消耗的占位符编号才能和外层值原子保持树序一致（PG 系编号占位符依赖这一点）。
+     *
+     * 关联锚点（与 MatchExp.buildQueryTree 的剪枝决策共用 existAtomCorrelation 判定）：
+     * - 'parent'（父路径全 x:1 / '&' / 对称段）：EXISTS 以 `反向属性.id = 直接父别名.id` 关联，
+     *   父路径由外层 JOIN 树提供（无扇出）。
+     * - 'root'（父路径含 x:n 段，r35）：整条路径折叠进 EXISTS——子查询以**完整反向路径**
+     *   （getReversePath）关联根记录 id，外层零 JOIN。此前父路径入树 + 关联直接父别名时，
+     *   NOT(exist) 按外层扇出行量化（∃ 中间行使 ¬∃ 终端），静默多返回根记录。
+     *
+     * CAUTION 关联原子的引用必须**预解析**并绑定到直接外层查询的别名（含其 prefix，
+     *  isResolvedFieldReference）。此前用 isReferenceValue 路径解析：解析作用域是
+     *  contextRootEntity（最外层根），嵌套 EXISTS（exist 载荷内再 exist）的关联被绑到
+     *  最外层根的列上——`member.group_fk = Org.id` 这类跨实体 id 比较静默返回空集（r25#7
+     *  的机制真相）。子查询自身的别名前缀也串联外层前缀，保证深嵌别名全局唯一（不与外层
+     *  作用域同名互相遮蔽）。
      */
     parseFunctionMatchAtom(
         entityName: string,
         atomData: FieldMatchAtom,
         contextRootEntity: string | undefined,
-        p: PlaceholderGen
+        p: PlaceholderGen,
+        prefix = ''
     ): FieldMatchAtom {
         if (!Array.isArray(atomData.value)) {
             throw new Error(`match value is not a array ${atomData.key}`)
@@ -530,26 +547,48 @@ ${paginationClauses.join('\n')}
 
         const info = this.map.getInfoByPath(atomData.namePath!)!
         const { alias: currentAlias } = this.map.getTableAndAliasStack(atomData.namePath!).at(-1)!
-        const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
 
-        // 注意这里去掉了 namePath 里面根部的 entityName，因为后面计算 referenceValue 的时候会加上
-        const parentAttributeNamePath = atomData.namePath!.slice(1, -1)
+        let correlationKey: string
+        let correlationAnchorPath: string[]
+        if (MatchExp.existAtomCorrelation(this.map, atomData.namePath!, atomData) === 'root') {
+            // 反向路径把「根可达终端」编码在子查询内部：EXISTS 直接关联根记录。
+            const reversePath = this.map.getReversePath(atomData.namePath!)
+            correlationKey = reversePath.slice(1).concat('id').join('.')
+            correlationAnchorPath = [entityName]
+        } else {
+            const reverseAttributeName = this.map.getReverseAttribute(info.parentEntityName, info.attributeName)
+            correlationKey = `${reverseAttributeName}.id`
+            correlationAnchorPath = [entityName, ...atomData.namePath!.slice(1, -1)]
+        }
+        const [anchorAlias, anchorIdField] = this.map.getTableAliasAndFieldName(correlationAnchorPath, 'id')
+        const resolvedReference = `${this.withPrefix(prefix)}${anchorAlias}.${anchorIdField}`
+
+        // CAUTION 子查询前缀必须 token 化（r36）：原始形态 = 外层前缀链 + 当前路径别名，
+        //  随嵌套深度线性增长。PostgreSQL 对 >63 字节的标识符**静默截断**——内外两层别名的
+        //  前 63 字节相同时（长实体名下三层嵌套即可构造），截断后内层 FROM 别名在自己的
+        //  作用域里遮蔽外层别名，关联引用被解析到内层表（"column ... does not exist"，
+        //  更深的巧合形态下是静默错列）。token（Q<n>___）+ registerTablePath 的长度预算
+        //  （见 AliasManager.SUBQUERY_PREFIX_BUDGET）保证任意嵌套深度下标识符 ≤ 63。
+        const innerPrefixRaw = `${this.withPrefix(prefix)}${currentAlias}`
+        const innerPrefix = this.map.aliasManager?.registerSubqueryPrefix(innerPrefixRaw) ?? innerPrefixRaw
 
         const existEntityQuery = RecordQuery.create(
             info.recordName,
             this.map,
             {
                 matchExpression: MatchExp.atom({
-                    key: `${reverseAttributeName}.id`,
-                    value: ['=', parentAttributeNamePath.concat('id').join('.')],
-                    isReferenceValue: true
+                    key: correlationKey,
+                    value: ['=', resolvedReference],
+                    isReferenceValue: true,
+                    isResolvedFieldReference: true
                 }).and(atomData.value[1])
             },
             // 如果上层还有，就继承上层的，如果没有， context 就只这一层
+            //（用户写的 isReferenceValue 引用按契约解析自最外层根实体的作用域）
             contextRootEntity || entityName
         )
 
-        const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, currentAlias, p)
+        const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, innerPrefix, p)
 
         return {
             ...atomData,
@@ -573,7 +612,8 @@ ${innerQuerySQL}
         entityName: string,
         fieldMatchExp: BoolExp<FieldMatchAtom> | null,
         contextRootEntity: string | undefined,
-        p: PlaceholderGen
+        p: PlaceholderGen,
+        prefix = ''
     ): BoolExp<FieldMatchAtom> | null {
         if (!fieldMatchExp) return null
 
@@ -584,7 +624,7 @@ ${innerQuerySQL}
 
             if (!exp.data.isFunctionMatch) return { ...exp.data }
 
-            return this.parseFunctionMatchAtom(entityName, exp.data, contextRootEntity, p)
+            return this.parseFunctionMatchAtom(entityName, exp.data, contextRootEntity, p, prefix)
         })
     }
     
@@ -595,7 +635,7 @@ ${innerQuerySQL}
      */
     buildInsertSQL(
         recordName: string,
-        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string }>
+        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string }>
     ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
@@ -606,7 +646,7 @@ INSERT INTO "${recordInfo.table}"
 VALUES
 (${fieldAndValues.map(() => p()).join(',')}) 
 `
-        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType))
+        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType, f.name || f.field))
         
         return [sql, params]
     }
@@ -620,7 +660,7 @@ VALUES
     buildUpdateSQL(
         entityName: string,
         idRef: { id: string | number },
-        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string }>
+        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string }>
     ): [string, unknown[]] {
         if (!columnAndValue.length) {
             return ['', []]
@@ -634,7 +674,7 @@ UPDATE "${entityInfo.table}"
 SET ${columnAndValue.map(({ field }) => `"${field}" = ${p()}`).join(',')}
 WHERE "${entityInfo.idField}" = (${p()})
 `
-        const params = [...columnAndValue.map(({ value, fieldType, valueType }) => this.prepareFieldValue(value, fieldType, valueType)), idRef.id]
+        const params = [...columnAndValue.map(({ field, name, value, fieldType, valueType }) => this.prepareFieldValue(value, fieldType, valueType, name || field)), idRef.id]
         
         return [sql, params]
     }
@@ -692,8 +732,20 @@ WHERE "${recordInfo.idField}" = ${p()}
      * 准备字段值（处理 JSON 等特殊类型）。
      * CAUTION json 用规范序列化（键排序）：等值匹配的文本比较回退路径（MatchExp）
      *  依赖写入与匹配两侧的序列化一致，非规范形会让键序不同的等价对象匹配失败。
+     * CAUTION thenable（Promise）字段值 fail-fast（r35c）：`create('X', {note: someAsync()})`
+     *  忘 await 的载荷（以及声明期构造器名检测覆盖不到的 async defaultValue/computed 残余）
+     *  会被 JSON.stringify 静默序列化成 "{}" 落库（数值列则抛与用户写法脱节的裸驱动错误）。
+     *  Promise 没有任何合法落库形态；带 then **函数**的 json 对象同样无法经 JSON 序列化
+     *  存活（函数键被丢弃），拒绝严格优于静默丢数据。
      */
-    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string): unknown {
+    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string, field?: string): unknown {
+        if (value && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function') {
+            throw new Error(
+                `field ${field ? `"${field}" ` : ''}received a Promise (thenable) as its value. ` +
+                `Promises cannot be persisted — they would be silently serialized as "{}". ` +
+                `Await the value before writing (a common cause is calling an async function in the payload or in defaultValue/computed without await).`
+            )
+        }
         if (fieldType?.toLowerCase() === 'json') {
             return canonicalJSONStringify(value)
         }

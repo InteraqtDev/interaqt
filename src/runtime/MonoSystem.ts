@@ -884,6 +884,14 @@ class MonoStorage implements Storage{
      * 崩溃，且键序不定的存储文本会让规范化比较失效。boolean 由各驱动的 query() 统一转换。
      */
     private normalizeRecordFieldParam(value: unknown, valueType: string | undefined): unknown {
+        // thenable fail-fast（r35c，与 SQLBuilder.prepareFieldValue 同一契约的兄弟归一化器）：
+        //  Promise 没有合法落库形态，静默序列化成 "{}" 是零告警数据损坏。
+        if (value && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function') {
+            throw new Error(
+                `atomic write received a Promise (thenable) as the field value. ` +
+                `Promises cannot be persisted — await the value before writing.`
+            )
+        }
         if (valueType === 'json' && value !== null && value !== undefined && typeof value !== 'string') {
             return canonicalJSONStringify(value)
         }
@@ -1130,15 +1138,54 @@ RETURNING "numberValue" AS value`,
                     const idPlaceholder = p()
                     const defaultPlaceholder = p()
                     const expectedPlaceholder = p()
+                    // CAUTION 与 replace 同一契约（r26 写参归一化的兄弟读者，r35 收口）：
+                    //  next/expected/defaultValue 必须过 normalizeRecordFieldParam。
+                    //  此前裸绑定：timestamp 字段传 Date 在 SQLite 直接抛绑定错误、
+                    //  传 ISO 字符串则与 INT 毫秒列恒不相等——静默返回 false，
+                    //  调用方误判为并发竞争失败。
                     const rows = await this.db.query<Record<string, unknown>>(
                         `UPDATE "${tableName}" SET "${fieldName}" = ${nextPlaceholder} WHERE "${idField}" = ${idPlaceholder} AND COALESCE("${fieldName}", ${defaultPlaceholder}) = ${expectedPlaceholder} RETURNING "${fieldName}" AS value`,
-                        [next, target.id, defaultValue, expected],
+                        [
+                            this.normalizeRecordFieldParam(next, valueType),
+                            target.id,
+                            this.normalizeRecordFieldParam(defaultValue, valueType),
+                            this.normalizeRecordFieldParam(expected, valueType)
+                        ],
                         `atomic compareAndSet ${target.recordName}.${target.field}`
                     )
                     return rows.length > 0
                 }
 
                 const column = this.resolveGlobalColumn(target, next)
+                // CAUTION global 目标的 json CAS 与 record 目标同一契约（r25 修 record、r36 收兄弟格）：
+                //  单语句 `COALESCE("jsonValue", ?) = ?` 在 PG 系直接抛 "operator does not exist:
+                //  json = unknown"（json 类型无等值操作符），SQLite 按存储文本比较——写路径是
+                //  非规范 JSON.stringify，键序不同的语义相等对象恒不相等（静默 false，
+                //  与并发竞争失败不可区分）。改走「锁定读 → 规范形比较 → 条件写」事务路径。
+                if (column === 'jsonValue') {
+                    return this.withAtomicTransaction(`atomic compareAndSet ${target.key}`, async () => {
+                        await this.ensureGlobalStateRow(target, column, defaultValue)
+                        const lockP = this.getPlaceholder()
+                        const rows = await this.db.query<Record<string, unknown>>(
+                            `SELECT "${column}" AS value FROM "_ComputationState_" WHERE "key" = ${lockP()}${this.supportsForUpdate() ? ' FOR UPDATE' : ''}`,
+                            [target.key],
+                            `atomic compareAndSet lock ${target.key}`
+                        )
+                        const current = this.parseGlobalValue<T>(rows[0]?.value, column)
+                        const currentForCompare = current === null ? (defaultValue ?? null) : current
+                        if (canonicalJSONStringify(currentForCompare) !== canonicalJSONStringify(expected ?? null)) return false
+                        const updateP = this.getPlaceholder()
+                        const valuePlaceholder = updateP()
+                        const keyPlaceholder = updateP()
+                        await this.db.update(
+                            `UPDATE "_ComputationState_" SET "${column}" = ${valuePlaceholder} WHERE "key" = ${keyPlaceholder}`,
+                            [this.normalizeGlobalValue(next, column), target.key],
+                            undefined,
+                            `atomic compareAndSet ${target.key}`
+                        )
+                        return true
+                    })
+                }
                 const storedNext = this.normalizeGlobalValue(next, column)
                 const storedDefault = this.normalizeGlobalValue(defaultValue, column)
                 const storedExpected = this.normalizeGlobalValue(expected, column)

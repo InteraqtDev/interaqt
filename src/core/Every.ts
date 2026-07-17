@@ -71,7 +71,9 @@ export class Every implements EveryInstance {
     callback: {
       type: 'function' as const,
       collection: false as const,
-      required: true as const
+      required: true as const,
+      // 消费点 `!!callback(...)` 不 await：async 函数会让每条贡献恒为 true（见 klassValidation）。
+      synchronous: true as const
     },
     attributeQuery: {
       instanceType: {} as unknown as {[key: string]: unknown},

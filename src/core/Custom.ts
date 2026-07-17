@@ -105,7 +105,9 @@ export class Custom implements CustomInstance {
     planIncremental: {
       type: 'function' as const,
       collection: false as const,
-      required: false as const
+      required: false as const,
+      // 消费点把返回值直接当 IncrementalPlan 读（不 await）：async 函数会让计划静默失效（见 klassValidation）。
+      synchronous: true as const
     },
     compute: {
       type: 'function' as const,
@@ -125,7 +127,9 @@ export class Custom implements CustomInstance {
     createState: {
       type: 'function' as const,
       collection: false as const,
-      required: false as const
+      required: false as const,
+      // 消费点把返回值直接当 state 字典使用（不 await）：async 函数会让 state 变成 Promise（见 klassValidation）。
+      synchronous: true as const
     },
     getInitialValue: {
       type: 'function' as const,

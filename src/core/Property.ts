@@ -1,6 +1,7 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { ALLOWED_PROPERTY_TYPES } from './RealDictionary.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
+import { assertSynchronousFunctionArg } from './klassValidation.js';
 import type { ComputationInstance } from './types.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
@@ -74,11 +75,15 @@ export class Property implements PropertyInstance {
     },
     defaultValue: {
       type: 'function' as const,
-      required: false as const
+      required: false as const,
+      // storage 写路径同步求值直接落库（create() 内 assertSynchronousFunctionArg 执行拒绝）。
+      synchronous: true as const
     },
     computed: {
       type: 'function' as const,
-      required: false as const
+      required: false as const,
+      // storage 写路径同步求值直接落库（create() 内 assertSynchronousFunctionArg 执行拒绝）。
+      synchronous: true as const
     },
     computation: {
       type: [] as const,
@@ -123,6 +128,10 @@ export class Property implements PropertyInstance {
         `computed must be a function of the record's own row, e.g. computed: (record) => ...`
       );
     }
+    // defaultValue/computed 在 storage 写路径上同步求值（返回值直接落库）：async 函数返回的
+    //  Promise 会被序列化成 "{}" 持久化（字符串列静默、数值列裸驱动报错）——r35，声明期拒绝。
+    assertSynchronousFunctionArg(`Property "${args.name}"`, 'defaultValue', args.defaultValue);
+    assertSynchronousFunctionArg(`Property "${args.name}"`, 'computed', args.computed);
 
     const instance = new Property(args, options);
     

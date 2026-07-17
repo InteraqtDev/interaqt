@@ -1,5 +1,6 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
+import { assertSynchronousFunctionArg } from './klassValidation.js';
 import type { ComputationInstance } from './types.js';
 
 export enum PropertyTypes {
@@ -106,6 +107,8 @@ export class Dictionary implements DictionaryInstance {
       type: 'function' as const,
       required: false as const,
       collection: false as const,
+      // setup/迁移回填同步求值直接落库（create() 内 assertSynchronousFunctionArg 执行拒绝）。
+      synchronous: true as const,
     },
     computation: {
       collection: false as const,
@@ -133,6 +136,9 @@ export class Dictionary implements DictionaryInstance {
         `defaultValue must be a function, e.g. defaultValue: () => ${JSON.stringify(args.defaultValue)}.`
       );
     }
+    // defaultValue 在 setup/迁移回填时同步求值直接落库：async 函数返回的 Promise 会被
+    //  序列化成 "{}" 持久化——r35，与 Property.defaultValue 同族，声明期拒绝。
+    assertSynchronousFunctionArg(`Dictionary "${args.name}"`, 'defaultValue', args.defaultValue);
 
     const instance = new Dictionary(args, options);
     

@@ -2,7 +2,7 @@ import { Count } from "@core";
 import { Controller } from "../Controller.js";
 import { CountInstance } from "@core";
 import { DataContext, GlobalBoundState, PropertyDataContext, RecordBoundState } from "./Computation.js";
-import { GlobalRecordsAggregationHandle, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
+import { assertSyncCallbackResult, GlobalRecordsAggregationHandle, PropertyRelationAggregationHandle } from "./aggregationTemplate.js";
 
 export class GlobalCountHandle extends GlobalRecordsAggregationHandle<boolean, number, CountInstance> {
     static computationType = Count
@@ -31,7 +31,7 @@ export class GlobalCountHandle extends GlobalRecordsAggregationHandle<boolean, n
     }
 
     protected computeItemValue(record: Record<string, unknown>, dataDeps: { [key: string]: unknown }): boolean {
-        return this.callback ? !!this.callback.call(this.controller, record, dataDeps) : true
+        return this.callback ? !!assertSyncCallbackResult(this.callback.call(this.controller, record, dataDeps), 'Count', this.dataContext) : true
     }
 
     protected async applyDelta(newValue: boolean | null, oldValue: boolean | null): Promise<number> {
@@ -80,7 +80,7 @@ export class PropertyCountHandle extends PropertyRelationAggregationHandle<boole
     }
 
     protected computeItemValue(relatedItem: Record<string, unknown>, dataDeps: { [key: string]: unknown }): boolean {
-        return this.callback ? !!this.callback.call(this.controller, relatedItem, dataDeps) : true
+        return this.callback ? !!assertSyncCallbackResult(this.callback.call(this.controller, relatedItem, dataDeps), 'Count', this.dataContext) : true
     }
 
     protected async applyDelta(hostRecord: Record<string, unknown>, newValue: boolean | null, oldValue: boolean | null): Promise<number> {
