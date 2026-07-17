@@ -563,6 +563,15 @@ ${paginationClauses.join('\n')}
         const [anchorAlias, anchorIdField] = this.map.getTableAliasAndFieldName(correlationAnchorPath, 'id')
         const resolvedReference = `${this.withPrefix(prefix)}${anchorAlias}.${anchorIdField}`
 
+        // CAUTION 子查询前缀必须 token 化（r36）：原始形态 = 外层前缀链 + 当前路径别名，
+        //  随嵌套深度线性增长。PostgreSQL 对 >63 字节的标识符**静默截断**——内外两层别名的
+        //  前 63 字节相同时（长实体名下三层嵌套即可构造），截断后内层 FROM 别名在自己的
+        //  作用域里遮蔽外层别名，关联引用被解析到内层表（"column ... does not exist"，
+        //  更深的巧合形态下是静默错列）。token（Q<n>___）+ registerTablePath 的长度预算
+        //  （见 AliasManager.SUBQUERY_PREFIX_BUDGET）保证任意嵌套深度下标识符 ≤ 63。
+        const innerPrefixRaw = `${this.withPrefix(prefix)}${currentAlias}`
+        const innerPrefix = this.map.aliasManager?.registerSubqueryPrefix(innerPrefixRaw) ?? innerPrefixRaw
+
         const existEntityQuery = RecordQuery.create(
             info.recordName,
             this.map,
@@ -579,7 +588,7 @@ ${paginationClauses.join('\n')}
             contextRootEntity || entityName
         )
 
-        const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, `${this.withPrefix(prefix)}${currentAlias}`, p)
+        const [innerQuerySQL, innerParams] = this.buildXToOneFindQuery(existEntityQuery, innerPrefix, p)
 
         return {
             ...atomData,
