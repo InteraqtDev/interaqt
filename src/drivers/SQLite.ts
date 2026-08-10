@@ -13,9 +13,8 @@ class IDSystem {
     /**
      * 计数器与存量数据对账（r28 记录项，r32 收口；与 PG 驱动 setupSequences 同一契约）：
      * setup(false) attach 到已有数据而 _IDS_ 计数器缺失/落后（手工导入、备份恢复、跨库
-     * 搬迁）时，getAutoId 会从 1 重发号——SQLite 的逻辑 id 列没有唯一索引，重复 id 是
-     * **静默**数据损坏（同一逻辑 id 两行），不是 PK 冲突。
-     * 只向前推进（MAX(last, 存量最大 id)），绝不回拨。
+     * 搬迁）时，getAutoId 会从 1 重发号——重复 id 在有框架逻辑 id UNIQUE INDEX 后 fail-loud，
+     * 但仍会破坏省略 id 的幸福路径。只向前推进（MAX(last, 存量最大 id)），绝不回拨。
      */
     async setupSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
         const quote = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`
@@ -36,6 +35,21 @@ RETURNING last`,
                 )
             }
         }
+    }
+    /**
+     * Create-path counterpart of setupSequences: after an external integer id is written,
+     * advance the counter so getAutoId cannot reissue that value in the same process.
+     */
+    async noteAllocatedId(recordName: string, id: unknown) {
+        const n = typeof id === 'number' ? id : Number(id)
+        if (!Number.isFinite(n) || n < 1) return
+        await this.db.query(
+            `INSERT INTO _IDS_ (name, last) VALUES (?, ?)
+ON CONFLICT(name) DO UPDATE SET last = MAX(last, excluded.last)
+RETURNING last`,
+            [recordName, n],
+            `note allocated id for ${recordName}`
+        )
     }
     async getAutoId(recordName: string) {
         // CAUTION 原子 UPSERT：此前的「SELECT 再 INSERT/UPDATE」读-改-写在并发下会分配重复 id；
@@ -220,6 +234,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
+    }
+    async noteAllocatedId(recordName: string, id: unknown) {
+        return this.idSystem.noteAllocatedId(recordName, id)
     }
     async setupRecordSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
         return this.idSystem.setupSequences(records)

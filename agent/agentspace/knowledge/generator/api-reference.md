@@ -3849,16 +3849,25 @@ Create a new record.
 
 **Parameters**
 - `entityName` (string): Name of the entity
-- `data` (any): Entity data (do NOT include id field)
+- `data` (any): Entity data. Top-level `id` is **optional** on create:
+  - omit → framework allocates (uuidv7 on PGLite; integer sequence on SQLite/PostgreSQL/MySQL)
+  - provide → stored as the logical application identity (must be unique and driver-compatible; duplicates fail loud)
 - `events` (RecordMutationEvent[], optional): Mutation events array
 
 ```typescript
+// Framework-allocated id
 const user = await storage.create('User', { 
   username: 'john', 
   email: 'john@example.com',
   role: 'user'
 })
-// Returns created record with generated id
+// Returns created record including logical id
+
+// Client-pregenerated id (single identity — same value used by Relation / MatchExp / computeTarget)
+const order = await storage.create('Order', {
+  id: clientGeneratedId,
+  status: 'pending'
+})
 ```
 
 **update(entityName: string, matchExpression: MatchExpressionData, data: any, events?: RecordMutationEvent[])**
@@ -3866,8 +3875,8 @@ Update existing records.
 
 **Parameters**
 - `entityName` (string): Name of the entity
-- `matchExpression` (MatchExpressionData): Which records to update
-- `data` (any): Fields to update
+- `matchExpression` (MatchExpressionData): Which records to update (typically match on logical `id`)
+- `data` (any): Fields to update. Top-level `id` in `data` is **ignored** (stripped); logical identity is immutable after create. Locate rows via `matchExpression`, not by rewriting `id`.
 - `events` (RecordMutationEvent[], optional): Mutation events array
 
 ```typescript
@@ -3875,6 +3884,7 @@ await storage.update('User',
   MatchExp.atom({ key: 'id', value: ['=', userId] }), 
   { status: 'inactive', lastModified: Math.floor(Date.now()/1000) }  // In seconds
 )
+// data: { id: otherId, status: 'inactive' } still leaves logical id === userId
 ```
 
 **delete(entityName: string, matchExpression: MatchExpressionData, events?: RecordMutationEvent[])**

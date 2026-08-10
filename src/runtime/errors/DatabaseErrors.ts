@@ -9,6 +9,11 @@ export type NormalizedDatabaseError = {
     fields?: string[],
     isUniqueViolation: boolean,
     isCheckViolation: boolean,
+    /**
+     * DDL "index/relation already exists" (setup re-entry on dialects without
+     * CREATE INDEX IF NOT EXISTS). Distinct from row-level unique violations.
+     */
+    isIndexAlreadyExists: boolean,
     raw: unknown,
 }
 
@@ -57,6 +62,17 @@ export function normalizeDatabaseError(error: unknown, database?: Database): Nor
         || message.includes('CHECK constraint failed')
         || message.includes('Check constraint')
 
+    // Index/relation already exists during CREATE INDEX (setup attach / setup(false)).
+    // MySQL: ER_DUP_KEYNAME 1061 "Duplicate key name".
+    // PostgreSQL/SQLite: SQLSTATE 42P07 / message "already exists".
+    // Must not be confused with row unique violations (23505 / 1062 / Duplicate entry).
+    const isIndexAlreadyExists = rawCode === 1061
+        || rawCode === '1061'
+        || rawCode === '42P07'
+        || rawCode === 'ER_DUP_KEYNAME'
+        || /duplicate key name/i.test(message)
+        || (/already exists/i.test(message) && /index|relation|key/i.test(message))
+
     return {
         driver: database?.constructor?.name,
         message,
@@ -66,6 +82,7 @@ export function normalizeDatabaseError(error: unknown, database?: Database): Nor
         fields: sqliteFields?.fields,
         isUniqueViolation,
         isCheckViolation,
+        isIndexAlreadyExists,
         raw: error,
     }
 }

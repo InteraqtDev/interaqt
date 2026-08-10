@@ -7,24 +7,13 @@ import { DataBasedComputation } from "./Computation.js";
 import { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { assert } from "../util.js";
 import { RequireSerializableRetry } from "../transaction.js";
-import { ComputationError, ComputationProtocolError } from "../errors/ComputationErrors.js";
+import { ComputationProtocolError } from "../errors/ComputationErrors.js";
 import { validateMutationEventPatternKeys, validateMutationEventPatternSurface } from "./TransitionFinder.js";
 
-// CAUTION Transform 派生记录的身份由框架管理（sourceRecordId + transformIndex），callback 返回
-//  顶层 `id` 会被 storage 的"外部 id"路径原样写入：id 来自源实体的发号序列（或 uuid），与派生
-//  实体自己的序列必然冲突——同表出现重复 id 后，按 id 的查询/更新/删除命中任意一行（静默数据
-//  损坏）。最常见的触发形态是自然写法 `callback: (r) => ({...r, extra})`。嵌套关联引用里的 id
-//  （如 {author: {id}}）是合法的关系挂载，不受影响。
-function assertNoIdInTransformedRecord(record: Record<string, unknown>, dataContext: DataContext) {
-    if (record.id !== undefined && record.id !== null) {
-        throw new ComputationError(
-            `Transform callback for ${dataContext.type} "${(dataContext.id as { name?: string }).name}" returned a record with a top-level "id" field (${JSON.stringify(record.id)}). ` +
-            `Derived record identity is managed by the framework; an explicit id collides with the target entity's own id sequence and silently corrupts data. ` +
-            `Strip it before returning, e.g. callback: ({id: _, ...rest}) => ({...rest}).`,
-            { computationName: 'Transform', computationPhase: 'transform-callback-result' }
-        )
-    }
-}
+// Transform insert may carry a top-level `id` (client-pregenerated or intentional shared identity).
+// Duplicate logical ids fail loud via the framework logical-id UNIQUE INDEX (storage invariant).
+// Update patches never rewrite identity: applyResultPatch / storage update strip top-level `id`.
+// Nested relation refs such as { author: { id } } are unaffected.
 
 export class RecordsTransformHandle implements DataBasedComputation {
     static computationType = Transform
@@ -92,7 +81,6 @@ export class RecordsTransformHandle implements DataBasedComputation {
             const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             transformedRecords.forEach((transformedRecord, index)=> {
                 if (!transformedRecord) return
-                assertNoIdInTransformedRecord(transformedRecord, this.dataContext)
                 result.push({
                     ...transformedRecord,
                     [this.state.sourceRecordId.key]: record.id,
@@ -130,7 +118,6 @@ export class RecordsTransformHandle implements DataBasedComputation {
         transformedRecords.forEach((transformedRecord, index) => {
             // 允许返回 Null，表示不插入
             if(transformedRecord) {
-                assertNoIdInTransformedRecord(transformedRecord, this.dataContext)
                 results.push({
                     type:'insert',
                     data: {
@@ -155,7 +142,6 @@ export class RecordsTransformHandle implements DataBasedComputation {
             transformedRecords.forEach((transformedRecord, index) => {
                 // 允许返回 Null，表示不插入
                 if(transformedRecord) {
-                    assertNoIdInTransformedRecord(transformedRecord, this.dataContext)
                     results.push({
                         type:'insert',
                         data: {
@@ -199,12 +185,13 @@ export class RecordsTransformHandle implements DataBasedComputation {
             
             transformedRecords.forEach((transformedRecord, index) => {
                 if (transformedRecord) {
-                    assertNoIdInTransformedRecord(transformedRecord, this.dataContext)
                     if(mappedRecordsByIndex[index]) {
+                        // Identity is located by affectedId only; top-level id in update data is stripped at applyResultPatch.
+                        const { id: _ignoredId, ...rest } = transformedRecord as Record<string, unknown>
                         results.push({
                             type:'update',
                             data: {
-                                ...transformedRecord,
+                                ...rest,
                                 [this.state.sourceRecordId.key]: sourceRecordId,
                                 [this.state.transformIndex.key]: index
                             },

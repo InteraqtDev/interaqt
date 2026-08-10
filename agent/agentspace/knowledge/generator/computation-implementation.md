@@ -43,24 +43,35 @@ Transform converts one collection (source) into another collection (target). Und
    }
    ```
 
-3. **System Auto-generates IDs**: NEVER include `id` in callback return value
+3. **Logical `id` on insert is optional (single identity)**:
+   - Omit top-level `id` → the framework allocates one (`getAutoId` / uuidv7 depending on driver).
+   - Supply a top-level `id` on **create/insert** → that value becomes the record's application identity (must be unique; type must match the driver: UUID on PGLite, integer on SQLite/PostgreSQL/MySQL). Duplicate logical ids fail loud via the framework unique index.
+   - **Do not** use top-level `id` to *update* an existing row's identity. Data-based Transform update patches and `applyResultPatch` strip `data.id`; location is always `affectedId` / match.
+   - Data-based maps that need an **independent** identity should strip the source id (`({id: _, ...rest}) => rest`) or assign a new unique id. Spreading the source (`(r) => ({...r})`) reuses the source id value; if a target row already has that id, create fails (unique constraint)—it does not silently create a second row.
+
    ```typescript
-   // ❌ WRONG: Including id in new entity
-   callback: function(event) {
-     return {
-       id: uuid(),  // NEVER DO THIS!
-       label: event.payload.label,
-       slug: event.payload.slug
-     };
-   }
-   
-   // ✅ CORRECT: Let system generate id
+   // ✅ Default: omit id — framework allocates
    callback: function(event) {
      return {
        label: event.payload.label,
        slug: event.payload.slug
      };
    }
+
+   // ✅ Insert with client-pregenerated id (idempotent create / known identity before persist)
+   callback: function(event) {
+     return {
+       id: event.payload.id,  // unique, driver-compatible
+       label: event.payload.label,
+       slug: event.payload.slug
+     };
+   }
+
+   // ✅ Data-based map with independent identity (strip source id)
+   callback: ({id: _sourceId, ...rest}) => ({
+     ...rest,
+     // optional: id: generateUniqueId()
+   })
    ```
 
 4. **Entity References Use ID**: When referencing existing entities in relations, use `{ id: ... }`
@@ -75,7 +86,7 @@ Transform converts one collection (source) into another collection (target). Und
    }
    ```
 
-Remember: Transform is a **mapping function** that converts each matching source item into one or more target items (or none). The framework handles ID generation, storage, and relationship management.
+Remember: Transform is a **mapping function** that converts each matching source item into one or more target items (or none). Nested `{ author: { id } }` refs are always relation attachments, not top-level identity rewrites.
 
 #### 🔴 CRITICAL: InteractionEventEntity Transform Limitations
 
@@ -109,8 +120,10 @@ When using `InteractionEventEntity` as the Transform input source, understand th
      callback: function(mutationEvent) {
        const event = mutationEvent.record;
        if (event.interactionName === 'UpdateStyle') {
-         // This will CREATE a new Style, not update existing!
-         return { id: event.payload.id, ... }  // WRONG!
+         // InteractionEvent Transform only CREATES. Returning payload.id here
+         // does not update the existing Style — it attempts another insert under
+         // that logical id (unique-constraint failure if the row already exists).
+         return { id: event.payload.id, label: event.payload.label };
        }
      }
    });

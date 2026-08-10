@@ -276,7 +276,12 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
             //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
             return "DOUBLE PRECISION"
         }else if(type === 'timestamp'){
-            return "TIMESTAMP"
+            // TIMESTAMPTZ stores an absolute instant. Plain TIMESTAMP is session/local-wall-clock:
+            // PGLite binds Date/ISO by UTC components into TIMESTAMP, then the JS client reinterprets
+            // the wall clock in the process timezone — epoch-ms round-trip shifts by getTimezoneOffset()
+            // (reproduced UTC+8: write Date.UTC(...) reads back −8h). SQLite keeps INT ms; PG family
+            // must use timestamptz to honor the r26 epoch-ms contract under any host TZ.
+            return "TIMESTAMPTZ"
         }else{
             return type
         }

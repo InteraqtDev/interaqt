@@ -41,7 +41,7 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { canonicalJSONStringify, createUniqueIndexSQL, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
+import { canonicalJSONStringify, createFrameworkLogicalIdUniqueIndexSQL, createUniqueIndexSQL, frameworkLogicalIdUniqueIndexes, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
@@ -397,6 +397,9 @@ class MonoStorage implements Storage{
         }
         if (createTables) await dbSetup.createTables()
         await this.createConstraints(dbSetup)
+        // Framework logical-id UNIQUE INDEX (identity contract): per non-filtered entity/relation
+        // on physical idField, via createUniqueIndexSQL — not user UniqueConstraint pipeline.
+        await this.setupFrameworkLogicalIdUniqueIndexes(dbSetup)
         if (this.db.setupRecordSequences) {
             const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
             await this.db.setupRecordSequences(Object.keys(dbSetup.map.records).map(recordName => {
@@ -415,7 +418,12 @@ class MonoStorage implements Storage{
         this.queryHandle = new EntityQueryHandle( new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), this.db)
 
         this.map = dbSetup.map
-        this.constraintSchemaItems = dbSetup.constraintSchemaItems
+        // User constraints from DBSetup plus framework logical-id UNIQUE INDEX items
+        // (observability / error mapping only — never fed back into createConstraintSQL).
+        this.constraintSchemaItems = [
+            ...dbSetup.constraintSchemaItems,
+            ...this.frameworkLogicalIdConstraintItems(dbSetup),
+        ]
         this.schema = this.createSchemaMetadata(dbSetup)
     }
 
@@ -564,7 +572,10 @@ class MonoStorage implements Storage{
         }
         this.queryHandle = new EntityQueryHandle(new EntityToTableMap(dbSetup.map, dbSetup.aliasManager), this.db)
         this.map = dbSetup.map
-        this.constraintSchemaItems = dbSetup.constraintSchemaItems
+        this.constraintSchemaItems = [
+            ...dbSetup.constraintSchemaItems,
+            ...this.frameworkLogicalIdConstraintItems(dbSetup),
+        ]
         this.schema = this.createSchemaMetadata(dbSetup)
     }
 
@@ -650,15 +661,25 @@ class MonoStorage implements Storage{
             logicalPath: item.kind === 'unique' ? `${item.recordName}.${item.properties.join('.')}` : `${item.recordName}.${item.property}`,
             description: `migration verify constraint ${item.constraintName}`,
         }))
-        const postRecomputeDDL = dbSetup.createConstraintSQL().map(statement => ({
-            kind: 'create-constraint' as const,
-            sql: statement.sql,
-            tableName: statement.item.tableName,
-            logicalPath: statement.item.kind === 'unique'
-                ? `${statement.item.recordName}.${statement.item.properties.join('.')}`
-                : `${statement.item.recordName}.${statement.item.property}`,
-            description: `migration setup constraint ${statement.item.constraintName}`,
-        }))
+        const postRecomputeDDL = [
+            ...dbSetup.createConstraintSQL().map(statement => ({
+                kind: 'create-constraint' as const,
+                sql: statement.sql,
+                tableName: statement.item.tableName,
+                logicalPath: statement.item.kind === 'unique'
+                    ? `${statement.item.recordName}.${statement.item.properties.join('.')}`
+                    : `${statement.item.recordName}.${statement.item.property}`,
+                description: `migration setup constraint ${statement.item.constraintName}`,
+            })),
+            // Same identity indexes as setup(true): physical idField UNIQUE via createUniqueIndexSQL.
+            ...createFrameworkLogicalIdUniqueIndexSQL(dbSetup.map, dialect).map(item => ({
+                kind: 'create-constraint' as const,
+                sql: item.sql,
+                tableName: item.table,
+                logicalPath: `${item.recordName}.id`,
+                description: `migration setup framework logical id unique index ${item.recordName}`,
+            })),
+        ]
         return { verificationDDL, postRecomputeDDL }
     }
 
@@ -759,12 +780,36 @@ class MonoStorage implements Storage{
         return new Set(rows.map(row => row.column_name))
     }
 
+    /**
+     * Observability items for framework logical-id UNIQUE INDEX (§3.3.1 E).
+     * Not registered on DBSetup.constraintSchemaItems so createConstraintSQL /
+     * user UniqueConstraint pipelines never emit them (MySQL unique:false).
+     */
+    private frameworkLogicalIdConstraintItems(dbSetup: DBSetup): ConstraintSchemaItem[] {
+        return frameworkLogicalIdUniqueIndexes(dbSetup.map).map(item => ({
+            kind: 'unique' as const,
+            constraintName: item.indexName,
+            physicalName: item.indexName,
+            recordName: item.recordName,
+            tableName: item.table,
+            properties: ['id'],
+            fields: [item.idField],
+        }))
+    }
+
     private createSchemaMetadata(dbSetup: DBSetup): StorageSchemaMetadata {
         const tableOwners = new Map<string, string[]>()
         Object.entries(dbSetup.map.records).forEach(([recordName, record]) => {
             if (!tableOwners.has(record.table)) tableOwners.set(record.table, [])
             tableOwners.get(record.table)!.push(recordName)
         })
+        // Always compose from the given dbSetup (user constraints + framework id
+        // indexes). Do not read this.constraintSchemaItems: migration planning
+        // may call this while an older setup's list is still assigned.
+        const constraints = [
+            ...dbSetup.constraintSchemaItems,
+            ...this.frameworkLogicalIdConstraintItems(dbSetup),
+        ]
         return {
             dialect: getSchemaDialect(this.db),
             records: Object.entries(dbSetup.map.records).map(([recordName, record]) => ({
@@ -803,7 +848,44 @@ class MonoStorage implements Storage{
                     ownerRecords: tableOwners.get(tableName) || [],
                 })),
             })),
-            constraints: dbSetup.constraintSchemaItems.map(item => ({ ...item })),
+            constraints: constraints.map(item => ({ ...item })),
+        }
+    }
+
+    /**
+     * Emit UNIQUE INDEX on each non-filtered entity/relation logical id physical column.
+     * Bypasses createUniqueConstraintStatement so MySQL (unique:false for user TEXT attrs)
+     * still gets fail-loud identity uniqueness. Columns are idField, never literal "id".
+     *
+     * Idempotent on setup re-entry: dialects without CREATE INDEX IF NOT EXISTS (MySQL)
+     * treat "index already exists" as success so setup(false)/attach does not crash.
+     * First setup still creates the index; missing indexes on a cold attach are created.
+     */
+    private async setupFrameworkLogicalIdUniqueIndexes(dbSetup: DBSetup) {
+        const dialect = getSchemaDialect(this.db)
+        for (const item of createFrameworkLogicalIdUniqueIndexSQL(dbSetup.map, dialect)) {
+            try {
+                await this.db.scheme(item.sql, `setup framework logical id unique index ${item.recordName}`)
+            } catch (error) {
+                const normalized = normalizeDatabaseError(error, this.db)
+                // setup(true) then setup(false) / new process attach: index already present.
+                if (normalized.isIndexAlreadyExists) {
+                    continue
+                }
+                throw new ConstraintSetupError(
+                    `Failed to setup framework logical id unique index on "${item.recordName}" (${item.table}.${item.idField})`,
+                    {
+                        constraintName: item.indexName,
+                        physicalName: item.indexName,
+                        recordName: item.recordName,
+                        tableName: item.table,
+                        properties: ['id'],
+                        driver: this.db.constructor?.name,
+                        rawCode: normalized.rawCode,
+                        causedBy: error instanceof Error ? error : undefined,
+                    }
+                )
+            }
         }
     }
 

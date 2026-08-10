@@ -299,6 +299,14 @@ async function timestampRoundTrip(db: any, options?: { skipUpdatePath?: boolean 
 }
 
 describe('L-7 — timestamp normalization (epoch-ms contract)', () => {
+  test('PG/PGLite map timestamp to TIMESTAMPTZ (absolute instant, not session-local TIMESTAMP)', () => {
+    // Pin the physical type that keeps epoch-ms stable under non-UTC host timezones.
+    // Plain TIMESTAMP + Date bind was observed to shift reads by getTimezoneOffset() on PGLite.
+    expect(new PGLiteDB().mapToDBFieldType('timestamp')).toMatch(/TIMESTAMPTZ/i)
+    expect(new PostgreSQLDB('unused_ts_type_pin').mapToDBFieldType('timestamp')).toMatch(/TIMESTAMPTZ/i)
+    // SQLite keeps integer epoch ms — different physical strategy, same JS contract.
+    expect(new SQLiteDB().mapToDBFieldType('timestamp')).toMatch(/INT/i)
+  })
   test('PGLite: write Date|ms|ISO, read ms; match by ms/Date/between', async () => {
     await timestampRoundTrip(new PGLiteDB())
   })

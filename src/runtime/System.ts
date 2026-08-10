@@ -277,6 +277,13 @@ export type Database = {
     insert: (sql: string, values: unknown[], name?:string) => Promise<EntityIdRef>
     update: (sql: string, values: unknown[], idField?: string, name?:string) => Promise<EntityIdRef[]>
     getAutoId: (recordName: string) => Promise<string>,
+    /**
+     * After a create that used a caller-supplied logical id, advance the record's auto-id
+     * counter so a later getAutoId cannot reissue that value (INT sequence drivers).
+     * No-op / omit on UUID drivers (PGLite). Non-finite / non-positive ids should be ignored
+     * by the driver (type must still be compatible with the column).
+     */
+    noteAllocatedId?: (recordName: string, id: unknown) => Promise<void>,
     parseMatchExpression?: (key: string, value: [string, any], fieldName: string, fieldType: string, isReferenceValue: boolean, getReferenceFieldValue:(v: string) => string, genPlaceholder: (name?: string) => string) => { fieldValue: string, fieldParams: unknown[] } | undefined
     getPlaceholder?: () => (name?:string) => string,
     supportsSelectForUpdate?: boolean,

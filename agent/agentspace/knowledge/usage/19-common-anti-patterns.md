@@ -478,150 +478,157 @@ await controller.callInteraction('CreatePost', {
 });
 ```
 
-## 9. ID Generation Mistakes
+## 9. Record Identity Mistakes
 
-### ❌ Manually Specifying IDs
+Logical `id` is the **single application identity**: Relation endpoints, `MatchExp`, and `StateMachine.computeTarget` all use `{ id }` / match-by-id. The physical table primary key `_rowId` is an implementation detail and must not be treated as business identity.
+
+### Rules (create optional, update immutable)
+
+| Path | Top-level `id` | Behavior |
+|------|----------------|----------|
+| `storage.create` / Transform **insert** | Optional | Omit → framework allocates. Provide → stored as logical identity (unique, driver-compatible). Duplicates fail loud. |
+| `storage.update` / Transform **update** patch | Ignored | Stripped before write; identity located only by match / `affectedId`. |
+| Nested `{ author: { id } }` | Always valid | Relation attachment, not identity rewrite. |
+| Declaring `Property.create({ name: 'id', ... })` | Forbidden | Reserved framework column — use another property name (e.g. `externalId`) for a *second* business key if needed. |
+
+Driver type contract for pregenerated ids: **PGLite** expects UUID strings; **SQLite / PostgreSQL / MySQL** use integer logical ids. Supplying a type the driver cannot store fails at write time.
+
+### ❌ Common mistakes
 
 ```javascript
-// ❌ WRONG: Never manually specify ID when creating entities
-const result = await controller.callInteraction('CreateArticle', {
-  user: currentUser,
-  payload: {
-    id: uuid(),  // ❌ Don't do this!
-    title: 'My Article',
-    content: 'Content...'
+// ❌ WRONG: data-based Transform spreads source id when the derived row needs its own identity
+// Spreading reuses source.id. If a target row already has that id, create fails (unique index).
+// If not, target and source share the same logical id value (observable; document if intentional).
+computation: Transform.create({
+  record: Product,
+  callback: (product) => ({ ...product, discountedPrice: product.price * 0.9 })
+})
+
+// ❌ WRONG: treating update payload id as a way to rename / relocate a row
+await system.storage.update(
+  'Article',
+  MatchExp.atom({ key: 'id', value: ['=', oldId] }),
+  { id: newId, title: 'Renamed' }  // id is stripped; row stays oldId
+)
+
+// ❌ WRONG: InteractionEvent Transform cannot "update by returning id"
+// That path only creates. Returning an existing id inserts again → unique constraint failure.
+callback: (mutationEvent) => {
+  const event = mutationEvent.record
+  if (event.interactionName === 'UpdateArticle') {
+    return { id: event.payload.id, title: event.payload.title }  // not an update
   }
-});
+}
 
-// ❌ WRONG: Don't specify ID in Transform computation
-const Article = Entity.create({
-  name: 'Article',
-  computation: Transform.create({
-    record: InteractionEventEntity,
-    callback: function(event) {
-      if (event.interactionName === 'CreateArticle') {
-        return {
-          id: uuid(),  // ❌ Never specify ID!
-          title: event.payload.title,
-          content: event.payload.content
-        };
-      }
-    }
-  })
-});
-
-// ❌ WRONG: Don't specify ID in test data setup
-beforeEach(async () => {
-  const user = await system.storage.create('User', {
-    id: 'user-123',  // ❌ Don't specify ID!
-    name: 'Test User'
-  });
-});
+// ❌ WRONG: declare a user property named `id` (reserved)
+Property.create({ name: 'id', type: 'string' })
 ```
 
-### ✅ Correct Approaches for Tracking Created Data
+### ✅ Correct patterns
 
-#### Option 1: Use Return Value from storage.create
+#### 1. Framework-allocated id (default)
 
 ```javascript
-// ✅ CORRECT: Use the returned entity which includes auto-generated ID
-beforeEach(async () => {
-  // storage.create returns the created entity with auto-generated ID
-  testUser = await system.storage.create('User', {
-    name: 'Test User',
-    email: 'test@example.com'
-  });
-  
-  // Use the returned entity's ID
-  testArticle = await system.storage.create('Article', {
-    title: 'Test Article',
-    author: { id: testUser.id }  // Reference using auto-generated ID
-  });
-});
+// Omit id — framework allocates; use the returned record for Relation / tests
+testUser = await system.storage.create('User', {
+  name: 'Test User',
+  email: 'test@example.com'
+})
 
-// Use in tests
-test('should update article', async () => {
-  const result = await controller.callInteraction('UpdateArticle', {
-    user: testUser,
-    payload: {
-      articleId: testArticle.id,  // Use the auto-generated ID
-      title: 'Updated Title'
-    }
-  });
-});
+testArticle = await system.storage.create('Article', {
+  title: 'Test Article',
+  author: { id: testUser.id }
+})
 ```
 
-#### Option 2: Use clientId Property for Tracking
+#### 2. Client-pregenerated logical id (single identity)
+
+Use when the client must know the identity before persist (idempotent create, offline keys, linking before round-trip).
 
 ```javascript
-// ✅ CORRECT: Define a clientId property for tracking
+const articleId = crypto.randomUUID()  // PGLite; use an integer on INT drivers
+
 const Article = Entity.create({
   name: 'Article',
   properties: [
     Property.create({ name: 'title', type: 'string' }),
-    Property.create({ name: 'content', type: 'string' }),
-    // Add clientId for tracking purposes
-    Property.create({ 
-      name: 'clientId', 
-      type: 'string',
-      description: 'Client-provided ID for tracking created entities'
-    })
+    Property.create({ name: 'content', type: 'string' })
   ],
   computation: Transform.create({
     record: InteractionEventEntity,
-    callback: function(event) {
-      if (event.interactionName === 'CreateArticle') {
-        return {
-          // ID is auto-generated, not specified
-          title: event.payload.title,
-          content: event.payload.content,
-          clientId: event.payload.clientId  // Use clientId for tracking
-        };
+    callback: function (mutationEvent) {
+      const event = mutationEvent.record
+      if (event.interactionName !== 'CreateArticle') return null
+      return {
+        id: event.payload.id,  // optional; unique + driver-compatible
+        title: event.payload.title,
+        content: event.payload.content,
+        author: event.user
       }
     }
   })
-});
+})
 
-// Use in interaction
-const result = await controller.callInteraction('CreateArticle', {
+await controller.dispatch('CreateArticle', {
   user: currentUser,
   payload: {
+    id: articleId,
     title: 'My Article',
-    content: 'Content...',
-    clientId: 'my-tracking-id-123'  // Provide clientId for tracking
+    content: 'Content...'
   }
-});
+})
 
-// Find the created article using clientId
-const createdArticle = await system.storage.findOne('Article',
-  MatchExp.atom({ key: 'clientId', value: ['=', 'my-tracking-id-123'] })
-);
+// Same id works for Relation, nested attributeQuery, and computeTarget
+await system.storage.create('Comment', {
+  body: 'Nice',
+  article: { id: articleId }
+})
 ```
 
-#### Option 3: Query by Unique Properties
+#### 3. Data-based Transform with independent identity
 
 ```javascript
-// ✅ CORRECT: Find created entity by unique properties
-const result = await controller.callInteraction('CreateUser', {
-  user: adminUser,
-  payload: {
-    email: 'unique@example.com',  // Use unique email
-    name: 'John Doe'
-  }
-});
-
-// Find the created user by unique email
-const createdUser = await system.storage.findOne('User',
-  MatchExp.atom({ key: 'email', value: ['=', 'unique@example.com'] })
-);
+computation: Transform.create({
+  record: Product,
+  callback: ({ id: _sourceId, ...rest }) => ({
+    name: rest.name,
+    originalPrice: rest.price,
+    discountedPrice: rest.price * 0.9
+    // omit id → new framework id; or set id: generateUniqueId()
+  })
+})
 ```
 
-### Why IDs Must Be Auto-Generated
+#### 4. Optional secondary tracking column (`clientId`)
 
-1. **Framework Design**: InterAQT manages ID generation internally to ensure uniqueness and consistency
-2. **Storage Layer Responsibility**: Different storage backends may have different ID generation strategies
-3. **Data Integrity**: Manual IDs can cause conflicts and break relationships
-4. **Reactive System**: The framework needs control over IDs for proper change tracking
+A separate `clientId` (or similar) property is **optional** when you need a non-primary correlation key *in addition to* logical `id` — not the recommended substitute for application identity. Prefer pregenerated `id` when the value *is* the identity.
+
+```javascript
+Property.create({
+  name: 'clientId',
+  type: 'string',
+  description: 'Optional external correlation key; logical id remains the Relation key'
+})
+```
+
+#### 5. Query by unique business properties
+
+```javascript
+const createdUser = await system.storage.findOne(
+  'User',
+  MatchExp.atom({ key: 'email', value: ['=', 'unique@example.com'] }),
+  undefined,
+  ['*']
+)
+```
+
+### Why these rules exist
+
+1. **Single identity** keeps Relation, `computeTarget`, and storage match expressions aligned on one key.
+2. **Create-time optional id** enables idempotent and offline-friendly creates without a parallel identity column.
+3. **Immutable id after create** keeps incremental Transform maps (`affectedId`), foreign references, and event targeting stable.
+4. **Unique logical id index** makes accidental reuse fail loud instead of silently duplicating rows.
+5. **Property name `id` stays reserved** so user declarations cannot shadow the framework column.
 
 ## Key Takeaways
 
@@ -635,8 +642,8 @@ const createdUser = await system.storage.findOne('User',
 8. **storage.create() bypasses ALL validation - use only for test setup**
 9. **ALL business logic testing must use callInteraction()**
 10. **Never test Entity/Relation directly - test through Interactions**
-11. **NEVER manually specify IDs - they are always auto-generated by the framework**
-12. **Use storage.create return value or clientId property to track created entities**
+11. **Logical `id` is the single application identity — optional on create, immutable on update; type must match the driver**
+12. **Prefer returned `storage.create` id or a pregenerated logical id for Relation / computeTarget; `clientId` is only an optional secondary key**
 13. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md)**
 
-Remember: The framework is about **declaring what data is**, not **how to manipulate it**. 
+Remember: The framework is about **declaring what data is**, not **how to manipulate it**.

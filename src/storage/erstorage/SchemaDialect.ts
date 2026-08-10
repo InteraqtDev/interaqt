@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import type { Database } from "@runtime";
 import type { ConstraintPredicate, ConstraintPredicateOperator, ConstraintPredicateValue } from "@core";
 import type { ConstraintSchemaItem, NonNullConstraintSchemaItem, UniqueConstraintSchemaItem } from "./Setup.js";
+import type { MapData } from "./EntityToTableMap.js";
 
 export type SchemaDialectName = 'postgres' | 'sqlite' | 'mysql';
 
@@ -158,6 +160,58 @@ export function createUniqueIndexSQL(
         : ''
 
     return `CREATE UNIQUE INDEX${ifNotExists} ${quoteIdentifier(physicalName, dialect)} ON ${quoteIdentifier(tableName, dialect)} (${columns})${predicate}`
+}
+
+/**
+ * Framework logical-id UNIQUE INDEX (entity-identity contract).
+ *
+ * Logical `id` is not the table PK (`_rowId`); its physical column is `attributes.id.field`
+ * (hashed short name via generateShortFieldName), never assumed to be the literal `"id"`.
+ * Emitted outside the user UniqueConstraint → createUniqueConstraintStatement pipeline so
+ * MySQL (constraints.unique === false) still gets fail-loud identity uniqueness on INT id.
+ *
+ * Reference function: one index per non-filtered entity/relation that has idField;
+ * combined tables yield one index per participating base record (distinct idFields).
+ */
+export type FrameworkLogicalIdUniqueIndex = {
+    recordName: string
+    table: string
+    idField: string
+    indexName: string
+}
+
+export function frameworkLogicalIdUniqueIndexName(recordName: string, idField: string): string {
+    // Same hash budget as Transform unique indexes: prefix + 20 hex < PG 63-char limit.
+    const hash = createHash('sha1').update(`${recordName}\0${idField}`).digest('hex').slice(0, 20)
+    return `interaqt_id_${hash}`
+}
+
+export function frameworkLogicalIdUniqueIndexes(map: Pick<MapData, 'records'>): FrameworkLogicalIdUniqueIndex[] {
+    const result: FrameworkLogicalIdUniqueIndex[] = []
+    for (const [recordName, record] of Object.entries(map.records)) {
+        if (record.isFilteredEntity || record.isFilteredRelation) continue
+        const idField = record.attributes?.id && 'field' in record.attributes.id
+            ? (record.attributes.id as { field?: string }).field
+            : undefined
+        if (!idField || !record.table) continue
+        result.push({
+            recordName,
+            table: record.table,
+            idField,
+            indexName: frameworkLogicalIdUniqueIndexName(recordName, idField),
+        })
+    }
+    return result
+}
+
+export function createFrameworkLogicalIdUniqueIndexSQL(
+    map: Pick<MapData, 'records'>,
+    dialect: SchemaDialect,
+): Array<FrameworkLogicalIdUniqueIndex & { sql: string }> {
+    return frameworkLogicalIdUniqueIndexes(map).map(item => ({
+        ...item,
+        sql: createUniqueIndexSQL(item.indexName, item.table, [item.idField], dialect),
+    }))
 }
 
 export function createUniqueConstraintStatement(

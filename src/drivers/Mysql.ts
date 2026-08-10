@@ -19,8 +19,8 @@ class IDSystem {
     /**
      * 计数器与存量数据对账（r28 记录项，r32 收口；与 PG 驱动 setupSequences 同一契约）：
      * setup(false) attach 到已有数据而 _IDS_ 计数器缺失/落后（手工导入、备份恢复、跨库
-     * 搬迁）时，getAutoId 会从 1 重发号——逻辑 id 列没有唯一索引，重复 id 是静默数据损坏。
-     * 只向前推进（GREATEST(last, 存量最大 id)），绝不回拨。
+     * 搬迁）时，getAutoId 会从 1 重发号。框架逻辑 id UNIQUE INDEX 使重复 fail-loud；
+     * 仍须向前推进计数器以保持省略 id 路径可用。绝不回拨。
      */
     async setupSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
         // open() 已 SET ANSI_QUOTES，双引号标识符可用。
@@ -42,6 +42,26 @@ ON DUPLICATE KEY UPDATE last = GREATEST(last, VALUES(last))`,
                 )
             }
         }
+    }
+    /**
+     * Create-path counterpart of setupSequences for caller-supplied integer ids.
+     * Serialized on the same allocating chain as getAutoId so concurrent note/get
+     * cannot interleave LAST_INSERT_ID session state incorrectly.
+     */
+    async noteAllocatedId(recordName: string, id: unknown) {
+        const n = typeof id === 'number' ? id : Number(id)
+        if (!Number.isFinite(n) || n < 1) return
+        const note = this.allocating.then(async () => {
+            await this.db.update(
+                `INSERT INTO "_IDS_" (name, last) VALUES (?, ?)
+ON DUPLICATE KEY UPDATE last = GREATEST(last, VALUES(last))`,
+                [recordName, n],
+                undefined,
+                `note allocated id for ${recordName}`
+            )
+        })
+        this.allocating = note.catch(() => {})
+        return note
     }
     // CAUTION LAST_INSERT_ID() 是会话级的，而「UPSERT + SELECT」是两条语句：同一连接上并发的
     //  getAutoId 交错执行会让两次 SELECT 读到同一个值（实测复现）。用本地分配链把两条语句
@@ -241,6 +261,9 @@ export class MysqlDB implements Database{
     }
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
+    }
+    async noteAllocatedId(recordName: string, id: unknown) {
+        return this.idSystem.noteAllocatedId(recordName, id)
     }
     async setupRecordSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
         return this.idSystem.setupSequences(records)

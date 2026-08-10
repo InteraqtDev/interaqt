@@ -730,11 +730,14 @@ const User = Entity.create({
 
 ```javascript
 // ✅ Correct: Create a derived entity based on another entity
-// ⚠️ IMPORTANT: the callback must NOT return a top-level `id` field.
-//    Derived-record identity is managed by the framework; spreading the source
-//    record (`(product) => ({...product})`) carries its id along and fails fast.
-//    Strip it first: `({id: _, ...rest}) => ({...rest})`.
-//    (Nested references like `{author: {id}}` are fine — that's how relations attach.)
+// Logical id rules for Transform:
+//   - Insert may omit id (framework allocates) or supply a unique driver-compatible id.
+//   - Data-based maps that need an *independent* identity should strip the source id
+//     (`({id: _, ...rest}) => rest`) or assign a new unique id. Spreading the source
+//     (`(product) => ({...product})`) reuses the source id; a conflicting target row
+//     fails loud on the logical-id unique index (no silent second row).
+//   - Update patches never rewrite identity (top-level id is stripped; location is affectedId).
+//   - Nested refs like `{author: {id}}` are relation attachments and remain valid.
 const Product = Entity.create({
   name: 'Product',
   properties: [
@@ -755,7 +758,8 @@ const DiscountedProduct = Entity.create({
   ],
   computation: Transform.create({
     record: Product,  // References a different, already-defined entity
-    callback: (product) => {
+    callback: ({id: _sourceId, ...product}) => {
+      // Strip source id so DiscountedProduct gets its own framework-allocated identity
       return {
         name: product.name,
         originalPrice: product.price,

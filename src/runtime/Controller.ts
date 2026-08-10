@@ -810,8 +810,17 @@ export class Controller {
                 if (patch.type === 'insert') {  
                     await this.system.storage.create(erDataContext.id.name!, patch.data, storageEvents)
                 } else if (patch.type === 'update') {
+                    // Identity is located only by affectedId. Strip top-level id from patch data so
+                    // computation callbacks (e.g. Transform spread) cannot rewrite logical identity
+                    // even if a caller bypasses the storage update gate.
+                    const updateData = (patch.data && typeof patch.data === 'object' && !Array.isArray(patch.data))
+                        ? (() => {
+                            const { id: _ignoredId, ...rest } = patch.data as Record<string, unknown>
+                            return rest
+                        })()
+                        : patch.data
                     const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
-                    await this.system.storage.update(erDataContext.id.name!, match, patch.data, storageEvents)
+                    await this.system.storage.update(erDataContext.id.name!, match, updateData, storageEvents)
                 } else if (patch.type === 'delete') {
                     const match = MatchExp.atom({key: 'id', value: ['=', patch.affectedId]})
                     await this.system.storage.delete(erDataContext.id.name!, match, storageEvents)

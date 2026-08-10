@@ -80,6 +80,25 @@ class IDSystem {
             }
         }
     }
+    /**
+     * Create-path counterpart of setupSequences: advance the PG sequence past a
+     * caller-supplied integer id so nextval cannot reissue it.
+     */
+    async noteAllocatedId(recordName: string, id: unknown) {
+        if (!this.initialized.has(recordName)) {
+            throw new Error(`PostgreSQL sequence for ${recordName} is not initialized. Run storage setup before creating records.`)
+        }
+        const n = typeof id === 'number' ? id : Number(id)
+        if (!Number.isFinite(n) || n < 1) return
+        const sequenceName = this.recordToSequenceName.get(recordName) ?? this.sequenceName(recordName)
+        const quotedSequence = this.quoteIdentifier(sequenceName)
+        // Same forward-only guard as setupSequences: never rewind past concurrent nextval.
+        await this.db.query(
+            `SELECT setval($1::regclass, $2, true) FROM ${quotedSequence} WHERE NOT is_called OR last_value < $2`,
+            [quotedSequence, n],
+            `note allocated id for ${recordName}`
+        )
+    }
     async getAutoId(recordName: string) {
         if (!this.initialized.has(recordName)) {
             throw new Error(`PostgreSQL sequence for ${recordName} is not initialized. Run storage setup before creating records.`)
@@ -374,6 +393,9 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     async getAutoId(recordName: string) {
         return this.idSystem.getAutoId(recordName)
     }
+    async noteAllocatedId(recordName: string, id: unknown) {
+        return this.idSystem.noteAllocatedId(recordName, id)
+    }
     setupRecordSequences(records: Array<{ recordName: string, tableName: string, idField: string }>) {
         return this.idSystem.setupSequences(records)
     }
@@ -440,7 +462,10 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
             //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
             return "DOUBLE PRECISION"
         }else if(type === 'timestamp'){
-            return "TIMESTAMP"
+            // Same contract as PGLite: absolute instant, not session-local TIMESTAMP wall clock.
+            // node-pg Date→TIMESTAMP uses process-local components; ISO/ms paths and mixed clients
+            // then disagree on the stored instant. TIMESTAMPTZ keeps JS epoch-ms stable in any TZ.
+            return "TIMESTAMPTZ"
         }else{
             return type
         }

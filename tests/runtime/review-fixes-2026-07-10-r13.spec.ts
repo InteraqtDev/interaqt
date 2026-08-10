@@ -29,6 +29,7 @@ import {
     Transform,
 } from 'interaqt';
 import { PGLiteDB, SQLiteDB } from '@drivers';
+import { findConstraintViolationError } from '../../src/runtime/errors/ConstraintErrors.js';
 
 describe('r13 review fixes', () => {
     // ============ F-1 守卫严格 boolean 契约 ============
@@ -174,8 +175,11 @@ describe('r13 review fixes', () => {
         await system.destroy();
     });
 
-    // ============ F-3 Transform 回调返回 id fail-fast ============
-    test('F-3: Transform callback returning a top-level id fails fast with guidance', async () => {
+    // ============ F-3 Transform 顶层 id：唯一约束 fail-loud + 合法 insert / 剥离正对照 ============
+    // 历史：r13 用 assertNoId 一律禁止 callback 顶层 id，避免 spread 源 id 静默双行。
+    // 现契约：insert 允许 id；与已有目标行冲突时由逻辑 id UNIQUE 失败（不得静默双行）；
+    // 剥离 id 的 callback 仍由框架发新 id。
+    test('F-3: Transform spread that collides with an existing target id fails loud (no silent duplicate rows)', async () => {
         const Order = Entity.create({
             name: 'R13Order',
             properties: [Property.create({ name: 'title', type: 'string' })]
@@ -186,7 +190,7 @@ describe('r13 review fixes', () => {
             computation: Transform.create({
                 record: Order,
                 attributeQuery: ['*'],
-                // 自然写法陷阱：展开源记录会携带 id
+                // 自然写法：展开源记录会携带源 id；若目标已占用该 id 则必须 fail-loud
                 callback: (order: any) => ({ ...order }),
             })
         });
@@ -196,11 +200,26 @@ describe('r13 review fixes', () => {
             forceThrowDispatchError: true
         });
         await controller.setup(true);
-        await expect(system.storage.create('R13Order', { title: 'x' }))
-            .rejects.toThrow(/top-level "id" field/);
-        // 派生表未被污染
+
+        // Seed a target row whose logical id will collide with the next source insert's id.
+        const reservedId = 'aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa';
+        await system.storage.create('R13Archived', { id: reservedId, title: 'preexisting' });
+        let collisionErr: unknown;
+        try {
+            await system.storage.create('R13Order', { id: reservedId, title: 'x' });
+        } catch (e) {
+            collisionErr = e;
+        }
+        // Must fail as a logical-id unique violation (not an unrelated error), with no second target row.
+        expect(collisionErr).toBeTruthy();
+        const violation = findConstraintViolationError(collisionErr);
+        expect(violation).toBeTruthy();
+        expect(violation?.properties).toEqual(expect.arrayContaining(['id']));
+
         const archived = await system.storage.find('R13Archived', undefined, undefined, ['*']);
-        expect(archived.length).toBe(0);
+        expect(archived.length).toBe(1);
+        expect(archived[0].title).toBe('preexisting');
+        expect(String(archived[0].id)).toBe(reservedId);
         await system.destroy();
     });
 
@@ -228,6 +247,34 @@ describe('r13 review fixes', () => {
         expect(archived.length).toBe(1);
         expect(archived[0].title).toBe('ok');
         expect(String(archived[0].id)).not.toBe(String(o.id));
+        await system.destroy();
+    });
+
+    test('F-3: Transform callback may insert with an explicit unique id', async () => {
+        const Order = Entity.create({
+            name: 'R13Order3',
+            properties: [Property.create({ name: 'title', type: 'string' })]
+        });
+        const explicitId = 'bbbbbbbb-bbbb-7bbb-8bbb-bbbbbbbbbbbb';
+        const Archived = Entity.create({
+            name: 'R13Archived3',
+            properties: [Property.create({ name: 'title', type: 'string' })],
+            computation: Transform.create({
+                record: Order,
+                attributeQuery: ['*'],
+                callback: (order: any) => ({ id: explicitId, title: order.title }),
+            })
+        });
+        const system = new MonoSystem(new PGLiteDB());
+        const controller = new Controller({
+            system, entities: [Order, Archived], relations: [], eventSources: []
+        });
+        await controller.setup(true);
+        await system.storage.create('R13Order3', { title: 'with-id' });
+        const archived = await system.storage.find('R13Archived3', undefined, undefined, ['*']);
+        expect(archived.length).toBe(1);
+        expect(String(archived[0].id)).toBe(explicitId);
+        expect(archived[0].title).toBe('with-id');
         await system.destroy();
     });
 

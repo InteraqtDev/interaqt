@@ -416,13 +416,21 @@ export class CreationExecutor {
         // CAUTION 特别注意，我们是支持数据使用 外部  id，例如使用外部用户系统的时候，它的  id 就是外部分配的。
         //  还有一种情况是 relocate record 的时候也用了这个函数，这个时候也是不要重新分配 id 的！
         //  也正是因为如此，所以我们通过一个参数 isUpdate 显式声明到底是不是 update，不能用有没有 id 来判断！
-        if (!isUpdate && !newRawDataWithNewIds.id) {
+        //
+        // Identity immutability (entity-identity contract): update payloads must not rewrite
+        // the stored logical id. Strip any payload id and pin to oldRecord.id (same-id rewrite
+        // is idempotent; different id is ignored without throwing). Events already exclude id
+        // from keys; the write path must not put a different id into the column either.
+        if (isUpdate) {
+            newRawDataWithNewIds.id = oldRecord!.id
+        } else if (!newRawDataWithNewIds.id) {
             // 为自己分配 id，一定要在最前面，因为后面记录link 事件的地方一定要有 target/source 的 id
             newRawDataWithNewIds.id = await this.allocateRecordId(newEntityData.recordName)
-        } else if(isUpdate && !newRawDataWithNewIds.id) {
-            // 因为用户传进来的 update 字段里面可能没有 id 字段，所以这里要加上。
-            // newRawDataWithNewIds 用在了后面的 event 里面，保证有 id 才正确。外部可能会从 event 里面读。
-            newRawDataWithNewIds.id = oldRecord!.id
+        } else if (this.database.noteAllocatedId) {
+            // Caller-supplied id on create: advance INT sequences so subsequent getAutoId
+            // cannot collide (setupSequences only reconciles at open time).
+            const resolved = this.map.getRecordInfo(newEntityData.recordName).resolvedBaseRecordName ?? newEntityData.recordName
+            await this.database.noteAllocatedId(resolved, newRawDataWithNewIds.id)
         }
 
         if (!isUpdate) {
