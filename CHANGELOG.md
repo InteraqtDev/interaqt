@@ -4,9 +4,8 @@
 
 ## [4.6.0](https://github.com/InteraqtDev/interaqt/compare/v4.5.0...v4.6.0) (2026-08-10)
 
-Empty accidental release produced by a double `release-it` invocation. **No product
-code changes relative to 4.5.0.** Prefer `4.5.0` for the identity work below, or any
-later non-empty release. The npm package `interaqt@4.6.0` is deprecated.
+Accidental extra `release-it minor` after 4.5.0. **No product code changes relative to
+4.5.0** (same feature set; see 4.5.0 notes). Safe to install; `latest` may resolve here.
 
 ## [4.5.0](https://github.com/InteraqtDev/interaqt/compare/v4.4.0...v4.5.0) (2026-08-10)
 
