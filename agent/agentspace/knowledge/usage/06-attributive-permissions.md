@@ -161,7 +161,7 @@ await controller.runInBusinessTransaction(
 | Side effects | `postCommit` and `RecordMutationSideEffect` run **only after** the BT-owned outer **COMMIT** succeeds — never after a nested “fake commit”. |
 | Nested dispatch | Still forbidden inside a dispatch stack. **Sequential** `dispatch` calls inside one BT callback are the supported multi-interaction composition. |
 | Drivers | Requires transactions **and** SAVEPOINT (PostgreSQL / PGLite / SQLite). MySQL (`transactions: false`) is rejected. |
-| Bare `runInTransaction` + `dispatch` | Not a complete official path (no per-attempt savepoint; soft errors / side-effect timing differ). Prefer BT. |
+| Bare `runInTransaction` + `dispatch` | **Runtime hard error.** `controller.dispatch` while a non-BT storage transaction is active throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`. Move write + dispatch into `runInBusinessTransaction`. Pure `runInTransaction` **without** `dispatch` remains legal. |
 
 ### Isolation and `RequireSerializableRetry` inside a business transaction
 
@@ -174,12 +174,14 @@ await controller.runInBusinessTransaction(
 
 ### Typed rejection at the call site
 
-Outside a business transaction, failed conditions surface as soft `result.error` with stable `code` / `details` / `conditionName` (duck-typed with historical `ConditionError` fields such as `type: 'condition check failed'`). Inside BT default `abort`, the same fields are on the thrown `InteractionGuardError` (or a wrapper whose `cause` preserves them):
+Outside a business transaction, failed conditions surface as soft `result.error` with stable **`code` / `details` / `conditionName`** on `InteractionGuardError`. Inside BT default `abort`, the same fields are on the thrown error (or a wrapper whose `cause` preserves them).
+
+**Business branching must use `code` (and `conditionName` when needed).** Historical duck-typed fields such as `type: 'condition check failed'` may still appear for compatibility; they are **not** the official discriminant. The exported `ConditionError` symbol is historical/deprecated for new code — prefer `InteractionGuardError`.
 
 ```typescript
 const result = await controller.dispatch(DebitAccount, { user, payload })
 if (result.error) {
-  // soft path (no BT, default)
+  // soft path (no BT, default) — assert / branch on code
   console.log(result.error.code) // e.g. 'INSUFFICIENT_BALANCE'
 }
 
@@ -193,6 +195,15 @@ try {
   }
 }
 ```
+
+### Forced migration (same-request write + dispatch / Condition results)
+
+| Old pattern | Required replacement |
+|-------------|----------------------|
+| `storage.runInTransaction` + `controller.dispatch` | `controller.runInBusinessTransaction` |
+| Hand-written Condition row locks / `FOR UPDATE` | `Condition.locks` + `AdmissionSnapshot` |
+| `event.error` / payload mutation for rejection or context | `{ allowed: false, code }` / `{ allowed: true, context }` |
+| Branching only on `error.type === 'condition check failed'` | `InteractionGuardError.code` / soft `result.error.code` |
 
 ## Related
 

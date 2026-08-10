@@ -6,30 +6,32 @@ Permission testing verifies that conditions correctly control access to interact
 ### Key Testing Pattern
 When testing permission failures on **top-level** `dispatch` / `callInteraction` (soft errors), always verify:
 1. **Error exists**: `expect(result.error).toBeDefined()`
-2. **Error type** (duck-compatible): `expect((result.error as ConditionError).type).toBe('condition check failed')`
-3. **Which condition failed**: `expect((result.error as ConditionError).error.data.name).toBe('ConditionName')` (or `conditionName`)
-4. **Stable business code** when the Condition used structured rejection: `expect((result.error as InteractionGuardError).code).toBe('INSUFFICIENT_BALANCE')`
+2. **Stable business code** (official discriminant): `expect((result.error as InteractionGuardError).code).toBe('NOT_ADMIN')`  
+   - Structured `{ allowed: false, code }` → that `code`  
+   - Boolean `false` without structured result → default `CONDITION_REJECTED`
+3. **Which condition failed**: `expect((result.error as InteractionGuardError).conditionName).toBe('ConditionName')`
+4. Historical duck fields (`type: 'condition check failed'`, nested `error.data.name`) may still exist for compatibility — **optional** secondary checks only; never the sole discriminant. Prefer `InteractionGuardError` over deprecated `ConditionError`.
 
 This detailed verification helps identify exactly which permission check failed, making debugging easier.
 
-Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`, Condition failures **throw** — assert with try/catch (or `rejects.toThrow`) on the BT call, not only `result.error`.
+Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`, Condition failures **throw** — assert with try/catch (or `rejects`) on the BT call, not only `result.error`. Assert thrown `code` / `conditionName`.
 
 ## 🔴 CRITICAL: Permission Testing Principles
 
 ### Error Handling Pattern
 ```typescript
-// ✅ CORRECT (top-level soft error): Check error in result with detailed verification
-import { ConditionError, InteractionGuardError } from "interaqt"
+// ✅ CORRECT (top-level soft error): Check error in result with code + conditionName
+import { InteractionGuardError } from "interaqt"
 const result = await controller.callInteraction('DeleteStyle', { 
   user: viewer,
   payload: { style: { id: styleId } }
 })
 expect(result.error).toBeDefined()
-expect((result.error as ConditionError).type).toBe('condition check failed')
-// Verify which specific condition failed
-expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
-// When Condition returned { allowed: false, code }, also assert:
-// expect((result.error as InteractionGuardError).code).toBe('NOT_ADMIN')
+const err = result.error as InteractionGuardError
+expect(err.code).toBe('CONDITION_REJECTED') // or the structured code from the Condition
+expect(err.conditionName).toBe('AdminRole')
+// optional historical duck field — not the sole discriminant:
+// expect(err.type).toBe('condition check failed')
 
 // ✅ CORRECT (business transaction abort): default onDispatchError throws
 await expect(
@@ -39,7 +41,10 @@ await expect(
       payload: { style: { id: styleId } }
     })
   })
-).rejects.toMatchObject({ type: 'condition check failed' })
+).rejects.toMatchObject({
+  code: 'CONDITION_REJECTED', // or structured code
+  conditionName: 'AdminRole',
+})
 
 // ❌ WRONG for top-level soft mode: assuming every failure throws
 try {
@@ -51,11 +56,18 @@ try {
 } catch (e) {
   // only expected under forceThrowDispatchError or BT abort
 }
+
+// ❌ WRONG: bare storage transaction + dispatch (hard boundary error, not a soft condition fail)
+// await storage.runInTransaction(async () => controller.dispatch(...))
+// → BusinessTransactionBoundaryError code: 'DISPATCH_IN_NON_BT_TRANSACTION'
 ```
 
-### Common Error Types
+### Common Error Surfaces
+- **`InteractionGuardError.code`** → Official business discriminant (`CONDITION_REJECTED`, structured codes, …)
+- **`InteractionGuardError.conditionName`** → Which Condition failed
+- Historical `type: 'condition check failed'` → May still appear; do not branch on it alone
 - `'no permission'` → Never used (legacy)
-- `'condition check failed'` → What you'll actually see
+- `ConditionError` export → Deprecated historical factory/shape; still available, prefer `InteractionGuardError`
 
 ### Guard Callback Return Contract (fail-closed result algebra)
 
@@ -101,7 +113,7 @@ content: async (event) => {
 Define permissions:
 
 ```typescript
-import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp, Controller, ConditionError, InteractionGuardError } from 'interaqt'
+import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp, Controller, InteractionGuardError } from 'interaqt'
 
 // Step 1: Define Conditions
 export const AdminRole = Condition.create({
@@ -190,8 +202,8 @@ test('role-based permission', async () => {
     payload: { style: { id: style.id } }
   })
   expect(operatorResult.error).toBeDefined()
-  expect((operatorResult.error as ConditionError).type).toBe('condition check failed')
-  expect((operatorResult.error as ConditionError).error.data.name).toBe('AdminRole')
+  expect((operatorResult.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
+  expect((operatorResult.error as InteractionGuardError).conditionName).toBe('AdminRole')
   
   // Step 5: Test viewer (denied)
   const viewerResult = await controller.callInteraction('DeleteStyle', {
@@ -199,8 +211,8 @@ test('role-based permission', async () => {
     payload: { style: { id: style.id } }
   })
   expect(viewerResult.error).toBeDefined()
-  expect((viewerResult.error as ConditionError).type).toBe('condition check failed')
-  expect((viewerResult.error as ConditionError).error.data.name).toBe('AdminRole')
+  expect((viewerResult.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
+  expect((viewerResult.error as InteractionGuardError).conditionName).toBe('AdminRole')
 })
 ```
 
@@ -277,9 +289,9 @@ test('combined permissions with BoolExp', async () => {
     payload: { style: { id: publishedStyle.id } }
   })
   expect(result3.error).toBeDefined()
-  expect((result3.error as ConditionError).type).toBe('condition check failed')
+  expect((result3.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
   // With combined conditions, the first failing condition is reported
-  expect((result3.error as ConditionError).error.data.name).toBeDefined()
+  expect((result3.error as InteractionGuardError).conditionName).toBeDefined()
   
   // Test admin with offline style (denied - even admin can't update offline)
   const result4 = await controller.callInteraction('UpdateStyle', {
@@ -287,8 +299,8 @@ test('combined permissions with BoolExp', async () => {
     payload: { style: { id: offlineStyle.id } }
   })
   expect(result4.error).toBeDefined()
-  expect((result4.error as ConditionError).type).toBe('condition check failed')
-  expect((result4.error as ConditionError).error.data.name).toBe('StyleNotOffline')
+  expect((result4.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
+  expect((result4.error as InteractionGuardError).conditionName).toBe('StyleNotOffline')
 })
 ```
 
@@ -367,9 +379,9 @@ test('resource ownership permission', async () => {
     payload: { style: { id: style.id } }
   })
   expect(otherResult.error).toBeDefined()
-  expect((otherResult.error as ConditionError).type).toBe('condition check failed')
+  expect((otherResult.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
   // Should fail on OwnerOnly condition
-  expect((otherResult.error as ConditionError).error.data.name).toBe('OwnerOnly')
+  expect((otherResult.error as InteractionGuardError).conditionName).toBe('OwnerOnly')
   
   // Admin can delete any style (allowed)
   const adminResult = await controller.callInteraction('DeleteOwnStyle', {
@@ -385,7 +397,7 @@ test('resource ownership permission', async () => {
 Test permissions for data retrieval interactions using GetAction:
 
 ```typescript
-import { GetAction, Query, QueryItem, Condition, Controller, MatchExp, ConditionError } from 'interaqt'
+import { GetAction, Query, QueryItem, Condition, Controller, MatchExp } from 'interaqt'
 
 // Check query-based permissions
 export const CanViewPrivateData = Condition.create({
@@ -485,8 +497,8 @@ test('data retrieval permissions based on query', async () => {
     }
   })
   expect(othersResult.error).toBeDefined()
-  expect((othersResult.error as ConditionError).type).toBe('condition check failed')
-  expect((othersResult.error as ConditionError).error.data.name).toBe('CanViewPrivateData')
+  expect((othersResult.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
+  expect((othersResult.error as InteractionGuardError).conditionName).toBe('CanViewPrivateData')
 })
 
 // Pagination limits based on user role
@@ -581,9 +593,9 @@ test('payload validation in conditions', async () => {
     payload: { style: { id: draftStyle.id } }
   })
   expect(result2.error).toBeDefined()
-  expect((result2.error as ConditionError).type).toBe('condition check failed')
+  expect((result2.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
   // Should fail on CheckPublishedStyle condition
-  expect((result2.error as ConditionError).error.data.name).toBe('CheckPublishedStyle')
+  expect((result2.error as InteractionGuardError).conditionName).toBe('CheckPublishedStyle')
 })
 ```
 
@@ -609,8 +621,8 @@ test('comprehensive permission coverage', async () => {
       expect(result.error).toBeUndefined()
     } else {
       expect(result.error).toBeDefined()
-      expect((result.error as ConditionError).type).toBe('condition check failed')
-      expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
+      expect((result.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
+      expect((result.error as InteractionGuardError).conditionName).toBe('AdminRole')
     }
   }
 })
@@ -699,19 +711,19 @@ test('verify detailed condition error information', async () => {
   
   // Basic error checks
   expect(result.error).toBeDefined()
-  expect((result.error as ConditionError).type).toBe('condition check failed')
+  expect((result.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
   
   // Detailed error verification - identify which condition failed
-  expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
+  expect((result.error as InteractionGuardError).conditionName).toBe('AdminRole')
   
   // For combined conditions, test each failure scenario
   const complexResult = await controller.callInteraction('ComplexAction', {
     user: unverifiedAdmin  // Admin but not verified
   })
   expect(complexResult.error).toBeDefined()
-  expect((complexResult.error as ConditionError).type).toBe('condition check failed')
+  expect((complexResult.error as InteractionGuardError).code).toBe('CONDITION_REJECTED')
   // Should report the specific condition that failed
-  expect((complexResult.error as ConditionError).error.data.name).toBe('EmailVerified')
+  expect((complexResult.error as InteractionGuardError).conditionName).toBe('EmailVerified')
 })
 
 test('structured rejection codes and messages', async () => {
@@ -748,10 +760,10 @@ test('structured rejection codes and messages', async () => {
   })
   
   expect(result.error).toBeDefined()
-  expect((result.error as ConditionError).type).toBe('condition check failed')
-  expect((result.error as ConditionError).error.data.name).toBe('CustomError')
-  expect((result.error as InteractionGuardError).code).toBe('INSUFFICIENT_CREDITS')
-  expect(String((result.error as ConditionError).message)).toContain('Insufficient credits')
+  const err = result.error as InteractionGuardError
+  expect(err.code).toBe('INSUFFICIENT_CREDITS')
+  expect(err.conditionName).toBe('CustomError')
+  expect(String(err.message)).toContain('Insufficient credits')
 })
 ```
 
@@ -877,8 +889,8 @@ test('conditional state updates', async () => {
 - [ ] Test resource state conditions
 - [ ] Test combined permissions (AND/OR logic)
 - [ ] Test edge cases (null user, non-existent resources)
-- [ ] Verify error types are 'condition check failed'
-- [ ] Verify specific failed condition name with `error.error.data.name`
+- [ ] Verify stable `InteractionGuardError.code` (structured code or `CONDITION_REJECTED`)
+- [ ] Verify specific failed condition with `conditionName`
 - [ ] Test custom error messages if used
 - [ ] Cover all branches in condition logic
 - [ ] Test time/state dependent conditions
@@ -903,17 +915,18 @@ const style = await system.storage.findOne('Style',
 
 ### 2. Wrong Error Expectations
 ```typescript
-// ❌ WRONG: Expecting wrong error type or incomplete verification
-expect((result.error as ConditionError).type).toBe('no permission')
+// ❌ WRONG: Expecting legacy / non-existent error type
+expect((result.error as InteractionGuardError).type).toBe('no permission')
 
-// ❌ INCOMPLETE: Only checking error type
+// ❌ INCOMPLETE: Only checking that an error exists, or only historical duck type
 expect(result.error).toBeDefined()
-expect((result.error as ConditionError).type).toBe('condition check failed')
+// expect((result.error as InteractionGuardError).type).toBe('condition check failed')  // not the sole discriminant
 
-// ✅ CORRECT: Complete error verification including which condition failed
+// ✅ CORRECT: Official surface — stable code + which condition failed
 expect(result.error).toBeDefined()
-expect((result.error as ConditionError).type).toBe('condition check failed')
-expect((result.error as ConditionError).error.data.name).toBe('AdminRole')  // Verify specific condition
+const err = result.error as InteractionGuardError
+expect(err.code).toBe('CONDITION_REJECTED') // or the structured code from the Condition
+expect(err.conditionName).toBe('AdminRole')
 ```
 
 ### 3. Incomplete Test Coverage

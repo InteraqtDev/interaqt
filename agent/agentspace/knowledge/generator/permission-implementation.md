@@ -494,9 +494,11 @@ await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async
 
 Do **not**:
 - Nest `controller.dispatch` inside another dispatch (`NestedDispatchError`)
-- Wrap BT inside `storage.runInTransaction` (rejected: BT must own the outermost transaction)
+- Call `controller.dispatch` inside bare `storage.runInTransaction` (`BusinessTransactionBoundaryError` / `DISPATCH_IN_NON_BT_TRANSACTION` — hard error)
+- Wrap BT inside `storage.runInTransaction` (rejected: BT must own the outermost transaction — `NESTED_STORAGE_TRANSACTION`)
 - Throw `RequireSerializableRetry` from Condition content as an isolation switch (absorbed as condition failure; does not upgrade)
-- Mutate `event.payload` to pass admission data (use `{ allowed: true, context }`)
+- Mutate `event.payload` / `event.error` to pass admission data (use `{ allowed: true, context }` / `{ allowed: false, code }`)
+- Branch business rejects only on duck-typed `error.type === 'condition check failed'` — use `InteractionGuardError.code`
 
 ## Security Checklist
 - [ ] Authentication check (user exists)
@@ -508,4 +510,5 @@ Do **not**:
 - [ ] Efficient condition ordering (simple checks first)
 - [ ] Structured rejection codes (`{ allowed: false, code }`) instead of mutating `event.error`
 - [ ] Concurrent check-then-act uses `Condition.locks` + snapshot (no dialect lock SQL)
-- [ ] Same-request storage write + dispatch uses `runInBusinessTransaction`
+- [ ] Same-request storage write + dispatch uses `runInBusinessTransaction` (never bare `runInTransaction` + `dispatch`)
+- [ ] Permission-failure tests assert stable `code` / `conditionName` (not duck-typed `type` alone)

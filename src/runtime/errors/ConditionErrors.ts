@@ -2,7 +2,12 @@ import { FrameworkError, ErrorSeverity, ErrorCategory } from './FrameworkError.j
 import { EvaluateError } from '@core'
 
 /**
- * Base class for all condition and permission related errors
+ * Historical condition/permission error factory and shape.
+ *
+ * @deprecated Prefer {@link InteractionGuardError} for runtime guard failures.
+ * Branch on stable `code` / `conditionName` / `details`. This symbol remains
+ * exported for compatibility; duck-typed `type: 'condition check failed'` is
+ * not the official business discriminant.
  */
 export class ConditionError extends FrameworkError {
     public readonly type: string  // For backward compatibility with existing tests

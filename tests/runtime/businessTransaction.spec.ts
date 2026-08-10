@@ -843,4 +843,128 @@ describe("runInBusinessTransaction (FR-02(a) / M-02)", () => {
     expect(events.filter((e: any) => e.interactionName === "BtSeqTwo")).toHaveLength(1);
     await system.destroy();
   });
+
+  test("I1: dispatch inside non-BT storage.runInTransaction hard-fails with DISPATCH_IN_NON_BT_TRANSACTION", async () => {
+    const Draft = Entity.create({
+      name: "BtDraftPathI1",
+      properties: [Property.create({ name: "title", type: "string" })],
+    });
+    const Activate = Interaction.create({
+      name: "BtActivatePathI1",
+      action: Action.create({ name: "btActivatePathI1" }),
+      payload: Payload.create({
+        items: [PayloadItem.create({ name: "draftId", type: "string", required: true })],
+      }),
+    });
+
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [Draft],
+      relations: [],
+      eventSources: [Activate],
+    });
+    await controller.setup(true);
+
+    await expect(
+      system.storage.runInTransaction({ name: "outer-path-i1" }, async () => {
+        const draft = await system.storage.create("BtDraftPathI1", { title: "gray" });
+        await controller.dispatch(Activate, {
+          user,
+          payload: { draftId: String(draft.id) },
+        });
+      })
+    ).rejects.toSatisfy((e: unknown) => {
+      return (
+        isBusinessTransactionBoundaryError(e) &&
+        (e as BusinessTransactionBoundaryError).code === "DISPATCH_IN_NON_BT_TRANSACTION" &&
+        String((e as Error).message).includes("runInBusinessTransaction")
+      );
+    });
+
+    // Outer RIT rejected → pre-create rolled back; no interaction event leaked.
+    expect(await system.storage.find("BtDraftPathI1", undefined, undefined, ["*"])).toHaveLength(0);
+    const events = await system.storage.find(InteractionEventEntity.name, undefined, undefined, ["*"]);
+    expect(events.some((e: any) => e.interactionName === "BtActivatePathI1")).toBe(false);
+    await system.destroy();
+  });
+
+  test("I1′: nested non-BT runInTransaction depth still hard-fails dispatch", async () => {
+    const Ping = Interaction.create({
+      name: "BtPingPathI1n",
+      action: Action.create({ name: "btPingPathI1n" }),
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [],
+      relations: [],
+      eventSources: [Ping],
+    });
+    await controller.setup(true);
+
+    await expect(
+      system.storage.runInTransaction({ name: "outer-path-i1n" }, async () => {
+        await system.storage.runInTransaction({ name: "inner-path-i1n" }, async () => {
+          await controller.dispatch(Ping, { user });
+        });
+      })
+    ).rejects.toSatisfy(
+      (e: unknown) =>
+        isBusinessTransactionBoundaryError(e) &&
+        (e as BusinessTransactionBoundaryError).code === "DISPATCH_IN_NON_BT_TRANSACTION"
+    );
+    await system.destroy();
+  });
+
+  test("ABORTED: further dispatch after aborting failure is rejected with code ABORTED", async () => {
+    const Deny = Interaction.create({
+      name: "BtDenyAborted",
+      action: Action.create({ name: "btDenyAborted" }),
+      conditions: Condition.create({
+        name: "alwaysNoAborted",
+        content: async () => ({ allowed: false, code: "ALWAYS_NO_ABORTED" }),
+      }),
+    });
+    const After = Interaction.create({
+      name: "BtAfterAborted",
+      action: Action.create({ name: "btAfterAborted" }),
+    });
+    const system = new MonoSystem(new PGLiteDB());
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [],
+      relations: [],
+      eventSources: [Deny, After],
+    });
+    await controller.setup(true);
+
+    let secondError: unknown;
+    await expect(
+      controller.runInBusinessTransaction({ name: "aborted-path" }, async () => {
+        try {
+          await controller.dispatch(Deny, { user });
+        } catch (first) {
+          expect(first).toBeInstanceOf(InteractionGuardError);
+          expect((first as InteractionGuardError).code).toBe("ALWAYS_NO_ABORTED");
+          try {
+            await controller.dispatch(After, { user });
+          } catch (e) {
+            secondError = e;
+            throw e;
+          }
+        }
+      })
+    ).rejects.toSatisfy(
+      (e: unknown) =>
+        isBusinessTransactionBoundaryError(e) &&
+        (e as BusinessTransactionBoundaryError).code === "ABORTED"
+    );
+    expect(secondError).toBeInstanceOf(BusinessTransactionBoundaryError);
+    expect((secondError as BusinessTransactionBoundaryError).code).toBe("ABORTED");
+    await system.destroy();
+  });
 });

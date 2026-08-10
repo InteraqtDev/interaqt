@@ -1323,7 +1323,7 @@ await controller.setup(true) // Create database tables
 ```
 
 #### dispatch(eventSource, args): Promise\<DispatchResponse\>
-Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`.
+Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` while a **non-business-transaction** storage transaction is active throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'` — use `runInBusinessTransaction` for same-request write + dispatch. Pure `storage.runInTransaction` without `dispatch` remains legal.
 
 ```typescript
 const result = await controller.dispatch(CreatePost, {
@@ -1332,6 +1332,7 @@ const result = await controller.dispatch(CreatePost, {
 })
 if (result.error) {
     // soft failure outside business-transaction abort mode
+    // branch on result.error.code (InteractionGuardError), not duck-typed type alone
 }
 ```
 
@@ -1352,7 +1353,12 @@ await controller.runInBusinessTransaction(
 )
 ```
 
-Boundary failures throw `BusinessTransactionBoundaryError` (`NESTED_STORAGE_TRANSACTION` | `REENTRANT` | `SAVEPOINT_UNSUPPORTED` | …). Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with `isolation: 'SERIALIZABLE'` when those framework paths are required. Full table: [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
+Boundary failures throw `BusinessTransactionBoundaryError` with stable `code`:
+`NESTED_STORAGE_TRANSACTION` | `REENTRANT` | `SAVEPOINT_UNSUPPORTED` | `ABORTED` |
+`DISPATCH_IN_NON_BT_TRANSACTION` | `TRANSACTIONS_UNSUPPORTED` (and related capability errors).
+Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with
+`isolation: 'SERIALIZABLE'` when those framework paths are required. Full table:
+[06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
 
 #### callInteraction(interactionName: string, args: InteractionEventArgs, activityName?: string, activityId?: string)
 Name-based convenience wrapper around dispatch for interaction or activity interaction.

@@ -317,7 +317,8 @@ const DeletePost = Interaction.create({
   // conditions receive the full event args: user, payload, query, activityId.
   // content may return boolean or { allowed, code?, context? } (fail-closed).
   // For concurrent check-then-act, declare locks and read AdmissionSnapshot (2nd arg).
-  // Same-request storage write + dispatch: controller.runInBusinessTransaction (not nested dispatch).
+  // Same-request storage write + dispatch: controller.runInBusinessTransaction
+  // (not nested dispatch; bare storage.runInTransaction + dispatch is a hard error).
   conditions: Condition.create({
     name: 'onlyAuthor',
     content: async function(event) {
@@ -328,7 +329,7 @@ const DeletePost = Interaction.create({
 });
 ```
 
-See `agent/agentspace/knowledge/usage/06-attributive-permissions.md` for locks, business transactions, and typed rejection.
+See `agent/agentspace/knowledge/usage/06-attributive-permissions.md` for locks, business transactions, and typed rejection. Business rejects branch on `InteractionGuardError.code` (not duck-typed `type` alone).
 
 ## Debugging
 
@@ -426,7 +427,7 @@ database with FORCE — never point it at a database you care about.
 
 1. **Transform** creates new entities/relations; it does not update existing ones — use **StateMachine** for property updates
 2. Always define state nodes before using them in StateMachine
-3. Nested `controller.dispatch()` inside a dispatch call stack throws `NestedDispatchError`. For multi-step work that must share one atomic boundary (storage writes + sequential interactions), use `controller.runInBusinessTransaction` and dispatch sequentially inside its callback — not nested dispatch.
+3. Nested `controller.dispatch()` inside a dispatch call stack throws `NestedDispatchError`. For multi-step work that must share one atomic boundary (storage writes + sequential interactions), use `controller.runInBusinessTransaction` and dispatch sequentially inside its callback — not nested dispatch. Calling `dispatch` inside a bare `storage.runInTransaction` (or any non-BT-owned active storage transaction) throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`. Pure `runInTransaction` without `dispatch` remains legal.
 
 ## Knowledge base
 

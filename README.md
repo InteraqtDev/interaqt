@@ -76,7 +76,7 @@ Use these hooks with the transaction boundary in mind:
 | `postCommit` | Runs after commit. Use it for external IO, notifications, outbox enqueueing, or non-critical response context. |
 | `RecordMutationSideEffect` | Runs after commit for committed mutation events. Failure is reported in `sideEffects`. |
 
-Nested `controller.dispatch()` calls are rejected inside a dispatch call stack with `NestedDispatchError`. Sequential dispatches that must share one atomic boundary with prior storage writes belong in `controller.runInBusinessTransaction` (each dispatch attempt uses a SAVEPOINT; post-commit side effects flush only after the business transaction commits). Dispatching again from `postCommit` or a record mutation side effect is allowed because it starts a new transaction boundary.
+Nested `controller.dispatch()` calls are rejected inside a dispatch call stack with `NestedDispatchError`. Sequential dispatches that must share one atomic boundary with prior storage writes belong in `controller.runInBusinessTransaction` (each dispatch attempt uses a SAVEPOINT; post-commit side effects flush only after the business transaction commits). Calling `dispatch` inside a bare `storage.runInTransaction` (or any non-BT-owned active storage transaction) is a hard runtime error: `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`. Pure storage transactions without `dispatch` remain legal. Dispatching again from `postCommit` or a record mutation side effect is allowed because it starts a new transaction boundary.
 
 Database drivers declare their transaction support through `getTransactionCapability()`:
 
@@ -87,7 +87,7 @@ Database drivers declare their transaction support through `getTransactionCapabi
 | SQLite | Local fallback atomicity and framework retry-path metadata. It does not provide PostgreSQL-level concurrent dispatch isolation. |
 | MySQL | Marked unsupported for strong dispatch transactions until it has a transaction-bound connection implementation. |
 
-Useful exported helpers include `TransactionCapabilityError`, `TransactionRetryExhaustedError`, `NestedDispatchError`, `isTransactionCapabilityError()`, `isTransactionRetryExhaustedError()`, `isRetryableTransactionError()`, and `hasErrorCode()`.
+Useful exported helpers include `TransactionCapabilityError`, `TransactionRetryExhaustedError`, `NestedDispatchError`, `BusinessTransactionBoundaryError`, `isBusinessTransactionBoundaryError()`, `isTransactionCapabilityError()`, `isTransactionRetryExhaustedError()`, `isRetryableTransactionError()`, and `hasErrorCode()`.
 
 ---
 

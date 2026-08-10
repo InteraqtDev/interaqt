@@ -657,12 +657,18 @@ Condition.create({
 ```typescript
 // ❌ Nested dispatch inside a dispatch stack → NestedDispatchError
 // ❌ storage.runInTransaction(async () => { await controller.dispatch(...) })
-//    is not the complete official path (no per-attempt SAVEPOINT; SE timing differs)
+//    → BusinessTransactionBoundaryError code: 'DISPATCH_IN_NON_BT_TRANSACTION'
+//    (hard runtime error — not a soft warning)
 
 // ✅ Official atomic boundary
 await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async () => {
   const row = await controller.system.storage.create('Draft', { … })
   return controller.dispatch(ActivateDraft, { user, payload: { draftId: row.id } })
+})
+
+// ✅ Pure storage transaction without dispatch remains legal
+await controller.system.storage.runInTransaction({ name: 'bulk-update' }, async () => {
+  await controller.system.storage.update('Draft', /* … */)
 })
 ```
 
@@ -698,6 +704,7 @@ Condition-thrown `RequireSerializableRetry` is absorbed as a condition failure a
 11. **Logical `id` is the single application identity — optional on create, immutable on update; type must match the driver**
 12. **Prefer returned `storage.create` id or a pregenerated logical id for Relation / computeTarget; `clientId` is only an optional secondary key**
 13. **Concurrent admission: `Condition.locks` + snapshot; same-request write+dispatch: `runInBusinessTransaction`**
-14. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md) and [Conditions guide](./06-attributive-permissions.md)**
+14. **Bare `runInTransaction` + `dispatch` is a hard error (`DISPATCH_IN_NON_BT_TRANSACTION`); branch business rejects on `InteractionGuardError.code`**
+15. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md) and [Conditions guide](./06-attributive-permissions.md)**
 
 Remember: The framework is about **declaring what data is**, not **how to manipulate it**.

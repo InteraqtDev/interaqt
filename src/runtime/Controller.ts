@@ -1027,6 +1027,14 @@ export class Controller {
         }
 
         const bt = getActiveBusinessTransaction()
+        // Path uniqueness: non-BT active storage transactions must not host dispatch.
+        // Keep this throw outside the soft-error try so callers observe a hard boundary error.
+        if (this.system.storage.isInTransaction() && bt?.active !== true) {
+            throw new BusinessTransactionBoundaryError({
+                code: 'DISPATCH_IN_NON_BT_TRANSACTION',
+                businessTransactionName: bt?.name,
+            })
+        }
         if (bt?.aborted) {
             throw new BusinessTransactionBoundaryError({
                 code: 'ABORTED',

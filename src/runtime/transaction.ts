@@ -67,12 +67,14 @@ export type BusinessTransactionBoundaryCode =
     | "REENTRANT"
     | "SAVEPOINT_UNSUPPORTED"
     | "ABORTED"
-    | "TRANSACTIONS_UNSUPPORTED";
+    | "TRANSACTIONS_UNSUPPORTED"
+    | "DISPATCH_IN_NON_BT_TRANSACTION";
 
 /**
- * Boundary errors for controller.runInBusinessTransaction.
- * Rejects nested storage transactions, BT re-entry, missing savepoint support, and
- * dispatch after an aborting failure inside the same business transaction.
+ * Boundary errors for business-transaction ownership and dispatch path uniqueness.
+ * Rejects nested storage transactions under BT, BT re-entry, missing savepoint support,
+ * dispatch after an aborting failure inside the same business transaction, and
+ * controller.dispatch inside a non-BT active storage transaction.
  */
 export class BusinessTransactionBoundaryError extends FrameworkError {
     public readonly code: BusinessTransactionBoundaryCode;
@@ -94,6 +96,8 @@ export class BusinessTransactionBoundaryError extends FrameworkError {
                 "business transaction already aborted after a failed dispatch; further dispatch calls are rejected",
             TRANSACTIONS_UNSUPPORTED:
                 "runInBusinessTransaction requires a driver with transaction support",
+            DISPATCH_IN_NON_BT_TRANSACTION:
+                "controller.dispatch cannot run inside an active storage transaction that is not owned by runInBusinessTransaction; move storage writes and sequential dispatches into controller.runInBusinessTransaction, or keep pure storage work in runInTransaction without calling dispatch",
         };
         super(options.message ?? defaultMessages[options.code], {
             errorType: "BusinessTransactionBoundaryError",

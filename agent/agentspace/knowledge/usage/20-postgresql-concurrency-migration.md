@@ -119,7 +119,7 @@ Do not use old manual transaction APIs such as `beginTransaction`, `commitTransa
 
 ### Business transactions (storage + dispatch)
 
-When the same request must write rows and then `dispatch` interactions that **see those uncommitted writes**, use `controller.runInBusinessTransaction` — not a bare outer `runInTransaction` around `dispatch`, and not nested `dispatch`.
+When the same request must write rows and then `dispatch` interactions that **see those uncommitted writes**, use `controller.runInBusinessTransaction`. A bare outer `storage.runInTransaction` around `controller.dispatch` is a **hard runtime error** (`BusinessTransactionBoundaryError` / `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`). Nested `dispatch` remains `NestedDispatchError`. Pure storage `runInTransaction` without `dispatch` stays legal (section above).
 
 ```typescript
 await controller.runInBusinessTransaction(
@@ -134,6 +134,7 @@ await controller.runInBusinessTransaction(
 | Rule | Detail |
 |------|--------|
 | Ownership | BT opens the outermost `BEGIN`/`COMMIT`. Nested inside `storage.runInTransaction` → `BusinessTransactionBoundaryError` (`NESTED_STORAGE_TRANSACTION`). |
+| Path uniqueness | `dispatch` while a non-BT storage transaction is active → `DISPATCH_IN_NON_BT_TRANSACTION` (must migrate to BT). |
 | Attempts | Each `dispatch` attempt uses a SAVEPOINT; failure rolls back that attempt’s writes. |
 | Default abort | Condition rejection **throws**; BT rejects and outer ROLLBACK. Side effects flush only after owned COMMIT. |
 | SERIALIZABLE | Top-level dispatch may still promote via `RequireSerializableRetry`. **Inside BT**, S is fail-fast — open BT with `isolation: 'SERIALIZABLE'` when Transform update/delete, full recompute, or replace gates require it. |

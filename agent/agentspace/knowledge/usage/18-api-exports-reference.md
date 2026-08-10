@@ -72,8 +72,8 @@ import {
   isRequireSerializableRetry,
   TransactionRetryExhaustedError,
   isTransactionRetryExhaustedError,
-  InteractionGuardError,   // condition/payload guard failures (code/details/conditionName)
-  ConditionError,          // historical factory/shape; runtime throws are often InteractionGuardError
+  InteractionGuardError,   // condition/payload guard failures (code/details/conditionName) — official
+  ConditionError,          // DEPRECATED historical factory/shape; use InteractionGuardError + .code
   ConstraintViolationError,
   ConstraintSetupError,
   findConstraintViolationError,
@@ -221,11 +221,11 @@ const controller = new Controller({
 
 5. **Database Drivers**: Imported from the `interaqt/drivers` subpath (not the main package). Choose one based on your needs - PGLiteDB for in-memory testing, PostgreSQLDB for production, etc. `ScopedSequence` is production-safe for cross-connection/cross-process allocation on PostgreSQL; PGLiteDB and SQLiteDB are local/test-level only for scoped sequence concurrency.
 
-6. **Transaction helpers**: `runWithTransactionRetry`, `isRetryableTransactionError`, and `isRequireSerializableRetry` are exported for advanced runtime integrations and tests. Most application code should use `Controller.dispatch()` for single interactions, and `Controller.runInBusinessTransaction()` when storage writes must share one atomic boundary with sequential dispatches. Prefer those over calling retry helpers or bare `storage.runInTransaction` + `dispatch` directly.
+6. **Transaction helpers**: `runWithTransactionRetry`, `isRetryableTransactionError`, and `isRequireSerializableRetry` are exported for advanced runtime integrations and tests. Most application code should use `Controller.dispatch()` for single interactions, and `Controller.runInBusinessTransaction()` when storage writes must share one atomic boundary with sequential dispatches. Do **not** call `controller.dispatch` inside a bare `storage.runInTransaction` — that is a hard runtime error (`BusinessTransactionBoundaryError` / `DISPATCH_IN_NON_BT_TRANSACTION`). Pure storage `runInTransaction` without `dispatch` remains legal.
 
-7. **Business transactions & nested dispatch**: `NestedDispatchError` rejects dispatch-inside-dispatch. `BusinessTransactionBoundaryError` rejects BT started inside an existing storage transaction, BT re-entry, or missing SAVEPOINT support. Inside BT, only write-conflict codes are SAVEPOINT-retried (`isBusinessTransactionSavepointRetryable`); connection-fatal codes fail fast (`isBusinessTransactionConnectionFatal`); `RequireSerializableRetry` is fail-fast (open BT with `isolation: 'SERIALIZABLE'` when needed). See [06-attributive-permissions.md](./06-attributive-permissions.md).
+7. **Business transactions & nested dispatch**: `NestedDispatchError` rejects dispatch-inside-dispatch. `BusinessTransactionBoundaryError` rejects: BT started inside an existing storage transaction (`NESTED_STORAGE_TRANSACTION`), BT re-entry (`REENTRANT`), missing SAVEPOINT support (`SAVEPOINT_UNSUPPORTED`), `dispatch` after BT abort (`ABORTED`), and **`dispatch` inside a non-BT active storage transaction (`DISPATCH_IN_NON_BT_TRANSACTION`)**. Inside BT, only write-conflict codes are SAVEPOINT-retried (`isBusinessTransactionSavepointRetryable`); connection-fatal codes fail fast (`isBusinessTransactionConnectionFatal`); `RequireSerializableRetry` is fail-fast (open BT with `isolation: 'SERIALIZABLE'` when needed). See [06-attributive-permissions.md](./06-attributive-permissions.md).
 
-8. **Condition admission & typed rejection**: `Condition.locks` + `AdmissionSnapshot`, structured `{ allowed, code }` results, and `InteractionGuardError.code` / `details` / `conditionName` are the official surfaces. Do not hand-write dialect row locks in Condition content; do not mutate `payload` to pass admission context (use `{ allowed: true, context }` → `event.context.admission`).
+8. **Condition admission & typed rejection**: `Condition.locks` + `AdmissionSnapshot`, structured `{ allowed, code }` results, and `InteractionGuardError.code` / `details` / `conditionName` are the official surfaces. Do not hand-write dialect row locks in Condition content; do not mutate `payload` / `event.error` to pass admission context (use `{ allowed: true, context }` → `event.context.admission`). `ConditionError` is historical/deprecated — still exported, but branch on `InteractionGuardError.code`, not duck-typed `type` alone.
 
 9. **Constraint helpers**: `UniqueConstraint`, `ConstraintViolationError`, `ConstraintSetupError`, `findConstraintViolationError`, and `normalizeDatabaseError` are exported for schema-level uniqueness and stable duplicate handling.
 

@@ -3170,8 +3170,9 @@ const ViewContent = Interaction.create({
 
 **Error Handling**
 - Top-level `dispatch` / `callInteraction` (outside business-transaction abort): failures are soft — check `result.error`
-- Runtime error shape remains duck-compatible (`type: 'condition check failed'`, `error.data.name`) and exposes stable `code` / `details` / `conditionName` on `InteractionGuardError`
-- Prefer asserting `result.error.code` (or `InteractionGuardError.code`) for structured rejections
+- Official business branch surface: stable `code` / `details` / `conditionName` on `InteractionGuardError` (or soft `result.error`)
+- Historical duck fields (`type: 'condition check failed'`, `error.data.name`) may still appear; **do not** use them as the sole discriminant. `ConditionError` is deprecated for new code — use `InteractionGuardError`
+- Assert `result.error.code` (or thrown `InteractionGuardError.code`) for structured rejections; use `conditionName` when identifying which Condition failed
 - Do **not** mutate `event.error`, payload, or admission rows to carry messages
 - Throwing `RequireSerializableRetry` inside Condition is **not** an isolation-upgrade switch (and is fail-fast inside `runInBusinessTransaction`)
 
@@ -3179,9 +3180,9 @@ const ViewContent = Interaction.create({
 const result = await controller.dispatch(PremiumAction, { user, payload })
 if (result.error) {
     // soft failure outside business-transaction abort mode
-    // result.error.type === 'condition check failed'
-    // result.error.code === 'PREMIUM_REQUIRED'  // when structured
-    // result.error.conditionName / result.error.error.data.name
+    // result.error.code === 'PREMIUM_REQUIRED'  // official discriminant
+    // result.error.conditionName                 // which Condition failed
+    // historical: type === 'condition check failed' (not the sole branch key)
 }
 ```
 
@@ -3250,7 +3251,7 @@ conditions: Conditions.create({
 5. **Declare locks for check-then-act**: use `locks` + `admission.get` rather than unlocked `findOne` or hand-written `FOR UPDATE`
 6. **Keep conditions focused**: Each condition should check one specific rule
 7. **Use storage attributeQuery**: Only fetch the fields you need for performance
-8. **Same-request write + dispatch**: use `controller.runInBusinessTransaction` (not nested `dispatch`, not bare `storage.runInTransaction` alone)
+8. **Same-request write + dispatch**: use `controller.runInBusinessTransaction` (not nested `dispatch`; bare `storage.runInTransaction` + `dispatch` throws `DISPATCH_IN_NON_BT_TRANSACTION`)
 
 See also: usage `06-attributive-permissions.md` and `14-api-reference.md` (Condition / business transactions).
 
@@ -3449,7 +3450,7 @@ await controller.setup(true) // Create database tables
 ```
 
 #### dispatch(eventSource, args)
-Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError` — for multi-step work that must share one atomic boundary, use `runInBusinessTransaction` and dispatch sequentially inside its callback.
+Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` inside a non-BT active storage transaction throws `BusinessTransactionBoundaryError` (`code: 'DISPATCH_IN_NON_BT_TRANSACTION'`). For multi-step work that must share one atomic boundary, use `runInBusinessTransaction` and dispatch sequentially inside its callback. Pure `storage.runInTransaction` without `dispatch` remains legal.
 
 **Syntax**
 ```typescript
@@ -3551,7 +3552,7 @@ const result = await controller.dispatch(GetAllPostsInteraction, {
 ```
 
 #### runInBusinessTransaction(options, fn)
-Official atomic boundary for “storage writes + sequential dispatches” that must share one connection and commit. Must own the **outermost** storage transaction (cannot start inside `storage.runInTransaction`; cannot nest BT). Each dispatch attempt uses a SAVEPOINT; `postCommit` / record mutation side effects flush only after the BT-owned COMMIT.
+Official atomic boundary for “storage writes + sequential dispatches” that must share one connection and commit. Must own the **outermost** storage transaction (cannot start inside `storage.runInTransaction`; cannot nest BT). Each dispatch attempt uses a SAVEPOINT; `postCommit` / record mutation side effects flush only after the BT-owned COMMIT. Calling `dispatch` inside bare `storage.runInTransaction` is illegal (`DISPATCH_IN_NON_BT_TRANSACTION`).
 
 ```typescript
 await controller.runInBusinessTransaction(
@@ -3568,7 +3569,11 @@ await controller.runInBusinessTransaction(
 )
 ```
 
-Boundary failures throw `BusinessTransactionBoundaryError` (`NESTED_STORAGE_TRANSACTION` | `REENTRANT` | `SAVEPOINT_UNSUPPORTED` | …). Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with `isolation: 'SERIALIZABLE'` when those framework paths are required. Full table: usage `06-attributive-permissions.md`.
+Boundary failures throw `BusinessTransactionBoundaryError` with stable `code`:
+`NESTED_STORAGE_TRANSACTION` | `REENTRANT` | `SAVEPOINT_UNSUPPORTED` | `ABORTED` |
+`DISPATCH_IN_NON_BT_TRANSACTION` | `TRANSACTIONS_UNSUPPORTED` (and related capability errors).
+Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with
+`isolation: 'SERIALIZABLE'` when those framework paths are required. Full table: usage `06-attributive-permissions.md`.
 
 #### findEventSourceByName(name)
 Find a registered event source by its name.

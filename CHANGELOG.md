@@ -2,6 +2,59 @@
 
 # Changelog
 
+## [Unreleased]
+
+Path uniqueness for transactions and `dispatch` (design:
+`docs/tx-dispatch-path-uniqueness/`). Builds on declarative Condition admission
+locks and `controller.runInBusinessTransaction` (product commit after 4.6.0;
+see usage `06-attributive-permissions.md` for the full FR-01/FR-02 contract).
+
+### Breaking changes
+
+* **runtime:** `controller.dispatch` inside a **non-business-transaction** active
+  storage transaction now throws `BusinessTransactionBoundaryError` with
+  `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`.
+  * **Must migrate** — this is a hard runtime error, not an optional suggestion.
+  * Legal: top-level `dispatch` (no outer storage transaction); sequential
+    `dispatch` inside `controller.runInBusinessTransaction`; pure
+    `storage.runInTransaction` with **no** `dispatch`.
+  * Illegal: `storage.runInTransaction` (or any non-BT-owned active storage
+    transaction) wrapping `controller.dispatch`. The framework does **not**
+    auto-upgrade bare `runInTransaction` into a business transaction.
+
+#### Forced migration table
+
+| Old pattern | Required replacement |
+|-------------|----------------------|
+| `storage.runInTransaction` + `controller.dispatch` | `controller.runInBusinessTransaction` (storage writes + sequential `dispatch` in the callback) |
+| Hand-written Condition row locks / `FOR UPDATE` | `Condition.locks` + `AdmissionSnapshot` |
+| `event.error` / mutating payload to pass rejection or context | `{ allowed: false, code }` / `{ allowed: true, context }` → `event.context.admission` |
+| Business branching on duck-typed `error.type === 'condition check failed'` | `InteractionGuardError.code` (or soft `result.error.code`) and `conditionName` when needed |
+
+#### Boundary error codes (`BusinessTransactionBoundaryError.code`)
+
+| Code | When |
+|------|------|
+| `DISPATCH_IN_NON_BT_TRANSACTION` | `dispatch` while a non-BT storage transaction is active |
+| `NESTED_STORAGE_TRANSACTION` | `runInBusinessTransaction` started inside an existing storage transaction |
+| `REENTRANT` | Nested / re-entered business transaction |
+| `SAVEPOINT_UNSUPPORTED` | Driver lacks SAVEPOINT |
+| `ABORTED` | `dispatch` after the business transaction has already aborted |
+| `TRANSACTIONS_UNSUPPORTED` | Driver lacks transactions (BT entry; top-level dispatch still surfaces `TransactionCapabilityError` where applicable) |
+
+### Deprecations
+
+* **`ConditionError`**: historical factory/shape; still exported. Runtime guard
+  failures are `InteractionGuardError`. Prefer `code` / `conditionName` /
+  `details` for business branching. Do not treat duck-typed `type:
+  'condition check failed'` as the sole discriminant.
+
+### Docs
+
+* Usage, generator, `AGENTS.md`, and `README.md` document the hard failure and
+  migration table; bare `runInTransaction` + `dispatch` is no longer described
+  as a soft “prefer BT” path.
+
 ## [4.6.0](https://github.com/InteraqtDev/interaqt/compare/v4.5.0...v4.6.0) (2026-08-10)
 
 Accidental extra `release-it minor` after 4.5.0. **No product code changes relative to

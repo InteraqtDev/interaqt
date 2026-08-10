@@ -1293,7 +1293,9 @@ const result = await controller.dispatch(processPaymentEventSource, {
 
 ### Business transactions (storage write + sequential dispatch)
 
-Nested `controller.dispatch()` **inside** a dispatch call stack throws `NestedDispatchError`. When one request must write storage rows and then dispatch interactions that see those **uncommitted** rows under one atomic boundary, use `controller.runInBusinessTransaction` and dispatch **sequentially** in the callback (not nested dispatch). Default `onDispatchError: 'abort'` makes a rejected Condition **throw** and roll back the whole business transaction. Full contract table: [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
+Nested `controller.dispatch()` **inside** a dispatch call stack throws `NestedDispatchError`. When one request must write storage rows and then dispatch interactions that see those **uncommitted** rows under one atomic boundary, use `controller.runInBusinessTransaction` and dispatch **sequentially** in the callback (not nested dispatch).
+
+Calling `controller.dispatch` inside a bare `storage.runInTransaction` (or any non-BT-owned active storage transaction) is a **hard runtime error**: `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`. Pure storage transactions without `dispatch` remain legal. Default `onDispatchError: 'abort'` makes a rejected Condition **throw** and roll back the whole business transaction. Full contract table: [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
 
 ```javascript
 await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async () => {
@@ -1307,9 +1309,10 @@ await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async
 
 ## Error Handling
 
-> **Default (no business transaction)**: `controller.dispatch` / `callInteraction` return a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw).  
+> **Default (no business transaction)**: `controller.dispatch` / `callInteraction` return a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw). Branch business rejects on stable **`result.error.code`** (and `conditionName` when needed), not duck-typed `type` alone.  
 > **Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`**: failed dispatch **throws** (for example `InteractionGuardError` with `code` / `details` / `conditionName`); the business transaction rejects and rolls back. Use `try/catch` or `expect(...).rejects` only for that path (or when you pass `forceThrowDispatchError`).  
-> **Opt-in `onDispatchError: 'continue'`**: soft `result.error` again; caller owns whether to continue.
+> **Opt-in `onDispatchError: 'continue'`**: soft `result.error` again; caller owns whether to continue.  
+> **Boundary errors** (`NestedDispatchError`, `BusinessTransactionBoundaryError` including `DISPATCH_IN_NON_BT_TRANSACTION`) always **throw** to the caller — they are never soft-wrapped as `result.error`.
 
 ### Parameter Validation Errors
 
