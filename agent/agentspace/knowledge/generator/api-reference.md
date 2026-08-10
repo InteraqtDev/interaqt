@@ -3070,79 +3070,88 @@ const ApprovalTransfer = Transfer.create({
 
 ### Condition.create()
 
-Create interaction execution condition. Conditions are used to determine whether an interaction can be executed based on dynamic runtime checks.
+Create an execution condition — the single guard concept for interactions (permission checks, payload content checks, activity user binding, concurrent admission).
 
 **Syntax**
 ```typescript
-Condition.create(config: ConditionConfig): ConditionInstance
+Condition.create(config: {
+  name?: string
+  content: (this: Controller, event: InteractionEventArgs, admission: AdmissionSnapshot) =>
+    boolean | Promise<boolean> |
+    { allowed: true, context?: Record<string, unknown> } |
+    { allowed: false, code: string, message?: string, details?: unknown } |
+    Promise<...>
+  locks?: AdmissionLockSpec[]
+}): ConditionInstance
 ```
 
 **Parameters**
-- `config.name` (string, optional): Condition name for debugging and error messages
-- `config.content` (function, required): Async condition check function with signature:
-  ```typescript
-  async function(this: Controller, event: InteractionEventArgs): Promise<boolean>
-  ```
+- `config.name` (string, optional): Condition name (recommended; appears on errors as `conditionName`)
+- `config.content` (function, required): Called with Controller as `this`, full event args, and a read-only `AdmissionSnapshot` (second argument; empty when no locks). **Result algebra (fail-closed)**:
+  - `true` / `false` — allow / reject (`false` → default code `CONDITION_REJECTED`; boolean polarity respects BoolExp `not`)
+  - `{ allowed: true, context? }` — allow; `context` shallow-merges into frozen `event.context.admission` for the same dispatch
+  - `{ allowed: false, code, message?, details? }` — structured rejection (not flipped by `not`); `code` is stable on `InteractionGuardError` / soft `result.error`
+  - other values (including `undefined`, `{ ok: true }`, missing `allowed`) — `CONDITION_INVALID_RESULT`
+  - thrown errors → `CONDITION_THROWN`, or `error.code` when it is a non-empty string
+- `config.locks` (optional): declarative admission read-set. Each entry is either `{ recordName, id, attributeQuery? }` (`mode: 'record'`, default) or `{ mode: 'match', recordName, match, attributeQuery? }`. Framework unions locks across BoolExp atoms, acquires `lockRecord` / `lockRows` before evaluation, and fills `AdmissionSnapshot`. Prefer `admission.get(...)` over unlocked `findOne` for check-then-act fields.
 
 **Function Context**
-The `content` function is called with:
-- `this`: The Controller instance, providing access to system storage and other services
-- `event`: The interaction event containing:
-  - `event.user`: The user executing the interaction
-  - `event.payload`: The interaction payload data
-  - Other event properties based on the interaction context
-
-**Return Values**
-- `true`: Condition passes, interaction can proceed
-- `false`: Condition fails, interaction is rejected with "condition check failed" error
-- `undefined`: Treated as `true` with a warning (condition might not be implemented)
-- Thrown error: Caught and treated as `false`
+- `this`: Controller (storage, etc.)
+- `event`: interaction args (`user`, `payload`, `query`, `activityId`, `context`, …)
+- `admission`: read-only snapshot of rows locked for this evaluation (do not mutate; do not assign `event.error`)
 
 **Examples**
 
 ```typescript
-// Basic condition - check user has enough credits
+// Basic condition - boolean allow/reject
 const hasEnoughCredits = Condition.create({
     name: 'hasEnoughCredits',
-    content: async function(this: Controller, event: any) {
-        const user = await this.system.storage.findOne('User', 
+    content: async function(this: Controller, event) {
+        const user = await this.system.storage.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
             undefined,
             ['id', 'credits']
         )
-        return user.credits >= 10
+        return !!(user && user.credits >= 10)
     }
 })
 
-// Complex condition - check based on payload data
+// Structured rejection — stable code for callers (do not assign event.error)
 const canAccessPremiumContent = Condition.create({
     name: 'canAccessPremiumContent',
-    content: async function(this: Controller, event: any) {
-        const user = await this.system.storage.findOne('User', 
+    content: async function(this: Controller, event) {
+        const user = await this.system.storage.findOne('User',
             MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
             undefined,
             ['id', 'credits', 'subscriptionLevel']
         )
         const content = event.payload?.content
-        
-        // Regular content is always accessible
         if (!content?.isPremium) return true
-        
-        // Premium content requires subscription or credits
-        return user.subscriptionLevel === 'premium' || user.credits >= content.creditCost
+        if (user?.subscriptionLevel === 'premium' || (user?.credits ?? 0) >= content.creditCost) {
+            return true
+        }
+        return {
+            allowed: false,
+            code: 'PREMIUM_REQUIRED',
+            message: 'Premium subscription or credits required'
+        }
     }
 })
 
-// System state condition
-const systemNotInMaintenance = Condition.create({
-    name: 'systemNotInMaintenance',
-    content: async function(this: Controller, event: any) {
-        const system = await this.system.storage.findOne('System', 
-            undefined, 
-            undefined, 
-            ['maintenanceMode']
-        )
-        return !system?.maintenanceMode
+// Concurrent admission: lock rows before content; prefer snapshot over unlocked findOne
+const HasBalance = Condition.create({
+    name: 'HasBalance',
+    locks: [{
+        recordName: 'Account',
+        id: (event) => event.payload.accountId,
+        attributeQuery: ['id', 'balance'],
+    }],
+    content: async function(event, admission) {
+        const account = admission.get('Account', event.payload.accountId)
+        if (!account || Number(account.balance) < Number(event.payload.amount)) {
+            return { allowed: false, code: 'INSUFFICIENT_BALANCE' }
+        }
+        return { allowed: true, context: { accountId: account.id } }
     }
 })
 
@@ -3155,17 +3164,29 @@ const ViewContent = Interaction.create({
             PayloadItem.create({ name: 'content', base: Content })
         ]
     }),
-    conditions: canAccessPremiumContent  // Single condition
+    conditions: canAccessPremiumContent
 })
 ```
 
 **Error Handling**
-- Conditions that return `false` trigger a `'condition check failed'` error
-- Throwing an error in the content function also results in permission denial
-- Use `event.error` to provide custom error messages
+- Top-level `dispatch` / `callInteraction` (outside business-transaction abort): failures are soft — check `result.error`
+- Runtime error shape remains duck-compatible (`type: 'condition check failed'`, `error.data.name`) and exposes stable `code` / `details` / `conditionName` on `InteractionGuardError`
+- Prefer asserting `result.error.code` (or `InteractionGuardError.code`) for structured rejections
+- Do **not** mutate `event.error`, payload, or admission rows to carry messages
+- Throwing `RequireSerializableRetry` inside Condition is **not** an isolation-upgrade switch (and is fail-fast inside `runInBusinessTransaction`)
+
+```typescript
+const result = await controller.dispatch(PremiumAction, { user, payload })
+if (result.error) {
+    // soft failure outside business-transaction abort mode
+    // result.error.type === 'condition check failed'
+    // result.error.code === 'PREMIUM_REQUIRED'  // when structured
+    // result.error.conditionName / result.error.error.data.name
+}
+```
 
 **Combining Conditions**
-Use `Conditions.create()` to combine multiple conditions with AND/OR logic:
+Use `Conditions.create()` + `BoolExp` for AND/OR/NOT. Structured `{ allowed: false, code }` is not flipped by `not`; boolean `false` polarity respects `not`.
 
 ```typescript
 import { Conditions, BoolExp } from 'interaqt'
@@ -3184,12 +3205,10 @@ const condition2 = Condition.create({
     }
 })
 
-// Combine with BoolExp
 const combinedConditions = Conditions.create({
     content: BoolExp.atom(condition1).and(BoolExp.atom(condition2))
 })
 
-// Use in Interaction
 const PremiumAction = Interaction.create({
     name: 'premiumAction',
     action: Action.create({ name: 'premium' }),
@@ -3225,23 +3244,15 @@ conditions: Conditions.create({
 **Best Practices**
 
 1. **Always handle async operations properly**: Use await for all storage queries
-2. **Return explicit boolean values**: Avoid implicit conversions
+2. **Return only the result algebra**: boolean or `{ allowed, ... }` — never `undefined` / truthy non-booleans
 3. **Provide meaningful condition names**: Helps with debugging when conditions fail
-4. **Handle missing data gracefully**: Check for null/undefined before accessing properties
-5. **Keep conditions focused**: Each condition should check one specific rule
-6. **Use storage attributeQuery**: Only fetch the fields you need for performance
+4. **Use structured codes for API callers**: `{ allowed: false, code }` instead of mutating event fields
+5. **Declare locks for check-then-act**: use `locks` + `admission.get` rather than unlocked `findOne` or hand-written `FOR UPDATE`
+6. **Keep conditions focused**: Each condition should check one specific rule
+7. **Use storage attributeQuery**: Only fetch the fields you need for performance
+8. **Same-request write + dispatch**: use `controller.runInBusinessTransaction` (not nested `dispatch`, not bare `storage.runInTransaction` alone)
 
-**Error Handling**
-
-When a condition fails or throws an error, the dispatch returns:
-```typescript
-{
-    error: {
-        type: 'condition check failed',
-        message: 'condition check failed'
-    }
-}
-```
+See also: usage `06-attributive-permissions.md` and `14-api-reference.md` (Condition / business transactions).
 
 ## 13.6 System-Related APIs
 
@@ -3438,7 +3449,7 @@ await controller.setup(true) // Create database tables
 ```
 
 #### dispatch(eventSource, args)
-Unified dispatch API for all event source types. This is the primary way to trigger events in the system.
+Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError` — for multi-step work that must share one atomic boundary, use `runInBusinessTransaction` and dispatch sequentially inside its callback.
 
 **Syntax**
 ```typescript
@@ -3454,11 +3465,15 @@ async dispatch<TArgs, TResult>(
 
 **Note about ignoreGuard**: When `controller.ignoreGuard` is set to `true`, dispatch will bypass all guard checks (conditions, user validation, payload validation) defined in the event source.
 
+**Error mode**
+- **Top-level** (default): failures are soft — inspect `result.error` (do not assume throw). `forceThrowDispatchError` makes top-level throw instead.
+- **Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`**: dispatch **throws** (typically `InteractionGuardError`); the business transaction rejects and rolls back. Catch the BT promise / use try-catch around the BT callback path when testing abort.
+
 **Return Type**
 ```typescript
 type DispatchResponse = {
-  // Contains error information if the dispatch failed
-  error?: unknown
+  // Soft failure outside business-transaction abort mode
+  error?: unknown  // often InteractionGuardError: type, code, conditionName, details, ...
   
   // For events with resolve: contains the resolved data
   data?: unknown
@@ -3466,7 +3481,7 @@ type DispatchResponse = {
   // Record mutations (create/update/delete) that occurred
   effects?: RecordMutationEvent[]
   
-  // Results from registered RecordMutationSideEffects
+  // Results from registered RecordMutationSideEffects (after successful commit / BT flush)
   sideEffects?: {
     [effectName: string]: {
       result?: unknown
@@ -3474,7 +3489,7 @@ type DispatchResponse = {
     }
   }
   
-  // Additional context from afterDispatch hook
+  // Additional context from afterDispatch hook (may include context.admission from Conditions)
   context?: {
     [key: string]: unknown
   }
@@ -3482,13 +3497,13 @@ type DispatchResponse = {
 ```
 
 **Dispatch Flow**
-1. Begin transaction
-2. Execute `guard` (if provided and `ignoreGuard` is false)
+1. Begin transaction (or join business-transaction attempt SAVEPOINT)
+2. Execute `guard` (if provided and `ignoreGuard` is false) — Conditions acquire declared locks first
 3. Map event data via `mapEventData` and create event record
 4. Execute `resolve` (if provided) - returns data
 5. Execute `afterDispatch` (if provided) inside the retryable transaction attempt - returns context
-6. Commit transaction
-7. Run RecordMutationSideEffects
+6. Commit transaction (top-level) or release SAVEPOINT (inside BT)
+7. Run RecordMutationSideEffects / postCommit only after the owning commit succeeds (deferred under BT)
 
 **Example - Dispatch Interaction**
 ```typescript
@@ -3499,9 +3514,10 @@ const result = await controller.dispatch(CreatePostInteraction, {
     context: { source: 'agent', tool: 'create_post', timestamp: Date.now() }
 })
 
-// Check for errors
+// Check for errors (top-level soft failure)
 if (result.error) {
     console.error('Dispatch failed:', result.error)
+    // Structured Condition reject: (result.error as InteractionGuardError).code
     return
 }
 
@@ -3533,6 +3549,26 @@ const result = await controller.dispatch(GetAllPostsInteraction, {
 })
 // result.data contains the queried records
 ```
+
+#### runInBusinessTransaction(options, fn)
+Official atomic boundary for “storage writes + sequential dispatches” that must share one connection and commit. Must own the **outermost** storage transaction (cannot start inside `storage.runInTransaction`; cannot nest BT). Each dispatch attempt uses a SAVEPOINT; `postCommit` / record mutation side effects flush only after the BT-owned COMMIT.
+
+```typescript
+await controller.runInBusinessTransaction(
+  {
+    name: 'create-and-activate',
+    isolation: 'READ COMMITTED', // or 'SERIALIZABLE'
+    onDispatchError: 'abort',    // default: dispatch throws; BT rejects + ROLLBACK
+  },
+  async () => {
+    const row = await controller.system.storage.create('Draft', { title: '…' })
+    // Sequential dispatches only — never nested dispatch inside another dispatch stack
+    return controller.dispatch(ActivateDraft, { user, payload: { draftId: row.id } })
+  }
+)
+```
+
+Boundary failures throw `BusinessTransactionBoundaryError` (`NESTED_STORAGE_TRANSACTION` | `REENTRANT` | `SAVEPOINT_UNSUPPORTED` | …). Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with `isolation: 'SERIALIZABLE'` when those framework paths are required. Full table: usage `06-attributive-permissions.md`.
 
 #### findEventSourceByName(name)
 Find a registered event source by its name.

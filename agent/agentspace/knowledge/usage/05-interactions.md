@@ -983,6 +983,8 @@ const Review = Entity.create({
 
 ## Permission Control and Security
 
+> Full Condition contract (result algebra, declarative `locks` / `AdmissionSnapshot`, business transactions, typed rejection codes): see [06-attributive-permissions.md](./06-attributive-permissions.md).
+
 ### Basic Permission Checks
 
 ```javascript
@@ -1001,7 +1003,15 @@ const CanDeletePost = Condition.create({
       undefined,
       [['author', { attributeQuery: ['id'] }]]
     );
-    return !!post && post.author?.id === event.user.id;
+    if (!!post && post.author?.id === event.user.id) {
+      return true;
+    }
+    // Structured rejection: stable code on result.error / InteractionGuardError
+    return {
+      allowed: false,
+      code: 'NOT_POST_AUTHOR',
+      message: 'Only the author or an admin can delete this post',
+    };
   }
 });
 
@@ -1045,6 +1055,10 @@ const ModerateContent = Interaction.create({
   conditions: CanModerateContent
 });
 ```
+
+### Concurrent admission (declarative locks)
+
+For check-then-act against rows updated in the same dispatch (for example balance check then debit), declare `locks` on the Condition and read the framework-filled `AdmissionSnapshot` second argument. Do not hand-write `FOR UPDATE` SQL in Condition content. Example and concurrency contract: [06-attributive-permissions.md](./06-attributive-permissions.md#declarative-admission-locks-concurrent-check-then-act).
 
 ## Using Transform to Listen to Interactions and Create Data
 
@@ -1228,16 +1242,21 @@ const Payment = Entity.create({
 
 ### Basic Execution
 
+Prefer `controller.dispatch(eventSource, args)` with the **Interaction / EventSource object** (see testing guide). `callInteraction(name, args)` remains a name-based convenience wrapper.
+
 ```javascript
-// Use controller.callInteraction to execute interactions
-const result = await controller.callInteraction('CreatePost', {
-  user: { id: 'user123', name: 'John' },  // User context
+// Preferred: dispatch the Interaction object
+const result = await controller.dispatch(CreatePost, {
+  user: { id: 'user123', name: 'John' },
   payload: {
     title: 'My First Post',
     content: 'This is the content of my first post.',
     authorId: 'user123'
   }
 });
+
+// Name-based convenience (legacy examples may still show this)
+// const result = await controller.callInteraction('CreatePost', { user, payload });
 
 console.log('Interaction result:', result);
 ```
@@ -1249,7 +1268,7 @@ console.log('Interaction result:', result);
 const createPostInteraction = Interaction.instances.find(i => i.name === 'CreatePost');
 
 if (createPostInteraction) {
-  const result = await controller.callInteraction(createPostInteraction.name, {
+  const result = await controller.dispatch(createPostInteraction, {
     user: { id: 'user123' },
     payload: {
       title: 'Another Post',
@@ -1263,27 +1282,40 @@ if (createPostInteraction) {
 ### Executing Interactions in Activities
 
 ```javascript
-// Execute interaction as part of an activity
-const result = await controller.callInteraction(
-  'processPayment',      // interaction name
-  {
+// Activity steps are EventSources (often named ActivityName:interactionName).
+// Dispatch the compiled event source; pass activityId when continuing an instance.
+const result = await controller.dispatch(processPaymentEventSource, {
+  user: { id: 'user123' },
+  payload: { /* ... */ },
+  activityId: 'activity-instance-id'
+});
+```
+
+### Business transactions (storage write + sequential dispatch)
+
+Nested `controller.dispatch()` **inside** a dispatch call stack throws `NestedDispatchError`. When one request must write storage rows and then dispatch interactions that see those **uncommitted** rows under one atomic boundary, use `controller.runInBusinessTransaction` and dispatch **sequentially** in the callback (not nested dispatch). Default `onDispatchError: 'abort'` makes a rejected Condition **throw** and roll back the whole business transaction. Full contract table: [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
+
+```javascript
+await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async () => {
+  const draft = await controller.system.storage.create('Draft', { title: '…' });
+  return controller.dispatch(ActivateDraft, {
     user: { id: 'user123' },
-    payload: { /* ... */ }
-  },
-  'OrderProcess',        // activity name (optional)
-  'activity-instance-id' // activity instance ID (optional)
-);
+    payload: { draftId: draft.id },
+  });
+});
 ```
 
 ## Error Handling
 
-> **Important**: The interaqt framework automatically catches and handles all errors, never throwing uncaught exceptions. All errors are returned through the `error` field in the return value of `callInteraction`. Therefore, **DO NOT use try-catch to test error cases**, instead check the `error` field in the return value.
+> **Default (no business transaction)**: `controller.dispatch` / `callInteraction` return a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw).  
+> **Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`**: failed dispatch **throws** (for example `InteractionGuardError` with `code` / `details` / `conditionName`); the business transaction rejects and rolls back. Use `try/catch` or `expect(...).rejects` only for that path (or when you pass `forceThrowDispatchError`).  
+> **Opt-in `onDispatchError: 'continue'`**: soft `result.error` again; caller owns whether to continue.
 
 ### Parameter Validation Errors
 
 ```javascript
-// ✅ Correct error handling approach
-const result = await controller.callInteraction('CreatePost', {
+// ✅ Soft error path (top-level dispatch)
+const result = await controller.dispatch(CreatePost, {
   user: { id: 'user123' },
   payload: {
     title: '',  // Empty title will trigger validation error
@@ -1296,19 +1328,12 @@ if (result.error) {
   console.log('Error type:', result.error.type);
   console.log('Error message:', result.error.message);
 }
-
-// ❌ Wrong approach: DO NOT use try-catch
-// try {
-//   const result = await controller.callInteraction('CreatePost', {...});
-// } catch (e) {
-//   // This code will never execute as the framework doesn't throw exceptions
-// }
 ```
 
 ### Permission Errors
 
 ```javascript
-const result = await controller.callInteraction('DeletePost', {
+const result = await controller.dispatch(DeletePost, {
   user: { id: 'user456' },  // Not the author
   payload: {
     postId: 'post123'
@@ -1316,7 +1341,8 @@ const result = await controller.callInteraction('DeletePost', {
 });
 
 if (result.error) {
-  console.log('Permission denied:', result.error);
+  // Structured Condition rejection exposes a stable code when content returned { allowed: false, code }
+  console.log('Permission denied:', result.error.code, result.error);
 }
 ```
 

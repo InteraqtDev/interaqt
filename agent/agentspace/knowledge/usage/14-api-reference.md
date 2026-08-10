@@ -1235,16 +1235,29 @@ const ApprovalTransfer = Transfer.create({
 
 ### Condition.create()
 
-Create an execution condition — the single guard concept for interactions (permission checks, payload content checks, activity user binding).
+Create an execution condition — the single guard concept for interactions (permission checks, payload content checks, activity user binding, concurrent admission).
 
 **Syntax**
 ```typescript
-Condition.create(config: ConditionConfig): KlassInstance<typeof Condition>
+Condition.create(config: {
+  name?: string
+  content: (this: Controller, event: InteractionEventArgs, admission: AdmissionSnapshot) =>
+    boolean | Promise<boolean> |
+    { allowed: true, context?: Record<string, unknown> } |
+    { allowed: false, code: string, message?: string, details?: unknown } |
+    Promise<...>
+  locks?: AdmissionLockSpec[]
+}): ConditionInstance
 ```
 
 **Parameters**
-- `config.name` (string, required): Condition name
-- `config.content` (function, required): Condition judgment function. Called with the Controller as `this` and the full event args (`user`, `payload`, `query`, `activityId`). Must return a strict boolean — any non-boolean result fails the check (fail-closed).
+- `config.name` (string, optional): Condition name (recommended; appears on errors as `conditionName`)
+- `config.content` (function, required): Called with Controller as `this`, full event args, and a read-only `AdmissionSnapshot` (second argument; empty when no locks). **Result algebra (fail-closed)**:
+  - `true` / `false` — allow / reject (`false` → default code `CONDITION_REJECTED`; boolean polarity respects BoolExp `not`)
+  - `{ allowed: true, context? }` — allow; `context` shallow-merges into frozen `event.context.admission` for the same dispatch
+  - `{ allowed: false, code, message?, details? }` — structured rejection (not flipped by `not`); `code` is stable on `InteractionGuardError` / soft `result.error`
+  - other values — `CONDITION_INVALID_RESULT`; throws → `CONDITION_THROWN` or `error.code` when it is a non-empty string
+- `config.locks` (optional): declarative admission read-set. Each entry is either `{ recordName, id, attributeQuery? }` (`mode: 'record'`, default) or `{ mode: 'match', recordName, match, attributeQuery? }`. Framework unions locks across BoolExp atoms, acquires `lockRecord` / `lockRows` before evaluation, and fills `AdmissionSnapshot`.
 
 **Examples**
 ```typescript
@@ -1259,7 +1272,26 @@ const OrderValueCondition = Condition.create({
 const AdminHighValueOrder = Conditions.create({
     content: BoolExp.atom(AdminOnly).and(OrderValueCondition)
 })
+
+// Concurrent admission: lock rows before content; prefer snapshot over unlocked findOne
+const HasBalance = Condition.create({
+    name: 'HasBalance',
+    locks: [{
+        recordName: 'Account',
+        id: (event) => event.payload.accountId,
+        attributeQuery: ['id', 'balance'],
+    }],
+    content: async function(event, admission) {
+        const account = admission.get('Account', event.payload.accountId)
+        if (!account || Number(account.balance) < Number(event.payload.amount)) {
+            return { allowed: false, code: 'INSUFFICIENT_BALANCE' }
+        }
+        return { allowed: true, context: { accountId: account.id } }
+    }
+})
 ```
+
+See also: [06-attributive-permissions.md](./06-attributive-permissions.md).
 
 ## 13.5 System-Related APIs
 
@@ -1290,8 +1322,40 @@ Initialize system.
 await controller.setup(true) // Create database tables
 ```
 
+#### dispatch(eventSource, args): Promise\<DispatchResponse\>
+Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`.
+
+```typescript
+const result = await controller.dispatch(CreatePost, {
+    user: { id: 'user1' },
+    payload: { title: 'Hello', content: 'World' }
+})
+if (result.error) {
+    // soft failure outside business-transaction abort mode
+}
+```
+
+#### runInBusinessTransaction(options, fn): Promise\<T\>
+Official atomic boundary for “storage writes + sequential dispatches” that must share one connection and commit. Must own the **outermost** storage transaction (cannot start inside `storage.runInTransaction`; cannot nest BT). Each dispatch attempt uses a SAVEPOINT; `postCommit` / record mutation side effects flush only after the BT-owned COMMIT.
+
+```typescript
+await controller.runInBusinessTransaction(
+  {
+    name: 'create-and-activate',
+    isolation: 'READ COMMITTED', // or 'SERIALIZABLE'
+    onDispatchError: 'abort',    // default: dispatch throws; BT rejects + ROLLBACK
+  },
+  async () => {
+    const row = await controller.system.storage.create('Draft', { title: '…' })
+    return controller.dispatch(ActivateDraft, { user, payload: { draftId: row.id } })
+  }
+)
+```
+
+Boundary failures throw `BusinessTransactionBoundaryError` (`NESTED_STORAGE_TRANSACTION` | `REENTRANT` | `SAVEPOINT_UNSUPPORTED` | …). Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with `isolation: 'SERIALIZABLE'` when those framework paths are required. Full table: [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
+
 #### callInteraction(interactionName: string, args: InteractionEventArgs, activityName?: string, activityId?: string)
-Call interaction or activity interaction.
+Name-based convenience wrapper around dispatch for interaction or activity interaction.
 
 **Parameters:**
 - `interactionName`: The name of the interaction to call
@@ -1305,6 +1369,7 @@ const result = await controller.callInteraction('createPost', {
     user: { id: 'user1' },
     payload: { postData: { title: 'Hello', content: 'World' } }
 })
+// Prefer: await controller.dispatch(CreatePost, { user, payload })
 ```
 
 **Example - Activity Interaction:**

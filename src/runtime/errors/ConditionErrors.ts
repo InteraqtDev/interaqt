@@ -12,6 +12,10 @@ export class ConditionError extends FrameworkError {
     public readonly payload?: any
     public readonly evaluationError?: EvaluateError<any> | any
     public readonly severity: ErrorSeverity
+    /** Stable business/framework code (FR-02(b)); aligned with InteractionGuardError.code */
+    public readonly code?: string
+    public readonly details?: unknown
+    public readonly conditionName?: string
 
     constructor(
         message: string,
@@ -24,6 +28,9 @@ export class ConditionError extends FrameworkError {
             context?: Record<string, unknown>
             causedBy?: Error
             type?: string  // For backward compatibility
+            code?: string
+            details?: unknown
+            conditionName?: string
         }
     ) {
         super(message, {
@@ -34,6 +41,9 @@ export class ConditionError extends FrameworkError {
                 fieldName: options.fieldName,
                 payload: options.payload,
                 evaluationError: options.evaluationError,
+                code: options.code,
+                details: options.details,
+                conditionName: options.conditionName,
                 ...options.context
             },
             causedBy: options.causedBy
@@ -46,6 +56,9 @@ export class ConditionError extends FrameworkError {
         this.error = options.evaluationError  // For backward compatibility
         this.type = options.type || message  // For backward compatibility
         this.severity = options.severity || ErrorSeverity.HIGH
+        this.code = options.code
+        this.details = options.details
+        this.conditionName = options.conditionName
     }
 
     /**
@@ -63,13 +76,23 @@ export class ConditionError extends FrameworkError {
         })
     }
 
-    static conditionCheckFailed(error: EvaluateError<any>, context?: Record<string, unknown>): ConditionError {
+    static conditionCheckFailed(
+        error: EvaluateError<any>,
+        context?: Record<string, unknown> & {
+            code?: string
+            details?: unknown
+            conditionName?: string
+        }
+    ): ConditionError {
         return new ConditionError(`Condition check failed: ${error.data.name}`, {
             checkType: 'condition',
             evaluationError: error,
             severity: ErrorSeverity.HIGH,
             context,
-            type: 'condition check failed'  // For backward compatibility
+            type: 'condition check failed',  // For backward compatibility
+            code: context?.code,
+            details: context?.details,
+            conditionName: context?.conditionName ?? error?.data?.name,
         })
     }
 }

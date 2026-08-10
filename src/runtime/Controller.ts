@@ -19,7 +19,15 @@ import { ComputationError, SchedulerError, SideEffectError } from "./errors/inde
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
-import { NestedDispatchError, RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
+import {
+    BusinessTransactionBoundaryError,
+    isBusinessTransactionSavepointRetryable,
+    NestedDispatchError,
+    RequireSerializableRetry,
+    runWithTransactionRetry,
+    TransactionCapabilityError,
+    TransactionIsolation,
+} from "./transaction.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
     addComputationTakeoverReview,
@@ -132,6 +140,47 @@ type DispatchExecutionContext = {
 }
 
 const dispatchExecutionContext = new AsyncLocalStorage<DispatchExecutionContext>()
+
+export type BusinessTransactionOnDispatchError = 'abort' | 'continue'
+
+export type BusinessTransactionOptions = {
+    name?: string
+    isolation?: TransactionIsolation
+    /**
+     * How dispatch failures surface inside the business transaction callback.
+     * - `abort` (default): dispatch throws; runInBusinessTransaction rejects; outer ROLLBACK.
+     * - `continue`: dispatch returns a soft DispatchResponse with error; caller owns atomicity.
+     */
+    onDispatchError?: BusinessTransactionOnDispatchError
+}
+
+type DeferredPostCommit = {
+    kind: 'postCommit'
+    eventSource: EventSourceInstance<any, any>
+    args: unknown
+    result: DispatchResponse
+}
+
+type DeferredMutationEffects = {
+    kind: 'mutationEffects'
+    result: DispatchResponse
+}
+
+type BusinessTransactionContext = {
+    active: boolean
+    name?: string
+    isolation: TransactionIsolation
+    onDispatchError: BusinessTransactionOnDispatchError
+    deferred: Array<DeferredPostCommit | DeferredMutationEffects>
+    aborted: boolean
+    savepointSeq: number
+}
+
+const businessTransactionContext = new AsyncLocalStorage<BusinessTransactionContext>()
+
+export function getActiveBusinessTransaction(): BusinessTransactionContext | undefined {
+    return businessTransactionContext.getStore()
+}
 
 export const HardDeletionProperty = {
     create() {
@@ -857,7 +906,98 @@ export class Controller {
         if (cloned.user && typeof cloned.user === 'object') {
             cloned.user = { ...(cloned.user as Record<string, unknown>) }
         }
+        // FR-02(b): shallow-clone context so Condition content cannot share a mutable
+        // reference with the caller's object. Official admission channel is return-value merge.
+        if (cloned.context && typeof cloned.context === 'object' && !Array.isArray(cloned.context)) {
+            cloned.context = { ...(cloned.context as Record<string, unknown>) }
+        }
         return cloned as TArgs
+    }
+
+    /**
+     * Official multi-step atomic boundary for storage writes + sequential dispatch.
+     *
+     * Owns the outermost storage BEGIN/COMMIT. Each dispatch attempt inside the callback
+     * uses a dedicated SAVEPOINT (does not change global nestedStrategy). postCommit and
+     * RecordMutationSideEffect run only after the owned COMMIT succeeds.
+     */
+    async runInBusinessTransaction<T>(
+        options: BusinessTransactionOptions,
+        fn: () => Promise<T>
+    ): Promise<T> {
+        const name = options.name || 'businessTransaction'
+        const isolation = options.isolation ?? 'READ COMMITTED'
+        const onDispatchError = options.onDispatchError ?? 'abort'
+        const storage = this.system.storage
+        const capability = storage.getTransactionCapability()
+
+        // A2-1
+        if (!capability.transactions) {
+            throw new TransactionCapabilityError({
+                transactionName: name,
+                requestedIsolation: isolation,
+                capability,
+                reason: 'driver does not support transactions',
+            })
+        }
+        // A2-2
+        if (!storage.supportsSavepoint()) {
+            throw new BusinessTransactionBoundaryError({
+                code: 'SAVEPOINT_UNSUPPORTED',
+                businessTransactionName: name,
+            })
+        }
+        // A2-4 before A2-3 so re-entry is distinguishable when already inside BT
+        // (BT always implies an active storage transaction).
+        if (getActiveBusinessTransaction()?.active) {
+            throw new BusinessTransactionBoundaryError({
+                code: 'REENTRANT',
+                businessTransactionName: name,
+            })
+        }
+        // A2-3
+        if (storage.isInTransaction()) {
+            throw new BusinessTransactionBoundaryError({
+                code: 'NESTED_STORAGE_TRANSACTION',
+                businessTransactionName: name,
+            })
+        }
+
+        const bt: BusinessTransactionContext = {
+            active: true,
+            name,
+            isolation,
+            onDispatchError,
+            deferred: [],
+            aborted: false,
+            savepointSeq: 0,
+        }
+
+        let fnResult: T
+        try {
+            fnResult = await businessTransactionContext.run(bt, async () => {
+                return storage.runInTransaction({ name, isolation }, async () => {
+                    return fn()
+                })
+            })
+        } catch (error) {
+            // Outer ROLLBACK already happened inside runInTransaction; discard defer.
+            bt.deferred.length = 0
+            bt.active = false
+            throw error
+        }
+
+        // COMMIT succeeded (runInTransaction returned). Flush deferred side effects once.
+        const deferred = bt.deferred.splice(0, bt.deferred.length)
+        bt.active = false
+        for (const item of deferred) {
+            if (item.kind === 'postCommit') {
+                await this.runPostCommitHook(item.eventSource, item.args, item.result, this.system.logger)
+            } else {
+                await this.runRecordChangeSideEffects(item.result, this.system.logger)
+            }
+        }
+        return fnResult
     }
 
     /**
@@ -868,9 +1008,10 @@ export class Controller {
      * guard, mapEventData, event record creation, resolve, synchronous computations,
      * and afterDispatch all run inside one retryable storage transaction attempt.
      * If any of those steps fails, the attempt is rolled back and postCommit plus
-     * record mutation side effects are skipped. After a successful commit,
-     * postCommit and record mutation side effects run outside the transaction;
-     * their failures are reported in sideEffects without rolling back committed facts.
+     * record mutation side effects are skipped. After a successful commit (or after the
+     * owning business transaction commits), postCommit and record mutation side effects
+     * run outside the transaction; their failures are reported in sideEffects without
+     * rolling back committed facts.
      */
     async dispatch<TArgs = unknown, TResult = unknown>(
         eventSource: EventSourceInstance<TArgs, TResult>,
@@ -884,6 +1025,15 @@ export class Controller {
                 nestedEventSourceName: eventSource.name,
             })
         }
+
+        const bt = getActiveBusinessTransaction()
+        if (bt?.aborted) {
+            throw new BusinessTransactionBoundaryError({
+                code: 'ABORTED',
+                businessTransactionName: bt.name,
+            })
+        }
+
         // 建立 dispatch 级别的 interaction context：driver 的每条 SQL 日志都会读取 logContext，
         // 使一次 dispatch 内的所有数据库操作可以按调用来源（args.context）关联排查。
         const argsContext = (args as { context?: unknown } | undefined)?.context
@@ -899,60 +1049,138 @@ export class Controller {
         //  activityId 对 postCommit 不可见（r35）。
         let committedAttemptArgs: TArgs = args
         try {
-            result = await asyncInteractionContext.run(interactionContext, () => runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
-                const attemptArgs = this.cloneDispatchArgs(args)
-                committedAttemptArgs = attemptArgs
-                const effectsContext = { effects: [] as RecordMutationEvent[] }
-                return asyncEffectsContext.run(effectsContext, async () => {
-                    return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
-                        return dispatchExecutionContext.run({ eventSourceName: eventSource.name }, async () => {
-                            if (!this.ignoreGuard && eventSource.guard) {
-                                await eventSource.guard.call(this, attemptArgs)
-                            }
-                            
-                            const eventData = eventSource.mapEventData
-                                ? await eventSource.mapEventData(attemptArgs)
-                                : {}
-                                
-                            await this.system.storage.create(eventSource.entity.name!, eventData)
-                            
-                            let data: unknown = undefined
-                            if (eventSource.resolve) {
-                                data = await eventSource.resolve.call(this, attemptArgs)
-                            }
-                            
-                            let context: Record<string, unknown> | undefined = undefined
-                            if (eventSource.afterDispatch) {
-                                const afterResult = await (eventSource.afterDispatch as Function).call(this, attemptArgs, { data })
-                                if (afterResult) {
-                                    context = afterResult
-                                }
-                            }
-                            
-                            return { data, effects: effectsContext.effects, sideEffects: {}, context }
-                        })
+            result = await asyncInteractionContext.run(interactionContext, () => {
+                if (bt?.active) {
+                    return this.runDispatchAttemptsInBusinessTransaction(bt, eventSource, args, (attemptArgs) => {
+                        committedAttemptArgs = attemptArgs
                     })
+                }
+                return runWithTransactionRetry(eventSource.name || 'dispatch', async (isolation) => {
+                    const attemptArgs = this.cloneDispatchArgs(args)
+                    committedAttemptArgs = attemptArgs
+                    return this.runDispatchAttemptBody(eventSource, attemptArgs, isolation)
                 })
-            }))
+            })
         } catch (e) {
-            if (this.forceThrowDispatchError) throw e
-            // 与成功路径同形态（data/context 显式为 undefined）：直接序列化 DispatchResponse
-            //  的调用方（HTTP 层等）拿到的 JSON 键集合在成功/失败两条路径上保持一致。
-            result = {
-                error: e,
-                data: undefined,
-                effects: [],
-                sideEffects: {},
-                context: undefined
+            if (bt?.active) {
+                // BT failure propagation: abort throws; continue returns soft error.
+                // forceThrowDispatchError is ignored inside BT (only onDispatchError decides).
+                if (bt.onDispatchError === 'abort') {
+                    bt.aborted = true
+                    throw e
+                }
+                result = {
+                    error: e,
+                    data: undefined,
+                    effects: [],
+                    sideEffects: {},
+                    context: undefined
+                }
+            } else {
+                if (this.forceThrowDispatchError) throw e
+                // 与成功路径同形态（data/context 显式为 undefined）：直接序列化 DispatchResponse
+                //  的调用方（HTTP 层等）拿到的 JSON 键集合在成功/失败两条路径上保持一致。
+                result = {
+                    error: e,
+                    data: undefined,
+                    effects: [],
+                    sideEffects: {},
+                    context: undefined
+                }
             }
         }
 
         if (!result.error) {
-            await this.runPostCommitHook(eventSource, committedAttemptArgs, result, this.system.logger)
-            await this.runRecordChangeSideEffects(result, this.system.logger)
+            if (bt?.active) {
+                // Defer until the business transaction's owned COMMIT succeeds.
+                bt.deferred.push(
+                    { kind: 'postCommit', eventSource, args: committedAttemptArgs, result },
+                    { kind: 'mutationEffects', result },
+                )
+            } else {
+                await this.runPostCommitHook(eventSource, committedAttemptArgs, result, this.system.logger)
+                await this.runRecordChangeSideEffects(result, this.system.logger)
+            }
         }
 
         return result
+    }
+
+    private async runDispatchAttemptsInBusinessTransaction<TArgs, TResult>(
+        bt: BusinessTransactionContext,
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        args: TArgs,
+        onAttemptArgs: (attemptArgs: TArgs) => void,
+    ): Promise<DispatchResponse> {
+        // BT-aware retry: fail-fast on RequireSerializableRetry; only W-family SAVEPOINT retries.
+        // Outer isolation is fixed (initialIsolation); never upgrade mid-BT.
+        return runWithTransactionRetry(
+            eventSource.name || 'dispatch',
+            async (_isolation, attempt) => {
+                const attemptArgs = this.cloneDispatchArgs(args)
+                onAttemptArgs(attemptArgs)
+                const savepointName = `iqt_dispatch_${++bt.savepointSeq}`
+                await this.system.storage.createSavepoint(savepointName)
+                try {
+                    const body = await this.runDispatchAttemptBody(eventSource, attemptArgs, bt.isolation)
+                    await this.system.storage.releaseSavepoint(savepointName)
+                    return body
+                } catch (error) {
+                    try {
+                        await this.system.storage.rollbackToSavepoint(savepointName)
+                    } catch {
+                        // Connection may already be unusable (C-family); still propagate original error.
+                    }
+                    throw error
+                }
+            },
+            {
+                initialIsolation: bt.isolation,
+                onRequireSerializableRetry: 'fail-fast',
+                retryablePredicate: isBusinessTransactionSavepointRetryable,
+            }
+        )
+    }
+
+    private async runDispatchAttemptBody<TArgs, TResult>(
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        attemptArgs: TArgs,
+        isolation: TransactionIsolation,
+    ): Promise<DispatchResponse> {
+        const effectsContext = { effects: [] as RecordMutationEvent[] }
+        return asyncEffectsContext.run(effectsContext, async () => {
+            // Outside BT this opens BEGIN/COMMIT (or nested reuse).
+            // Inside BT the outer runInBusinessTransaction already owns the transaction;
+            // nested runInTransaction only increments depth (reuse) — attempt rollback is SAVEPOINT.
+            return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
+                return dispatchExecutionContext.run({ eventSourceName: eventSource.name }, async () => {
+                    if (!this.ignoreGuard && eventSource.guard) {
+                        await eventSource.guard.call(this, attemptArgs)
+                    }
+
+                    const eventData = eventSource.mapEventData
+                        ? await eventSource.mapEventData(attemptArgs)
+                        : {}
+
+                    await this.system.storage.create(eventSource.entity.name!, eventData)
+
+                    let data: unknown = undefined
+                    if (eventSource.resolve) {
+                        data = await eventSource.resolve.call(this, attemptArgs)
+                    }
+
+                    let context: Record<string, unknown> | undefined = undefined
+                    if (eventSource.afterDispatch) {
+                        const afterResult = await (eventSource.afterDispatch as Function).call(this, attemptArgs, { data })
+                        if (afterResult) {
+                            context = afterResult
+                        }
+                    }
+
+                    return { data, effects: effectsContext.effects, sideEffects: {}, context }
+                })
+            })
+        })
     }
 
     async runPostCommitHook<TArgs = unknown, TResult = unknown>(

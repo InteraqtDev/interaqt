@@ -315,15 +315,20 @@ const DeletePost = Interaction.create({
   name: 'DeletePost',
   action: Action.create({ name: 'deletePost' }),
   // conditions receive the full event args: user, payload, query, activityId.
-  // Guard callbacks must return an actual boolean (fail-closed otherwise).
+  // content may return boolean or { allowed, code?, context? } (fail-closed).
+  // For concurrent check-then-act, declare locks and read AdmissionSnapshot (2nd arg).
+  // Same-request storage write + dispatch: controller.runInBusinessTransaction (not nested dispatch).
   conditions: Condition.create({
     name: 'onlyAuthor',
     content: async function(event) {
-      return event.user.id === event.payload.post.author.id
+      if (event.user.id === event.payload.post.author.id) return true
+      return { allowed: false, code: 'NOT_AUTHOR' }
     }
   })
 });
 ```
+
+See `agent/agentspace/knowledge/usage/06-attributive-permissions.md` for locks, business transactions, and typed rejection.
 
 ## Debugging
 
@@ -421,7 +426,7 @@ database with FORCE — never point it at a database you care about.
 
 1. **Transform** creates new entities/relations; it does not update existing ones — use **StateMachine** for property updates
 2. Always define state nodes before using them in StateMachine
-3. Nested `controller.dispatch()` inside a transaction throws `NestedDispatchError`
+3. Nested `controller.dispatch()` inside a dispatch call stack throws `NestedDispatchError`. For multi-step work that must share one atomic boundary (storage writes + sequential interactions), use `controller.runInBusinessTransaction` and dispatch sequentially inside its callback — not nested dispatch.
 
 ## Knowledge base
 

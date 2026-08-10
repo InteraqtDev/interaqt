@@ -9,7 +9,7 @@ Testing in interaqt focuses on interactions as the primary way to verify busines
 1. **Test Through Interactions Only**: All business logic testing must use `callInteraction()`
 2. **Storage APIs Bypass Validation**: `storage.create/update/delete` are ONLY for test setup
 3. **No Entity/Relation Unit Tests**: These are implementation details tested through interactions
-4. **Error Handling**: interaqt returns errors in result.error, never throws exceptions
+4. **Error Handling**: top-level `dispatch` / `callInteraction` return failures in `result.error` (soft). Exceptions still apply for nested `dispatch` (`NestedDispatchError`), `forceThrowDispatchError`, and default `runInBusinessTransaction` abort mode.
 
 ### Common Mistakes
 ```typescript
@@ -21,16 +21,23 @@ storage.findByProperty()
 // ❌ WRONG: Direct storage manipulation for business logic
 await storage.create('Style', { ... })  // Bypasses ALL validation!
 
-// ❌ WRONG: Try-catch for errors
+// ❌ WRONG for top-level soft mode: only try-catch, ignoring result.error
 try {
   await controller.callInteraction(...)
 } catch (e) {
-  // interaqt doesn't throw exceptions
+  // top-level soft failures usually do not throw
 }
 
-// ✅ CORRECT: Test through interactions
+// ✅ CORRECT: Test through interactions; inspect result.error
 const result = await controller.callInteraction('CreateStyle', { ... })
 expect(result.error).toBeUndefined()
+
+// ✅ CORRECT when using business transactions (default abort throws)
+await expect(
+  controller.runInBusinessTransaction({ name: 'case' }, async () =>
+    controller.dispatch(SomeInteraction, { user, payload })
+  )
+).resolves.toBeDefined()
 ```
 
 ## callInteraction Return Value
@@ -296,7 +303,9 @@ await controller.callInteraction('AssignStyles', {
 
 ## Error Checking
 
-The interaqt framework wraps all exceptions in the return value, so you NEVER need try-catch blocks:
+Top-level `dispatch` / `callInteraction` wrap guard and most domain failures in `result.error`, so success/failure tests usually inspect the return value rather than try-catch.
+
+**Exception — business transactions:** with default `onDispatchError: 'abort'`, `dispatch` **throws** inside `runInBusinessTransaction` and the BT promise rejects. Use try-catch or `expect(...).rejects` for those paths. Nested `dispatch` and `forceThrowDispatchError` also throw.
 
 ### Error Types
 
@@ -309,6 +318,8 @@ const result = await controller.callInteraction('DeleteStyle', {
 expect(result.error).toBeDefined()
 expect((result.error as any).type).toBe('condition check failed')
 expect((result.error as any).error.data.name).toBe('AdminOnly')  // which condition failed
+// When Condition used { allowed: false, code }:
+// expect((result.error as any).code).toBe('NOT_ADMIN')
 
 // 2. Payload content validation errors (also condition checks)
 const result = await controller.callInteraction('PublishStyle', {
@@ -680,7 +691,7 @@ const userFavoriteRelation = await system.storage.findRelationByName(
 ### DON'T
 - Don't use storage APIs for business logic testing
 - Don't test framework mechanics (entity/relation creation)
-- Don't use try-catch for error handling
+- Don't use try-catch alone for **top-level soft** errors (inspect `result.error`); do use try-catch / `rejects` for BT abort and nested-dispatch cases
 - Don't forget attributeQuery in find operations
 - Don't test implementation details
 
@@ -688,7 +699,8 @@ const userFavoriteRelation = await system.storage.findRelationByName(
 - [ ] All tests use callInteraction for business logic
 - [ ] Storage APIs only used for test setup
 - [ ] All findOne/find calls include attributeQuery
-- [ ] Error checking uses result.error pattern
+- [ ] Error checking uses result.error pattern for top-level soft failures
+- [ ] BT abort / NestedDispatch paths use try-catch or expect().rejects when applicable
 - [ ] Test covers success and failure scenarios
 - [ ] Computed values verified after interactions
-- [ ] No try-catch blocks for error handling
+- [ ] Structured Condition rejects assert `.code` when the Condition defines one

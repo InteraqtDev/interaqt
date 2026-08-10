@@ -48,6 +48,59 @@ describe('Condition serialization', () => {
         expect(cloned.content).toBe(content);
         expect(cloned.name).toBe('test');
     });
+
+    test('locks round-trip through stringify/parse and clone', () => {
+        const idResolver = (event: any) => event.payload.accountId;
+        const content = () => true;
+        const locks = [
+            {
+                recordName: 'Account',
+                id: idResolver,
+                attributeQuery: ['id', 'balance'],
+            },
+        ];
+        const instance = Condition.create(
+            { content, name: 'hasBalance', locks },
+            { uuid: 'cond-locks-1' }
+        );
+        expect(instance.locks).toEqual(locks);
+
+        const json = Condition.stringify(instance);
+        const data = JSON.parse(json);
+        expect(data.public.locks).toHaveLength(1);
+        expect(data.public.locks[0].recordName).toBe('Account');
+        expect(data.public.locks[0].id).toMatch(/^func::/);
+        expect(data.public.locks[0].attributeQuery).toEqual(['id', 'balance']);
+
+        clearAllInstances(Condition);
+        const parsed = Condition.parse(json);
+        expect(parsed.uuid).toBe('cond-locks-1');
+        expect(parsed.locks).toHaveLength(1);
+        expect(parsed.locks![0].recordName).toBe('Account');
+        expect(typeof (parsed.locks![0] as any).id).toBe('function');
+
+        const cloned = Condition.clone(instance, false);
+        expect(cloned.locks).toEqual(locks);
+        expect(cloned.uuid).not.toBe(instance.uuid);
+    });
+
+    test('create rejects invalid locks shape', () => {
+        expect(() =>
+            Condition.create({ content: () => true, locks: { recordName: 'X' } as any })
+        ).toThrow(/locks.*array/i);
+        expect(() =>
+            Condition.create({
+                content: () => true,
+                locks: [{ mode: 'record', recordName: 'X' } as any],
+            })
+        ).toThrow(/requires "id"/i);
+        expect(() =>
+            Condition.create({
+                content: () => true,
+                locks: [{ mode: 'match', recordName: 'X' } as any],
+            })
+        ).toThrow(/requires "match"/i);
+    });
 });
 
 describe('Conditions serialization', () => {

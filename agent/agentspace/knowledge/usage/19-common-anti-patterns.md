@@ -630,6 +630,59 @@ const createdUser = await system.storage.findOne(
 4. **Unique logical id index** makes accidental reuse fail loud instead of silently duplicating rows.
 5. **Property name `id` stays reserved** so user declarations cannot shadow the framework column.
 
+## 10. Condition / transaction anti-patterns
+
+### ❌ Hand-writing row locks in Condition content
+
+```typescript
+// ❌ Dialect SQL or ad-hoc advisory locks in the guard
+content: async function(this: Controller, event) {
+  await this.system.storage.query(`SELECT … FOR UPDATE …`)
+  // …
+}
+
+// ✅ Declarative locks + AdmissionSnapshot
+Condition.create({
+  name: 'HasBalance',
+  locks: [{ recordName: 'Account', id: (e) => e.payload.accountId, attributeQuery: ['id', 'balance'] }],
+  content: async function(event, admission) {
+    const account = admission.get('Account', event.payload.accountId)
+    return !!account && Number(account.balance) >= Number(event.payload.amount)
+  }
+})
+```
+
+### ❌ Nested dispatch or bare outer transaction instead of business transaction
+
+```typescript
+// ❌ Nested dispatch inside a dispatch stack → NestedDispatchError
+// ❌ storage.runInTransaction(async () => { await controller.dispatch(...) })
+//    is not the complete official path (no per-attempt SAVEPOINT; SE timing differs)
+
+// ✅ Official atomic boundary
+await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async () => {
+  const row = await controller.system.storage.create('Draft', { … })
+  return controller.dispatch(ActivateDraft, { user, payload: { draftId: row.id } })
+})
+```
+
+### ❌ Mutating payload / event.error for Condition results
+
+```typescript
+// ❌
+event.payload._resolved = x
+event.error = 'nope'
+return false
+
+// ✅
+return { allowed: false, code: 'NOPE', details: { … } }
+// or on allow: return { allowed: true, context: { resolved: x } }  // → event.context.admission
+```
+
+### ❌ Throwing RequireSerializableRetry from Condition as an isolation switch
+
+Condition-thrown `RequireSerializableRetry` is absorbed as a condition failure and does **not** upgrade the dispatch isolation. Use declarative `locks` for concurrent admission, or open `runInBusinessTransaction({ isolation: 'SERIALIZABLE' })` when framework SERIALIZABLE gates are required inside a BT.
+
 ## Key Takeaways
 
 1. **interaqt provides tools, not pre-built business entities**
@@ -638,12 +691,13 @@ const createdUser = await system.storage.findOne(
 4. **Action is just an identifier, not an operation**
 5. **Transform is for collection transformations, not property computations**
 6. **Always use object references in StateMachine, not strings**
-7. **Check result.error for errors, don't use try-catch**
+7. **Top-level dispatch: check `result.error`; BT default abort: dispatch throws — use try/catch only there**
 8. **storage.create() bypasses ALL validation - use only for test setup**
-9. **ALL business logic testing must use callInteraction()**
+9. **ALL business logic testing must use `controller.dispatch` (or callInteraction)**
 10. **Never test Entity/Relation directly - test through Interactions**
 11. **Logical `id` is the single application identity — optional on create, immutable on update; type must match the driver**
 12. **Prefer returned `storage.create` id or a pregenerated logical id for Relation / computeTarget; `clientId` is only an optional secondary key**
-13. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md)**
+13. **Concurrent admission: `Condition.locks` + snapshot; same-request write+dispatch: `runInBusinessTransaction`**
+14. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md) and [Conditions guide](./06-attributive-permissions.md)**
 
 Remember: The framework is about **declaring what data is**, not **how to manipulate it**.

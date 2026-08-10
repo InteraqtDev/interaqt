@@ -4,30 +4,22 @@
 Permission testing verifies that conditions correctly control access to interactions. Tests should cover both allowed and denied scenarios for different user roles and data states.
 
 ### Key Testing Pattern
-When testing permission failures, always verify:
+When testing permission failures on **top-level** `dispatch` / `callInteraction` (soft errors), always verify:
 1. **Error exists**: `expect(result.error).toBeDefined()`
-2. **Error type**: `expect((result.error as ConditionError).type).toBe('condition check failed')`
-3. **Which condition failed**: `expect((result.error as ConditionError).error.data.name).toBe('ConditionName')`
+2. **Error type** (duck-compatible): `expect((result.error as ConditionError).type).toBe('condition check failed')`
+3. **Which condition failed**: `expect((result.error as ConditionError).error.data.name).toBe('ConditionName')` (or `conditionName`)
+4. **Stable business code** when the Condition used structured rejection: `expect((result.error as InteractionGuardError).code).toBe('INSUFFICIENT_BALANCE')`
 
 This detailed verification helps identify exactly which permission check failed, making debugging easier.
+
+Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`, Condition failures **throw** — assert with try/catch (or `rejects.toThrow`) on the BT call, not only `result.error`.
 
 ## 🔴 CRITICAL: Permission Testing Principles
 
 ### Error Handling Pattern
 ```typescript
-// ❌ WRONG: interaqt doesn't throw exceptions
-try {
-  await controller.callInteraction('DeleteStyle', { 
-    user: viewer,
-    payload: { style: { id: styleId } }
-  })
-  fail('Should have thrown')
-} catch (e) {
-  // This will never execute
-}
-
-// ✅ CORRECT: Check error in result with detailed verification
-import {ConditionError} from "interaqt"
+// ✅ CORRECT (top-level soft error): Check error in result with detailed verification
+import { ConditionError, InteractionGuardError } from "interaqt"
 const result = await controller.callInteraction('DeleteStyle', { 
   user: viewer,
   payload: { style: { id: styleId } }
@@ -36,28 +28,70 @@ expect(result.error).toBeDefined()
 expect((result.error as ConditionError).type).toBe('condition check failed')
 // Verify which specific condition failed
 expect((result.error as ConditionError).error.data.name).toBe('AdminRole')
+// When Condition returned { allowed: false, code }, also assert:
+// expect((result.error as InteractionGuardError).code).toBe('NOT_ADMIN')
+
+// ✅ CORRECT (business transaction abort): default onDispatchError throws
+await expect(
+  controller.runInBusinessTransaction({ name: 'deny' }, async () => {
+    return controller.dispatch(DeleteStyle, {
+      user: viewer,
+      payload: { style: { id: styleId } }
+    })
+  })
+).rejects.toMatchObject({ type: 'condition check failed' })
+
+// ❌ WRONG for top-level soft mode: assuming every failure throws
+try {
+  await controller.callInteraction('DeleteStyle', {
+    user: viewer,
+    payload: { style: { id: styleId } }
+  })
+  // may succeed with result.error set — always inspect the return value
+} catch (e) {
+  // only expected under forceThrowDispatchError or BT abort
+}
 ```
 
 ### Common Error Types
 - `'no permission'` → Never used (legacy)
 - `'condition check failed'` → What you'll actually see
 
-### Guard Callback Return Contract (strict boolean)
+### Guard Callback Return Contract (fail-closed result algebra)
 
-Condition callbacks must return an actual `boolean` (`true` or `false`).
-Any non-boolean return value — including truthy values like `'admin'` and falsy values
-like `null` / `0` / `''` — is treated as a definition error and the check fails
-(fail-closed), with an error message telling you what was returned.
+Condition `content` may return:
+- `true` / `false` — allow / reject (`false` → default code `CONDITION_REJECTED`; boolean polarity respects BoolExp `not`)
+- `{ allowed: true, context? }` — allow; optional context merges into frozen `event.context.admission`
+- `{ allowed: false, code, message?, details? }` — structured rejection (stable `code` on the error; **not** flipped by `not`)
 
-Why falsy non-booleans matter: under a `not(...)` combination, a sloppy falsy value
-would otherwise be inverted into a pass. Always coerce explicitly:
+Any other value — including `undefined`, truthy non-booleans like `'admin'`, and falsy values
+like `null` / `0` / `''` — is `CONDITION_INVALID_RESULT` (fail-closed).
+
+Do **not** assign `event.error` for custom messages; use structured rejection or throw an Error with a string `code`.
+
+Why invalid non-booleans matter: under a `not(...)` combination, a sloppy falsy value
+must not be inverted into a pass. Always return an explicit algebra member:
 
 ```typescript
 // ❌ WRONG: short-circuit expressions can produce null/undefined/0
 content: async (event) => event.user.profile && event.user.profile.isAdmin
 
+// ❌ WRONG: custom message via event mutation (not an official channel)
+content: async (event) => {
+  event.error = 'nope'
+  return false
+}
+
 // ✅ CORRECT: coerce to boolean
 content: async (event) => !!(event.user.profile && event.user.profile.isAdmin)
+
+// ✅ CORRECT: structured rejection with stable code
+content: async (event) => {
+  if (!(event.user.profile && event.user.profile.isAdmin)) {
+    return { allowed: false, code: 'NOT_ADMIN', message: 'Admin role required' }
+  }
+  return true
+}
 ```
 
 ## Testing Permission Patterns
@@ -67,7 +101,7 @@ content: async (event) => !!(event.user.profile && event.user.profile.isAdmin)
 Define permissions:
 
 ```typescript
-import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp, Controller, ConditionError } from 'interaqt'
+import { Condition, BoolExp, Conditions, Interaction, Action, Payload, PayloadItem, MatchExp, Controller, ConditionError, InteractionGuardError } from 'interaqt'
 
 // Step 1: Define Conditions
 export const AdminRole = Condition.create({
@@ -464,8 +498,12 @@ export const EnforcePaginationLimits = Condition.create({
     const userLimit = maxLimits[event.user?.role] || 50
     
     if (modifier?.limit && modifier.limit > userLimit) {
-      event.error = `Limit exceeds maximum allowed (${userLimit})`
-      return false
+      return {
+        allowed: false,
+        code: 'LIMIT_EXCEEDED',
+        message: `Limit exceeds maximum allowed (${userLimit})`,
+        details: { userLimit, requested: modifier.limit }
+      }
     }
     
     return true
@@ -676,24 +714,31 @@ test('verify detailed condition error information', async () => {
   expect((complexResult.error as ConditionError).error.data.name).toBe('EmailVerified')
 })
 
-test('meaningful error messages', async () => {
-  // Define condition with custom error
+test('structured rejection codes and messages', async () => {
+  // Define condition with structured rejection (do not assign event.error)
   const CustomError = Condition.create({
     name: 'CustomError',
     content: async function(this: Controller, event) {
       if (!event.user) {
-        event.error = 'User authentication required'
-        return false
+        return {
+          allowed: false,
+          code: 'AUTH_REQUIRED',
+          message: 'User authentication required'
+        }
       }
       if (event.user.credits < 10) {
-        event.error = 'Insufficient credits (minimum: 10)'
-        return false
+        return {
+          allowed: false,
+          code: 'INSUFFICIENT_CREDITS',
+          message: 'Insufficient credits (minimum: 10)',
+          details: { minimum: 10, actual: event.user.credits }
+        }
       }
       return true
     }
   })
   
-  // Test error messages
+  // Test stable code + message on soft top-level error
   const poorUser = await system.storage.create('User', {
     credits: 5
   })
@@ -705,7 +750,8 @@ test('meaningful error messages', async () => {
   expect(result.error).toBeDefined()
   expect((result.error as ConditionError).type).toBe('condition check failed')
   expect((result.error as ConditionError).error.data.name).toBe('CustomError')
-  expect((result.error as ConditionError).message).toContain('Insufficient credits')
+  expect((result.error as InteractionGuardError).code).toBe('INSUFFICIENT_CREDITS')
+  expect(String((result.error as ConditionError).message)).toContain('Insufficient credits')
 })
 ```
 

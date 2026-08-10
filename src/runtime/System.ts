@@ -146,6 +146,30 @@ export type Storage = {
     runInTransaction: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
     getTransactionIsolation: () => TransactionIsolation | undefined
     getTransactionCapability: () => TransactionCapability
+    /**
+     * True while MonoStorage / driver transaction ALS reports an active transaction
+     * (depth > 0). Used by business-transaction ownership checks (A2).
+     */
+    isInTransaction: () => boolean
+    /**
+     * Whether the active driver can execute SAVEPOINT / RELEASE / ROLLBACK TO for
+     * business-transaction per-dispatch attempt boundaries. Independent of the public
+     * nestedStrategy capability bit (which stays 'reuse' for global nested runInTransaction).
+     */
+    supportsSavepoint: () => boolean
+    /**
+     * Create a SAVEPOINT on the active transaction connection. Requires isInTransaction().
+     * Name must be a simple SQL identifier (letters, digits, underscore).
+     */
+    createSavepoint: (name: string) => Promise<void>
+    releaseSavepoint: (name: string) => Promise<void>
+    /**
+     * ROLLBACK TO SAVEPOINT. Also truncates any caller event arrays registered against
+     * the active transaction baseline map back to their pre-attempt lengths when the
+     * caller supplies `effects` / event arrays that were pushed during the attempt —
+     * MonoStorage truncates all baselines recorded for this outer transaction context.
+     */
+    rollbackToSavepoint: (name: string) => Promise<void>
 
     atomic: AtomicStorage
 

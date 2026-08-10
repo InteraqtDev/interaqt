@@ -6,7 +6,11 @@ import {
 } from '@core';
 import type { Controller } from '@runtime';
 import { ActionInstance, GET_ACTION_UUID } from './Action.js';
-import { ConditionInstance } from './Condition.js';
+import {
+  AdmissionSnapshot,
+  type AdmissionLockSpec,
+  type ConditionInstance,
+} from './Condition.js';
 import { ConditionsInstance, Conditions } from './Conditions.js';
 import { PayloadInstance } from './Payload.js';
 import { DataPolicyInstance } from './Data.js';
@@ -218,17 +222,45 @@ export class Interaction implements InteractionInstance {
   }
 }
 
+export type ConditionRejectionInfo = {
+  code: string
+  message?: string
+  details?: unknown
+  conditionName?: string
+}
+
+/**
+ * Guard failure raised by Condition / Payload checks.
+ * Condition failures expose a stable `code` (and optional `details`) for callers
+ * without re-running the admission query (FR-02(b)).
+ */
 export class InteractionGuardError extends Error {
   public readonly type: string
   public readonly error: unknown
   public readonly checkType: string
+  public readonly code?: string
+  public readonly details?: unknown
+  public readonly conditionName?: string
 
-  constructor(message: string, options: { type: string, checkType: string, error?: unknown }) {
+  constructor(
+    message: string,
+    options: {
+      type: string
+      checkType: string
+      error?: unknown
+      code?: string
+      details?: unknown
+      conditionName?: string
+    }
+  ) {
     super(message)
     this.name = 'InteractionGuardError'
     this.type = options.type
     this.checkType = options.checkType
     this.error = options.error
+    this.code = options.code
+    this.details = options.details
+    this.conditionName = options.conditionName
   }
 }
 
@@ -273,6 +305,35 @@ export async function runInteractionGuard(
   await checkPayload(controller, interaction, args);
 }
 
+/**
+ * FR-02(b) Condition content result algebra (fail-closed).
+ * Objects never enter BoolExp raw; structured rejections use the error-string path
+ * plus a side channel so `code`/`details` survive BoolExp evaluation.
+ */
+export type ConditionContentResult =
+  | boolean
+  | { allowed: true; context?: Record<string, unknown> }
+  | { allowed: false; code: string; message?: string; details?: unknown }
+
+const CONDITION_REJECTED = 'CONDITION_REJECTED'
+const CONDITION_INVALID_RESULT = 'CONDITION_INVALID_RESULT'
+const CONDITION_THROWN = 'CONDITION_THROWN'
+
+function formatConditionRejectionMessage(
+  conditionName: string | undefined,
+  info: ConditionRejectionInfo
+): string {
+  const name = conditionName ?? '(unnamed)'
+  if (info.message) {
+    return `Condition '${name}' rejected [${info.code}]: ${info.message}`
+  }
+  return `Condition '${name}' rejected [${info.code}]`
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
 export async function checkCondition(controller: GuardController, interaction: InteractionInstance, eventArgs: InteractionEventArgs) {
   if (!interaction.conditions) return;
 
@@ -280,38 +341,394 @@ export async function checkCondition(controller: GuardController, interaction: I
     ? new BoolExp<ConditionInstance>(interaction.conditions.content as BoolExpressionRawData<ConditionInstance>)
     : BoolExp.atom<ConditionInstance>(interaction.conditions as ConditionInstance);
 
-  const handleAttribute = async (condition: ConditionInstance) => {
-    // fail-closed: a condition placed on the guard chain must be executable,
-    // and its callback must explicitly return a boolean.
-    if (!condition || !condition.content) {
-      return `Condition '${(condition as ConditionInstance | undefined)?.name ?? '(unnamed)'}' has no content to execute`;
-    }
-    let result;
-    try {
-      result = await condition.content.call(controller, eventArgs);
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      return `Condition '${condition.name}' threw exception: ${errorMessage}`;
-    }
-    // CAUTION 守卫回调必须严格返回 boolean。非 boolean 的返回值在 BoolExp 组合下按 truthiness
-    //  求值：truthy 的类型错误（`return user.role`）静默放行；更危险的是 falsy 的类型错误
-    //  （null / 0 / ''，如 `return user.profile && user.profile.isAdmin` 短路出 null）在
-    //  not(...) 组合下会被取反成"通过"——权限检查的 fail-open。错误字符串在 BoolExp 中
-    //  无论是否处于 not 之下都判为失败（fail-closed）。
-    if (typeof result !== 'boolean') {
-      return `Condition '${condition.name}' returned ${result === undefined ? 'undefined' : JSON.stringify(result)} (${typeof result}); guard callbacks must explicitly return a boolean (did you forget a return statement, or a !! coercion?)`;
-    }
-    return result;
-  };
+  // FR-01: collect every atom's locks (including under not) before evaluation, then
+  // acquire them in stable order on the current dispatch transaction. Snapshot is
+  // passed as content's second argument so guards need not re-read unlocked rows.
+  let admission: AdmissionSnapshot;
+  try {
+    admission = await acquireAdmissionLocks(controller, conditions, eventArgs);
+  } catch (e) {
+    if (e instanceof InteractionGuardError) throw e
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    throw new InteractionGuardError(`Condition admission lock failed: ${errorMessage}`, {
+      type: 'condition check failed',
+      checkType: 'condition',
+      error: errorMessage,
+      code: CONDITION_THROWN,
+      details: { cause: e },
+    });
+  }
 
-  const result = await conditions.evaluateAsync(handleAttribute);
-  if (result !== true) {
-    throw new InteractionGuardError(`Condition check failed: ${(result as any)?.data?.name}`, {
+  // FR-02(b): side channel for structured rejection metadata. Bound to this evaluate only.
+  const rejectionByCondition = new WeakMap<ConditionInstance, ConditionRejectionInfo>()
+  const admissionContext: Record<string, unknown> = {}
+
+  const recordRejection = (
+    condition: ConditionInstance | undefined,
+    info: ConditionRejectionInfo
+  ): string => {
+    if (condition) rejectionByCondition.set(condition, info)
+    return formatConditionRejectionMessage(condition?.name ?? info.conditionName, info)
+  }
+
+  const handleAttribute = async (condition: ConditionInstance): Promise<boolean | string> => {
+    // fail-closed: a condition placed on the guard chain must be executable.
+    if (!condition || !condition.content) {
+      const name = (condition as ConditionInstance | undefined)?.name ?? '(unnamed)'
+      return recordRejection(condition, {
+        code: CONDITION_INVALID_RESULT,
+        message: `Condition '${name}' has no content to execute`,
+        conditionName: (condition as ConditionInstance | undefined)?.name,
+      })
+    }
+
+    let raw: unknown
+    try {
+      raw = await condition.content.call(controller, eventArgs, admission)
+    } catch (e) {
+      // Already-normalized guard errors propagate unchanged (single choke point).
+      if (e instanceof InteractionGuardError) throw e
+      const thrownCode =
+        e !== null &&
+        typeof e === 'object' &&
+        typeof (e as { code?: unknown }).code === 'string' &&
+        (e as { code: string }).code.length > 0
+          ? (e as { code: string }).code
+          : CONDITION_THROWN
+      const message = e instanceof Error ? e.message : String(e)
+      const details =
+        e !== null && typeof e === 'object' && 'details' in (e as object)
+          ? (e as { details: unknown }).details
+          : { cause: e }
+      // Preserve prior EvaluateError string shape for existing tests ("threw exception").
+      const human = `Condition '${condition.name}' threw exception: ${message}`
+      rejectionByCondition.set(condition, {
+        code: thrownCode,
+        message: human,
+        details,
+        conditionName: condition.name,
+      })
+      return human
+    }
+
+    // true — pass (compatible)
+    if (raw === true) {
+      return true
+    }
+
+    // false — boolean polarity (subject to BoolExp not); default code only if final reject
+    if (raw === false) {
+      rejectionByCondition.set(condition, {
+        code: CONDITION_REJECTED,
+        message: `Condition '${condition.name}' returned false`,
+        conditionName: condition.name,
+      })
+      return false
+    }
+
+    // Structured object results: must carry boolean `allowed`. Never feed objects into BoolExp.
+    if (isPlainObject(raw) && typeof (raw as { allowed?: unknown }).allowed === 'boolean') {
+      const allowed = (raw as { allowed: boolean }).allowed
+      if (allowed) {
+        const ctx = (raw as { context?: unknown }).context
+        if (ctx !== undefined) {
+          if (!isPlainObject(ctx)) {
+            const message =
+              `Condition '${condition.name}' returned allowed:true with non-object context ` +
+              `(${ctx === null ? 'null' : Array.isArray(ctx) ? 'array' : typeof ctx})`
+            return recordRejection(condition, {
+              code: CONDITION_INVALID_RESULT,
+              message,
+              conditionName: condition.name,
+              details: { result: raw },
+            })
+          }
+          Object.assign(admissionContext, ctx)
+        }
+        return true
+      }
+
+      // allowed: false — structured rejection (error-string path; not flipped by not)
+      const code = (raw as { code?: unknown }).code
+      if (typeof code !== 'string' || code.length === 0) {
+        const message =
+          `Condition '${condition.name}' returned allowed:false without a non-empty string code`
+        return recordRejection(condition, {
+          code: CONDITION_INVALID_RESULT,
+          message,
+          conditionName: condition.name,
+          details: { result: raw },
+        })
+      }
+      const message =
+        typeof (raw as { message?: unknown }).message === 'string'
+          ? (raw as { message: string }).message
+          : undefined
+      const details = (raw as { details?: unknown }).details
+      return recordRejection(condition, {
+        code,
+        message,
+        details,
+        conditionName: condition.name,
+      })
+    }
+
+    // Informal fields (ok/success/pass) and any other shape → invalid, fail-closed.
+    const rendered =
+      raw === undefined
+        ? 'undefined'
+        : (() => {
+            try {
+              return JSON.stringify(raw)
+            } catch {
+              return String(raw)
+            }
+          })()
+    const message =
+      `Condition '${condition.name}' returned ${rendered} (${raw === null ? 'null' : typeof raw}); ` +
+      `guard callbacks must return a boolean or { allowed: boolean, ... } ` +
+      `(did you forget a return statement, or a !! coercion?)`
+    return recordRejection(condition, {
+      code: CONDITION_INVALID_RESULT,
+      message,
+      conditionName: condition.name,
+      details: { result: raw },
+    })
+  }
+
+  const result = await conditions.evaluateAsync(handleAttribute)
+  if (result === true) {
+    // Merge read-only admission context into this attempt's event args for mapEventData /
+    // computations. Official channel is return-value merge — not payload mutation.
+    if (Object.keys(admissionContext).length > 0) {
+      const base =
+        eventArgs.context && isPlainObject(eventArgs.context) ? { ...eventArgs.context } : {}
+      base.admission = Object.freeze({ ...admissionContext })
+      eventArgs.context = base
+    }
+    return
+  }
+
+  const failingAtom = (result as { data?: ConditionInstance }).data
+  const channelInfo = failingAtom ? rejectionByCondition.get(failingAtom) : undefined
+  // not(true) / bare boolean false with no structured info → default CONDITION_REJECTED
+  const info: ConditionRejectionInfo = channelInfo ?? {
+    code: CONDITION_REJECTED,
+    message:
+      typeof (result as { error?: unknown }).error === 'string'
+        ? ((result as { error: string }).error)
+        : `Condition '${failingAtom?.name ?? '(unnamed)'}' rejected`,
+    conditionName: failingAtom?.name,
+  }
+
+  throw new InteractionGuardError(
+    `Condition check failed: ${failingAtom?.name ?? info.conditionName ?? '(unnamed)'}`,
+    {
       type: 'condition check failed',
       checkType: 'condition',
       error: result,
-    });
+      code: info.code,
+      details: info.details,
+      conditionName: info.conditionName ?? failingAtom?.name,
+    }
+  )
+}
+
+/**
+ * Walk a Condition BoolExp and return every atomic Condition (including atoms under not).
+ * Locks are isolation, not polarity — negated atoms still contribute to the read set.
+ */
+export function collectConditionAtoms(conditions: BoolExp<ConditionInstance>): ConditionInstance[] {
+  const atoms: ConditionInstance[] = [];
+  const visit = (node: BoolExp<ConditionInstance>) => {
+    if (node.isAtom()) {
+      atoms.push(node.data);
+      return;
+    }
+    visit(node.left);
+    if (node.right) visit(node.right);
+  };
+  visit(conditions);
+  return atoms;
+}
+
+type ResolvedRecordLock = {
+  kind: 'record'
+  recordName: string
+  id: string | number
+  attributeQuery: unknown
+  sortKey: string
+}
+
+type ResolvedMatchLock = {
+  kind: 'match'
+  recordName: string
+  match: unknown
+  attributeQuery: unknown
+  sortKey: string
+}
+
+type ResolvedAdmissionLock = ResolvedRecordLock | ResolvedMatchLock
+
+async function resolveAdmissionLocks(
+  atoms: ConditionInstance[],
+  eventArgs: InteractionEventArgs
+): Promise<ResolvedAdmissionLock[]> {
+  const resolved: ResolvedAdmissionLock[] = [];
+  // Admission lock resolvers use a structural event type (no Condition↔Interaction cycle).
+  const admissionEvent = eventArgs as unknown as import('./Condition.js').AdmissionEventArgs;
+
+  for (const condition of atoms) {
+    const locks = condition.locks;
+    if (!locks || locks.length === 0) continue;
+    const conditionLabel = condition.name ?? '(unnamed)';
+
+    for (let i = 0; i < locks.length; i++) {
+      const spec = locks[i] as AdmissionLockSpec;
+      const mode = spec.mode ?? 'record';
+      const attributeQuery = spec.attributeQuery ?? ['*'];
+
+      if (mode === 'match') {
+        const matchSpec = spec as Extract<AdmissionLockSpec, { mode: 'match' }>;
+        let match: unknown;
+        try {
+          match =
+            typeof matchSpec.match === 'function'
+              ? await matchSpec.match(admissionEvent)
+              : matchSpec.match;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(
+            `Condition '${conditionLabel}' locks[${i}] match resolver threw: ${msg}`
+          );
+        }
+        if (match === undefined || match === null) {
+          throw new Error(
+            `Condition '${conditionLabel}' locks[${i}] match resolver returned ${match === null ? 'null' : 'undefined'}; admission locks must resolve a match expression.`
+          );
+        }
+        resolved.push({
+          kind: 'match',
+          recordName: matchSpec.recordName,
+          match,
+          attributeQuery,
+          // Stable order: recordName, then match specs after record locks for same name
+          // (match sort after id locks via prefix), then a stable index within the list.
+          sortKey: `${matchSpec.recordName}\0match\0${i}\0${conditionLabel}`,
+        });
+        continue;
+      }
+
+      const recordSpec = spec as Extract<AdmissionLockSpec, { mode?: 'record' }>;
+      let idOrIds: unknown;
+      try {
+        idOrIds =
+          typeof recordSpec.id === 'function' ? await recordSpec.id(admissionEvent) : recordSpec.id;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(
+          `Condition '${conditionLabel}' locks[${i}] id resolver threw: ${msg}`
+        );
+      }
+
+      if (idOrIds === undefined || idOrIds === null) {
+        throw new Error(
+          `Condition '${conditionLabel}' locks[${i}] id resolver returned ${idOrIds === null ? 'null' : 'undefined'}; admission locks must resolve a record id.`
+        );
+      }
+
+      const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+      if (ids.length === 0) {
+        throw new Error(
+          `Condition '${conditionLabel}' locks[${i}] id resolver returned an empty id list; admission locks must resolve at least one record id.`
+        );
+      }
+      for (const id of ids) {
+        if (id === undefined || id === null || (typeof id !== 'string' && typeof id !== 'number')) {
+          throw new Error(
+            `Condition '${conditionLabel}' locks[${i}] resolved an invalid id (${String(id)}); expected string or number.`
+          );
+        }
+        resolved.push({
+          kind: 'record',
+          recordName: recordSpec.recordName,
+          id,
+          attributeQuery,
+          sortKey: `${recordSpec.recordName}\0record\0${String(id)}`,
+        });
+      }
+    }
   }
+
+  // Deduplicate record locks by (recordName, id): keep the first attributeQuery (declaration order
+  // after stable sort is by sortKey, so identical keys keep first-seen query via Map).
+  const recordSeen = new Map<string, ResolvedRecordLock>();
+  const matchLocks: ResolvedMatchLock[] = [];
+  for (const lock of resolved) {
+    if (lock.kind === 'match') {
+      matchLocks.push(lock);
+      continue;
+    }
+    const key = `${lock.recordName}\0${String(lock.id)}`;
+    if (!recordSeen.has(key)) recordSeen.set(key, lock);
+  }
+
+  const recordLocks = Array.from(recordSeen.values()).sort((a, b) =>
+    a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0
+  );
+  matchLocks.sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));
+
+  // Global order: all record locks by (recordName, id), then match locks by (recordName, index).
+  // Within the same recordName, record id locks come before match locks (sortKey middle token).
+  return [...recordLocks, ...matchLocks].sort((a, b) =>
+    a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0
+  );
+}
+
+async function acquireAdmissionLocks(
+  controller: GuardController,
+  conditions: BoolExp<ConditionInstance>,
+  eventArgs: InteractionEventArgs
+): Promise<AdmissionSnapshot> {
+  const snapshot = new AdmissionSnapshot();
+  const atoms = collectConditionAtoms(conditions);
+  const locks = await resolveAdmissionLocks(atoms, eventArgs);
+
+  // Populate while unsealed. Every path that hands the snapshot to Condition content
+  // must seal first — including locks.length === 0 — so put cannot forge rows for
+  // later atoms (design §3.2.1; domain admission-snapshot-readonly).
+  if (locks.length > 0) {
+    const atomic = controller.system?.storage?.atomic;
+    if (!atomic || typeof atomic.lockRecord !== 'function' || typeof atomic.lockRows !== 'function') {
+      throw new Error(
+        'Condition admission locks require storage.atomic.lockRecord / lockRows on the active storage (missing atomic API).'
+      );
+    }
+
+    for (const lock of locks) {
+      if (lock.kind === 'record') {
+        const row = await atomic.lockRecord(
+          lock.recordName,
+          lock.id,
+          lock.attributeQuery
+        );
+        snapshot.put(lock.recordName, row as Record<string, unknown> | undefined);
+        continue;
+      }
+      const rows = (await atomic.lockRows(
+        lock.recordName,
+        lock.match,
+        lock.attributeQuery
+      )) as Record<string, unknown>[];
+      for (const row of rows ?? []) {
+        snapshot.put(lock.recordName, row);
+      }
+    }
+  }
+
+  // Single exit: content always receives a sealed, copy-on-read snapshot.
+  snapshot.seal();
+  return snapshot;
 }
 
 // Runtime checks for the primitive payload types a PayloadItem can declare.

@@ -3,10 +3,17 @@
 ## Overview
 Permissions in interaqt are implemented through conditions in interactions. These control who can perform actions and under what circumstances.
 
-**Important**: Conditions can return:
-- `true` - Permission granted
-- `false` - Permission denied (generic error)  
-- A string - Permission denied with specific error message (recommended)
+**Important**: Condition `content` result algebra (fail-closed):
+- `true` — permission granted
+- `false` — permission denied (default code `CONDITION_REJECTED`; boolean polarity; inverted by BoolExp `not`)
+- `{ allowed: true, context?: Record<string, unknown> }` — granted; optional `context` merges into read-only `event.context.admission` for the same dispatch (do **not** mutate `payload`)
+- `{ allowed: false, code: string, message?: string, details?: unknown }` — **structured rejection** (stable `code` on `InteractionGuardError` / soft `result.error`; **not** flipped by `not`)
+- any other value (including informal `{ ok: true }`) — `CONDITION_INVALID_RESULT`
+- thrown errors — `error.code` if non-empty string, else `CONDITION_THROWN`
+
+Discriminator is **only** `allowed`. Returning a bare string is **not** a supported success/deny channel.
+
+For concurrent check-then-act, declare `locks` on `Condition.create` and read the `AdmissionSnapshot` second argument — see `../usage/06-attributive-permissions.md`. For same-request storage write + dispatch, use `controller.runInBusinessTransaction`, not nested dispatch.
 
 ## 🔴 CRITICAL: Common Mistakes
 
@@ -402,18 +409,24 @@ const EfficientCheck = Condition.create({
 
 ### 2. Clear Error Context
 ```typescript
-// ✅ Provide meaningful error context
+// ✅ Structured rejection — stable code for callers (do not assign event.error)
 const WithContext = Condition.create({
   name: 'WithContext',
   content: async function(this: Controller, event) {
     if (!event.user) {
-      event.error = 'User not authenticated';
-      return false;
+      return {
+        allowed: false,
+        code: 'UNAUTHENTICATED',
+        message: 'User not authenticated',
+      };
     }
     
     if (event.user.role !== 'admin') {
-      event.error = 'Admin role required';
-      return false;
+      return {
+        allowed: false,
+        code: 'ADMIN_REQUIRED',
+        message: 'Admin role required',
+      };
     }
     
     return true;
@@ -449,6 +462,42 @@ conditions: Conditions.create({
 conditions: AdminRole
 ```
 
+## Concurrent admission & business transactions
+
+```typescript
+// ✅ Declarative locks — no hand-written FOR UPDATE
+const HasBalance = Condition.create({
+  name: 'HasBalance',
+  locks: [{
+    recordName: 'Account',
+    id: (event) => event.payload.accountId,
+    attributeQuery: ['id', 'balance'],
+  }],
+  content: async function(this: Controller, event, admission) {
+    const account = admission.get('Account', event.payload.accountId);
+    if (!account || Number(account.balance) < Number(event.payload.amount)) {
+      return { allowed: false, code: 'INSUFFICIENT_BALANCE' };
+    }
+    return { allowed: true, context: { accountId: account.id } };
+  }
+});
+
+// ✅ Same-request create + activate (Condition sees uncommitted row)
+await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async () => {
+  const draft = await controller.system.storage.create('Draft', { title: '…' });
+  return controller.dispatch(ActivateDraft, {
+    user,
+    payload: { draftId: draft.id },
+  });
+});
+```
+
+Do **not**:
+- Nest `controller.dispatch` inside another dispatch (`NestedDispatchError`)
+- Wrap BT inside `storage.runInTransaction` (rejected: BT must own the outermost transaction)
+- Throw `RequireSerializableRetry` from Condition content as an isolation switch (absorbed as condition failure; does not upgrade)
+- Mutate `event.payload` to pass admission data (use `{ allowed: true, context }`)
+
 ## Security Checklist
 - [ ] Authentication check (user exists)
 - [ ] Authorization check (user has permission)
@@ -457,4 +506,6 @@ conditions: AdminRole
 - [ ] Payload data validation
 - [ ] BoolExp combinations wrapped with Conditions.create
 - [ ] Efficient condition ordering (simple checks first)
-- [ ] Clear error messages for debugging 
+- [ ] Structured rejection codes (`{ allowed: false, code }`) instead of mutating `event.error`
+- [ ] Concurrent check-then-act uses `Condition.locks` + snapshot (no dialect lock SQL)
+- [ ] Same-request storage write + dispatch uses `runInBusinessTransaction`

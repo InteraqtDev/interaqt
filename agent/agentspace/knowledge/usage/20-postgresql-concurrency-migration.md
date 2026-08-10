@@ -104,7 +104,7 @@ Migration rules:
 
 ## Transaction API
 
-Use callback transactions:
+Use callback transactions for storage-only work:
 
 ```typescript
 await system.storage.runInTransaction(
@@ -116,6 +116,36 @@ await system.storage.runInTransaction(
 ```
 
 Do not use old manual transaction APIs such as `beginTransaction`, `commitTransaction`, or `rollbackTransaction`.
+
+### Business transactions (storage + dispatch)
+
+When the same request must write rows and then `dispatch` interactions that **see those uncommitted writes**, use `controller.runInBusinessTransaction` — not a bare outer `runInTransaction` around `dispatch`, and not nested `dispatch`.
+
+```typescript
+await controller.runInBusinessTransaction(
+  { name: 'create-and-activate', isolation: 'READ COMMITTED' },
+  async () => {
+    const draft = await controller.system.storage.create('Draft', { … })
+    return controller.dispatch(ActivateDraft, { user, payload: { draftId: draft.id } })
+  }
+)
+```
+
+| Rule | Detail |
+|------|--------|
+| Ownership | BT opens the outermost `BEGIN`/`COMMIT`. Nested inside `storage.runInTransaction` → `BusinessTransactionBoundaryError` (`NESTED_STORAGE_TRANSACTION`). |
+| Attempts | Each `dispatch` attempt uses a SAVEPOINT; failure rolls back that attempt’s writes. |
+| Default abort | Condition rejection **throws**; BT rejects and outer ROLLBACK. Side effects flush only after owned COMMIT. |
+| SERIALIZABLE | Top-level dispatch may still promote via `RequireSerializableRetry`. **Inside BT**, S is fail-fast — open BT with `isolation: 'SERIALIZABLE'` when Transform update/delete, full recompute, or replace gates require it. |
+| Nested dispatch | Still `NestedDispatchError`. Sequential dispatches inside one BT callback are allowed. |
+
+Full contract: [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
+
+### Declarative Condition locks (concurrent admission)
+
+For concurrent check-then-act (for example two connections debiting the same balance), declare `Condition.locks` so the framework runs `lockRecord` / `lockRows` before Condition content. Prefer the `AdmissionSnapshot` second argument over unlocked re-reads. Do not implement application-level `FOR UPDATE` SQL for this pattern.
+
+Real PostgreSQL contract: `tests/runtime/postgresqlConditionAdmission.spec.ts` (balance `B`, two concurrent full debits → at most one success, balance ≥ 0).
 
 ## Testing PostgreSQL Concurrency
 
@@ -134,3 +164,13 @@ INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-scoped-sequence
 ```
 
 This is the critical acceptance test for cross-controller scoped counter allocation.
+
+Condition admission + business transaction contracts on real PostgreSQL:
+
+```bash
+INTERAQT_POSTGRES_DATABASE=interaqt_test PGHOST=127.0.0.1 PGUSER=interaqt PGPASSWORD=interaqt \
+  npx vitest run tests/runtime/postgresqlConditionAdmission.spec.ts tests/runtime/postgresqlBusinessTransaction.spec.ts
+# or the full matrix:
+INTERAQT_POSTGRES_DATABASE=interaqt_test PGHOST=127.0.0.1 PGUSER=interaqt PGPASSWORD=interaqt \
+  npm run test:postgres
+```

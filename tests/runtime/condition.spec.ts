@@ -11,7 +11,8 @@ import {
     Condition,
     Conditions,
     ConditionError, Payload,
-    PayloadItem
+    PayloadItem,
+    MatchExp,
 } from 'interaqt';
 
 describe('condition checks', () => {
@@ -399,6 +400,358 @@ describe('condition checks', () => {
             const conditionError = result.error as ConditionError
             expect(conditionError.type).toBe('condition check failed')
             expect(conditionError.error.error).toContain('returned undefined')
+        })
+    })
+
+    describe('declarative admission locks (FR-01)', () => {
+        test('content second argument receives locked snapshot for declared record id', async () => {
+            const Account = Entity.create({
+                name: 'CondLockAccount',
+                properties: [
+                    Property.create({ name: 'balance', type: 'number' }),
+                ],
+            })
+
+            let seenBalance: number | undefined
+            let seenViaGet: Record<string, unknown> | undefined
+            const hasBalance = Condition.create({
+                name: 'hasBalance',
+                locks: [
+                    {
+                        recordName: 'CondLockAccount',
+                        id: (event: any) => event.payload.accountId,
+                        attributeQuery: ['id', 'balance'],
+                    },
+                ],
+                content: async function (this: Controller, event: any, admission: any) {
+                    seenViaGet = admission?.get?.('CondLockAccount', event.payload.accountId)
+                    seenBalance = seenViaGet?.balance as number | undefined
+                    return Number(seenBalance) >= Number(event.payload.amount)
+                },
+            })
+
+            const Debit = Interaction.create({
+                name: 'condLockDebit',
+                action: Action.create({ name: 'condLockDebit' }),
+                payload: Payload.create({
+                    items: [
+                        PayloadItem.create({ name: 'accountId', type: 'string', required: true }),
+                        PayloadItem.create({ name: 'amount', type: 'number', required: true }),
+                    ],
+                }),
+                conditions: hasBalance,
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Account],
+                relations: [],
+                eventSources: [Debit],
+            })
+            await controller.setup(true)
+
+            const account = await system.storage.create('CondLockAccount', { balance: 50 })
+            const user = { id: 'u-cond-lock' }
+            const accountId = String(account.id)
+
+            const ok = await controller.dispatch(Debit, {
+                user,
+                payload: { accountId, amount: 30 },
+            })
+            expect(ok.error).toBeUndefined()
+            expect(seenBalance).toBe(50)
+            expect(seenViaGet).toMatchObject({ id: account.id, balance: 50 })
+
+            const denied = await controller.dispatch(Debit, {
+                user,
+                payload: { accountId, amount: 100 },
+            })
+            expect(denied.error).toBeDefined()
+            expect((denied.error as ConditionError).type).toBe('condition check failed')
+        })
+
+        test('missing id from lock resolver fails closed before content runs', async () => {
+            let contentRan = false
+            const Item = Entity.create({
+                name: 'CondLockItem',
+                properties: [Property.create({ name: 'n', type: 'number' })],
+            })
+            const gate = Condition.create({
+                name: 'lockNeedsId',
+                locks: [
+                    {
+                        recordName: 'CondLockItem',
+                        id: () => undefined as any,
+                    },
+                ],
+                content: async function () {
+                    contentRan = true
+                    return true
+                },
+            })
+            const Gate = Interaction.create({
+                name: 'condLockNeedsId',
+                action: Action.create({ name: 'condLockNeedsId' }),
+                conditions: gate,
+            })
+            controller = new Controller({
+                system,
+                entities: [Item],
+                relations: [],
+                eventSources: [Gate],
+            })
+            await controller.setup(true)
+            const user = await system.storage.create('CondLockItem', { n: 1 })
+            const result = await controller.dispatch(Gate, { user: { id: String(user.id) } })
+            expect(result.error).toBeDefined()
+            expect(String((result.error as any).error ?? (result.error as any).message ?? result.error)).toMatch(
+                /id resolver returned undefined|admission lock/i
+            )
+            expect(contentRan).toBe(false)
+        })
+
+
+        test('AdmissionSnapshot is read-only for Condition content (design §3.2.1)', async () => {
+            // Design: snapshot is a read-only view of locked rows. Content must not be able
+            // to rewrite balances (or other fields) for later atoms in the same guard via
+            // get()/getAll() mutation or put().
+            const Account = Entity.create({
+                name: 'CondSnapAccount',
+                properties: [
+                    Property.create({ name: 'balance', type: 'number' }),
+                ],
+            })
+
+            let mutatedSeen: number | undefined
+            let secondAtomSaw: number | undefined
+            let secondAtomSawViaGetAll: number | undefined
+
+            const mutator = Condition.create({
+                name: 'mutatesSnapshot',
+                locks: [
+                    {
+                        recordName: 'CondSnapAccount',
+                        id: (event: any) => event.payload.accountId,
+                        attributeQuery: ['id', 'balance'],
+                    },
+                ],
+                content: async function (_event: any, admission: any) {
+                    const row = admission.get('CondSnapAccount', _event.payload.accountId)
+                    if (row) {
+                        row.balance = -999
+                        mutatedSeen = row.balance
+                    }
+                    // getAll must also return copies; mutating them must not rewrite the store
+                    const all = typeof admission.getAll === 'function'
+                        ? admission.getAll('CondSnapAccount')
+                        : []
+                    for (const r of all) {
+                        r.balance = -888
+                    }
+                    // put must not be a public write channel for guards
+                    if (typeof admission.put === 'function') {
+                        try {
+                            admission.put('CondSnapAccount', {
+                                id: _event.payload.accountId,
+                                balance: -1,
+                            })
+                        } catch {
+                            // sealed/read-only put may throw — that is acceptable
+                        }
+                    }
+                    return true
+                },
+            })
+
+            const observer = Condition.create({
+                name: 'observesSnapshot',
+                content: async function (_event: any, admission: any) {
+                    const row = admission?.get?.('CondSnapAccount', _event.payload.accountId)
+                    secondAtomSaw = row?.balance as number | undefined
+                    const viaAll = admission?.getAll?.('CondSnapAccount') ?? []
+                    secondAtomSawViaGetAll = viaAll[0]?.balance as number | undefined
+                    return Number(row?.balance) === 50 && Number(viaAll[0]?.balance) === 50
+                },
+            })
+
+            const Gate = Interaction.create({
+                name: 'condSnapReadonly',
+                action: Action.create({ name: 'condSnapReadonly' }),
+                payload: Payload.create({
+                    items: [
+                        PayloadItem.create({ name: 'accountId', type: 'string', required: true }),
+                    ],
+                }),
+                conditions: Conditions.create({
+                    content: BoolExp.atom(mutator).and(observer),
+                }),
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Account],
+                relations: [],
+                eventSources: [Gate],
+            })
+            await controller.setup(true)
+
+            const account = await system.storage.create('CondSnapAccount', { balance: 50 })
+            const result = await controller.dispatch(Gate, {
+                user: { id: 'u-snap' },
+                payload: { accountId: String(account.id) },
+            })
+
+            expect(result.error).toBeUndefined()
+            expect(mutatedSeen).toBe(-999) // local binding may hold a discarded copy
+            // The shared snapshot must still present the locked balance to later atoms.
+            expect(secondAtomSaw).toBe(50)
+            expect(secondAtomSawViaGetAll).toBe(50)
+        })
+        test('empty-locks AdmissionSnapshot is still read-only (no forge via put)', async () => {
+            // Same domain as sealed snapshot: content must never use put to plant rows
+            // for later atoms — including the common path where no atom declared locks
+            // (acquireAdmissionLocks early-returns without seal in a defective build).
+            let secondSaw: unknown
+            const forger = Condition.create({
+                name: 'forgesEmptySnapshot',
+                content: async (_event: any, admission: any) => {
+                    if (typeof admission?.put === 'function') {
+                        try {
+                            admission.put('GhostAccount', { id: 'g1', balance: 999 })
+                        } catch {
+                            // sealed/read-only put may throw
+                        }
+                    }
+                    return true
+                },
+            })
+            const observer = Condition.create({
+                name: 'observesEmptySnapshot',
+                content: async (_event: any, admission: any) => {
+                    secondSaw = admission?.get?.('GhostAccount', 'g1')
+                    return true
+                },
+            })
+            const Gate = Interaction.create({
+                name: 'condEmptySnapReadonly',
+                action: Action.create({ name: 'condEmptySnapReadonly' }),
+                conditions: Conditions.create({
+                    content: BoolExp.atom(forger).and(observer),
+                }),
+            })
+            controller = new Controller({
+                system,
+                entities: [],
+                relations: [],
+                eventSources: [Gate],
+            })
+            await controller.setup(true)
+            const result = await controller.dispatch(Gate, { user: { id: 'u-empty-snap' } })
+            expect(result.error).toBeUndefined()
+            expect(secondSaw).toBeUndefined()
+        })
+
+        test('mode match locks populate snapshot via lockRows', async () => {
+            const Item = Entity.create({
+                name: 'CondMatchItem',
+                properties: [
+                    Property.create({ name: 'code', type: 'string' }),
+                    Property.create({ name: 'n', type: 'number' }),
+                ],
+            })
+
+            let saw: Record<string, unknown> | undefined
+            const gate = Condition.create({
+                name: 'matchLockGate',
+                locks: [
+                    {
+                        mode: 'match',
+                        recordName: 'CondMatchItem',
+                        match: (event: any) =>
+                            MatchExp.atom({ key: 'code', value: ['=', event.payload.code] }),
+                        attributeQuery: ['id', 'code', 'n'],
+                    },
+                ],
+                content: async function (event: any, admission: any) {
+                    const rows = admission.getAll('CondMatchItem')
+                    saw = rows.find((r: any) => r.code === event.payload.code)
+                    return !!saw && Number(saw.n) > 0
+                },
+            })
+
+            const Open = Interaction.create({
+                name: 'condMatchOpen',
+                action: Action.create({ name: 'condMatchOpen' }),
+                payload: Payload.create({
+                    items: [PayloadItem.create({ name: 'code', type: 'string', required: true })],
+                }),
+                conditions: gate,
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Item],
+                relations: [],
+                eventSources: [Open],
+            })
+            await controller.setup(true)
+            await system.storage.create('CondMatchItem', { code: 'alpha', n: 3 })
+            const ok = await controller.dispatch(Open, {
+                user: { id: 'u-match' },
+                payload: { code: 'alpha' },
+            })
+            expect(ok.error).toBeUndefined()
+            expect(saw).toMatchObject({ code: 'alpha', n: 3 })
+        })
+
+        test('locks under BoolExp.not are still acquired (union of all atoms)', async () => {
+            const Flag = Entity.create({
+                name: 'CondLockFlag',
+                properties: [Property.create({ name: 'on', type: 'boolean', defaultValue: () => false })],
+            })
+
+            let snapshotSawFlag = false
+            const alwaysFalse = Condition.create({
+                name: 'alwaysFalseWithLock',
+                locks: [
+                    {
+                        recordName: 'CondLockFlag',
+                        id: (event: any) => event.payload.flagId,
+                        attributeQuery: ['id', 'on'],
+                    },
+                ],
+                content: async function (_event: any, admission: any) {
+                    snapshotSawFlag = !!admission?.get?.('CondLockFlag', _event.payload.flagId)
+                    return false
+                },
+            })
+
+            // not(false) => pass; lock must still run for the negated atom
+            const OpenGate = Interaction.create({
+                name: 'condLockNotAtom',
+                action: Action.create({ name: 'condLockNotAtom' }),
+                payload: Payload.create({
+                    items: [PayloadItem.create({ name: 'flagId', type: 'string', required: true })],
+                }),
+                conditions: Conditions.create({
+                    content: BoolExp.atom(alwaysFalse).not(),
+                }),
+            })
+
+            controller = new Controller({
+                system,
+                entities: [Flag],
+                relations: [],
+                eventSources: [OpenGate],
+            })
+            await controller.setup(true)
+            const flag = await system.storage.create('CondLockFlag', { on: true })
+            const result = await controller.dispatch(OpenGate, {
+                user: { id: 'u-not' },
+                payload: { flagId: String(flag.id) },
+            })
+            expect(result.error).toBeUndefined()
+            expect(snapshotSawFlag).toBe(true)
         })
     })
 })

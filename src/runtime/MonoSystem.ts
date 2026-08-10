@@ -163,6 +163,94 @@ class MonoStorage implements Storage{
             ],
         }
     }
+    isInTransaction(): boolean {
+        return (this.getActiveTransactionContext()?.depth ?? 0) > 0
+    }
+    /**
+     * BT savepoint probe. Explicit capability.supportsSavepoint wins; otherwise
+     * transactions-capable drivers with nestedStrategy !== 'unsupported' (PG/PGLite/SQLite)
+     * are treated as supporting SAVEPOINT SQL on the active connection.
+     */
+    supportsSavepoint(): boolean {
+        const capability = this.getTransactionCapability()
+        if (!capability.transactions) return false
+        if (typeof capability.supportsSavepoint === 'boolean') return capability.supportsSavepoint
+        return capability.nestedStrategy !== 'unsupported'
+    }
+    private assertSavepointName(name: string) {
+        if (typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+            throw new Error(`Invalid savepoint name: ${String(name)}`)
+        }
+    }
+    /**
+     * Snapshot of event-array lengths at SAVEPOINT create time.
+     * rollbackToSavepoint restores to this snapshot (only this attempt's pushes);
+     * releaseSavepoint advances the sticky baseline so later rollbacks keep committed attempt effects.
+     */
+    private savepointEventSnapshots = new Map<string, Map<RecordMutationEvent[], number>>()
+    private snapshotEventArrayLengths(): Map<RecordMutationEvent[], number> {
+        const context = this.getActiveTransactionContext()
+        const baselines = context?.eventArrayBaselines
+        const snapshot = new Map<RecordMutationEvent[], number>()
+        if (!baselines?.size) return snapshot
+        for (const [events] of baselines) {
+            // Prefer live length at savepoint time so prior successful attempt effects stick.
+            snapshot.set(events, events.length)
+        }
+        return snapshot
+    }
+    private restoreEventArraySnapshot(snapshot: Map<RecordMutationEvent[], number> | undefined) {
+        const context = this.getActiveTransactionContext()
+        const baselines = context?.eventArrayBaselines
+        if (!baselines) return
+        // Arrays known at savepoint: restore length.
+        if (snapshot) {
+            for (const [events, length] of snapshot) {
+                events.length = length
+                baselines.set(events, length)
+            }
+        }
+        // Arrays first seen during the failed attempt: drop to empty and forget.
+        for (const [events] of [...baselines.entries()]) {
+            if (snapshot && snapshot.has(events)) continue
+            events.length = 0
+            baselines.delete(events)
+        }
+    }
+    async createSavepoint(name: string): Promise<void> {
+        this.requireTransaction(`createSavepoint ${name}`)
+        this.assertSavepointName(name)
+        this.savepointEventSnapshots.set(name, this.snapshotEventArrayLengths())
+        await this.db.scheme(`SAVEPOINT ${name}`, `savepoint ${name}`)
+    }
+    async releaseSavepoint(name: string): Promise<void> {
+        this.requireTransaction(`releaseSavepoint ${name}`)
+        this.assertSavepointName(name)
+        await this.db.scheme(`RELEASE SAVEPOINT ${name}`, `release savepoint ${name}`)
+        // Successful attempt: advance sticky baselines to current lengths so a later
+        // failed attempt cannot truncate these effects back to the pre-success size.
+        const context = this.getActiveTransactionContext()
+        const baselines = context?.eventArrayBaselines
+        if (baselines?.size) {
+            for (const [events] of baselines) {
+                baselines.set(events, events.length)
+            }
+        }
+        this.savepointEventSnapshots.delete(name)
+    }
+    async rollbackToSavepoint(name: string): Promise<void> {
+        this.requireTransaction(`rollbackToSavepoint ${name}`)
+        this.assertSavepointName(name)
+        const snapshot = this.savepointEventSnapshots.get(name)
+        try {
+            await this.db.scheme(`ROLLBACK TO SAVEPOINT ${name}`, `rollback to savepoint ${name}`)
+        } finally {
+            // Always restore memory event arrays even if the connection is already dead
+            // (connection-fatal path still must not leave phantom effects registered).
+            this.restoreEventArraySnapshot(snapshot)
+            this.savepointEventSnapshots.delete(name)
+        }
+    }
     async runInTransaction<T>(options: TransactionOptions, fn: () => Promise<T>): Promise<T> {
         const isolation = options.isolation ?? 'READ COMMITTED'
         const capability = this.getTransactionCapability()
@@ -240,9 +328,6 @@ class MonoStorage implements Storage{
     }
     // 串行化 concurrentTransactions: 'unsupported' 驱动上的顶层事务。
     private transactionQueue: Promise<unknown> = Promise.resolve()
-    private isInTransaction() {
-        return (this.getActiveTransactionContext()?.depth ?? 0) > 0
-    }
     private requireTransaction(operation: string) {
         if (!this.isInTransaction()) {
             throw new Error(`${operation} requires an active transaction`)

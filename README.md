@@ -76,7 +76,7 @@ Use these hooks with the transaction boundary in mind:
 | `postCommit` | Runs after commit. Use it for external IO, notifications, outbox enqueueing, or non-critical response context. |
 | `RecordMutationSideEffect` | Runs after commit for committed mutation events. Failure is reported in `sideEffects`. |
 
-Nested `controller.dispatch()` calls are rejected inside a dispatch transaction with `NestedDispatchError`. Dispatching again from `postCommit` or a record mutation side effect is allowed because it starts a new transaction boundary.
+Nested `controller.dispatch()` calls are rejected inside a dispatch call stack with `NestedDispatchError`. Sequential dispatches that must share one atomic boundary with prior storage writes belong in `controller.runInBusinessTransaction` (each dispatch attempt uses a SAVEPOINT; post-commit side effects flush only after the business transaction commits). Dispatching again from `postCommit` or a record mutation side effect is allowed because it starts a new transaction boundary.
 
 Database drivers declare their transaction support through `getTransactionCapability()`:
 
