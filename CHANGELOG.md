@@ -1,3 +1,12 @@
+
+
+## [4.5.0](https://github.com/InteraqtDev/interaqt/compare/v4.4.0...v4.5.0) (2026-08-10)
+
+
+### Features
+
+* single logical id identity with optional create-time ids ([fcfe2b9](https://github.com/InteraqtDev/interaqt/commit/fcfe2b9ce4d1182bdee08bf5ba1a54ad7a673b14))
+
 # Changelog
 
 ## [4.4.0](https://github.com/interaqtdev/interaqt/compare/v4.3.0...v4.4.0) (2026-07-17)
