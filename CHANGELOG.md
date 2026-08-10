@@ -1,15 +1,70 @@
 
 
+# Changelog
+
 ## [4.6.0](https://github.com/InteraqtDev/interaqt/compare/v4.5.0...v4.6.0) (2026-08-10)
+
+Empty accidental release produced by a double `release-it` invocation. **No product
+code changes relative to 4.5.0.** Prefer `4.5.0` for the identity work below, or any
+later non-empty release. The npm package `interaqt@4.6.0` is deprecated.
 
 ## [4.5.0](https://github.com/InteraqtDev/interaqt/compare/v4.4.0...v4.5.0) (2026-08-10)
 
+Entity identity consistency: logical `id` is the single application identity and Relation
+reference key. Design and audit record:
+`docs/entity-identity-and-relations/`.
 
 ### Features
 
-* single logical id identity with optional create-time ids ([fcfe2b9](https://github.com/InteraqtDev/interaqt/commit/fcfe2b9ce4d1182bdee08bf5ba1a54ad7a673b14))
+* **runtime/storage:** single logical-id identity with optional create-time ids
+  ([fcfe2b9](https://github.com/InteraqtDev/interaqt/commit/fcfe2b9ce4d1182bdee08bf5ba1a54ad7a673b14))
+  * Framework UNIQUE INDEX on each non-filtered entity/relation physical `idField`
+    (hashed column name, not literal `"id"`; one index per base record on combined tables),
+    emitted via `createUniqueIndexSQL` outside the user `UniqueConstraint` pipeline so MySQL
+    (`constraints.unique === false` for user TEXT attributes) still gets fail-loud identity
+    uniqueness. Setup re-entry treats “index already exists” as success.
+  * `storage.create` may omit `id` (framework allocation) or supply a driver-compatible unique
+    id; integer drivers advance the sequence on external ids (`noteAllocatedId`) so subsequent
+    auto ids cannot collide in-process.
+  * `storage.update` / `Controller.applyResultPatch` strip top-level `id` — logical identity is
+    immutable after create (match / `affectedId` only).
+  * Transform callbacks may return a top-level `id` on **insert** (event-based and data-based).
+    Duplicate logical ids fail loud via the unique index. Update patches never rewrite identity.
+    The former hard ban (`assertNoIdInTransformedRecord` / r13 “must throw on top-level id”) is
+    replaced by uniqueness + strip-on-update. Natural `callback: (r) => ({...r})` that collides
+    with an existing target id fails; if the id is free, the derived row shares that id value
+    (document strip/`id: _` when independent identity is required).
+  * Knowledge base and `AGENTS.md` no longer teach “never hand-write / return id”; create-optional
+    / update-immutable / Relation `{ id }` is the documented model. Optional `clientId` parallel
+    columns are no longer the recommended identity pattern.
 
-# Changelog
+* **drivers:** PGLite and PostgreSQL map `type: 'timestamp'` to **`TIMESTAMPTZ`** so epoch-ms
+  round-trips stay stable under non-UTC host timezones. Plain `TIMESTAMP` stored UTC wall-clock
+  components then re-read in the process local zone (reproduced as an 8h shift on UTC+8).
+  SQLite remains integer epoch ms. MySQL mapping unchanged in this release.
+
+### Behavior changes (upgrade notes)
+
+* **Duplicate logical ids now fail at write time** wherever a framework id UNIQUE INDEX exists.
+  Databases that already contain duplicate non-null logical ids will fail setup/migration when
+  the index is created — clean duplicates before upgrading.
+* **Transform callbacks may include top-level `id` on insert.** Code that relied on a
+  `ComputationError` for any returned `id` must switch to uniqueness / intentional strip.
+  Update-path `id` in patch data is ignored (row id unchanged), not rejected with the old error.
+* **Update payloads cannot change logical `id`.** Previously `storage.update(..., { id: other })`
+  could rewrite the column while returning the old id; the value is now pinned to the matched row.
+* **PostgreSQL / PGLite new schemas** create timestamp columns as `TIMESTAMPTZ`. Existing
+  databases keep prior column types until migrated; applications that depended on session-local
+  `TIMESTAMP` wall-clock semantics should treat values as absolute instants (epoch ms in JS).
+* **MySQL user `UniqueConstraint`** remains unsupported (`unique: false`); only the framework
+  logical-id index is added on the INT id column. Dispatch still requires transactions (unchanged).
+
+### Tests
+
+* `tests/runtime/entityIdentity.spec.ts` — storage invariants, Transform/applyResultPatch rules,
+  pregenerated id × Relation × `computeTarget`, setup idempotency, optional real PG/MySQL pins.
+* r13 F-3 adjusted to uniqueness collision + legal id insert + strip positive control.
+* Timestamp TIMESTAMPTZ physical-type pin under L-7 leftovers.
 
 ## [4.4.0](https://github.com/interaqtdev/interaqt/compare/v4.3.0...v4.4.0) (2026-07-17)
 
