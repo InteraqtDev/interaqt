@@ -1,5 +1,12 @@
 
 
+## [4.8.0](https://github.com/InteraqtDev/interaqt/compare/v4.7.0...v4.8.0) (2026-08-11)
+
+
+### Features
+
+* **core/storage:** explicit property type extension via definePropertyType ([cb48c07](https://github.com/InteraqtDev/interaqt/commit/cb48c0731d782afdbfb07ed02f0b2a7378455324))
+
 ## [4.7.0](https://github.com/InteraqtDev/interaqt/compare/v4.6.0...v4.7.0) (2026-08-11)
 
 
