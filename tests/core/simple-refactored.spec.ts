@@ -88,19 +88,26 @@ describe("Simple Objects Refactored - compatibility test", () => {
     });
 
     test("should create dictionary with all properties", () => {
+      // Builtin Dictionary types no longer accept args (aligned with Property;
+      // extended types apply only to Property columns — see propertyTypeExtension).
       const dict = Dictionary.create({
         name: "UserSettings",
         type: "string",
         collection: true,
-        args: { maxItems: 10 },
         defaultValue: () => "default"
       });
 
       expect(dict.name).toBe("UserSettings");
       expect(dict.type).toBe("string");
       expect(dict.collection).toBe(true);
-      expect(dict.args).toEqual({ maxItems: 10 });
       expect(dict.defaultValue).toBeDefined();
+      expect(() =>
+        Dictionary.create({
+          name: "UserSettingsArgs",
+          type: "string",
+          args: { maxItems: 10 },
+        })
+      ).toThrow(/builtin type "string" with args/);
     });
 
     test("should stringify and parse dictionary", () => {

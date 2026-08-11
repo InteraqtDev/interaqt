@@ -144,12 +144,15 @@ Property.create(config: PropertyConfig): PropertyInstance
 ```
 
 **Parameters**
-- `config.name` (string, required): Property name, must be 1-5 characters long
-- `config.type` (string, required): Property type, options: 'string' | 'number' | 'boolean'
+- `config.name` (string, required): Property name (letters, numbers, underscore)
+- `config.type` (string, required): Builtin `'string' | 'number' | 'boolean' | 'timestamp' | 'object' | 'id'` (plus `'json'` alias), or an extended name registered via `definePropertyType` **before** this create call
 - `config.collection` (boolean, optional): Whether it's a collection type
+- `config.args` (object, optional): Extended-type parameters only; builtins must omit
 - `config.defaultValue` (function, optional): Default value function
 - `config.computed` (function, optional): Computed property function
 - `config.computation` (Computation, optional): Property computed data
+
+**Do not** invent raw SQL type strings as `type` (e.g. `'vector'`, `'varchar(255)'`) without `definePropertyType`. Drivers no longer passthrough unknown types into DDL. Extended Match operators are never free — register each under `storage.<dialect>.match`. Dictionary and PayloadItem do not accept extended property types.
 
 **⚠️ IMPORTANT: Timestamp Properties**
 When creating timestamp properties with `defaultValue`, **always convert milliseconds to seconds** using `Math.floor(Date.now()/1000)`:
@@ -2113,9 +2116,9 @@ Dictionary.create(config: DictionaryConfig): DictionaryInstance
 
 **Parameters**
 - `config.name` (string, required): Dictionary name
-- `config.type` (string, required): Value type, must be one of PropertyTypes (e.g., 'string', 'number', 'boolean', 'object', etc.)
+- `config.type` (string, required): Builtin only (`string`/`number`/`boolean`/`timestamp`/`object`/`id`/`json`). Extended `definePropertyType` names are rejected — Dictionary storage is fixed JSON KV, not plugin columns.
 - `config.collection` (boolean, required): Whether it's a collection type, defaults to false
-- `config.args` (object, optional): Type-specific arguments (e.g., string length, number range)
+- `config.args` (object, optional): Omit for builtins (create rejects builtin args)
 - `config.defaultValue` (function, optional): Default value generator function
 - `config.computation` (Computation, optional): Reactive computation for the dictionary value
 

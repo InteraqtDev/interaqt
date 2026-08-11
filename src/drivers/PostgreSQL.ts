@@ -465,21 +465,30 @@ CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" (
             return 'INT'
         } else if (collection || type === 'object') {
             return 'JSON'
+        } else if (type === 'json') {
+            // CAUTION 现网字符串钉死为小写 json（与 object 的大写 JSON 不同；r25 方言自洽）。
+            //  扩展类型不得进入本函数。
+            return 'json'
         } else if (type === 'string') {
             return 'TEXT'
         } else if (type === 'boolean') {
             return 'BOOLEAN'
-        } else if(type === 'number'){
+        } else if (type === 'number') {
             // CAUTION JS 的 number 是双精度浮点。映射成 INT 会让合法的小数值
             //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
             return "DOUBLE PRECISION"
-        }else if(type === 'timestamp'){
+        } else if (type === 'timestamp') {
             // Same contract as PGLite: absolute instant, not session-local TIMESTAMP wall clock.
             // node-pg Date→TIMESTAMP uses process-local components; ISO/ms paths and mixed clients
             // then disagree on the stored instant. TIMESTAMPTZ keeps JS epoch-ms stable in any TZ.
             return "TIMESTAMPTZ"
-        }else{
-            return type
+        } else {
+            throw new Error(
+                `PostgreSQLDB.mapToDBFieldType: unknown type "${type}". ` +
+                `Builtin logical types are string, number, boolean, timestamp, object, id, json (plus internal pk). ` +
+                `Extended column types must be registered with definePropertyType and resolved via Setup resolveFieldType — ` +
+                `unknown strings are no longer passed through as SQL types.`
+            )
         }
     }
 }

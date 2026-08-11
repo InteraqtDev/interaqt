@@ -67,6 +67,39 @@ Property.create({
 });
 ```
 
+### ❌ Treating raw SQL / plugin type strings as Property.type
+
+```typescript
+// ❌ WRONG: unknown type strings are rejected at Property.create.
+// Drivers no longer silently paste unknown types into DDL.
+Property.create({ name: 'embedding', type: 'vector' })
+Property.create({ name: 'title', type: 'varchar(255)' })
+
+// ❌ WRONG: Dictionary is not a native column — extended names are rejected.
+Dictionary.create({ name: 'embedding', type: 'vector' })
+
+// ❌ WRONG: PayloadItem has its own whitelist; definePropertyType does not widen it.
+PayloadItem.create({ name: 'embedding', type: 'vector' })
+
+// ✅ CORRECT: register then declare on a Property column
+import { definePropertyType, Property } from 'interaqt'
+definePropertyType({
+  name: 'vector',
+  validateArgs(args) { /* require dimensions */ },
+  storage: {
+    postgres: {
+      fieldType: (ctx) => `vector(${(ctx.args as { dimensions: number }).dimensions})`,
+      // match: { ... }  // operators are NOT free — register each one you need
+    }
+  }
+})
+Property.create({ name: 'embedding', type: 'vector', args: { dimensions: 1536 } })
+```
+
+Having a physical column does **not** enable Match operators. Unregistered `=`,
+`in`, `contains`, etc. fail at Match compile time until declared under
+`storage.<dialect>.match`.
+
 ### ❌ Declaring Reserved Property Names
 
 ```javascript

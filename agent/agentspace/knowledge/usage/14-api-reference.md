@@ -53,12 +53,15 @@ Property.create(config: PropertyConfig): KlassInstance<typeof Property>
 ```
 
 **Parameters**
-- `config.name` (string, required): Property name, must be 1-5 characters long
-- `config.type` (string, required): Property type, options: 'string' | 'number' | 'boolean'
+- `config.name` (string, required): Property name (letters, numbers, underscore)
+- `config.type` (string, required): Logical type. Built-ins: `'string' | 'number' | 'boolean' | 'timestamp' | 'object' | 'id'` (plus `'json'` as an alias of `object`). Extended names are accepted only after `definePropertyType({ name })` in the same process.
 - `config.collection` (boolean, optional): Whether it's a collection type
+- `config.args` (object, optional): Type parameters for **extended** types only (e.g. vector dimensions). Built-in types must omit `args`.
 - `config.defaultValue` (function, optional): Default value function
 - `config.computed` (function, optional): Computed property function
 - `config.computation` (Computation, optional): Property computed data
+
+**Extended types:** call `definePropertyType` before create. Physical DDL/codec/Match apply only to Entity/Relation property columns. See usage `02-define-entities-properties.md`.
 
 **Examples**
 ```typescript
@@ -93,6 +96,54 @@ const postCount = Property.create({
         record: UserPostRelation
     })
 })
+```
+
+### definePropertyType()
+
+Register an extended logical property type and optional per-dialect storage. Must run before any `Property.create({ type: extendedName })`.
+
+**Syntax**
+```typescript
+definePropertyType(def: DefinePropertyTypeInput): void
+```
+
+**Parameters (`def`)**
+- `name` (string, required): Extended logical type name (must not collide with builtins or `pk`)
+- `validateArgs` (function, optional): Called from `Property.create` with declaration `args` (may be `undefined`)
+- `storage` (object, optional): Map of dialect → storage entry (`postgres` | `sqlite` | `mysql`)
+  - `fieldType` (string | `(ctx) => string`, required per dialect entry): physical DDL type
+  - `toDB` / `fromDB` (optional, both or neither): write/read codecs
+  - `match` (optional): map of operator → compiler; **no operators are inherited by default**
+
+**Notes**
+- Registration is all-or-nothing: failed validation leaves no logical or physical residue.
+- Duplicate registration of the same name is rejected.
+- Applies to Entity/Relation **Property** columns only — not Dictionary, not PayloadItem.
+- Test suites may call `resetPropertyTypeRegistryForTests()` between cases.
+
+**Example**
+```typescript
+import { definePropertyType, Property } from 'interaqt'
+
+definePropertyType({
+  name: 'vector',
+  validateArgs(args) {
+    const d = (args as { dimensions?: unknown } | undefined)?.dimensions
+    if (typeof d !== 'number' || !Number.isInteger(d) || d <= 0) {
+      throw new Error('vector requires args.dimensions')
+    }
+  },
+  storage: {
+    postgres: {
+      fieldType: (ctx) => `vector(${(ctx.args as { dimensions: number }).dimensions})`,
+      match: {
+        // Operators are opt-in. Without this map, MatchExp '=' on the column fails at compile time.
+      }
+    }
+  }
+})
+
+Property.create({ name: 'embedding', type: 'vector', args: { dimensions: 1536 } })
 ```
 
 ### Relation.create()
@@ -843,9 +894,9 @@ Dictionary.create(config: DictionaryConfig): KlassInstance<typeof Dictionary>
 
 **Parameters**
 - `config.name` (string, required): Dictionary name
-- `config.type` (string, required): Value type, must be one of PropertyTypes (e.g., 'string', 'number', 'boolean', 'object', etc.)
+- `config.type` (string, required): Builtin logical type only: `'string' | 'number' | 'boolean' | 'timestamp' | 'object' | 'id'` (plus `'json'` alias). Extended names from `definePropertyType` are rejected — Dictionary values are stored in the fixed `_Dictionary_` JSON KV table, not native plugin columns.
 - `config.collection` (boolean, required): Whether it's a collection type, defaults to false
-- `config.args` (object, optional): Type-specific arguments (e.g., string length, number range)
+- `config.args` (object, optional): **Not accepted for builtin types** (create rejects them). Reserved historically; omit on new declarations.
 - `config.defaultValue` (function, optional): Default value generator function
 - `config.computation` (Computation, optional): Reactive computation for the dictionary value
 

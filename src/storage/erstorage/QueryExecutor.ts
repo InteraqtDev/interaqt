@@ -1,5 +1,5 @@
 import { Database } from "@runtime"
-import { EntityToTableMap } from "./EntityToTableMap.js"
+import { EntityToTableMap, ValueAttribute } from "./EntityToTableMap.js"
 import { SQLBuilder } from "./SQLBuilder.js"
 import { RecordQuery, RecordQueryTree, LINK_SYMBOL } from "./RecordQuery.js"
 import { Modifier } from "./Modifier.js"
@@ -8,6 +8,7 @@ import { RecursiveContext, ROOT_LABEL } from "./util/RecursiveContext.js"
 import { normalizeTimestampReadValue, setByPath, assert } from "../utils.js"
 import { AttributeQuery, AttributeQueryData, AttributeQueryDataRecordItem } from "./AttributeQuery.js"
 import { MatchExp } from "./MatchExp.js"
+import { applyExtendedPropertyTypeFromDB } from "../propertyTypeStorage.js"
 
 // 使用 RecordQueryAgent 中的 Record 类型定义
 import type { Record } from "./RecordQueryAgent.js"
@@ -89,22 +90,33 @@ export class QueryExecutor {
         //  导致同一 API 在不同 driver 下返回类型不一致：
         //  - JSON 字段：SQLite/MySQL 返回字符串，需要 JSON.parse
         //  - boolean 字段：SQLite/MySQL 以 0/1 数字存储，需要转回 boolean（PG/PGLite 是原生 BOOLEAN）
-        const valueTypeCache = new Map<string, string | undefined>()
-        const resolveValueType = (attributePath: string[]): string | undefined => {
+        //  - 扩展 Property：fromDB / opaque 优先于内置 json/boolean/timestamp 启发式
+        type ResolvedValueAttr = {
+            /** Builtin read kind: json | boolean | timestamp | other logical type */
+            readKind?: string
+            valueAttr?: ValueAttribute
+            parentRecordName?: string
+        }
+        const valueAttrCache = new Map<string, ResolvedValueAttr>()
+        const resolveValueAttr = (attributePath: string[]): ResolvedValueAttr => {
             const cacheKey = attributePath.join('.')
-            if (valueTypeCache.has(cacheKey)) return valueTypeCache.get(cacheKey)
-            let result: string | undefined
+            if (valueAttrCache.has(cacheKey)) return valueAttrCache.get(cacheKey)!
+            let result: ResolvedValueAttr = {}
             try {
                 const info = this.map.getInfoByPath([recordName, ...attributePath])
                 if (info && info.isValue) {
-                    const data = info.data as { collection?: boolean, type?: string }
-                    result = (!!data.collection || data.type === 'object' || data.type === 'json') ? 'json' : data.type
+                    const data = info.data as ValueAttribute
+                    const parentRecordName = info.parentEntityName
+                    const readKind = (!!data.collection || data.type === 'object' || data.type === 'json')
+                        ? 'json'
+                        : data.type
+                    result = { readKind, valueAttr: data, parentRecordName }
                 }
             } catch (e) {
                 // 无法解析的路径（例如别名等特殊字段）保持原样返回
-                result = undefined
+                result = {}
             }
-            valueTypeCache.set(cacheKey, result)
+            valueAttrCache.set(cacheKey, result)
             return result
         }
 
@@ -118,16 +130,29 @@ export class QueryExecutor {
             Object.entries(rawReturn).forEach(([key, value]) => {
                 // CAUTION 注意这里去掉了最开始的 entityName
                 const attributePath = fieldAliasMap.getPath(key)!.slice(1, Infinity)
-                const valueType = resolveValueType(attributePath)
-                if (!jsonAlreadyParsed && typeof value === 'string' && valueType === 'json') {
+                const { readKind, valueAttr, parentRecordName } = resolveValueAttr(attributePath)
+
+                // Extended Property columns first: never auto-JSON.parse; codec or opaque only.
+                const extended = applyExtendedPropertyTypeFromDB({
+                    type: valueAttr?.type,
+                    args: valueAttr?.args,
+                    collection: valueAttr?.collection,
+                    recordName: parentRecordName,
+                    propertyName: valueAttr?.name ?? attributePath[attributePath.length - 1],
+                    database: this.database,
+                    value,
+                })
+                if (extended.handled) {
+                    value = extended.value
+                } else if (!jsonAlreadyParsed && typeof value === 'string' && readKind === 'json') {
                     try {
                         value = JSON.parse(value)
                     } catch (e) {
                         throw new Error(`Failed to parse JSON field "${recordName}.${attributePath.join('.')}": ${e instanceof Error ? e.message : String(e)}. Raw value: ${(value as string).slice(0, 200)}`)
                     }
-                } else if (typeof value === 'number' && valueType === 'boolean') {
+                } else if (typeof value === 'number' && readKind === 'boolean') {
                     value = value !== 0
-                } else if (valueType === 'timestamp' && value !== null) {
+                } else if (readKind === 'timestamp' && value !== null) {
                     // r26：timestamp 读侧归一化为 epoch 毫秒（PG 系/MySQL 返回 Date、SQLite 返回 number）。
                     value = normalizeTimestampReadValue(value)
                 }

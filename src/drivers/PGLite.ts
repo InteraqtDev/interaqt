@@ -279,23 +279,32 @@ CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" (
             return 'UUID'
         } else if (collection || type === 'object') {
             return 'JSON'
+        } else if (type === 'json') {
+            // CAUTION 现网字符串钉死为小写 json（与 object 的大写 JSON 不同；r25 方言自洽）。
+            //  扩展类型不得进入本函数。
+            return 'json'
         } else if (type === 'string') {
             return 'TEXT'
         } else if (type === 'boolean') {
             return 'BOOL'
-        } else if(type === 'number'){
+        } else if (type === 'number') {
             // CAUTION JS 的 number 是双精度浮点。映射成 INT 会让合法的小数值
             //  （例如内置 Average 计算的结果 sum/count）在写入时直接报错。
             return "DOUBLE PRECISION"
-        }else if(type === 'timestamp'){
+        } else if (type === 'timestamp') {
             // TIMESTAMPTZ stores an absolute instant. Plain TIMESTAMP is session/local-wall-clock:
             // PGLite binds Date/ISO by UTC components into TIMESTAMP, then the JS client reinterprets
             // the wall clock in the process timezone — epoch-ms round-trip shifts by getTimezoneOffset()
             // (reproduced UTC+8: write Date.UTC(...) reads back −8h). SQLite keeps INT ms; PG family
             // must use timestamptz to honor the r26 epoch-ms contract under any host TZ.
             return "TIMESTAMPTZ"
-        }else{
-            return type
+        } else {
+            throw new Error(
+                `PGLiteDB.mapToDBFieldType: unknown type "${type}". ` +
+                `Builtin logical types are string, number, boolean, timestamp, object, id, json (plus internal pk). ` +
+                `Extended column types must be registered with definePropertyType and resolved via Setup resolveFieldType — ` +
+                `unknown strings are no longer passed through as SQL types.`
+            )
         }
     }
 }

@@ -1,32 +1,19 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { assertSynchronousFunctionArg } from './klassValidation.js';
+import {
+  ALLOWED_PROPERTY_TYPES,
+  formatBuiltinPropertyTypesForError,
+  isBuiltinPropertyType,
+  isExtendedPropertyType,
+  PropertyTypes,
+  type AllowedPropertyType,
+} from './propertyTypes.js';
 import type { ComputationInstance } from './types.js';
 
-export enum PropertyTypes {
-  String = 'string',
-  Number = 'number',
-  Boolean = 'boolean',
-  Timestamp = 'timestamp',
-  /** Structured JSON payload (maps to JSON/JSONB column). */
-  Object = 'object',
-  /** Relation endpoint / foreign-key style id column (maps to INT). */
-  Id = 'id',
-}
-
-/** Property / Dictionary `type` values accepted by create() and mapped by drivers. */
-export const ALLOWED_PROPERTY_TYPES = [
-  PropertyTypes.String,
-  PropertyTypes.Number,
-  PropertyTypes.Boolean,
-  PropertyTypes.Timestamp,
-  PropertyTypes.Object,
-  PropertyTypes.Id,
-  // Framework internals (async task tables) and some apps use 'json' as an alias of object.
-  'json',
-] as const
-
-export type AllowedPropertyType = (typeof ALLOWED_PROPERTY_TYPES)[number]
+// Re-export builtins so existing `import { PropertyTypes, ALLOWED_PROPERTY_TYPES } from './RealDictionary.js'` keeps working.
+export { ALLOWED_PROPERTY_TYPES, PropertyTypes }
+export type { AllowedPropertyType }
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -122,10 +109,27 @@ export class Dictionary implements DictionaryInstance {
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`Dictionary name "${args.name}" is invalid. Dictionary names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
     }
-    if (args.type !== undefined && !(ALLOWED_PROPERTY_TYPES as readonly string[]).includes(args.type)) {
+    // Dictionary 仅接受内置逻辑类型（决策 A）：扩展类型只用于 Entity/Relation Property 列；
+    //  物理上 Dictionary 值永远落在 _Dictionary_.value JSON，不解析 fieldType/codec。
+    if (args.type !== undefined && !isBuiltinPropertyType(args.type)) {
+      if (isExtendedPropertyType(args.type)) {
+        throw new Error(
+          `Dictionary "${args.name}" cannot use extended property type "${args.type}". ` +
+          `Extended property types apply only to Entity/Relation Property columns; ` +
+          `Dictionary values are stored in the shared JSON table _Dictionary_. ` +
+          formatBuiltinPropertyTypesForError()
+        );
+      }
       throw new Error(
         `Dictionary "${args.name}" has unsupported type "${args.type}". ` +
-        `Allowed types: ${ALLOWED_PROPERTY_TYPES.join(', ')}.`
+        formatBuiltinPropertyTypesForError()
+      );
+    }
+    // 与 Property 对齐：内置类型拒绝无意义 args（历史字段可省略）。
+    if (args.type !== undefined && isBuiltinPropertyType(args.type) && args.args !== undefined) {
+      throw new Error(
+        `Dictionary "${args.name}" uses builtin type "${args.type}" with args. ` +
+        `Builtin dictionary types do not accept args; omit args.`
       );
     }
     // 与 Property.defaultValue 同族（r31）：非函数 defaultValue 在部分消费点被静默忽略、

@@ -88,11 +88,9 @@ import { Dictionary } from 'interaqt';
 // Define system configuration dictionary
 const systemConfig = Dictionary.create({
   name: 'systemConfig',        // Dictionary name, globally unique
-  type: 'object',              // Data type
+  type: 'object',              // Builtin data type only
   collection: false,           // Whether it's a collection type
-  args: {                      // Type parameters (optional)
-    maxLength: 1000
-  }
+  // Do not pass args for builtin Dictionary types — they are rejected at create.
 });
 
 // Define total user count statistics
@@ -153,7 +151,27 @@ const dailyStats = Dictionary.create({
   type: 'object',
   collection: true
 });
+
+// timestamp / id / json alias also accepted as builtin Dictionary types when needed.
 ```
+
+**Dictionary `type` is not a physical column type.** Every dictionary value is
+stored in the fixed `_Dictionary_` table as JSON (`key` + `value.raw`). The
+declared `type` is logical metadata (create-time whitelist, migration signature,
+computation typing) — it never becomes a native SQL column and never runs through
+`definePropertyType` storage / codec / Match.
+
+Allowed Dictionary types are the **built-in property types only**:
+`string`, `number`, `boolean`, `timestamp`, `object`, `id`, and the `json` alias.
+Extended names registered with `definePropertyType` (for example `vector`) are
+**rejected** at `Dictionary.create` with an error that states extensions apply
+only to Entity/Relation Property columns.
+
+Builtin Dictionary declarations must **omit `args`**. Historical docs that showed
+`args: { maxLength: … }` on builtins are incorrect for the current create guards.
+
+See also: Property extensions in `02-define-entities-properties.md`, payload
+validation types in `07-payload-parameters.md` (a third, independent whitelist).
 
 ### 10.2.3 Dictionary Naming Conventions
 

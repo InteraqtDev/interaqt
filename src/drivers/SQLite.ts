@@ -275,21 +275,27 @@ CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" (
             return 'INTEGER PRIMARY KEY'
         } else if (type === 'id') {
             return 'INT'
-        } else if (collection || type === 'object'||type==='json') {
+        } else if (collection || type === 'object' || type === 'json') {
+            // json 与 object 现网均为大写 JSON（r25）；扩展类型不得进入本函数。
             return 'JSON'
         } else if (type === 'string') {
             return 'TEXT'
         } else if (type === 'boolean') {
             return 'INT(2)'
-        } else if(type === 'number'){
+        } else if (type === 'number') {
             // CAUTION SQLite 是动态类型（type affinity）：INT 亲和的列写入 2.5 仍原样存为 REAL，
             //  不会像 PG/MySQL 的 INT 那样报错或截断，所以 number 在 SQLite 上没有精度问题。
             //  保持 INT 声明是为了既有部署的 schema/manifest 兼容（改声明会触发迁移 diff）。
             return "INT"
-        }else if(type === 'timestamp'){
+        } else if (type === 'timestamp') {
             return "INT"
-        }else{
-            return type
+        } else {
+            throw new Error(
+                `SQLiteDB.mapToDBFieldType: unknown type "${type}". ` +
+                `Builtin logical types are string, number, boolean, timestamp, object, id, json (plus internal pk). ` +
+                `Extended column types must be registered with definePropertyType and resolved via Setup resolveFieldType — ` +
+                `unknown strings are no longer passed through as SQL types.`
+            )
         }
     }
 }

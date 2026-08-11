@@ -417,6 +417,12 @@ export type MigrationManifest = {
             type: string;
             collection: boolean;
             computed: boolean;
+            /**
+             * Extended Property type parameters (e.g. vector dimensions).
+             * Present only when Property.args !== undefined; participates in
+             * modelHash and property change detection so args drift is never silent.
+             */
+            args?: object;
         }>;
         /**
          * Entity retention declaration (absent / forever / cap / ttl).
@@ -441,6 +447,11 @@ export type MigrationManifest = {
         type: string;
         collection: boolean;
         computed: boolean;
+        /**
+         * Dictionary declaration args (metadata only — Dictionary remains JSON KV).
+         * Present only when Dictionary.args !== undefined; logical signature only.
+         */
+        args?: object;
     }>;
     computations: ComputationManifest[];
     sequences: ScopedSequenceDeclarationManifest[];
@@ -974,6 +985,22 @@ function createComputationManifest(computation: Computation, includeFunctionText
     };
 }
 
+/**
+ * Property/Dictionary.args for migration logical signatures.
+ * Omitted when undefined so absent vs present stays distinguishable via key presence
+ * (stableStringify already drops undefined-valued keys).
+ * Deep-stable comparison uses isEqualValue / stableStringify elsewhere.
+ */
+function migrationDeclarationArgs(args: unknown): object | undefined {
+    if (args === undefined) return undefined;
+    // Callers only pass plain objects from Klass create; still reject non-objects
+    // so accidental functions never enter modelHash.
+    if (args === null || typeof args !== 'object' || Array.isArray(args)) {
+        throw new MigrationError(`Migration declaration args must be a plain object when present`);
+    }
+    return args as object;
+}
+
 export function createMigrationManifest(controller: Controller, storageSchema: StorageSchemaMetadata = controller.system.storage.schema, options: { includeFunctionText?: boolean } = {}): MigrationManifest {
     const records = [
         ...controller.entities.map(entity => {
@@ -985,6 +1012,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
             kind: "entity" as const,
             properties: (entity.properties || []).map(property => {
                 const propertyIdentity = createIdentity("property", `property:${entity.name}.${property.name}`, property.uuid);
+                const args = migrationDeclarationArgs((property as { args?: unknown }).args);
                 return ({
                 id: identityKey(propertyIdentity),
                 identity: propertyIdentity,
@@ -992,6 +1020,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
                 type: property.type,
                 collection: property.collection === true,
                 computed: !!property.computation,
+                ...(args !== undefined ? { args } : {}),
             });
             }),
             // Minimal signature extension: retention policy is part of the entity declaration.
@@ -1009,6 +1038,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
             kind: "relation" as const,
             properties: (relation.properties || []).map(property => {
                 const propertyIdentity = createIdentity("property", `property:${relation.name}.${property.name}`, property.uuid);
+                const args = migrationDeclarationArgs((property as { args?: unknown }).args);
                 return ({
                 id: identityKey(propertyIdentity),
                 identity: propertyIdentity,
@@ -1016,6 +1046,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
                 type: property.type,
                 collection: property.collection === true,
                 computed: !!property.computation,
+                ...(args !== undefined ? { args } : {}),
             });
             }),
         });
@@ -1036,6 +1067,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
     });
     const dictionaries = controller.dict.map(dictionary => {
         const identity = createIdentity("dictionary", `dictionary:${dictionary.name}`, dictionary.uuid);
+        const args = migrationDeclarationArgs((dictionary as { args?: unknown }).args);
         return {
             id: identityKey(identity),
             identity,
@@ -1043,6 +1075,7 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
             type: dictionary.type,
             collection: dictionary.collection === true,
             computed: !!dictionary.computation,
+            ...(args !== undefined ? { args } : {}),
         };
     });
     const computations = Array.from(controller.scheduler.computationsHandles.values())
@@ -1587,14 +1620,15 @@ export function buildMigrationDiff(
                 oldProperty.name !== property.name ||
                 oldProperty.type !== property.type ||
                 oldProperty.collection !== property.collection ||
-                oldProperty.computed !== property.computed
+                oldProperty.computed !== property.computed ||
+                !isEqualValue(oldProperty.args, property.args)
             ) {
                 changes.push({
                     kind: "property",
                     id: property.id,
                     changeType: "changed",
                     dataContext: `property:${record.name}.${property.name}`,
-                    reason: "property name, type, collection, or computed flag changed",
+                    reason: "property name, type, collection, computed flag, or args changed",
                 });
             }
         }
@@ -1659,9 +1693,14 @@ export function buildMigrationDiff(
         if (!old) {
             changeType = "added";
             reason = "dictionary was added";
-        } else if (old.type !== dictionary.type || old.collection !== dictionary.collection || old.computed !== dictionary.computed) {
+        } else if (
+            old.type !== dictionary.type ||
+            old.collection !== dictionary.collection ||
+            old.computed !== dictionary.computed ||
+            !isEqualValue(old.args, dictionary.args)
+        ) {
             changeType = "changed";
-            reason = "dictionary type, collection, or computed flag changed";
+            reason = "dictionary type, collection, computed flag, or args changed";
         }
         if (changeType !== "unchanged") {
             changes.push({

@@ -37,9 +37,20 @@ const obj = Entity.create({ name: 'obj' });
 
 ## Defining Property Types
 
-### Basic Types
+Property `type` is a **closed built-in set** plus optional **explicit extensions**.
+Unknown strings (including database plugin names such as `vector`) are rejected at
+`Property.create` — they are never silently pasted into DDL.
 
-The framework supports multiple basic data types:
+### Built-in types
+
+| Logical `type` | Typical column role |
+|----------------|---------------------|
+| `string` | Text |
+| `number` | Numeric |
+| `boolean` | Boolean |
+| `timestamp` | Dialect timestamp binding (epoch-ms at the application boundary) |
+| `object` | Structured JSON (`json` is an accepted alias of `object`) |
+| `id` | Relation-endpoint / foreign-key style id column |
 
 ```javascript
 const Product = Entity.create({
@@ -48,27 +59,28 @@ const Product = Entity.create({
     Property.create({ name: 'title', type: 'string' }),
     Property.create({ name: 'price', type: 'number' }),
     Property.create({ name: 'isActive', type: 'boolean' }),
-    Property.create({ name: 'createdAt', type: 'string' }) // Can store ISO date strings
+    Property.create({ name: 'createdAt', type: 'timestamp' }),
+    Property.create({ name: 'createdAtIso', type: 'string' }) // ISO strings if you prefer text
   ]
 });
 ```
 
-### JSON Type
+### JSON / object type
 
-For complex data structures, you can use JSON type:
+For structured payloads stored as JSON columns, use `object` (or the `json` alias):
 
 ```javascript
 const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({ name: 'name', type: 'string' }),
-    Property.create({ 
-      name: 'profile', 
-      type: 'object',  // JSON object
-      collection: false 
+    Property.create({
+      name: 'profile',
+      type: 'object',  // JSON object column
+      collection: false
     }),
-    Property.create({ 
-      name: 'tags', 
+    Property.create({
+      name: 'tags',
       type: 'string',
       collection: true  // Array of strings
     })
@@ -87,25 +99,91 @@ const userData = {
 };
 ```
 
-### Custom Types
+Nested application shapes (addresses, settings bags) are still `type: 'object'` —
+there is no separate “custom structural type” keyword. Model nested *entities*
+with Relation when they need identity and links.
 
-You can define custom complex types:
+### Extended property types (`definePropertyType`)
+
+Database plugin columns (for example PostgreSQL + pgvector) are **not** built-ins.
+Register a logical name with `definePropertyType` **before** any
+`Property.create({ type: thatName })`, then declare storage per dialect:
+
+```typescript
+import { definePropertyType, Property, Entity } from 'interaqt'
+
+// Side-effect registration — must run before Property.create uses this name.
+definePropertyType({
+  name: 'vector',
+  validateArgs(args) {
+    const d = (args as { dimensions?: unknown } | undefined)?.dimensions
+    if (typeof d !== 'number' || !Number.isInteger(d) || d <= 0) {
+      throw new Error('type "vector" requires args.dimensions as a positive integer')
+    }
+  },
+  storage: {
+    postgres: {
+      fieldType: (ctx) => `vector(${(ctx.args as { dimensions: number }).dimensions})`,
+      // Optional codecs; provide both or neither (opaque pass-through).
+      // toDB / fromDB / match — see below
+    },
+    // sqlite / mysql omitted → setup on those drivers fails with a dialect-binding error
+  }
+})
+
+const Document = Entity.create({
+  name: 'Document',
+  properties: [
+    Property.create({
+      name: 'embedding',
+      type: 'vector',
+      args: { dimensions: 1536 }
+    })
+  ]
+})
+```
+
+Contract summary:
+
+1. **Property columns only.** Extended types drive Entity/Relation property DDL,
+   write/read codecs, and optional Match compilers. They do **not** turn
+   `Dictionary` into a native column (Dictionary stays a fixed JSON key/value table —
+   see `11-global-dictionaries.md`).
+2. **Import order.** Call `definePropertyType` (or import an adapter that does)
+   before any `Property.create` that uses the extended name.
+3. **`args`.** Built-in types must omit `args`. Extended types may declare
+   `args` and validate them via `validateArgs`.
+4. **Dialect storage.** Each driver dialect you support needs
+   `storage.<postgres|sqlite|mysql>` with a non-empty `fieldType` string or
+   function. Missing dialect storage fails at setup with an actionable error.
+5. **Codecs.** Omit both `toDB` and `fromDB` for opaque pass-through; provide
+   both for a symmetric codec. One-sided registration is rejected.
+6. **Match is not free.** Having a column does **not** enable `=`, `in`,
+   `contains`, or any other operator. Register each operator under
+   `storage.<dialect>.match` (see `12-data-querying.md`). Unregistered operators
+   fail at Match compile time.
+7. **No silent DDL passthrough.** Drivers no longer accept unknown logical types
+   as raw SQL type strings. Extensions must go through `definePropertyType` +
+   setup field-type resolution.
+
+Three separate type universes (do not mix them):
+
+| Surface | What `type` means | Extension path |
+|---------|-------------------|----------------|
+| `Property.create` | Logical column type (builtin ∪ registered) | `definePropertyType` |
+| `Dictionary.create` | Logical value metadata only (builtin **only**) | None — values live in `_Dictionary_.value` JSON |
+| `PayloadItem.create` | Runtime payload validation tags | None — separate whitelist (`string`/`number`/`boolean`/`object`/`Entity`/`Relation`) |
+
+### Structured object shapes (not extended types)
 
 ```javascript
-// Define address type
-const Address = {
-  street: 'string',
-  city: 'string',
-  country: 'string',
-  zipCode: 'string'
-};
-
+// Address is an application-level shape stored as JSON — still type: 'object'
 const User = Entity.create({
   name: 'User',
   properties: [
     Property.create({ name: 'name', type: 'string' }),
-    Property.create({ 
-      name: 'address', 
+    Property.create({
+      name: 'address',
       type: 'object',
       collection: false
     })

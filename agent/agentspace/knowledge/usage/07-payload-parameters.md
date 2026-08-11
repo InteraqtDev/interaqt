@@ -41,6 +41,13 @@ these require `base`). Any other string is rejected at declaration time: an unkn
 type has no runtime validation attached, so accepting it would silently skip all
 checks for that field. Item names must be unique within one `Payload`.
 
+This whitelist is **independent** of Property / Dictionary logical types. Payload
+does **not** accept `timestamp`, `json`, `id`, or names from `definePropertyType`
+(for example `vector`). Property column extensions never widen PayloadItem; use
+`object` / `Entity` / `Relation` (plus Conditions for content rules) for interaction
+inputs. See `02-define-entities-properties.md` for the Property extension path and
+`11-global-dictionaries.md` for Dictionary’s builtin-only rule.
+
 To validate payload **contents** (e.g. "only published posts can be shared"), write the check as a `Condition` on the Interaction — see [Payload Validation with Conditions](#payload-validation-with-conditions) below.
 
 ## Basic Payload Usage

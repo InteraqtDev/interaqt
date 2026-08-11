@@ -31,6 +31,7 @@ The storage layer is built around a few key concepts:
 - **Entities**: Represent your data models (like User, Product, etc.)
 - **Relations**: Represent relationships between entities (like one-to-many, many-to-many)
 - **Properties**: Define the attributes of entities or relations
+- **Extended property types**: Optional `definePropertyType` registrations that map a logical Property `type` to per-dialect `fieldType`, codecs, and Match compilers. Built-in types stay closed; unknown strings never passthrough into DDL. Dictionary values are **not** extended this way (fixed JSON KV).
 - **Queries**: Used to fetch or manipulate data using a semantic API
 
 ## Setting Up

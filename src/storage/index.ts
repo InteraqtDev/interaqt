@@ -16,5 +16,23 @@ export * from './erstorage/SchemaDialect.js'
 export * from './erstorage/SQLBuilder.js'
 export * from './erstorage/util/AliasManager.js'
 export * from './erstorage/util/RecursiveContext.js'
+export {
+    definePropertyType,
+    resetPropertyTypeRegistryForTests,
+    resolveFieldType,
+    resolvePropertyTypeStorage,
+    getPropertyTypeStorageMap,
+    applyExtendedPropertyTypeToDB,
+    applyExtendedPropertyTypeFromDB,
+    applyExtendedPropertyTypeMatch,
+} from './definePropertyType.js'
+export type {
+    DefinePropertyTypeInput,
+    PropertyTypeStorage,
+    PropertyTypeResolveContext,
+    PropertyTypeMatchCompiler,
+    ApplyPropertyTypeCodecInput,
+    ApplyPropertyTypeMatchInput,
+} from './definePropertyType.js'
 // json 列写入/比较的规范序列化（runtime 的 atomic 写路径与 storage 写路径共用同一实现）。
 export { canonicalJSONStringify, normalizeTimestampInputToMs, normalizeTimestampReadValue, timestampParamForDialect } from './utils.js'

@@ -9,6 +9,7 @@ import { BoolExp } from "@core";
 import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
 import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, getSchemaDialect, shouldSkipConstraintForDialect } from "./SchemaDialect.js";
+import { resolveFieldType } from "../propertyTypeStorage.js";
 
 // Define the types we need
 
@@ -263,8 +264,16 @@ export class DBSetup {
                     type: prop.type,
                     computed: prop.computed as ((record: any) => any) | undefined,
                     collection: prop.collection,
+                    args: prop.args,
                     defaultValue: prop.defaultValue as (() => any) | undefined,
-                    fieldType: this.database!.mapToDBFieldType(prop.type, prop.collection)
+                    fieldType: resolveFieldType({
+                        type: prop.type,
+                        collection: prop.collection,
+                        args: prop.args,
+                        database: this.database!,
+                        recordName: entity.name,
+                        propertyName: prop.name,
+                    })
                 }
             ];
         }));
@@ -274,11 +283,17 @@ export class DBSetup {
             assert(!attributes.source && !attributes.target, 'source and target is reserved name for relation attributes')
         }
 
-        // 自动补充
+        // 自动补充逻辑 id 列。type 为 'id'；createRecord 阶段的 fieldType 会被
+        // 后续 createTables 回填覆盖（与历史 mapToDBFieldType(prop.type) 一致）。
         attributes[ID_ATTR] = {
             name: ID_ATTR,
             type: 'id',
-            fieldType: this.database!.mapToDBFieldType('pk')
+            fieldType: resolveFieldType({
+                type: 'id',
+                database: this.database!,
+                recordName: entity.name,
+                propertyName: ID_ATTR,
+            })
         }
 
         // 使用递归方法收集所有依赖的 filtered entities。
@@ -335,8 +350,16 @@ export class DBSetup {
                     type: prop.type,
                     computed: prop.computed as ((record: any) => any) | undefined,
                     collection: prop.collection,
+                    args: prop.args,
                     defaultValue: prop.defaultValue as (() => any) | undefined,
-                    fieldType: this.database!.mapToDBFieldType(prop.type, prop.collection)
+                    fieldType: resolveFieldType({
+                        type: prop.type,
+                        collection: prop.collection,
+                        args: prop.args,
+                        database: this.database!,
+                        recordName: relation.name,
+                        propertyName: prop.name,
+                    })
                 }
             ];
         }));
@@ -1194,7 +1217,14 @@ export class DBSetup {
                     if ((attributeData as RecordAttribute).isRecord) return
                     const valueAttributeData = attributeData as ValueAttribute
                     valueAttributeData.field = this.generateShortFieldName(`${recordName}_${attributeName}`)
-                    valueAttributeData.fieldType = this.database!.mapToDBFieldType(valueAttributeData.type, valueAttributeData.collection)
+                    valueAttributeData.fieldType = resolveFieldType({
+                        type: valueAttributeData.type,
+                        collection: valueAttributeData.collection,
+                        args: valueAttributeData.args,
+                        database: this.database!,
+                        recordName,
+                        propertyName: attributeName,
+                    })
                 })
             }
         })
@@ -1234,18 +1264,46 @@ export class DBSetup {
             const targetAttribute = record.attributes.target as ValueAttribute
             if (!link.mergedTo ) {
                 sourceAttribute.field = this.generateShortFieldName(`${recordName}_source`)
-                sourceAttribute.fieldType = this.database!.mapToDBFieldType(sourceAttribute.type, false)
+                sourceAttribute.fieldType = resolveFieldType({
+                    type: sourceAttribute.type,
+                    collection: false,
+                    args: sourceAttribute.args,
+                    database: this.database!,
+                    recordName,
+                    propertyName: 'source',
+                })
 
                 targetAttribute.field = this.generateShortFieldName(`${recordName}_target`)
-                targetAttribute.fieldType = this.database!.mapToDBFieldType(targetAttribute.type, false)
+                targetAttribute.fieldType = resolveFieldType({
+                    type: targetAttribute.type,
+                    collection: false,
+                    args: targetAttribute.args,
+                    database: this.database!,
+                    recordName,
+                    propertyName: 'target',
+                })
             } else if (link.mergedTo === 'source') {
                 // field 名字以 sourceRecord 里面的称呼为主
                 targetAttribute.field = this.generateShortFieldName(`${link.sourceRecord}_${link.sourceProperty}`)
-                targetAttribute.fieldType = this.database!.mapToDBFieldType(targetAttribute.type, false)
+                targetAttribute.fieldType = resolveFieldType({
+                    type: targetAttribute.type,
+                    collection: false,
+                    args: targetAttribute.args,
+                    database: this.database!,
+                    recordName,
+                    propertyName: 'target',
+                })
 
             } else if (link.mergedTo === 'target') {
                 sourceAttribute.field = this.generateShortFieldName(`${link.targetRecord}_${link.targetProperty}`)
-                sourceAttribute.fieldType = this.database!.mapToDBFieldType(sourceAttribute.type, false)
+                sourceAttribute.fieldType = resolveFieldType({
+                    type: sourceAttribute.type,
+                    collection: false,
+                    args: sourceAttribute.args,
+                    database: this.database!,
+                    recordName,
+                    propertyName: 'source',
+                })
 
             } else {
                 // combined 情况
@@ -1264,7 +1322,12 @@ export class DBSetup {
                     [ROW_ID_ATTR]: {
                         name: ROW_ID_ATTR,
                         type: 'pk',
-                        fieldType: this.database!.mapToDBFieldType('pk'),
+                        fieldType: resolveFieldType({
+                            type: 'pk',
+                            database: this.database!,
+                            recordName,
+                            propertyName: ROW_ID_ATTR,
+                        }),
                     }
                 }}
             }

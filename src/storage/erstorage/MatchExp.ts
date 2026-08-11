@@ -1,10 +1,11 @@
-import {BoolExp, BoolExpressionRawData, ExpressionData} from "@core";
+import {BoolExp, BoolExpressionRawData, ExpressionData, isExtendedPropertyType} from "@core";
 import {EntityToTableMap, RecordAttribute} from "./EntityToTableMap.js";
 import {assert, canonicalJSONStringify, normalizeTimestampInputToMs, timestampParamForDialect} from "../utils.js";
 import {getSchemaDialect} from "./SchemaDialect.js";
 import {LINK_SYMBOL, RecordQueryTree} from "./RecordQuery.js";
 import {Database} from "@runtime";
 import {PlaceholderGen} from "./SQLBuilder.js";
+import { applyExtendedPropertyTypeMatch } from "../propertyTypeStorage.js";
 
 // physicalRowMatch：内部行寻址标记（flashOut 行认领等）——combined 路径按「物理同住」匹配，
 //  不追加逻辑配对（link id 非空）守卫。公开查询面绝不设置该标记。
@@ -428,7 +429,47 @@ export class MatchExp {
         }
     }
 
-    getFinalFieldValue(isReferenceValue: boolean, key: string, value: [string, any], fieldName:string, fieldType: string|undefined, p: PlaceholderGen, db?: Database, valueType?: string, isResolvedFieldReference?: boolean): [string, unknown[]] {
+    getFinalFieldValue(
+        isReferenceValue: boolean,
+        key: string,
+        value: [string, any],
+        fieldName: string,
+        fieldType: string | undefined,
+        p: PlaceholderGen,
+        db?: Database,
+        valueType?: string,
+        isResolvedFieldReference?: boolean,
+        /** Extended Property type parameters (ValueAttribute.args). */
+        valueArgs?: object,
+        /** Owning record of the value attribute (for errors / resolveCtx). */
+        valueRecordName?: string,
+        /** Logical property name of the value attribute. */
+        valuePropertyName?: string,
+        /** ValueAttribute.collection — same resolveCtx surface as codec write/read. */
+        valueCollection?: boolean,
+    ): [string, unknown[]] {
+        // Extended Property columns: only explicitly registered match operators are legal.
+        // Unregistered ops (including default `=` / `in`) fail at compile time — having a
+        // column does not imply Match support. Must run before builtin simpleOp / json paths.
+        const extendedMatch = applyExtendedPropertyTypeMatch({
+            type: valueType,
+            args: valueArgs,
+            collection: valueCollection,
+            recordName: valueRecordName,
+            propertyName: valuePropertyName,
+            database: db,
+            key,
+            value: value as [string, unknown],
+            fieldName,
+            fieldType,
+            isReferenceValue,
+            getReferenceFieldValue: (v: string) => this.getReferenceFieldValue(v),
+            p,
+        })
+        if (extendedMatch.handled) {
+            return [extendedMatch.fieldValue, extendedMatch.fieldParams]
+        }
+
         // timestamp（r26）：匹配参数与写路径同一契约（Date|ms|ISO → 方言可绑定形态）。
         //  语义类型判定（SQLite 的 timestamp 列 fieldType 是 'INT'）。
         const prepareTimestampParam = (raw: unknown): unknown => {
@@ -692,9 +733,15 @@ export class MatchExp {
                 //  （PG json_array_elements_text / SQLite json_each / MySQL JSON_CONTAINS）。
                 //  用在非 collection 属性（如 type:'object'）上会在执行期抛出与用户写法无关的裸数据库错误
                 //  （"cannot call json_array_elements_text on a non-array"）。这里在编译期 fail-fast。
+                //  Extended Property types own their match operators: a registered (or deliberately
+                //  unregistered) "contains" must reach applyExtendedPropertyTypeMatch via
+                //  getFinalFieldValue. Do not let this builtin JSON-collection precheck preempt
+                //  the extension choke point (D4 / match-builtin-precheck-bypass).
+                const valueLogicType = (attributeInfo.data as { type?: string }).type
                 if (typeof exp.data.value?.[0] === 'string'
                     && exp.data.value[0].toLowerCase() === 'contains'
-                    && !attributeInfo.isCollection) {
+                    && !attributeInfo.isCollection
+                    && !(valueLogicType && isExtendedPropertyType(valueLogicType))) {
                     throw new Error(
                         `match operator 'contains' on key "${exp.data.key}" requires a collection property, ` +
                         `but "${this.entityName}.${exp.data.key}" is not declared with collection: true. ` +
@@ -708,7 +755,7 @@ export class MatchExp {
 
                 const buildValueAtom = (fieldNamePath: [string, string]): BoolExp<FieldMatchAtom> | FieldMatchAtom => {
                     if (!nullSplit) {
-                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type, exp.data.isResolvedFieldReference)
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key,  exp.data.value, fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type, exp.data.isResolvedFieldReference, (attributeInfo.data as { args?: object }).args, attributeInfo.parentEntityName, attributeInfo.attributeName, (attributeInfo.data as { collection?: boolean }).collection)
                         return {
                             ...exp.data,
                             fieldName: fieldNamePath,
@@ -718,7 +765,7 @@ export class MatchExp {
                     }
                     let combinedParts: BoolExp<FieldMatchAtom> | undefined
                     for (const partValue of nullSplit.parts) {
-                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type, exp.data.isResolvedFieldReference)
+                        const [fieldValue, fieldParams] = this.getFinalFieldValue(exp.data.isReferenceValue!, exp.data.key, partValue as [string, any], fieldNamePath.join('.'), attributeInfo.fieldType, p, db, (attributeInfo.data as { type?: string }).type, exp.data.isResolvedFieldReference, (attributeInfo.data as { args?: object }).args, attributeInfo.parentEntityName, attributeInfo.attributeName, (attributeInfo.data as { collection?: boolean }).collection)
                         const atomData = {
                             ...exp.data,
                             value: partValue,

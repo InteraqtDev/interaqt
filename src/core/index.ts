@@ -8,6 +8,7 @@ export { KlassByName } from './utils.js';
 
 // Core data model
 export * from "./Property.js";
+export * from "./propertyTypes.js";
 export * from "./Constraint.js";
 export * from "./Entity.js";
 export * from "./Relation.js";

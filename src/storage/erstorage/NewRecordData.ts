@@ -15,6 +15,13 @@ export type FieldAndValue = {
     // 语义类型（Property.type，如 'timestamp'/'boolean'）：fieldType 是 DB 列型（SQLite 的
     //  timestamp 列是 'INT'），写路径的类型归一化必须按语义类型判定。
     valueType?: string
+    /**
+     * Extended Property type parameters (Property.args), copied from ValueAttribute at Setup.
+     * Must travel with the row field: same-row merged relation properties are inserted under the
+     * parent entity recordName, so SQLBuilder cannot recover args by looking up the logical name
+     * on the insert target alone.
+     */
+    args?: object
 }
 
 /**
@@ -269,7 +276,8 @@ export class NewRecordData {
                 field: info.field!,
                 value,
                 fieldType: info.fieldType!,
-                valueType: (info.data as ValueAttribute).type
+                valueType: valueAttr.type,
+                args: valueAttr.args,
             })
             if (info.isComputed) {
                 updatedComputedFields.add(info.attributeName)
@@ -289,7 +297,8 @@ export class NewRecordData {
                         field: attr.field!,
                         value: defaultVal,
                         fieldType: attr.fieldType!,
-                        valueType: (attr.data as ValueAttribute).type
+                        valueType: valueAttr.type,
+                        args: valueAttr.args,
                     })
                 }
             }
@@ -301,12 +310,14 @@ export class NewRecordData {
             if (info.isComputed && !updatedComputedFields.has(info.attributeName)) {
                 const newValue = info.computed!(guardComputedInput(newRecord, info.attributeName))
                 if (newValue !== oldRecord[info.attributeName]) {
+                    const valueAttr = info.data as ValueAttribute
                     result.push({
                         name: info.attributeName,
                         field: info.field!,
                         value: newValue,
                         fieldType: info.fieldType!,
-                        valueType: (info.data as ValueAttribute).type
+                        valueType: valueAttr.type,
+                        args: valueAttr.args,
                     })
                 }
             }

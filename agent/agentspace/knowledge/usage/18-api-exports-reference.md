@@ -10,6 +10,14 @@ import {
   Entity,
   Property,
   UniqueConstraint,
+
+  // Property type extension (Entity/Relation columns only)
+  definePropertyType,
+  PropertyTypes,
+  ALLOWED_PROPERTY_TYPES,
+  // resetPropertyTypeRegistryForTests,  // test-only registry clear
+  // isAllowedPropertyType, isBuiltinPropertyType, isExtendedPropertyType,
+  // formatAllowedPropertyTypesForError, resolveFieldType, ...
   
   // Relation-related
   Relation,
@@ -90,6 +98,21 @@ import {
   KlassByName
   
 } from 'interaqt';
+
+
+### Property type extension exports
+
+Public from the main `interaqt` entry (also re-exported via `@storage` / `@core` path aliases in-repo):
+
+| Export | Role |
+|--------|------|
+| `definePropertyType` | Register logical extended type + optional per-dialect storage |
+| `PropertyTypes` / `ALLOWED_PROPERTY_TYPES` | Builtin logical type enum / list |
+| `resetPropertyTypeRegistryForTests` | Clear extension registries between tests |
+| `resolveFieldType` / `resolvePropertyTypeStorage` | Storage binding helpers (advanced / adapters) |
+| Types: `DefinePropertyTypeInput`, `PropertyTypeStorage`, `PropertyTypeResolveContext`, `PropertyTypeMatchCompiler`, `PropertyTypeDefinition`, … | TypeScript contracts |
+
+Extended types apply to **Property** columns only. Dictionary and PayloadItem keep separate, non-extensible type rules. Match operators on extended columns are opt-in. Drivers no longer accept unknown logical types as raw DDL strings.
 
 // Database drivers are a separate subpath entry (NOT exported from the main package):
 import {

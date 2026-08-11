@@ -2,12 +2,13 @@ import { Database } from "@runtime";
 import { BoolExp } from "@core";
 import { canonicalJSONStringify, normalizeTimestampInputToMs, timestampParamForDialect } from "../utils.js";
 import { getSchemaDialect } from "./SchemaDialect.js";
-import { EntityToTableMap } from "./EntityToTableMap.js";
+import { EntityToTableMap, ValueAttribute } from "./EntityToTableMap.js";
 import { FieldMatchAtom, MatchExp } from "./MatchExp.js";
 import { AttributeQuery } from "./AttributeQuery.js";
 import { RecordQuery, RecordQueryTree, LINK_SYMBOL } from "./RecordQuery.js";
 import { Modifier } from "./Modifier.js";
 import { FieldAliasMap } from "./util/FieldAliasMap.js";
+import { applyExtendedPropertyTypeToDB } from "../propertyTypeStorage.js";
 
 /**
  * JOIN 表信息
@@ -635,7 +636,7 @@ ${innerQuerySQL}
      */
     buildInsertSQL(
         recordName: string,
-        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string }>
+        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string, args?: object }>
     ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
@@ -646,7 +647,7 @@ INSERT INTO "${recordInfo.table}"
 VALUES
 (${fieldAndValues.map(() => p()).join(',')}) 
 `
-        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType, f.name || f.field))
+        const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType, f.name || f.field, recordName, f.args))
         
         return [sql, params]
     }
@@ -660,7 +661,7 @@ VALUES
     buildUpdateSQL(
         entityName: string,
         idRef: { id: string | number },
-        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string }>
+        columnAndValue: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string, args?: object }>
     ): [string, unknown[]] {
         if (!columnAndValue.length) {
             return ['', []]
@@ -674,7 +675,7 @@ UPDATE "${entityInfo.table}"
 SET ${columnAndValue.map(({ field }) => `"${field}" = ${p()}`).join(',')}
 WHERE "${entityInfo.idField}" = (${p()})
 `
-        const params = [...columnAndValue.map(({ field, name, value, fieldType, valueType }) => this.prepareFieldValue(value, fieldType, valueType, name || field)), idRef.id]
+        const params = [...columnAndValue.map(({ field, name, value, fieldType, valueType, args }) => this.prepareFieldValue(value, fieldType, valueType, name || field, entityName, args)), idRef.id]
         
         return [sql, params]
     }
@@ -729,7 +730,9 @@ WHERE "${recordInfo.idField}" = ${p()}
     }
     
     /**
-     * 准备字段值（处理 JSON 等特殊类型）。
+     * 准备字段值（处理扩展 codec / JSON / timestamp）。
+     * CAUTION 扩展逻辑类型优先于 fieldType 启发式：即使 fieldType 字符串碰巧含 json，
+     *  也不得误入内置 json 分支（设计 §3.8）。有 toDB 则编码；无 codec 则 opaque 透传。
      * CAUTION json 用规范序列化（键排序）：等值匹配的文本比较回退路径（MatchExp）
      *  依赖写入与匹配两侧的序列化一致，非规范形会让键序不同的等价对象匹配失败。
      * CAUTION thenable（Promise）字段值 fail-fast（r35c）：`create('X', {note: someAsync()})`
@@ -738,7 +741,7 @@ WHERE "${recordInfo.idField}" = ${p()}
      *  Promise 没有任何合法落库形态；带 then **函数**的 json 对象同样无法经 JSON 序列化
      *  存活（函数键被丢弃），拒绝严格优于静默丢数据。
      */
-    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string, field?: string): unknown {
+    prepareFieldValue(value: unknown, fieldType?: string, valueType?: string, field?: string, recordName?: string, args?: object): unknown {
         if (value && (typeof value === 'object' || typeof value === 'function') && typeof (value as { then?: unknown }).then === 'function') {
             throw new Error(
                 `field ${field ? `"${field}" ` : ''}received a Promise (thenable) as its value. ` +
@@ -746,6 +749,25 @@ WHERE "${recordInfo.idField}" = ${p()}
                 `Await the value before writing (a common cause is calling an async function in the payload or in defaultValue/computed without await).`
             )
         }
+
+        // Extended Property columns: codec / opaque before any builtin fieldType heuristic.
+        // Prefer row-carried args (FieldAndValue.args) over map lookup: merged same-row relation
+        // properties are written under the parent entity recordName while the logical attribute
+        // lives on the relation record (codec-args-lookup / D2).
+        const valueAttr = this.lookupValueAttribute(recordName, field)
+        const extended = applyExtendedPropertyTypeToDB({
+            type: valueType ?? valueAttr?.type,
+            args: args ?? valueAttr?.args,
+            collection: valueAttr?.collection,
+            recordName,
+            propertyName: valueAttr?.name ?? field,
+            database: this.database,
+            value,
+        })
+        if (extended.handled) {
+            return extended.value
+        }
+
         if (fieldType?.toLowerCase() === 'json') {
             return canonicalJSONStringify(value)
         }
@@ -757,6 +779,21 @@ WHERE "${recordInfo.idField}" = ${p()}
             return timestampParamForDialect(ms, getSchemaDialect(this.database).name)
         }
         return value
+    }
+
+    /**
+     * Resolve ValueAttribute by logical attribute name when available on the map.
+     * Fallback only: row FieldAndValue.args is authoritative for extended codecs when present.
+     */
+    private lookupValueAttribute(recordName?: string, attributeName?: string): ValueAttribute | undefined {
+        if (!recordName || !attributeName) return undefined
+        try {
+            const info = this.map.getInfo(recordName, attributeName)
+            if (!info.isValue) return undefined
+            return info.data as ValueAttribute
+        } catch {
+            return undefined
+        }
     }
 }
 

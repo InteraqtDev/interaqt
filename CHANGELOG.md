@@ -15,6 +15,17 @@
 
 ### Features
 
+* **core/storage:** explicit property type extension via `definePropertyType`.
+  Built-in logical types stay closed (`string`/`number`/`boolean`/`timestamp`/
+  `object`/`id` + `json` alias). Adapters register per-dialect `fieldType`,
+  optional symmetric `toDB`/`fromDB` codecs, and opt-in Match compilers.
+  Physical extension applies to Entity/Relation **Property** columns only;
+  `Dictionary.create` remains builtin-only (fixed `_Dictionary_` JSON KV);
+  `PayloadItem` keeps its independent payload whitelist.
+  Migration logical signatures include property/dictionary `args`.
+  Public exports: `definePropertyType`, `PropertyTypes`, `ALLOWED_PROPERTY_TYPES`,
+  `resetPropertyTypeRegistryForTests`, resolve/codec helpers and related types.
+
 * **runtime:** atomic contiguous sequence ranges via `storage.atomic.reserveSequenceRange`
   (`SequenceRange`); `nextSequenceValue` shares the same upsert kernel. Drivers with
   atomic sequence capability always ensure `_ScopedSequence_` at install and migration
@@ -30,6 +41,13 @@
 
 ### Docs
 
+* Usage/API guides document `definePropertyType`, Property vs Dictionary vs
+  PayloadItem type contracts, opt-in Match operators on extended columns, and the
+  removal of driver unknown-type DDL passthrough. See usage
+  `02-define-entities-properties.md`, `11-global-dictionaries.md`,
+  `07-payload-parameters.md`, `12-data-querying.md`, `14-api-reference.md`,
+  `18-api-exports-reference.md`, `19-common-anti-patterns.md`.
+
 * Usage and generator guides document `this.atomic.reserveSequenceRange`, `outcome`-based
   idempotent retry, and `maintainEntityRetention`. Removed dual Transform/Custom atomic
   access tables, multi-row `nextSequenceValue` loops, effects-scanning-as-replay, and
@@ -41,6 +59,14 @@ locks and `controller.runInBusinessTransaction` (product commit after 4.6.0;
 see usage `06-attributive-permissions.md` for the full FR-01/FR-02 contract).
 
 ### Breaking changes
+
+* **storage/drivers:** `Database.mapToDBFieldType` no longer passthrough-returns
+  unrecognized logical type strings into DDL. Unknown types throw. Applications
+  that previously relied on silent passthrough of plugin type names (for example
+  `type: 'vector'` before the r23 create whitelist, or internal callers that
+  bypassed create) **must** register via `definePropertyType` with per-dialect
+  `storage` and declare Property columns with that logical name. Builtin JSON
+  mapping strings are unchanged (pinned for migration hash stability).
 
 * **runtime:** `controller.dispatch` inside a **non-business-transaction** active
   storage transaction now throws `BusinessTransactionBoundaryError` with

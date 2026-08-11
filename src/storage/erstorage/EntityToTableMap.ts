@@ -12,6 +12,8 @@ export type ValueAttribute = {
     //entityType
     type: string,
     collection?: boolean,
+    /** Type parameters for extended property types; copied from Property.args at Setup. */
+    args?: object,
 
     // 没有的话就继承上面的
     table?: string,

@@ -138,6 +138,14 @@ const inMatch = MatchExp.atom({
 const notNullMatch = MatchExp.atom({ key: 'email', value: ['not', null] });
 ```
 
+The operators above apply to **built-in** property types (and relation paths over
+them). **Extended property types** registered with `definePropertyType` do **not**
+inherit `=`, `in`, `like`, `contains`, or any other operator by default. A native
+column is not automatically Matchable: each operator must be registered under
+`storage.<dialect>.match` on that type. Unregistered operators fail when the Match
+expression is compiled (before SQL runs). See
+`02-define-entities-properties.md` § Extended property types.
+
 ### 11.2.2 Logical Combinations (AND/OR)
 
 ```typescript

@@ -1,5 +1,11 @@
 import { IInstance, SerializedData, generateUUID } from './interfaces.js';
-import { ALLOWED_PROPERTY_TYPES } from './RealDictionary.js';
+import {
+  ALLOWED_PROPERTY_TYPES,
+  formatAllowedPropertyTypesForError,
+  getPropertyTypeDefinition,
+  isAllowedPropertyType,
+  isBuiltinPropertyType,
+} from './propertyTypes.js';
 import { stringifyInstance, decodeFunctionValues } from './utils.js';
 import { assertSynchronousFunctionArg } from './klassValidation.js';
 import type { ComputationInstance } from './types.js';
@@ -10,6 +16,8 @@ export interface PropertyInstance extends IInstance {
   name: string;
   type: string;
   collection?: boolean;
+  /** Type parameters for extended property types (e.g. vector dimensions). Builtins must omit. */
+  args?: object;
   defaultValue?: Function;
   computed?: Function;
   computation?: ComputationInstance;
@@ -19,6 +27,7 @@ export interface PropertyCreateArgs {
   name: string;
   type: string;
   collection?: boolean;
+  args?: object;
   defaultValue?: Function;
   computed?: Function;
   computation?: ComputationInstance;
@@ -31,6 +40,7 @@ export class Property implements PropertyInstance {
   public name: string;
   public type: string;
   public collection?: boolean;
+  public args?: object;
   public defaultValue?: Function;
   public computed?: Function;
   public computation?: ComputationInstance;
@@ -41,6 +51,7 @@ export class Property implements PropertyInstance {
     this.name = args.name;
     this.type = args.type;
     this.collection = args.collection;
+    this.args = args.args;
     this.defaultValue = args.defaultValue;
     this.computed = args.computed;
     this.computation = args.computation;
@@ -66,11 +77,16 @@ export class Property implements PropertyInstance {
       required: true as const,
       // CAUTION 必须是静态数组（r27 记录的潜伏元数据缺陷，r32 修正）：validateCreateArgs 的
       //  options 契约是 readonly unknown[]（def.options.includes）——函数形态在未来接线时
-      //  会静默判失败/崩溃。当前 create() 的手写白名单是执行面，此元数据是声明面，两者同源。
+      //  会静默判失败/崩溃。执行面是 create() 的 isAllowedPropertyType（内置 ∪ 扩展注册表）；
+      //  此元数据只钉内置集，扩展名不进静态 options。
       options: [...ALLOWED_PROPERTY_TYPES] as readonly string[]
     },
     collection: {
       type: 'boolean' as const,
+      required: false as const
+    },
+    args: {
+      type: 'object' as const,
       required: false as const
     },
     defaultValue: {
@@ -104,13 +120,27 @@ export class Property implements PropertyInstance {
     if (args.computed && args.computation) {
       throw new Error(`Property "${args.name}" declares both computed and computation. They are competing write channels for the same column (computed re-evaluates on every write and silently overwrites the computation's output) — keep exactly one.`);
     }
-    // type 白名单（r23）：未知字符串此前静默落到 mapToDBFieldType 的 fallback（原样当 SQL 类型），
-    //  SQLite 亲和放过、PG/MySQL 在 setup 才炸——声明形同虚设。与 PayloadItem.type / Dictionary.type 同族。
-    if (args.type !== undefined && !(ALLOWED_PROPERTY_TYPES as readonly string[]).includes(args.type)) {
+    // type 白名单（r23）+ 扩展注册表：未知字符串不得静默落到 mapToDBFieldType fallback。
+    //  扩展逻辑名须先 definePropertyType；物理 dialect storage 闸门在 setup，不在 create。
+    if (args.type !== undefined && !isAllowedPropertyType(args.type)) {
       throw new Error(
         `Property "${args.name}" has unsupported type "${args.type}". ` +
-        `Allowed types: ${ALLOWED_PROPERTY_TYPES.join(', ')}.`
+        formatAllowedPropertyTypesForError()
       );
+    }
+    // 内置类型无 args 合同；无意义附着会进入 migration 签名却无语义。
+    if (isBuiltinPropertyType(args.type) && args.args !== undefined) {
+      throw new Error(
+        `Property "${args.name}" uses builtin type "${args.type}" with args. ` +
+        `Builtin property types do not accept args; omit args, or use an extended type registered via definePropertyType.`
+      );
+    }
+    // 扩展类型：create 期调用 validateArgs（args 可为 undefined）。
+    if (args.type !== undefined && !isBuiltinPropertyType(args.type)) {
+      const def = getPropertyTypeDefinition(args.type);
+      if (def?.validateArgs) {
+        def.validateArgs(args.args);
+      }
     }
     // defaultValue/computed 必须是函数（r31）：写路径只对 `typeof === 'function'` 的
     //  defaultValue 求值，非函数（如 defaultValue: 'user' 的直觉写法）会被**静默忽略**——
@@ -156,6 +186,7 @@ export class Property implements PropertyInstance {
       type: instance.type
     };
     if (instance.collection !== undefined) args.collection = instance.collection;
+    if (instance.args !== undefined) args.args = instance.args;
     if (instance.defaultValue !== undefined) args.defaultValue = instance.defaultValue;
     if (instance.computed !== undefined) args.computed = instance.computed;
     if (instance.computation !== undefined) args.computation = instance.computation;
