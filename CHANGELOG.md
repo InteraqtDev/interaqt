@@ -1,5 +1,14 @@
 
 
+## [4.7.0](https://github.com/InteraqtDev/interaqt/compare/v4.6.0...v4.7.0) (2026-08-11)
+
+
+### Features
+
+* **runtime:** declarative Condition admission locks and business transactions ([92e8e70](https://github.com/InteraqtDev/interaqt/commit/92e8e70525717a55ab8304c35c374a3e35d55164))
+* **runtime:** hard-fail dispatch inside non-BT storage transactions ([a7f6ec8](https://github.com/InteraqtDev/interaqt/commit/a7f6ec856eafee428f327b627ad7648058ef85b8))
+* **runtime:** sequence ranges, dispatch idempotency, and entity retention ([c9f6a64](https://github.com/InteraqtDev/interaqt/commit/c9f6a64270c05a0f0a95aab4c05084ba9a44e129))
+
 # Changelog
 
 ## [Unreleased]
