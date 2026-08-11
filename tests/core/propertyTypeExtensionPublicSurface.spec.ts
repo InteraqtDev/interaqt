@@ -121,23 +121,24 @@ describe('property type extension — documentation contracts', () => {
     expect(storageGuide).toMatch(/never passthrough into DDL/i)
     expect(storageGuide).toMatch(/fixed JSON KV/i)
 
-    // CHANGELOG Unreleased (after "# Changelog") must call out the feature + breaking change.
-    // Note: released 4.7.0 notes currently appear above the Unreleased section in this file.
+    // Released notes for this feature live under ## [4.8.0] (Unreleased stays empty
+    // after cut). Keep an Unreleased heading so the next cycle has a drop target.
     const changelog = readDoc('CHANGELOG.md')
-    const unreleasedStart = changelog.indexOf('## [Unreleased]')
-    expect(unreleasedStart).toBeGreaterThanOrEqual(0)
-    const nextHeading = changelog.indexOf('\n## [', unreleasedStart + 1)
-    const unreleased = changelog.slice(
-      unreleasedStart,
+    expect(changelog).toMatch(/## \[Unreleased\]/)
+    const releasedStart = changelog.indexOf('## [4.8.0]')
+    expect(releasedStart).toBeGreaterThanOrEqual(0)
+    const nextHeading = changelog.indexOf('\n## [', releasedStart + 1)
+    const released = changelog.slice(
+      releasedStart,
       nextHeading === -1 ? undefined : nextHeading,
     )
-    expect(unreleased).toMatch(/definePropertyType/)
-    expect(unreleased).toMatch(/Property\*\* columns only|Property columns only/i)
-    expect(unreleased).toMatch(/Dictionary\.create` remains builtin-only|builtin-only \(fixed `_Dictionary_`/i)
-    expect(unreleased).toMatch(/PayloadItem/)
-    expect(unreleased).toMatch(/opt-in Match/)
-    expect(unreleased).toMatch(/### Breaking changes/)
-    expect(unreleased).toMatch(/mapToDBFieldType/)
-    expect(unreleased).toMatch(/no longer passthrough-returns|passthrough-returns/i)
+    expect(released).toMatch(/definePropertyType/)
+    expect(released).toMatch(/Property\*\* columns only|Property columns only/i)
+    expect(released).toMatch(/Dictionary\.create` remains builtin-only|builtin-only \(fixed `_Dictionary_`/i)
+    expect(released).toMatch(/PayloadItem/)
+    expect(released).toMatch(/opt-in Match/)
+    expect(released).toMatch(/### Breaking changes/)
+    expect(released).toMatch(/mapToDBFieldType/)
+    expect(released).toMatch(/no longer passthrough-returns|passthrough-returns/i)
   })
 })

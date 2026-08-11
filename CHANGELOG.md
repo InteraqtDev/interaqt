@@ -1,28 +1,16 @@
-
-
-## [4.8.0](https://github.com/InteraqtDev/interaqt/compare/v4.7.0...v4.8.0) (2026-08-11)
-
-
-### Features
-
-* **core/storage:** explicit property type extension via definePropertyType ([cb48c07](https://github.com/InteraqtDev/interaqt/commit/cb48c0731d782afdbfb07ed02f0b2a7378455324))
-
-## [4.7.0](https://github.com/InteraqtDev/interaqt/compare/v4.6.0...v4.7.0) (2026-08-11)
-
-
-### Features
-
-* **runtime:** declarative Condition admission locks and business transactions ([92e8e70](https://github.com/InteraqtDev/interaqt/commit/92e8e70525717a55ab8304c35c374a3e35d55164))
-* **runtime:** hard-fail dispatch inside non-BT storage transactions ([a7f6ec8](https://github.com/InteraqtDev/interaqt/commit/a7f6ec856eafee428f327b627ad7648058ef85b8))
-* **runtime:** sequence ranges, dispatch idempotency, and entity retention ([c9f6a64](https://github.com/InteraqtDev/interaqt/commit/c9f6a64270c05a0f0a95aab4c05084ba9a44e129))
-
 # Changelog
 
 ## [Unreleased]
 
+## [4.8.0](https://github.com/InteraqtDev/interaqt/compare/v4.7.0...v4.8.0) (2026-08-11)
+
+Explicit property type extension for Entity/Relation plugin columns. Design and
+audit record: `docs/property-type-extension/`.
+
 ### Features
 
-* **core/storage:** explicit property type extension via `definePropertyType`.
+* **core/storage:** explicit property type extension via `definePropertyType`
+  ([cb48c07](https://github.com/InteraqtDev/interaqt/commit/cb48c0731d782afdbfb07ed02f0b2a7378455324)).
   Built-in logical types stay closed (`string`/`number`/`boolean`/`timestamp`/
   `object`/`id` + `json` alias). Adapters register per-dialect `fieldType`,
   optional symmetric `toDB`/`fromDB` codecs, and opt-in Match compilers.
@@ -33,6 +21,32 @@
   Public exports: `definePropertyType`, `PropertyTypes`, `ALLOWED_PROPERTY_TYPES`,
   `resetPropertyTypeRegistryForTests`, resolve/codec helpers and related types.
 
+### Docs
+
+* Usage/API guides document `definePropertyType`, Property vs Dictionary vs
+  PayloadItem type contracts, opt-in Match operators on extended columns, and the
+  removal of driver unknown-type DDL passthrough. See usage
+  `02-define-entities-properties.md`, `11-global-dictionaries.md`,
+  `07-payload-parameters.md`, `12-data-querying.md`, `14-api-reference.md`,
+  `18-api-exports-reference.md`, `19-common-anti-patterns.md`.
+
+### Breaking changes
+
+* **storage/drivers:** `Database.mapToDBFieldType` no longer passthrough-returns
+  unrecognized logical type strings into DDL. Unknown types throw. Applications
+  that previously relied on silent passthrough of plugin type names (for example
+  `type: 'vector'` before the r23 create whitelist, or internal callers that
+  bypassed create) **must** register via `definePropertyType` with per-dialect
+  `storage` and declare Property columns with that logical name. Builtin JSON
+  mapping strings are unchanged (pinned for migration hash stability).
+
+## [4.7.0](https://github.com/InteraqtDev/interaqt/compare/v4.6.0...v4.7.0) (2026-08-11)
+
+### Features
+
+* **runtime:** declarative Condition admission locks and business transactions ([92e8e70](https://github.com/InteraqtDev/interaqt/commit/92e8e70525717a55ab8304c35c374a3e35d55164))
+* **runtime:** hard-fail dispatch inside non-BT storage transactions ([a7f6ec8](https://github.com/InteraqtDev/interaqt/commit/a7f6ec856eafee428f327b627ad7648058ef85b8))
+* **runtime:** sequence ranges, dispatch idempotency, and entity retention ([c9f6a64](https://github.com/InteraqtDev/interaqt/commit/c9f6a64270c05a0f0a95aab4c05084ba9a44e129))
 * **runtime:** atomic contiguous sequence ranges via `storage.atomic.reserveSequenceRange`
   (`SequenceRange`); `nextSequenceValue` shares the same upsert kernel. Drivers with
   atomic sequence capability always ensure `_ScopedSequence_` at install and migration
@@ -48,13 +62,6 @@
 
 ### Docs
 
-* Usage/API guides document `definePropertyType`, Property vs Dictionary vs
-  PayloadItem type contracts, opt-in Match operators on extended columns, and the
-  removal of driver unknown-type DDL passthrough. See usage
-  `02-define-entities-properties.md`, `11-global-dictionaries.md`,
-  `07-payload-parameters.md`, `12-data-querying.md`, `14-api-reference.md`,
-  `18-api-exports-reference.md`, `19-common-anti-patterns.md`.
-
 * Usage and generator guides document `this.atomic.reserveSequenceRange`, `outcome`-based
   idempotent retry, and `maintainEntityRetention`. Removed dual Transform/Custom atomic
   access tables, multi-row `nextSequenceValue` loops, effects-scanning-as-replay, and
@@ -66,14 +73,6 @@ locks and `controller.runInBusinessTransaction` (product commit after 4.6.0;
 see usage `06-attributive-permissions.md` for the full FR-01/FR-02 contract).
 
 ### Breaking changes
-
-* **storage/drivers:** `Database.mapToDBFieldType` no longer passthrough-returns
-  unrecognized logical type strings into DDL. Unknown types throw. Applications
-  that previously relied on silent passthrough of plugin type names (for example
-  `type: 'vector'` before the r23 create whitelist, or internal callers that
-  bypassed create) **must** register via `definePropertyType` with per-dialect
-  `storage` and declare Property columns with that logical name. Builtin JSON
-  mapping strings are unchanged (pinned for migration hash stability).
 
 * **runtime:** `controller.dispatch` inside a **non-business-transaction** active
   storage transaction now throws `BusinessTransactionBoundaryError` with
