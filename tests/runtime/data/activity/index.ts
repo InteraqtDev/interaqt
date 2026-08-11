@@ -187,7 +187,7 @@ export function createData() {
         computation: Transform.create({
             record: InteractionEventEntity,
             attributeQuery: ['*', ['activity', {attributeQuery:['id']}]],
-            callback: async function (this: Controller, eventArgs: any) {
+            callback: async function (this: any, eventArgs: any) {
                 if (eventArgs.interactionName === approveInteraction.name) {
                     // 检查 activity 是否存在
                     if (!eventArgs.activity?.id) {
@@ -200,7 +200,7 @@ export function createData() {
                         key: 'activity.id',
                         value: ['=', eventArgs.activity.id]
                     })
-                    const sendEvent = await this.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
+                    const sendEvent = await this.controller.system.storage.findOne(InteractionEventEntity.name, match, undefined, ['*'])
                     if (sendEvent && sendEvent.user && sendEvent.payload?.to) {
                         return {
                             source: sendEvent.user,

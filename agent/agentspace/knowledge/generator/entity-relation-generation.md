@@ -392,4 +392,22 @@ const RecentUserPost = Entity.create({
 - [ ] Relation types use correct format ('1:1', 'n:1', etc.)
 - [ ] No entities are imported from interaqt package
 - [ ] Filtered entities have valid baseEntity and matchExpression
-- [ ] TypeScript compilation passes 
+- [ ] TypeScript compilation passes
+
+## Entity retention (optional)
+
+For high-volume history entities, prefer declarative retention over generated prune Interactions:
+
+```typescript
+Entity.create({
+  name: 'EventLog',
+  properties: [/* ... */, Property.create({ name: 'createdAt', type: 'number' })],
+  retention: {
+    mode: 'ttl',
+    ttl: { timestampProperty: 'createdAt', maxAgeMs: 7 * 24 * 3600 * 1000 },
+  },
+})
+```
+
+Operators call `controller.maintainEntityRetention()`. Do not generate ad-hoc storage delete loops as the supported retention API. Filtered/merged entities cannot declare retention.
+

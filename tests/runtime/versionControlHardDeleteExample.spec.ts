@@ -204,13 +204,13 @@ describe('Version Control Example with Hard Delete', () => {
           type: 'update'
         }
       },
-      callback: async function(this: Controller, mutationEvent: RecordMutationEvent) {
+      callback: async function(this: any, mutationEvent: RecordMutationEvent) {
         const event = mutationEvent.record!;
 
         // Handle style creation
         if (mutationEvent.type === 'create' && event.interactionName === 'CreateStyle') {
           // Get current version info
-          let versionInfo = await this.system.storage.dict.get('currentVersionInfo') as VersionInfo;
+          let versionInfo = await this.controller.system.storage.dict.get('currentVersionInfo') as VersionInfo;
           
           return {
             content: event.payload.content,
@@ -226,13 +226,13 @@ describe('Version Control Example with Hard Delete', () => {
 
           if (versionInfo.type === 'publish') {
             // Copy all current version styles to new version
-            const currentStyles = await this.system.storage.find('VersionedStyle',
+            const currentStyles = await this.controller.system.storage.find('VersionedStyle',
               MatchExp.atom({ key: 'version', value: ['=', versionInfo.version - 1] }),
               undefined,
               ['*']
             );
 
-            return currentStyles.map(style => {
+            return currentStyles.map((style: any) => {
               return {
                 ...style,
                 id: undefined,
@@ -243,13 +243,13 @@ describe('Version Control Example with Hard Delete', () => {
             });
           } else if (versionInfo.type === 'rollback') {
             // Copy styles from rollback target version
-            const targetStyles = await this.system.storage.find('VersionedStyle',
+            const targetStyles = await this.controller.system.storage.find('VersionedStyle',
               MatchExp.atom({ key: 'version', value: ['=', versionInfo.rollbackTo] }),
               undefined,
               ['*']
             );
 
-            return targetStyles.map(style => ({
+            return targetStyles.map((style: any) => ({
               ...style,
               id: undefined,
               version: versionInfo.version,

@@ -300,6 +300,18 @@ CREATE TABLE IF NOT EXISTS "_ScopedSequence_" (
     PRIMARY KEY ("sequenceName", "scopeKey")
 )`, 'setup scoped sequence table')
     }
+    async setupDispatchIdempotencyState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" (
+    "namespace" TEXT NOT NULL,
+    "idempotencyKey" TEXT NOT NULL,
+    "state" TEXT NOT NULL,
+    "data" JSONB NULL,
+    "context" JSONB NULL,
+    "createdAt" NUMERIC NOT NULL,
+    PRIMARY KEY ("namespace", "idempotencyKey")
+)`, 'setup dispatch idempotency table')
+    }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})

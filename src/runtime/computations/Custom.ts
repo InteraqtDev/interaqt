@@ -1,4 +1,10 @@
-import { DataContext, DataDepEventContext, IncrementalPlan, PropertyDataContext } from "./Computation.js";
+import {
+  ComputationActionContext,
+  DataContext,
+  DataDepEventContext,
+  IncrementalPlan,
+  PropertyDataContext,
+} from "./Computation.js";
 import { Custom, CustomInstance } from "@core";
 import { Controller } from "../Controller.js";
 import { 
@@ -82,12 +88,7 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       this.compute = async (...args: any[]): Promise<ComputationResult|any> => {
         if (this.computeCallback) {
           const [dataDeps, record] = args;
-          const context = {
-            controller: this.controller,
-            state: this.state,
-            getState: (key: string) => this.state[key]
-          };
-          return await this.computeCallback.call(context, dataDeps, record);
+          return await this.computeCallback.call(this.buildActionContext(), dataDeps, record);
         }
       }
     }
@@ -98,12 +99,13 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
         if (this.incrementalComputeCallback) {
           // 传递 lastValue, mutationEvent 等参数
           const [lastValue, mutationEvent, record, dataDeps] = args;
-          const context = {
-            controller: this.controller,
-            state: this.state,
-            getState: (key: string) => this.state[key]
-          };
-          return await this.incrementalComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
+          return await this.incrementalComputeCallback.call(
+            this.buildActionContext(),
+            lastValue,
+            mutationEvent,
+            record,
+            dataDeps,
+          );
         }
         // 如果没有定义增量计算，回退到全量计算
         return ComputationResult.fullRecompute('No incrementalCompute defined');
@@ -115,12 +117,13 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       this.incrementalPatchCompute = async (...args: any[]): Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined> => {
         if (this.incrementalPatchComputeCallback) {
           const [lastValue, mutationEvent, record, dataDeps] = args;
-          const context = {
-            controller: this.controller,
-            state: this.state,
-            getState: (key: string) => this.state[key]
-          };
-          return await this.incrementalPatchComputeCallback.call(context, lastValue, mutationEvent, record, dataDeps);
+          return await this.incrementalPatchComputeCallback.call(
+            this.buildActionContext(),
+            lastValue,
+            mutationEvent,
+            record,
+            dataDeps,
+          );
         }
       }
     }
@@ -136,12 +139,12 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
       this.asyncReturn = async (...args: any[]): Promise<ComputationResult|any> => {
         if (this.asyncReturnCallback) {
           const [asyncResult, dataDeps, record] = args;
-          const context = {
-            controller: this.controller,
-            state: this.state,
-            getState: (key: string) => this.state[key]
-          };
-          return await this.asyncReturnCallback.call(context, asyncResult, dataDeps, record);
+          return await this.asyncReturnCallback.call(
+            this.buildActionContext(),
+            asyncResult,
+            dataDeps,
+            record,
+          );
         }
       }
     }
@@ -201,6 +204,18 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     }
   }
   
+  /**
+   * Official Custom callback `this`. Always includes `atomic` (= storage.atomic).
+   */
+  private buildActionContext(): ComputationActionContext {
+    return {
+      controller: this.controller,
+      atomic: this.controller.system.storage.atomic,
+      state: this.state,
+      getState: (key: string) => this.state[key],
+    }
+  }
+
   createState() {
     if (this.createStateCallback) {
       const states = this.createStateCallback.call(this.controller);
@@ -225,13 +240,7 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
     if (this.computeCallback) {
       // 传递 dataDeps 和 record（对于 property computation）
       const [dataDeps, record] = args;
-      // 创建一个包含 state 的上下文对象
-      const context = {
-        controller: this.controller,
-        state: this.state,
-        getState: (key: string) => this.state[key]
-      };
-      return await this.computeCallback.call(context, dataDeps, record);
+      return await this.computeCallback.call(this.buildActionContext(), dataDeps, record);
     }
     return ComputationResult.skip();
   }
@@ -239,11 +248,7 @@ abstract class BaseCustomComputationHandle implements DataBasedComputation {
   planIncremental(event: unknown, record: unknown, context: DataDepEventContext): IncrementalPlan {
     if (this.planIncrementalCallback) {
       return this.planIncrementalCallback.call(
-        {
-          controller: this.controller,
-          state: this.state,
-          getState: (key: string) => this.state[key]
-        },
+        this.buildActionContext(),
         event,
         record,
         context

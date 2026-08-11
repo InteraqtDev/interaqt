@@ -21,8 +21,11 @@ import {
     AtomicSequenceTarget,
     AtomicSequenceScope,
     AtomicSequenceScopeValue,
-    SystemSchemaOptions
+    SequenceRange,
+    SystemSchemaOptions,
+    DispatchIdempotencyRow,
 } from "./System.js";
+import { IdempotencyError } from "./errors/IdempotencyError.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { RequireSerializableRetry, RetryableWriteConflict, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
@@ -97,6 +100,7 @@ class MonoStorage implements Storage{
     }
     public dict: { get: (key: string) => Promise<unknown>, set: (key: string, value: unknown) => Promise<void>, setInternal?: (key: string, value: unknown) => Promise<void>, registerDefaults?: (defaults: Map<string, unknown>) => void }
     public atomic: AtomicStorage
+    public dispatchIdempotency: Storage['dispatchIdempotency']
     private transactionContext = new AsyncLocalStorage<StorageTransactionContext>()
     // 声明驱动的 dict 读回退（Scheduler 从 Dictionary 声明求值一次后注册）。
     //  install 时 setupDictDefaultValue 会把默认值持久化；但 setup(false) 路径下新增声明、
@@ -133,6 +137,11 @@ class MonoStorage implements Storage{
             }
         }
         this.atomic = this.createAtomicStorage()
+        this.dispatchIdempotency = {
+            load: (namespace, idempotencyKey) => this.loadDispatchIdempotencyRow(namespace, idempotencyKey),
+            claim: (namespace, idempotencyKey) => this.claimDispatchIdempotencyRow(namespace, idempotencyKey),
+            finish: (namespace, idempotencyKey, payload) => this.finishDispatchIdempotencyRow(namespace, idempotencyKey, payload),
+        }
     }
 
     private async ensureDbOpenForSchemaRead() {
@@ -394,6 +403,43 @@ class MonoStorage implements Storage{
     private sequenceScopeKey(scope: AtomicSequenceScope) {
         return JSON.stringify(this.normalizeSequenceScope(scope))
     }
+    /**
+     * Shared upsert kernel for nextSequenceValue (count=1) and reserveSequenceRange.
+     * Advances lastValue by count*step in one INSERT ... ON CONFLICT DO UPDATE RETURNING.
+     */
+    private async reserveSequenceRangeInternal(target: AtomicSequenceTarget, count: number): Promise<SequenceRange> {
+        this.validateAtomicSequenceTarget(target)
+        if (!Number.isInteger(count) || count < 1) {
+            throw new Error('Atomic sequence range count must be a positive integer')
+        }
+        const { step, initialValue, sequenceName, scope } = target
+        const totalAdvance = count * step
+        if (!Number.isFinite(totalAdvance)) {
+            throw new Error('Atomic sequence range count * step must be a finite number')
+        }
+        this.requireTransaction(`atomic scoped sequence ${sequenceName}`)
+        const scopeKey = this.sequenceScopeKey(scope)
+        const scopeJson = JSON.stringify(this.normalizeSequenceScope(scope))
+        // Empty row: first reserved value is initialValue + step; lastValue becomes initialValue + count*step.
+        const insertLastValue = initialValue + totalAdvance
+        const p = this.getPlaceholder()
+        const sequenceNamePlaceholder = p()
+        const scopeKeyPlaceholder = p()
+        const scopePlaceholder = p()
+        const initialValuePlaceholder = p()
+        const updateStepPlaceholder = p()
+        const rows = await this.db.query<{ value: number | string }>(
+            `INSERT INTO "_ScopedSequence_" ("sequenceName", "scopeKey", "scope", "lastValue") VALUES (${sequenceNamePlaceholder}, ${scopeKeyPlaceholder}, ${scopePlaceholder}, ${initialValuePlaceholder})
+ON CONFLICT ("sequenceName", "scopeKey") DO UPDATE SET "lastValue" = "_ScopedSequence_"."lastValue" + ${updateStepPlaceholder}
+RETURNING "lastValue" AS value`,
+            [sequenceName, scopeKey, scopeJson, insertLastValue, totalAdvance],
+            `atomic scoped sequence range ${sequenceName}`
+        )
+        if (!rows.length) throw new Error(`ScopedSequence allocation failed for ${sequenceName}`)
+        const end = Number(rows[0].value)
+        const start = end - (count - 1) * step
+        return { start, count, end, step }
+    }
     private async setDictionaryValue(key: string, value: unknown, emitEvents: boolean): Promise<void> {
         const match = MatchExp.atom({key: 'key', value: ['=', key]})
         const origin = await this.queryHandle!.findOne(DICTIONARY_RECORD, match, undefined, ['value'])
@@ -453,16 +499,34 @@ class MonoStorage implements Storage{
             }
         }
     }
-    private requiresScopedSequenceState(options?: SystemSchemaOptions) {
-        return options?.internalRequirements?.some(requirement => requirement.kind === 'scoped-sequence-table' && requirement.declarations.length > 0) === true
+    /**
+     * Single table-install predicate for `_ScopedSequence_` (S1/S2/S3).
+     * Capability is an object descriptor, not a boolean — never compare with `=== true`.
+     * Does not read ScopedSequence Property declarations or internalRequirements lengths.
+     */
+    private needsScopedSequenceTable() {
+        return !!this.db.atomicSequenceCapability
+            && typeof this.db.setupScopedSequenceState === 'function'
+    }
+    /**
+     * Single table-install predicate for `_DispatchIdempotency_` (I1/I2/I3).
+     * Always true when the driver exposes the setup helper — not gated on whether any
+     * EventSource declares idempotency.
+     */
+    private needsDispatchIdempotencyTable() {
+        return typeof this.db.setupDispatchIdempotencyState === 'function'
     }
     async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false, options?: SystemSchemaOptions) {
         await this.db.open(createTables)
         if (createTables && this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
         }
-        if (createTables && this.requiresScopedSequenceState(options) && this.db.setupScopedSequenceState) {
-            await this.db.setupScopedSequenceState()
+        if (createTables && this.needsScopedSequenceTable()) {
+            await this.db.setupScopedSequenceState!()
+        }
+        // I1: always ensure the dispatch idempotency ledger when the driver can create it.
+        if (createTables && this.needsDispatchIdempotencyTable()) {
+            await this.db.setupDispatchIdempotencyState!()
         }
         let dbSetup: DBSetup
         try {
@@ -537,7 +601,8 @@ class MonoStorage implements Storage{
 
         const preRecomputeDDL = await this.createAdditiveSchemaPlan(dbSetup)
         const existingTables = await this.getExistingTables()
-        if (this.requiresScopedSequenceState(options) && this.db.setupScopedSequenceState && !existingTables.has('_ScopedSequence_')) {
+        // S2: capability-driven table DDL when missing — independent of Property declarations.
+        if (this.needsScopedSequenceTable() && !existingTables.has('_ScopedSequence_')) {
             const dialect = getSchemaDialect(this.db).name
             preRecomputeDDL.unshift({
                 kind: 'create-table',
@@ -547,6 +612,20 @@ class MonoStorage implements Storage{
                 sql: dialect === 'sqlite'
                     ? `CREATE TABLE IF NOT EXISTS "_ScopedSequence_" ("sequenceName" TEXT NOT NULL, "scopeKey" TEXT NOT NULL, "scope" JSON NOT NULL, "lastValue" NUMERIC NOT NULL, PRIMARY KEY ("sequenceName", "scopeKey"))`
                     : `CREATE TABLE IF NOT EXISTS "_ScopedSequence_" ("sequenceName" TEXT NOT NULL, "scopeKey" TEXT NOT NULL, "scope" JSONB NOT NULL, "lastValue" NUMERIC NOT NULL, PRIMARY KEY ("sequenceName", "scopeKey"))`,
+            })
+        }
+        // I2: always plan create-table for the dispatch idempotency ledger when missing.
+        if (this.needsDispatchIdempotencyTable() && !existingTables.has('_DispatchIdempotency_')) {
+            const dialect = getSchemaDialect(this.db).name
+            const jsonType = dialect === 'sqlite' ? 'JSON' : dialect === 'mysql' ? 'JSON' : 'JSONB'
+            preRecomputeDDL.unshift({
+                kind: 'create-table',
+                tableName: '_DispatchIdempotency_',
+                logicalPath: 'internal:_DispatchIdempotency_',
+                description: 'create dispatch idempotency ledger table',
+                sql: dialect === 'mysql'
+                    ? `CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" ("namespace" VARCHAR(191) NOT NULL, "idempotencyKey" VARCHAR(191) NOT NULL, "state" VARCHAR(32) NOT NULL, "data" JSON NULL, "context" JSON NULL, "createdAt" DOUBLE NOT NULL, PRIMARY KEY ("namespace", "idempotencyKey"))`
+                    : `CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" ("namespace" TEXT NOT NULL, "idempotencyKey" TEXT NOT NULL, "state" TEXT NOT NULL, "data" ${jsonType} NULL, "context" ${jsonType} NULL, "createdAt" NUMERIC NOT NULL, PRIMARY KEY ("namespace", "idempotencyKey"))`,
             })
         }
         const { verificationDDL, postRecomputeDDL } = this.createPostRecomputeSchemaPlan(dbSetup)
@@ -635,9 +714,13 @@ class MonoStorage implements Storage{
         if (this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
         }
-        const requiresScopedSequence = (plan.internal as { options?: SystemSchemaOptions }).options?.internalRequirements?.some(requirement => requirement.kind === 'scoped-sequence-table' && requirement.declarations.length > 0) === true
-        if (requiresScopedSequence && this.db.setupScopedSequenceState) {
-            await this.db.setupScopedSequenceState()
+        // S3: same capability predicate as S1/S2 — never gate on declarations.length.
+        if (this.needsScopedSequenceTable()) {
+            await this.db.setupScopedSequenceState!()
+        }
+        // I3: same always-install predicate as I1/I2 — never gate on idempotency declarations.
+        if (this.needsDispatchIdempotencyTable()) {
+            await this.db.setupDispatchIdempotencyState!()
         }
         await this.applyMigrationOperations('schema', plan.preRecomputeDDL, migrationId)
         if (this.db.setupRecordSequences) {
@@ -1169,6 +1252,139 @@ class MonoStorage implements Storage{
         }
     }
 
+    private parseDispatchIdempotencyJson(value: unknown): unknown {
+        if (value === undefined || value === null) return undefined
+        if (typeof value === 'string') {
+            // SQLite returns JSON columns as text; PG/PGLite/MySQL may already parse.
+            if (this.db.returnsParsedJSON) {
+                // Still tolerate a string that is a JSON-encoded payload stored as text.
+                try {
+                    return JSON.parse(value)
+                } catch {
+                    return value
+                }
+            }
+            try {
+                return JSON.parse(value)
+            } catch {
+                return value
+            }
+        }
+        return value
+    }
+
+    private serializeDispatchIdempotencyJson(value: unknown): unknown {
+        if (value === undefined) return null
+        // Drivers that bind objects via JSON.stringify still accept objects; keep objects
+        // for PG/MySQL parsed-JSON paths and stringify for SQLite text paths.
+        if (value !== null && typeof value === 'object') {
+            return this.db.returnsParsedJSON === true ? value : JSON.stringify(value)
+        }
+        return value
+    }
+
+    private async loadDispatchIdempotencyRow(
+        namespace: string,
+        idempotencyKey: string,
+    ): Promise<DispatchIdempotencyRow | null> {
+        this.requireTransaction('dispatchIdempotency.load')
+        const p = this.getPlaceholder()
+        const forUpdate = this.supportsForUpdate() ? ' FOR UPDATE' : ''
+        const rows = await this.db.query<{
+            namespace: string
+            idempotencyKey: string
+            state: string
+            data: unknown
+            context: unknown
+            createdAt: number | string
+        }>(
+            `SELECT "namespace", "idempotencyKey", "state", "data", "context", "createdAt"
+             FROM "_DispatchIdempotency_"
+             WHERE "namespace" = ${p()} AND "idempotencyKey" = ${p()}${forUpdate}`,
+            [namespace, idempotencyKey],
+            'load dispatch idempotency row',
+        )
+        const row = rows[0]
+        if (!row) return null
+        if (row.state !== 'in_flight' && row.state !== 'succeeded') {
+            throw new Error(`Unexpected dispatch idempotency state "${row.state}" for ${namespace}/${idempotencyKey}`)
+        }
+        const contextRaw = this.parseDispatchIdempotencyJson(row.context)
+        return {
+            namespace: row.namespace,
+            idempotencyKey: row.idempotencyKey,
+            state: row.state,
+            data: this.parseDispatchIdempotencyJson(row.data),
+            context: (contextRaw && typeof contextRaw === 'object' && !Array.isArray(contextRaw))
+                ? contextRaw as Record<string, unknown>
+                : contextRaw === undefined
+                    ? undefined
+                    : { value: contextRaw },
+            createdAt: Number(row.createdAt),
+        }
+    }
+
+    private async claimDispatchIdempotencyRow(namespace: string, idempotencyKey: string): Promise<void> {
+        this.requireTransaction('dispatchIdempotency.claim')
+        const p = this.getPlaceholder()
+        const createdAt = Date.now()
+        try {
+            // Use update (not insert): driver insert always appends RETURNING "_rowId",
+            // and this internal table has no _rowId column.
+            await this.db.update(
+                `INSERT INTO "_DispatchIdempotency_" ("namespace", "idempotencyKey", "state", "data", "context", "createdAt")
+                 VALUES (${p()}, ${p()}, 'in_flight', NULL, NULL, ${p()})`,
+                [namespace, idempotencyKey, createdAt],
+                undefined,
+                'claim dispatch idempotency row',
+            )
+        } catch (error) {
+            if (normalizeDatabaseError(error, this.db).isUniqueViolation) {
+                // Concurrent claim lost the race — re-load under the same transaction and map.
+                const existing = await this.loadDispatchIdempotencyRow(namespace, idempotencyKey)
+                if (existing?.state === 'succeeded') {
+                    // Caller should have loaded first; treat as conflict rather than replay here.
+                    throw new IdempotencyError({
+                        code: 'IDEMPOTENCY_CONFLICT',
+                        namespace,
+                        idempotencyKey,
+                        causedBy: error instanceof Error ? error : undefined,
+                    })
+                }
+                throw new IdempotencyError({
+                    code: 'IDEMPOTENCY_IN_FLIGHT',
+                    namespace,
+                    idempotencyKey,
+                    causedBy: error instanceof Error ? error : undefined,
+                })
+            }
+            throw error
+        }
+    }
+
+    private async finishDispatchIdempotencyRow(
+        namespace: string,
+        idempotencyKey: string,
+        payload: { data?: unknown; context?: Record<string, unknown>; createdAt: number },
+    ): Promise<void> {
+        this.requireTransaction('dispatchIdempotency.finish')
+        const p = this.getPlaceholder()
+        await this.db.update(
+            `UPDATE "_DispatchIdempotency_"
+             SET "state" = 'succeeded', "data" = ${p()}, "context" = ${p()}, "createdAt" = ${p()}
+             WHERE "namespace" = ${p()} AND "idempotencyKey" = ${p()} AND "state" = 'in_flight'`,
+            [
+                this.serializeDispatchIdempotencyJson(payload.data),
+                this.serializeDispatchIdempotencyJson(payload.context),
+                payload.createdAt,
+                namespace,
+                idempotencyKey,
+            ],
+            undefined,
+            'finish dispatch idempotency row',
+        )
+    }
+
     private createAtomicStorage(): AtomicStorage {
         const globalColumns = ['numberValue', 'booleanValue', 'stringValue', 'jsonValue']
         return {
@@ -1390,26 +1606,11 @@ RETURNING "numberValue" AS value`,
                 return (this.parseGlobalValue<T>(rows[0]?.value, column) ?? target.defaultValue ?? null) as T | null
             },
             nextSequenceValue: async (target: AtomicSequenceTarget): Promise<number> => {
-                this.validateAtomicSequenceTarget(target)
-                this.requireTransaction(`atomic scoped sequence ${target.sequenceName}`)
-                const scopeKey = this.sequenceScopeKey(target.scope)
-                const scopeJson = JSON.stringify(this.normalizeSequenceScope(target.scope))
-                const firstValue = target.initialValue + target.step
-                const p = this.getPlaceholder()
-                const sequenceNamePlaceholder = p()
-                const scopeKeyPlaceholder = p()
-                const scopePlaceholder = p()
-                const initialValuePlaceholder = p()
-                const updateStepPlaceholder = p()
-                const rows = await this.db.query<{ value: number | string }>(
-                    `INSERT INTO "_ScopedSequence_" ("sequenceName", "scopeKey", "scope", "lastValue") VALUES (${sequenceNamePlaceholder}, ${scopeKeyPlaceholder}, ${scopePlaceholder}, ${initialValuePlaceholder})
-ON CONFLICT ("sequenceName", "scopeKey") DO UPDATE SET "lastValue" = "_ScopedSequence_"."lastValue" + ${updateStepPlaceholder}
-RETURNING "lastValue" AS value`,
-                    [target.sequenceName, scopeKey, scopeJson, firstValue, target.step],
-                    `atomic scoped sequence ${target.sequenceName}`
-                )
-                if (!rows.length) throw new Error(`ScopedSequence allocation failed for ${target.sequenceName}`)
-                return Number(rows[0].value)
+                const range = await this.reserveSequenceRangeInternal(target, 1)
+                return range.start
+            },
+            reserveSequenceRange: async (target: AtomicSequenceTarget & { count: number }): Promise<SequenceRange> => {
+                return this.reserveSequenceRangeInternal(target, target.count)
             },
             seedSequenceValue: async (target: AtomicSequenceTarget & { value: number; mode?: 'max' | 'replace' }): Promise<void> => {
                 this.validateAtomicSequenceTarget(target)

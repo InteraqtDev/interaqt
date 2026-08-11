@@ -1621,7 +1621,7 @@ describe('StateMachineRunner', () => {
         Task.computation = Transform.create({
             record: Project,
             attributeQuery: ['name', 'type'],
-            callback: async function(this: Controller, project: any) {
+            callback: async function(this: any, project: any) {
                 // 根据项目类型决定任务的初始状态
                 const initialState = project.type === 'urgent' ? UrgentState : TodoState
                 
@@ -1637,7 +1637,7 @@ describe('StateMachineRunner', () => {
                 // 直接设置状态机的状态数据
                 // 对于 property-level StateMachine，key 格式为: _${entityName}_${propertyName}_bound_${stateName}
 
-                const stateData = await this.scheduler.createStateData(statusProperty, initialState)
+                const stateData = await this.controller.scheduler.createStateData(statusProperty, initialState)
                 
                 // 返回任务数据和状态数据
                 const result = {
@@ -1883,10 +1883,10 @@ describe('StateMachineRunner', () => {
             // 使用 Transform 从订单创建事件创建关系
             computation: Transform.create({
                 record: InteractionEventEntity,
-                callback: async function(this: Controller, event: any) {
+                callback: async function(this: any, event: any) {
                     if (event.interactionName === 'placeOrder') {
                         // 找到刚创建的订单
-                        const order = await this.system.storage.findOne(
+                        const order = await this.controller.system.storage.findOne(
                             'Order',
                             BoolExp.atom({
                                 key: 'orderNumber',

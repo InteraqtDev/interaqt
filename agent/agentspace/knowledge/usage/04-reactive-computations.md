@@ -144,6 +144,48 @@ Rules:
 - Keep the `UniqueConstraint`; the allocator prevents normal duplicates, and the constraint is the integrity backstop.
 - PostgreSQL is the production-safe cross-process driver for this feature.
 
+### Multi-row contiguous sequences (`this.atomic.reserveSequenceRange`)
+
+When a Transform or Custom computation must assign a **block** of contiguous numbers in one transaction (N rows, one atomic advance), use:
+
+```typescript
+// Transform / Custom callback — official this is ComputationActionContext
+const { start, step } = await this.atomic.reserveSequenceRange({
+  sequenceName: 'WorkspaceChangeSeq',
+  scope: [/* AtomicSequenceScope items */],
+  initialValue: 0,
+  step: 1,
+  count: items.length,
+})
+return items.map((item, i) => ({ ...item, seq: start + i * step }))
+```
+
+Rules:
+
+- Prefer `this.atomic` inside computation callbacks. `controller.system.storage.atomic` remains valid outside callbacks.
+- Do **not** document or generate a loop of `nextSequenceValue` for multi-row contiguity, and do not emit dialect `UPDATE … RETURNING` counters in application code.
+- Property-level `ScopedSequence` stays the per-host-row single allocator; use a **different** `sequenceName` unless you intentionally share the counter.
+
+### Entity retention (cap / TTL)
+
+Ordinary entities may declare `retention` so operators can prune history without domain delete Interactions:
+
+```typescript
+Entity.create({
+  name: 'ChangeLog',
+  properties: [/* ... */, Property.create({ name: 'createdAt', type: 'number' })],
+  retention: {
+    mode: 'cap',
+    partitionBy: ['workspaceId'],
+    retainLatest: 1000,
+    orderBy: ['createdAt'], // required for cap; each key DESC
+    ttl: { timestampProperty: 'createdAt', maxAgeMs: 30 * 24 * 3600 * 1000 }, // optional; runs before cap
+  },
+})
+```
+
+Call `await controller.maintainEntityRetention()` at a safe point (cron / admin). Do not hand-write prune loops against storage as the official pattern. `cleanupAsyncTasks` only clears internal async-task terminal rows and is a separate mechanism.
+
 ### Core Principle: Data Existence
 
 In interaqt, all data has its "reason for existence":

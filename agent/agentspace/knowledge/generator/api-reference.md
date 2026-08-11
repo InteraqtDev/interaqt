@@ -276,11 +276,11 @@ const Article = Entity.create({
                 type: 'create'
             }
         },
-        callback: async function(this: Controller, mutationEvent) {
+        callback: async function(this: ComputationActionContext, mutationEvent) {
             const event = mutationEvent.record;
             if (event.interactionName === 'CreateArticle') {
-                // Use Controller to generate article slug
-                const existingCount = await this.system.storage.find('Article',
+                // Generate article slug (prefer ScopedSequence for serials)
+                const existingCount = await this.controller.system.storage.find('Article',
                     undefined,
                     undefined,
                     ['id']
@@ -1021,14 +1021,14 @@ Transform supports two modes of operation:
    - `config.record` (Entity|Relation, required): Entity or relation to transform from (source collection)
    - `config.attributeQuery` (AttributeQueryData, optional): Attribute query configuration
    - `config.callback` (function, required): Transformation function that converts source data to target data
-     - **Context**: `this` is bound to the Controller instance, providing access to system APIs via `this.system.storage`, `this.globals`, etc.
-     - **Signature**: `function(this: Controller, record: any): any | any[]`
+     - **Context**: `this` is a `ComputationActionContext` (`{ controller, atomic }`). Use `this.controller.system.storage` / `this.controller.globals` for storage and MatchExp; use `this.atomic` for multi-row sequence ranges.
+     - **Signature**: `function(this: ComputationActionContext, record: any): any | any[]`
 
 2. **Event-Driven Transform Mode** (Recommended for interaction-based transformations):
    - `config.eventDeps` (EventDeps, required): Event dependencies that trigger the transformation
    - `config.callback` (function, required): Transformation function that processes mutation events
-     - **Context**: `this` is bound to the Controller instance, providing access to system APIs via `this.system.storage`, `this.globals`, etc.
-     - **Signature**: `function(this: Controller, mutationEvent: MutationEvent): any | any[]`
+     - **Context**: `this` is a `ComputationActionContext` (`{ controller, atomic }`). Use `this.controller.system.storage` / `this.controller.globals` for storage and MatchExp; use `this.atomic` for multi-row sequence ranges.
+     - **Signature**: `function(this: ComputationActionContext, mutationEvent: MutationEvent): any | any[]`
 
 Transform does not accept `dataDeps`. For cross-source enrichment, persist the needed values on the source event/record or use a `Custom` computation.
 
@@ -1070,9 +1070,9 @@ const DiscountedProduct = Entity.create({
   computation: Transform.create({
     record: Product,
     attributeQuery: ['name', 'price'],
-    callback: async function(this: Controller, product) {
-      // Access system configuration via Controller
-      const discountRate = await this.system.storage.get('config', 'globalDiscountRate', 0.1);
+    callback: async function(this: ComputationActionContext, product) {
+      // Access system configuration via ComputationActionContext
+      const discountRate = await this.controller.system.storage.get('config', 'globalDiscountRate', 0.1);
       
       return {
         name: product.name,
@@ -1110,9 +1110,9 @@ const UserAudit = Entity.create({
         type: 'delete'
       }
     },
-    callback: function(this: Controller, mutationEvent) {
-      // Access Controller APIs via 'this'
-      console.log('Audit log created by:', this.name); // Controller name
+    callback: function(this: ComputationActionContext, mutationEvent) {
+      // Access controller APIs via this.controller
+      console.log('Audit log created by:', this.controller.name); // Controller name
       
       return {
         action: mutationEvent.type,
@@ -1146,12 +1146,12 @@ const Article = Entity.create({
         type: 'create'
       }
     },
-    callback: async function(this: Controller, mutationEvent) {
+    callback: async function(this: ComputationActionContext, mutationEvent) {
       const event = mutationEvent.record;
       if (event.interactionName === 'CreateArticle') {
-        // Use Controller to fetch additional user data
-        const author = await this.system.storage.findOne('User', 
-          this.globals.MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
+        // Fetch additional user data via this.controller.system.storage
+        const author = await this.controller.system.storage.findOne('User', 
+          this.controller.globals.MatchExp.atom({ key: 'id', value: ['=', event.user.id] }),
           undefined,
           ['id', 'name']
         );
@@ -1186,15 +1186,15 @@ const Notification = Entity.create({
         type: 'create'
       }
     },
-    callback: async function(this: Controller, mutationEvent) {
+    callback: async function(this: ComputationActionContext, mutationEvent) {
       const order = mutationEvent.record;
       
-      // Use Controller to fetch warehouse email from configuration
-      const warehouseEmail = await this.system.storage.get('config', 'warehouseEmail', 'warehouse@company.com');
+      // Fetch warehouse email from configuration
+      const warehouseEmail = await this.controller.system.storage.get('config', 'warehouseEmail', 'warehouse@company.com');
       
-      // Use Controller to check if customer wants notifications
-      const customer = await this.system.storage.findOne('User',
-        this.globals.MatchExp.atom({ key: 'email', value: ['=', order.customerEmail] }),
+      // Check if customer wants notifications
+      const customer = await this.controller.system.storage.findOne('User',
+        this.controller.globals.MatchExp.atom({ key: 'email', value: ['=', order.customerEmail] }),
         undefined,
         ['id', 'notificationPreferences']
       );
@@ -1328,11 +1328,11 @@ const UserTargetRelation = Relation.create({
                 type: 'create'
             }
         },
-        callback: async function(this: Controller, mutationEvent) {
+        callback: async function(this: ComputationActionContext, mutationEvent) {
             const event = mutationEvent.record;
             if (event.interactionName === 'CreateRelation') {
-                // Use Controller to validate the relation
-                const sourceExists = await this.system.storage.findOne('User',
+                // Validate the relation via this.controller.system.storage
+                const sourceExists = await this.controller.system.storage.findOne('User',
                     MatchExp.atom({ key: 'id', value: ['=', event.payload.sourceUser.id] }),
                     undefined,
                     ['id']
@@ -1623,6 +1623,49 @@ const Media = Entity.create({
 - Do not generate `StateMachine`, `Custom`, raw SQL, or `max + 1` logic for scoped serial numbers.
 - For existing data, use `initializeFrom` to seed every existing scope with `MAX(valuePath)`. Do not partial-seed with `initializeFrom.match` unless the sequence will only ever allocate for that exact subset.
 
+### Atomic multi-row ranges (`this.atomic.reserveSequenceRange`)
+
+When generating Transform/Custom code that assigns contiguous numbers to N rows in one transaction:
+
+```typescript
+// Official: ComputationActionContext
+const { start, step } = await this.atomic.reserveSequenceRange({
+  sequenceName: 'WorkspaceChangeSeq',
+  scope: [/* ... */],
+  initialValue: 0,
+  step: 1,
+  count: items.length,
+})
+```
+
+**Do not generate**:
+- loops of `nextSequenceValue` for multi-row contiguity
+- dual-path docs (`this.system.storage.atomic` for Transform vs `this.controller.system.storage.atomic` for Custom) as the final pattern
+- dialect counter SQL in application code
+
+Property-level `ScopedSequence` remains the single-value-per-host-row generator target.
+
+### Entity.retention + maintainEntityRetention
+
+When generating entities that accumulate history (audit/change logs), prefer declarative retention:
+
+```typescript
+Entity.create({
+  name: 'AuditLog',
+  properties: [/* ... */],
+  retention: {
+    mode: 'cap',
+    partitionBy: ['tenantId'],
+    retainLatest: 5000,
+    orderBy: ['createdAt'],
+  },
+})
+// Schedule or admin path:
+await controller.maintainEntityRetention()
+```
+
+Do **not** generate hand-written prune loops as the supported retention pattern. Do not confuse with `cleanupAsyncTasks` (async task terminal rows only).
+
 ### Custom.create()
 
 Create custom computation with completely user-defined calculation logic.
@@ -1636,17 +1679,19 @@ Custom.create(config: CustomConfig): CustomInstance
 
 **Parameters**
 - `config.name` (string, required): Computation name for identification
-- `config.compute` (function, required): Main computation function with signature:
+- `config.compute` (function, required): Main computation function with signature.
+  Callback `this` is `ComputationActionContext` (`{ controller, atomic, state?, getState? }`).
+  Use `this.controller.system.storage` for storage access and `this.atomic` for multi-row sequence ranges.
   ```typescript
   // For Dictionary/Global context:
   async function(
-    this: { controller: Controller, state: any }, 
+    this: ComputationActionContext,
     dataDeps: any
   ): Promise<any>
   
   // For Property context:
   async function(
-    this: { controller: Controller, state: any }, 
+    this: ComputationActionContext,
     dataDeps: any,
     record: any
   ): Promise<any>
@@ -1654,7 +1699,7 @@ Custom.create(config: CustomConfig): CustomInstance
 - `config.incrementalCompute` (function, optional): Incremental computation function for optimized updates:
   ```typescript
   async function(
-    this: { controller: Controller, state: any },
+    this: ComputationActionContext,
     lastValue: any,
     mutationEvent: any,
     record: any,
@@ -1664,7 +1709,7 @@ Custom.create(config: CustomConfig): CustomInstance
 - `config.incrementalPatchCompute` (function, optional): Patch-based incremental computation:
   ```typescript
   async function(
-    this: { controller: Controller, state: any },
+    this: ComputationActionContext,
     lastValue: any,
     mutationEvent: any,
     record: any,
@@ -1682,7 +1727,7 @@ Custom.create(config: CustomConfig): CustomInstance
 - `config.asyncReturn` (function, optional): Handle async task results:
   ```typescript
   async function(
-    this: { controller: Controller, state: any },
+    this: ComputationActionContext,
     asyncResult: any,
     dataDeps: any,
     record?: any
@@ -2118,9 +2163,9 @@ const activeUsers = Dictionary.create({
     computation: Transform.create({
         record: User,
         attributeQuery: ['id', 'lastLoginTime'],
-        callback: async function(this: Controller, users) {
-            // Use Controller to get activity threshold from config
-            const activityThreshold = await this.system.storage.get('config', 'userActivityThreshold', 3600000); // Default 1 hour
+        callback: async function(this: ComputationActionContext, users) {
+            // Get activity threshold from config
+            const activityThreshold = await this.controller.system.storage.get('config', 'userActivityThreshold', 3600000); // Default 1 hour
             const cutoffTime = Date.now() - activityThreshold;
             
             return users
@@ -2781,10 +2826,10 @@ const UserPostRelation = Relation.create({
         type: 'create'
       }
     },
-    callback: async function(this: Controller, mutationEvent) {
+    callback: async function(this: ComputationActionContext, mutationEvent) {
       const event = mutationEvent.record;
       if (event.interactionName === 'CreatePost') {
-        // Use Controller to validate and enhance data
+        // Validate and enhance data
         const now = Math.floor(Date.now() / 1000);
         
         // This is where the actual creation logic is
@@ -3474,7 +3519,7 @@ async dispatch<TArgs, TResult>(
 ```typescript
 type DispatchResponse = {
   // Soft failure outside business-transaction abort mode
-  error?: unknown  // often InteractionGuardError: type, code, conditionName, details, ...
+  error?: unknown  // InteractionGuardError / IdempotencyError: prefer stable .code
   
   // For events with resolve: contains the resolved data
   data?: unknown
@@ -3494,17 +3539,22 @@ type DispatchResponse = {
   context?: {
     [key: string]: unknown
   }
+
+  // Present only when the EventSource participates in idempotency and the attempt succeeded.
+  // Branch retries on outcome — never by scanning effects or guessing from unique conflicts.
+  outcome?: 'applied' | 'replayed'
 }
 ```
 
 **Dispatch Flow**
 1. Begin transaction (or join business-transaction attempt SAVEPOINT)
-2. Execute `guard` (if provided and `ignoreGuard` is false) — Conditions acquire declared locks first
-3. Map event data via `mapEventData` and create event record
-4. Execute `resolve` (if provided) - returns data
-5. Execute `afterDispatch` (if provided) inside the retryable transaction attempt - returns context
-6. Commit transaction (top-level) or release SAVEPOINT (inside BT)
-7. Run RecordMutationSideEffects / postCommit only after the owning commit succeeds (deferred under BT)
+2. **Admit** (conditions / user / payload). Idempotent replays stop after admit and return `outcome: 'replayed'`.
+3. **Open** ledger claim when idempotency is declared (in-flight races → `IDEMPOTENCY_IN_FLIGHT`)
+4. Map event data via `mapEventData` and create event record
+5. Execute `resolve` (if provided) - returns data
+6. Execute `afterDispatch` (if provided) inside the retryable transaction attempt - returns context
+7. Finish idempotency success row when participating; commit (top-level) or release SAVEPOINT (inside BT)
+8. Run RecordMutationSideEffects / postCommit only after the owning commit succeeds (deferred under BT); never on `replayed`
 
 **Example - Dispatch Interaction**
 ```typescript
@@ -3522,8 +3572,9 @@ if (result.error) {
     return
 }
 
-// Access created record ID from effects
+// Access created record ID from effects (data inspection — not idempotency discrimination)
 const createdPostId = result.effects?.[0]?.record?.id
+// If idempotency was declared: branch retries on result.outcome ('applied' | 'replayed')
 
 // Check side effects
 if (result.sideEffects?.emailNotification?.error) {
@@ -4384,6 +4435,7 @@ type DispatchResponse = {
     effects?: RecordMutationEvent[]
     sideEffects?: { [k: string]: { result?: unknown, error?: unknown } }
     context?: { [k: string]: unknown }
+    outcome?: 'applied' | 'replayed'
 }
 
 // Interaction event arguments (used when dispatching Interactions)
@@ -4491,7 +4543,7 @@ const Post = Entity.create({
                 type: 'create'
             }
         },
-        callback: async function(this: Controller, mutationEvent) {
+        callback: async function(this: ComputationActionContext, mutationEvent) {
             const event = mutationEvent.record
             if (event.interactionName === 'createPost') {
                 return {
@@ -4518,7 +4570,7 @@ const UserPostRelation = Relation.create({
                 type: 'create'
             }
         },
-        callback: async function(this: Controller, mutationEvent) {
+        callback: async function(this: ComputationActionContext, mutationEvent) {
             const event = mutationEvent.record
             if (event.interactionName === 'createPost') {
                 return {

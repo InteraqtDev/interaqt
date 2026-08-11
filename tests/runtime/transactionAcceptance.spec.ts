@@ -164,7 +164,7 @@ describe("dispatch transaction acceptance", () => {
     const guarded = EventSource.create({
       name: "txnAcceptanceGuarded",
       entity: GuardEventRecord,
-      guard: async () => {
+      admit: async () => {
         throw new Error("guard rejected");
       },
       mapEventData: () => ({ kind: "guarded" }),
@@ -661,7 +661,7 @@ describe("dispatch transaction acceptance", () => {
         name: "_TxnAcceptanceViewEvent_",
         properties: [Property.create({ name: "kind", type: "string" })],
       }),
-      guard: async function(this: Controller) {
+      admit: async function(this: Controller) {
         seen.push(["guard", this.system.storage.getTransactionIsolation()]);
       },
       mapEventData: () => {

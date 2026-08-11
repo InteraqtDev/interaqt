@@ -374,4 +374,9 @@ export const GetVersionHistory = Interaction.create({
 - [ ] Payload items have appropriate required flags
 - [ ] Collections use isCollection: true
 - [ ] No permissions or constraints included
-- [ ] TypeScript compilation passes 
+- [ ] TypeScript compilation passes
+
+## Optional dispatch idempotency
+
+When the product needs client-safe retries, declare `idempotency` on the Interaction and branch on `result.outcome` (`applied` | `replayed`). Do not teach scanning `effects` or unique-constraint errors as the replay signal. Concurrent in-flight same keys use `IdempotencyError` / `IDEMPOTENCY_IN_FLIGHT`.
+

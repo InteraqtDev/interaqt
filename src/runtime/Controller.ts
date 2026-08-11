@@ -1,6 +1,6 @@
-import { BoolExp, EntityInstance, RelationInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
+import { BoolExp, EntityInstance, EntityRetention, RelationInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
 import { MatchExp } from "@storage";
-import { ComputationState, RecordMutationEvent, System, SystemLogger } from "./System.js";
+import { ComputationState, RecordMutationEvent, Storage, System, SystemLogger } from "./System.js";
 import './computations/index.js';
 import { Computation, ComputationResult, ComputationResultSkip, ComputationResultPatch, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/Computation.js";
 import { Scheduler } from "./Scheduler.js";
@@ -15,7 +15,7 @@ import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
 import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
-import { ComputationError, SchedulerError, SideEffectError } from "./errors/index.js";
+import { ComputationError, IdempotencyError, SchedulerError, SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
@@ -111,12 +111,38 @@ type SideEffectResult = {
     error?: unknown
 }
 
+export type DispatchOutcome = 'applied' | 'replayed'
+
 export type DispatchResponse = {
     error?: unknown
     data?: unknown
     effects?: RecordMutationEvent[]
     sideEffects?: { [k: string]: SideEffectResult }
     context?: { [k: string]: unknown }
+    /**
+     * Present only when the EventSource participates in idempotency and the attempt
+     * succeeds. Must be absent for non-participating successes and for failures.
+     */
+    outcome?: DispatchOutcome
+}
+
+export type EntityRetentionControllerOptions = {
+    /**
+     * When true, call `maintainEntityRetention()` after a successful dispatch commit
+     * (and after postCommit / mutation side effects). Default false — explicit control.
+     * Still uses the same single prune path; does not invent a second deletion semantics.
+     */
+    runAfterSuccessfulDispatch?: boolean
+}
+
+export type RetentionEntityReport = {
+    entityName: string
+    removed: number
+}
+
+export type RetentionReport = {
+    entities: RetentionEntityReport[]
+    removed: number
 }
 
 export interface ControllerOptions {
@@ -131,9 +157,67 @@ export interface ControllerOptions {
     computations?: (new (...args: any[]) => Computation)[]
     ignoreGuard?: boolean
     forceThrowDispatchError?: boolean
+    /**
+     * Optional automatic entity retention hook. Default is off.
+     * Distinct from `cleanupAsyncTasks` (internal async-task terminal rows only).
+     */
+    entityRetention?: EntityRetentionControllerOptions
 }
 
 export const HARD_DELETION_PROPERTY_NAME = '_isDeleted_'
+
+/** Internal batch size for retention deletes (keeps mutation events bounded). */
+const ENTITY_RETENTION_DELETE_BATCH = 500
+
+function stablePartitionKeyPart(value: unknown): string {
+    if (value === null || value === undefined) return `\u0000${String(value)}`
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return `${typeof value}:${String(value)}`
+    }
+    try {
+        return `json:${JSON.stringify(value)}`
+    } catch {
+        return `raw:${String(value)}`
+    }
+}
+
+/**
+ * DESC comparator for retention orderBy keys: higher / later values rank first.
+ * Nullish sorts last (oldest for retention purposes).
+ */
+function compareRetentionOrder(
+    a: Record<string, unknown>,
+    b: Record<string, unknown>,
+    orderBy: string[],
+): number {
+    for (const key of orderBy) {
+        const av = a[key]
+        const bv = b[key]
+        if (av === bv) continue
+        if (av === null || av === undefined) return 1
+        if (bv === null || bv === undefined) return -1
+        if (typeof av === 'number' && typeof bv === 'number') {
+            if (av > bv) return -1
+            if (av < bv) return 1
+            continue
+        }
+        if (typeof av === 'string' && typeof bv === 'string') {
+            if (av > bv) return -1
+            if (av < bv) return 1
+            continue
+        }
+        const as = String(av)
+        const bs = String(bv)
+        if (as > bs) return -1
+        if (as < bs) return 1
+    }
+    // Stable tie-break on id DESC so equal orderBy keys still have a total order.
+    const aid = String(a.id ?? '')
+    const bid = String(b.id ?? '')
+    if (aid > bid) return -1
+    if (aid < bid) return 1
+    return 0
+}
 
 type DispatchExecutionContext = {
     eventSourceName?: string
@@ -207,6 +291,7 @@ export class Controller {
     public recordMutationSideEffects: RecordMutationSideEffect<unknown>[] = []
     public ignoreGuard: boolean
     public forceThrowDispatchError: boolean
+    public entityRetentionOptions: EntityRetentionControllerOptions
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private eventSourcesByName = new Map<string, EventSourceInstance<any, any>>()
@@ -224,11 +309,15 @@ export class Controller {
             computations = [],
             ignoreGuard = false,
             forceThrowDispatchError = false,
+            entityRetention,
         } = options
         
         this.system = system
         this.ignoreGuard = ignoreGuard
         this.forceThrowDispatchError = forceThrowDispatchError
+        this.entityRetentionOptions = {
+            runAfterSuccessfulDispatch: entityRetention?.runAfterSuccessfulDispatch === true,
+        }
         this.entities = [...entities]
         this.relations = [...relations]
         this.dict = [...dict]
@@ -436,6 +525,168 @@ export class Controller {
             results.push({ taskRecordName, removed })
         }
         return results
+    }
+
+    /**
+     * Single entry point for declarative entity row retention (FR-RET-01).
+     *
+     * Scans only entities that declare a non-forever `retention`. Runs in independent
+     * storage transaction(s) outside any business attempt. Does not clean internal
+     * async-task tables — use `cleanupAsyncTasks` for those.
+     *
+     * Combination order for `mode:'cap'` with optional `ttl`: expire by TTL first, then
+     * apply per-partition latest-N by explicit `orderBy` (each key DESC).
+     */
+    async maintainEntityRetention(options?: {
+        entityNames?: string[]
+        now?: number
+    }): Promise<RetentionReport> {
+        const now = options?.now ?? Date.now()
+        if (typeof now !== 'number' || !Number.isFinite(now)) {
+            throw new Error(`maintainEntityRetention options.now must be a finite number (epoch milliseconds); got ${JSON.stringify(options?.now)}`)
+        }
+
+        const nameFilter = options?.entityNames
+        if (nameFilter !== undefined) {
+            if (!Array.isArray(nameFilter) || nameFilter.some(n => typeof n !== 'string' || n.length === 0)) {
+                throw new Error('maintainEntityRetention options.entityNames must be an array of non-empty entity names when provided')
+            }
+        }
+        const nameSet = nameFilter ? new Set(nameFilter) : null
+
+        const targets = this.entities.filter(entity => {
+            if (nameSet && !nameSet.has(entity.name)) return false
+            const retention = entity.retention
+            if (!retention || retention.mode === 'forever') return false
+            // Filtered / merged should already fail at Entity.create; skip defensively.
+            if (entity.baseEntity || entity.inputEntities) return false
+            return true
+        })
+
+        if (nameSet) {
+            for (const name of nameSet) {
+                const entity = this.entities.find(e => e.name === name)
+                if (!entity) {
+                    throw new Error(
+                        `maintainEntityRetention: unknown entity name "${name}". ` +
+                        `Pass names of entities registered on this Controller.`,
+                    )
+                }
+            }
+        }
+
+        const entities: RetentionEntityReport[] = []
+        let removedTotal = 0
+        for (const entity of targets) {
+            const retention = entity.retention
+            if (!retention || retention.mode === 'forever') continue
+            const activeRetention = retention
+            const removed = await this.system.storage.runInTransaction(
+                { name: `maintainEntityRetention:${entity.name}` },
+                async () => this.applyEntityRetention(entity.name, activeRetention, now),
+            ) as number
+            entities.push({ entityName: entity.name, removed })
+            removedTotal += removed
+        }
+        return { entities, removed: removedTotal }
+    }
+
+    private async applyEntityRetention(
+        entityName: string,
+        retention: Exclude<EntityRetention, { mode: 'forever' }>,
+        now: number,
+    ): Promise<number> {
+        let removed = 0
+        if (retention.mode === 'ttl') {
+            removed += await this.deleteExpiredByTtl(entityName, retention.ttl, now)
+            return removed
+        }
+        // mode: 'cap' — optional ttl first, then latest-N
+        if (retention.ttl) {
+            removed += await this.deleteExpiredByTtl(entityName, retention.ttl, now)
+        }
+        removed += await this.deleteBeyondCap(entityName, retention)
+        return removed
+    }
+
+    private async deleteExpiredByTtl(
+        entityName: string,
+        ttl: { timestampProperty: string; maxAgeMs: number },
+        now: number,
+    ): Promise<number> {
+        const cutoff = now - ttl.maxAgeMs
+        let removed = 0
+        // Batch by id so large tables do not build one giant mutation event list.
+        for (;;) {
+            const expired = await this.system.storage.find(
+                entityName,
+                MatchExp.atom({ key: ttl.timestampProperty, value: ['<', cutoff] }),
+                { limit: ENTITY_RETENTION_DELETE_BATCH, orderBy: { id: 'ASC' } },
+                ['id'],
+            ) as Array<{ id: string }>
+            if (!expired.length) break
+            const ids = expired.map(row => row.id)
+            const deleted = await this.system.storage.delete(
+                entityName,
+                MatchExp.atom({ key: 'id', value: ['in', ids] }),
+            ) as unknown as unknown[]
+            const count = Array.isArray(deleted) ? deleted.length : ids.length
+            removed += count
+            if (expired.length < ENTITY_RETENTION_DELETE_BATCH) break
+        }
+        return removed
+    }
+
+    private async deleteBeyondCap(
+        entityName: string,
+        retention: Extract<EntityRetention, { mode: 'cap' }>,
+    ): Promise<number> {
+        const partitionBy = retention.partitionBy ?? []
+        const attributeQuery = ['id', ...new Set([...partitionBy, ...retention.orderBy])]
+        // Full scan of surviving rows after any TTL pass; partition in memory.
+        // Suitable for bounded logs; large tables should schedule maintenance off peak.
+        const rows = await this.system.storage.find(
+            entityName,
+            undefined,
+            undefined,
+            attributeQuery,
+        ) as Array<Record<string, unknown> & { id: string }>
+
+        if (!rows.length) return 0
+
+        const groups = new Map<string, Array<Record<string, unknown> & { id: string }>>()
+        for (const row of rows) {
+            const key = partitionBy.length
+                ? partitionBy.map(name => stablePartitionKeyPart(row[name])).join('\u0001')
+                : ''
+            let group = groups.get(key)
+            if (!group) {
+                group = []
+                groups.set(key, group)
+            }
+            group.push(row)
+        }
+
+        const toDelete: string[] = []
+        for (const group of groups.values()) {
+            if (group.length <= retention.retainLatest) continue
+            group.sort((a, b) => compareRetentionOrder(a, b, retention.orderBy))
+            // After sort: index 0 is newest (DESC). Keep [0, retainLatest).
+            for (let i = retention.retainLatest; i < group.length; i++) {
+                toDelete.push(String(group[i].id))
+            }
+        }
+
+        let removed = 0
+        for (let offset = 0; offset < toDelete.length; offset += ENTITY_RETENTION_DELETE_BATCH) {
+            const batch = toDelete.slice(offset, offset + ENTITY_RETENTION_DELETE_BATCH)
+            const deleted = await this.system.storage.delete(
+                entityName,
+                MatchExp.atom({ key: 'id', value: ['in', batch] }),
+            ) as unknown as unknown[]
+            removed += Array.isArray(deleted) ? deleted.length : batch.length
+        }
+        return removed
     }
 
     // Recovery path for a migration process that died without releasing the
@@ -990,12 +1241,20 @@ export class Controller {
         // COMMIT succeeded (runInTransaction returned). Flush deferred side effects once.
         const deferred = bt.deferred.splice(0, bt.deferred.length)
         bt.active = false
+        let anySuccessfulApplied = false
         for (const item of deferred) {
             if (item.kind === 'postCommit') {
+                if (!item.result.error && item.result.outcome !== 'replayed') {
+                    anySuccessfulApplied = true
+                }
                 await this.runPostCommitHook(item.eventSource, item.args, item.result, this.system.logger)
             } else {
                 await this.runRecordChangeSideEffects(item.result, this.system.logger)
             }
+        }
+        // Same optional hook as non-BT dispatch: after owned COMMIT + deferred postCommit.
+        if (anySuccessfulApplied && this.entityRetentionOptions.runAfterSuccessfulDispatch) {
+            await this.maintainEntityRetention()
         }
         return fnResult
     }
@@ -1099,6 +1358,10 @@ export class Controller {
         }
 
         if (!result.error) {
+            // P (postCommit + mutation side effects): never on idempotent replay.
+            if (result.outcome === 'replayed') {
+                return result
+            }
             if (bt?.active) {
                 // Defer until the business transaction's owned COMMIT succeeds.
                 bt.deferred.push(
@@ -1108,6 +1371,11 @@ export class Controller {
             } else {
                 await this.runPostCommitHook(eventSource, committedAttemptArgs, result, this.system.logger)
                 await this.runRecordChangeSideEffects(result, this.system.logger)
+                // Optional retention maintenance after successful commit + postCommit.
+                // Independent storage transaction(s); never inside the attempt body.
+                if (this.entityRetentionOptions.runAfterSuccessfulDispatch) {
+                    await this.maintainEntityRetention()
+                }
             }
         }
 
@@ -1150,6 +1418,54 @@ export class Controller {
         )
     }
 
+    private resolveIdempotencyParticipation<TArgs, TResult>(
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        attemptArgs: TArgs,
+    ): { participating: false } | { participating: true; namespace: string; key: string } {
+        const config = eventSource.idempotency
+        if (!config) return { participating: false }
+        const keyRaw = config.key(attemptArgs)
+        if (typeof keyRaw !== 'string' || keyRaw.length === 0) {
+            return { participating: false }
+        }
+        const scope = config.scope ?? 'eventSource'
+        let namespace: string
+        if (scope === 'eventSource') {
+            namespace = eventSource.name
+        } else if (scope === 'interaction') {
+            const interactionKey = eventSource.idempotencyInteractionKey
+            if (typeof interactionKey !== 'string' || interactionKey.length === 0) {
+                throw new Error(
+                    `EventSource "${eventSource.name}" uses idempotency.scope "interaction" but has no idempotencyInteractionKey. ` +
+                    `Interaction.create installs this automatically; Activity wrappers forward the interaction uuid.`
+                )
+            }
+            namespace = `interaction:${interactionKey}`
+        } else if (scope && typeof scope === 'object' && typeof scope.custom === 'function') {
+            const customNs = scope.custom(attemptArgs)
+            if (typeof customNs !== 'string' || customNs.length === 0) {
+                throw new Error(
+                    `EventSource "${eventSource.name}" idempotency.scope.custom must return a non-empty string`
+                )
+            }
+            namespace = customNs
+        } else {
+            throw new Error(
+                `EventSource "${eventSource.name}" has an invalid idempotency.scope`
+            )
+        }
+        return { participating: true, namespace, key: keyRaw }
+    }
+
+    private jsonSafeSubset(value: unknown): unknown {
+        if (value === undefined) return undefined
+        try {
+            return JSON.parse(JSON.stringify(value))
+        } catch {
+            return undefined
+        }
+    }
+
     private async runDispatchAttemptBody<TArgs, TResult>(
         eventSource: EventSourceInstance<TArgs, TResult>,
         attemptArgs: TArgs,
@@ -1162,8 +1478,88 @@ export class Controller {
             // nested runInTransaction only increments depth (reuse) — attempt rollback is SAVEPOINT.
             return this.system.storage.runInTransaction({ name: eventSource.name, isolation }, async () => {
                 return dispatchExecutionContext.run({ eventSourceName: eventSource.name }, async () => {
-                    if (!this.ignoreGuard && eventSource.guard) {
-                        await eventSource.guard.call(this, attemptArgs)
+                    const participation = this.resolveIdempotencyParticipation(eventSource, attemptArgs)
+                    let branch: 'unscoped' | 'applied' | 'replayed' = 'unscoped'
+                    let stored: Awaited<ReturnType<Storage['dispatchIdempotency']['load']>> = null
+
+                    if (participation.participating) {
+                        stored = await this.system.storage.dispatchIdempotency.load(
+                            participation.namespace,
+                            participation.key,
+                        )
+                        if (stored?.state === 'succeeded') {
+                            branch = 'replayed'
+                        } else if (stored?.state === 'in_flight') {
+                            throw new IdempotencyError({
+                                code: 'IDEMPOTENCY_IN_FLIGHT',
+                                namespace: participation.namespace,
+                                idempotencyKey: participation.key,
+                                eventSourceName: eventSource.name,
+                            })
+                        } else {
+                            branch = 'applied'
+                        }
+                    }
+
+                    // --- A admit: applied / replayed / unscoped (unless ignoreGuard) ---
+                    if (!this.ignoreGuard) {
+                        if (typeof eventSource.admit !== 'function') {
+                            throw new Error(
+                                `EventSource "${eventSource.name}" is missing admit. ` +
+                                `Dispatch only runs the admit/open pipeline; install admit (conditions) and optional open (bookkeeping).`
+                            )
+                        }
+                        await eventSource.admit.call(this, attemptArgs)
+                    }
+
+                    if (branch === 'replayed') {
+                        const replayData = eventSource.idempotency?.replayData
+                            ? eventSource.idempotency.replayData(attemptArgs, { data: stored?.data })
+                            : stored?.data
+                        return {
+                            outcome: 'replayed' as const,
+                            data: replayData,
+                            effects: [],
+                            sideEffects: {},
+                            context: stored?.context,
+                        }
+                        // Does not run: open, map, create, resolve, afterDispatch, I-*, P
+                    }
+
+                    // --- applied / unscoped ---
+                    if (branch === 'applied' && participation.participating) {
+                        try {
+                            await this.system.storage.dispatchIdempotency.claim(
+                                participation.namespace,
+                                participation.key,
+                            )
+                        } catch (error) {
+                            if (error instanceof IdempotencyError && error.code === 'IDEMPOTENCY_CONFLICT') {
+                                // Concurrent first attempt finished between load and claim.
+                                // Admit already ran; return the archived success as replayed.
+                                const again = await this.system.storage.dispatchIdempotency.load(
+                                    participation.namespace,
+                                    participation.key,
+                                )
+                                if (again?.state === 'succeeded') {
+                                    const replayData = eventSource.idempotency?.replayData
+                                        ? eventSource.idempotency.replayData(attemptArgs, { data: again.data })
+                                        : again.data
+                                    return {
+                                        outcome: 'replayed' as const,
+                                        data: replayData,
+                                        effects: [],
+                                        sideEffects: {},
+                                        context: again.context,
+                                    }
+                                }
+                            }
+                            throw error
+                        }
+                    }
+
+                    if (typeof eventSource.open === 'function') {
+                        await eventSource.open.call(this, attemptArgs)
                     }
 
                     const eventData = eventSource.mapEventData
@@ -1185,7 +1581,25 @@ export class Controller {
                         }
                     }
 
-                    return { data, effects: effectsContext.effects, sideEffects: {}, context }
+                    if (branch === 'applied' && participation.participating) {
+                        await this.system.storage.dispatchIdempotency.finish(
+                            participation.namespace,
+                            participation.key,
+                            {
+                                data: this.jsonSafeSubset(data),
+                                context: this.jsonSafeSubset(context) as Record<string, unknown> | undefined,
+                                createdAt: Date.now(),
+                            },
+                        )
+                    }
+
+                    return {
+                        outcome: participation.participating ? 'applied' as const : undefined,
+                        data,
+                        effects: effectsContext.effects,
+                        sideEffects: {},
+                        context,
+                    }
                 })
             })
         })

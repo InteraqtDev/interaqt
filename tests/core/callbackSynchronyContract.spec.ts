@@ -50,14 +50,15 @@ const ASYNC_LEGAL: Record<string, Record<string, string>> = {
     Attributive: { content: 'evaluateAsync: awaited' },
     Interaction: {
         // 事件源生命周期钩子全部在 dispatch 管线内 await
-        guard: 'Controller.dispatch: await eventSource.guard.call(...)',
+        admit: 'Controller.dispatch: await eventSource.admit.call(...)',
         mapEventData: 'Controller.dispatch: await eventSource.mapEventData(...)',
         resolve: 'Controller.dispatch: await eventSource.resolve.call(...)',
         afterDispatch: 'Controller.dispatch: await afterDispatch.call(...)',
         postCommit: 'Controller.runPostCommitHook: awaited',
     },
     EventSource: {
-        guard: 'Controller.dispatch: awaited',
+        admit: 'Controller.dispatch: awaited',
+        open: 'Controller.dispatch: await eventSource.open.call(...)',
         mapEventData: 'Controller.dispatch: awaited',
         resolve: 'Controller.dispatch: awaited',
         afterDispatch: 'Controller.dispatch: awaited',

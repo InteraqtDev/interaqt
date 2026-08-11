@@ -30,6 +30,14 @@ export {
     ConditionError
 } from './ConditionErrors.js'
 
+// Dispatch idempotency ledger errors
+export {
+    IdempotencyError
+} from './IdempotencyError.js'
+export type {
+    IdempotencyErrorCode
+} from './IdempotencyError.js'
+
 /**
  * Error utility functions
  */

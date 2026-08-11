@@ -73,6 +73,7 @@ import {
   TransactionRetryExhaustedError,
   isTransactionRetryExhaustedError,
   InteractionGuardError,   // condition/payload guard failures (code/details/conditionName) — official
+  IdempotencyError,        // IDEMPOTENCY_IN_FLIGHT / IDEMPOTENCY_CONFLICT on declared keys
   ConditionError,          // DEPRECATED historical factory/shape; use InteractionGuardError + .code
   ConstraintViolationError,
   ConstraintSetupError,

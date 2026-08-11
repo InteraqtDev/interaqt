@@ -21,6 +21,8 @@ export interface InteractionInstance extends EventSourceInstance<InteractionEven
   payload?: PayloadInstance;
   data?: EntityInstance | RelationInstance;
   dataPolicy?: DataPolicyInstance;
+  /** Optional dispatch idempotency declaration (forwarded to Activity wrappers). */
+  idempotency?: EventSourceInstance<InteractionEventArgs, unknown>['idempotency']
 }
 
 export type InteractionEventArgs = {
@@ -67,6 +69,11 @@ export interface InteractionCreateArgs {
   payload?: PayloadInstance;
   data?: EntityInstance | RelationInstance;
   dataPolicy?: DataPolicyInstance;
+  /**
+   * Optional idempotency declaration. When `key(args)` returns a non-empty string,
+   * successful dispatches carry `outcome: 'applied' | 'replayed'`.
+   */
+  idempotency?: EventSourceInstance<InteractionEventArgs, unknown>['idempotency']
 }
 
 export class Interaction implements InteractionInstance {
@@ -81,9 +88,14 @@ export class Interaction implements InteractionInstance {
   public dataPolicy?: DataPolicyInstance;
 
   public entity!: EntityInstance;
+  public admit?: (this: Controller, args: InteractionEventArgs) => Promise<void>;
+  /** @deprecated alias of `admit` — same function reference */
   public guard?: (this: Controller, args: InteractionEventArgs) => Promise<void>;
+  public open?: (this: Controller, args: InteractionEventArgs) => Promise<void>;
   public mapEventData?: (args: InteractionEventArgs) => Record<string, unknown>;
   public resolve?: (this: Controller, args: InteractionEventArgs) => Promise<unknown>;
+  public idempotency?: EventSourceInstance<InteractionEventArgs, unknown>['idempotency'];
+  public idempotencyInteractionKey?: string;
   
   constructor(args: InteractionCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -94,6 +106,7 @@ export class Interaction implements InteractionInstance {
     this.payload = args.payload;
     this.data = args.data;
     this.dataPolicy = args.dataPolicy;
+    this.idempotency = args.idempotency;
   }
   
   static isKlass = true as const;
@@ -129,7 +142,12 @@ export class Interaction implements InteractionInstance {
       type: 'DataPolicy' as const,
       required: false as const,
       collection: false as const
-    }
+    },
+    idempotency: {
+      type: 'object' as const,
+      required: false as const,
+      collection: false as const,
+    },
   };
   
   static create(args: InteractionCreateArgs, options?: { uuid?: string }): InteractionInstance {
@@ -173,8 +191,12 @@ export class Interaction implements InteractionInstance {
 
     instance.entity = InteractionEventEntity;
 
-    instance.guard = buildInteractionGuard(instance);
+    const admit = buildInteractionAdmit(instance);
+    instance.admit = admit;
+    instance.guard = admit; // same reference — no dual-track admission
     instance.mapEventData = buildInteractionMapEventData(instance);
+    // Stable key for idempotency.scope === 'interaction' (shared across Activity wrappers).
+    instance.idempotencyInteractionKey = instance.uuid;
 
     if (isGetAction) {
       instance.resolve = buildInteractionResolve(instance);
@@ -202,6 +224,7 @@ export class Interaction implements InteractionInstance {
 
     if (instance.data !== undefined) args.data = instance.data;
     if (instance.dataPolicy !== undefined) args.dataPolicy = instance.dataPolicy;
+    if (instance.idempotency !== undefined) args.idempotency = instance.idempotency;
     
     return this.create(args);
   }
@@ -264,7 +287,7 @@ export class InteractionGuardError extends Error {
   }
 }
 
-function buildInteractionGuard(interaction: InteractionInstance): (this: Controller, args: InteractionEventArgs) => Promise<void> {
+function buildInteractionAdmit(interaction: InteractionInstance): (this: Controller, args: InteractionEventArgs) => Promise<void> {
   return async function(this: Controller, args: InteractionEventArgs) {
     await runInteractionGuard(this, interaction, args);
   };

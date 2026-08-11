@@ -1310,6 +1310,9 @@ await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async
 ## Error Handling
 
 > **Default (no business transaction)**: `controller.dispatch` / `callInteraction` return a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw). Branch business rejects on stable **`result.error.code`** (and `conditionName` when needed), not duck-typed `type` alone.  
+
+**Idempotency.** When the Interaction declares `idempotency`, successful responses include `outcome: 'applied' | 'replayed'`. Branch client retries on `outcome`. Do not infer replay by scanning `effects` or by treating unique-constraint errors as success. Concurrent same-key attempts that race an in-flight claim throw/return `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'`. Replay still runs admit (conditions) and skips open, event create, resolve, afterDispatch, and postCommit.
+
 > **Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`**: failed dispatch **throws** (for example `InteractionGuardError` with `code` / `details` / `conditionName`); the business transaction rejects and rolls back. Use `try/catch` or `expect(...).rejects` only for that path (or when you pass `forceThrowDispatchError`).  
 > **Opt-in `onDispatchError: 'continue'`**: soft `result.error` again; caller owns whether to continue.  
 > **Boundary errors** (`NestedDispatchError`, `BusinessTransactionBoundaryError` including `DISPATCH_IN_NON_BT_TRANSACTION`) always **throw** to the caller — they are never soft-wrapped as `result.error`.

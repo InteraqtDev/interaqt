@@ -106,7 +106,7 @@ describe('EventSource', () => {
       const webhookEvent = EventSource.create<WebhookArgs>({
         name: 'paymentWebhook',
         entity: WebhookRecord,
-        guard: async function(args) {
+        admit: async function(args) {
           if (args.signature !== 'valid-signature') {
             throw new Error('Invalid webhook signature');
           }
@@ -161,7 +161,7 @@ describe('EventSource', () => {
       const guardedSource = EventSource.create({
         name: 'guardedSource',
         entity: TestRecord,
-        guard: async function() {
+        admit: async function() {
           throw new Error('Guard should be skipped');
         },
         mapEventData: (args: any) => ({ data: args.data }),
@@ -253,7 +253,7 @@ describe('EventSource', () => {
       const txSource = EventSource.create({
         name: 'txTest',
         entity: TxRecord,
-        guard: async function(args: any) {
+        admit: async function(args: any) {
           if (args.shouldFail) {
             throw new Error('Intentional failure');
           }
@@ -299,7 +299,7 @@ describe('EventSource', () => {
       const throwSource = EventSource.create({
         name: 'throwTest',
         entity: ThrowRecord,
-        guard: async function() {
+        admit: async function() {
           throw new Error('Test error');
         },
         mapEventData: (args: any) => ({ value: args.value }),
@@ -583,7 +583,7 @@ describe('EventSource', () => {
       const guardedSource = EventSource.create({
         name: 'guardedContextTest',
         entity: GuardRecord,
-        guard: async function(this: any, args: any) {
+        admit: async function(this: any, args: any) {
           // Guard has access to controller (this) and can query storage
           const counters = await this.system.storage.find('Counter', undefined, undefined, ['*']);
           if (counters.length > 0 && counters[0].count >= 3) {

@@ -4,6 +4,28 @@
 
 ## [Unreleased]
 
+### Features
+
+* **runtime:** atomic contiguous sequence ranges via `storage.atomic.reserveSequenceRange`
+  (`SequenceRange`); `nextSequenceValue` shares the same upsert kernel. Drivers with
+  atomic sequence capability always ensure `_ScopedSequence_` at install and migration
+  (no Property-declaration gate). Transform/Custom callbacks receive
+  `ComputationActionContext` with official `this.atomic`.
+* **runtime:** optional Interaction/EventSource `idempotency` with first-class
+  `DispatchResponse.outcome: 'applied' | 'replayed'`, unique admit→open dispatch pipeline,
+  internal `_DispatchIdempotency_` ledger, and `IdempotencyError` (`IDEMPOTENCY_IN_FLIGHT` /
+  `IDEMPOTENCY_CONFLICT`).
+* **runtime/core:** declarative `Entity.retention` (`forever` | `cap` | `ttl`) and
+  `controller.maintainEntityRetention` (optional post-dispatch auto-hook, default off).
+  Separate from `cleanupAsyncTasks`.
+
+### Docs
+
+* Usage and generator guides document `this.atomic.reserveSequenceRange`, `outcome`-based
+  idempotent retry, and `maintainEntityRetention`. Removed dual Transform/Custom atomic
+  access tables, multi-row `nextSequenceValue` loops, effects-scanning-as-replay, and
+  hand-written prune as official patterns.
+
 Path uniqueness for transactions and `dispatch` (design:
 `docs/tx-dispatch-path-uniqueness/`). Builds on declarative Condition admission
 locks and `controller.runInBusinessTransaction` (product commit after 4.6.0;

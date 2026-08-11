@@ -708,3 +708,14 @@ Condition-thrown `RequireSerializableRetry` is absorbed as a condition failure a
 15. **When in doubt, check the [API Exports Reference](./18-api-exports-reference.md) and [Conditions guide](./06-attributive-permissions.md)**
 
 Remember: The framework is about **declaring what data is**, not **how to manipulate it**.
+
+## Sequence, idempotency, and retention anti-patterns
+
+| Anti-pattern | Prefer |
+|--------------|--------|
+| Loop `nextSequenceValue` N times for multi-row contiguous tickets | `this.atomic.reserveSequenceRange({ count: N, ... })` |
+| Dual callback access (`this.system.storage.atomic` vs `this.controller.system.storage.atomic`) as the taught API | `this.atomic` on `ComputationActionContext` |
+| Infer idempotent replay by scanning `effects` or catching unique conflicts | Declare `idempotency` and branch on `result.outcome` |
+| Hand-written storage prune loops for history caps/TTL | `Entity.retention` + `controller.maintainEntityRetention` |
+| Using `cleanupAsyncTasks` to delete user entity history | Keep async-task cleanup separate; use entity retention for user rows |
+

@@ -27,7 +27,7 @@ function createEventSource(name: string, entity: any) {
     uuid: `${name}_uuid`,
     name,
     entity,
-    guard: async () => true,
+    admit: async () => true,
     mapEventData: (args: any) => args.payload,
   } as any;
 }

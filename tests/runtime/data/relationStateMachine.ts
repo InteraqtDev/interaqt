@@ -34,7 +34,7 @@ export function createData() {
         ],
         computation: Transform.create({
             record: InteractionEventEntity,
-            callback: async function(this: Controller, event: any) {
+            callback: async function(this: any, event: any) {
                 if (event.interactionName === sendInteraction.name) {
                     return {
                         title: event.payload.title,
@@ -97,12 +97,12 @@ export function createData() {
         // 使用 Transform 从交互事件创建关系
         computation: Transform.create({
             record: InteractionEventEntity,
-            callback: async function(this: Controller, eventArgs: any) {
-                const MatchExp = this.globals.MatchExp
+            callback: async function(this: any, eventArgs: any) {
+                const MatchExp = this.controller.globals.MatchExp
                 
                 // 从 sendRequest 创建初始关系
                 if (eventArgs.interactionName === sendInteraction.name) {
-                    const request = await this.system.storage.findOne(RequestEntity.name, MatchExp.atom({
+                    const request = await this.controller.system.storage.findOne(RequestEntity.name, MatchExp.atom({
                         key: 'interaction.id',
                         value: ['=', eventArgs.id]
                     }), undefined, ['id'])

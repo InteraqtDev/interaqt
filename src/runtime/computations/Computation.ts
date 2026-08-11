@@ -4,10 +4,23 @@ import {
     type ComputationRecord
 } from "@core";
 import { Controller } from "../Controller";
+import type { AtomicStorage } from "../System.js";
 import { AttributeQueryData, LINK_SYMBOL, MatchExp, MatchExpressionData, ModifierData } from "@storage";
 import { type ComputationPhase, PHASE_AFTER_ALL, PHASE_BEFORE_ALL, PHASE_NORMAL} from "../ComputationSourceMap";
 import type { EtityMutationEvent } from "../ComputationSourceMap.js";
 import { ComputationProtocolError } from "../errors/ComputationErrors.js";
+
+/**
+ * Unified `this` for Transform / Custom computation callbacks.
+ * `atomic` is always `controller.system.storage.atomic`.
+ * Custom callbacks may also receive `state` / `getState`.
+ */
+export type ComputationActionContext = {
+    controller: Controller
+    atomic: AtomicStorage
+    state?: {[key: string]: RecordBoundState<any>|GlobalBoundState<any>}
+    getState?: (key: string) => RecordBoundState<any>|GlobalBoundState<any>|undefined
+}
 
 // Types from ComputationHandle.ts
 export type GlobalDataContext = {

@@ -84,6 +84,9 @@ PostgreSQL sequence gaps are normal after rollback or failed transactions. Do no
 
 Use `ScopedSequence` when a number property needs a unique serial inside a business scope, for example `project + prefix + serialNumber`.
 
+For multi-row contiguous ranges in one transaction, use `storage.atomic.reserveSequenceRange` (from Transform/Custom via `this.atomic`). Real PostgreSQL dual-connection concurrency for ranges is covered by `tests/runtime/postgresqlSequenceRange.spec.ts` when `INTERAQT_POSTGRES_DATABASE` is set. Do not use application-side counter SQL.
+
+
 Key semantics:
 
 - Allocation happens after the host record create mutation and before the dispatch transaction commits.

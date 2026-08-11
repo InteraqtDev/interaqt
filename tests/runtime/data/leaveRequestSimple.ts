@@ -108,15 +108,15 @@ const reviewerRelation = Relation.create({
     // TODO 改 interaction，没有 mapInteractionItem 了
     computation: Transform.create({
         record: InteractionEventEntity,
-        callback: async function map(this: Controller, event: any) {
-            const {BoolExp} = this.globals
+        callback: async function map(this: any, event: any) {
+            const {BoolExp} = this.controller.globals
 
             const match = BoolExp.atom({
                 key: 'id',
                 value: ['=', event.user.id]
             })
 
-            const {supervisor} = await this.system.storage.findOne(
+            const {supervisor} = await this.controller.system.storage.findOne(
                 'User',
                 match,
                 undefined,

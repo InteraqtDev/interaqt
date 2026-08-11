@@ -481,7 +481,7 @@ describe("transaction retry and serializable promotion", () => {
     const fromGuard = EventSource.create({
       name: "nestedDispatchFromGuard",
       entity: GuardEventRecord,
-      guard: async function(this: Controller) {
+      admit: async function(this: Controller) {
         await this.dispatch(inner, {});
       },
       mapEventData: () => ({ kind: "guard" }),

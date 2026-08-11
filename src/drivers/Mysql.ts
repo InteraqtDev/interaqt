@@ -178,6 +178,19 @@ export class MysqlDB implements Database{
         await this.db.connect()
         await this.db.query(`SET sql_mode='ANSI_QUOTES'`)
     }
+    // Always-install internal ledger table (dispatch still fails without transactions).
+    async setupDispatchIdempotencyState() {
+        await this.scheme(`
+CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" (
+    \`namespace\` VARCHAR(191) NOT NULL,
+    \`idempotencyKey\` VARCHAR(191) NOT NULL,
+    \`state\` VARCHAR(32) NOT NULL,
+    \`data\` JSON NULL,
+    \`context\` JSON NULL,
+    \`createdAt\` DOUBLE NOT NULL,
+    PRIMARY KEY (\`namespace\`, \`idempotencyKey\`)
+)`, 'setup dispatch idempotency table')
+    }
     async query<T>(sql:string, where: unknown[] =[], name= '')  {
         const context= asyncInteractionContext.getStore() as InteractionContext
         const logger = this.logger.child(context?.logContext || {})

@@ -19,6 +19,7 @@ Entity.create(config: EntityConfig): KlassInstance<typeof Entity>
 - `config.computation` (Computation[], optional): Entity-level computed data
 - `config.baseEntity` (Entity|Relation, optional): Base entity for filtered entity (used to create filtered entities)
 - `config.filterCondition` (MatchExp, optional): Filter condition (used to create filtered entities)
+- `config.retention` (EntityRetention, optional): Declarative row retention for ordinary entities. Omitted or `{ mode: 'forever' }` means this mechanism never deletes. `mode: 'cap'` keeps the latest N rows per partition (`retainLatest` + required `orderBy` DESC keys; optional nested `ttl`). `mode: 'ttl'` deletes only by age (`ttl.timestampProperty` + `ttl.maxAgeMs`; no `orderBy`/`retainLatest`). Filtered/merged entities and hard-deletion hosts cannot declare retention (create-time fail-fast). Pruning runs only through `controller.maintainEntityRetention` (optional auto-hook is off by default).
 
 **Examples**
 ```typescript
@@ -596,6 +597,31 @@ const Media = Entity.create({
 - Keep a `UniqueConstraint` over scope fields plus the sequence property.
 - PostgreSQL is production-safe for cross-connection allocation; PGLite and SQLite are local/test-level only.
 - Existing data migrations must seed every future allocation scope. Do not use `initializeFrom.match` to seed only part of a sequence that will allocate for all host rows.
+
+### Atomic multi-row sequence ranges (`storage.atomic.reserveSequenceRange`)
+
+For **multi-row contiguous ticket numbers** in one transaction (for example a Transform that emits N change-log rows), use the atomic range API. Do **not** loop `nextSequenceValue`, and do **not** write dialect SQL counters.
+
+```typescript
+// Official entry inside Transform / Custom callbacks:
+const { start, count, step } = await this.atomic.reserveSequenceRange({
+  sequenceName: 'WorkspaceChangeSeq',
+  scope: [
+    { name: 'workspace', type: 'ref', value: { type: 'ref', entity: 'Workspace', id: workspaceId } },
+  ],
+  initialValue: 0,
+  step: 1,
+  count: items.length, // N ≥ 1
+})
+// Writable values: start + i * step for i = 0..count-1
+```
+
+- `this` in Transform and Custom callbacks is a `ComputationActionContext`: `{ controller, atomic, … }`.
+  `this.atomic` is always `controller.system.storage.atomic`.
+- Outside computation callbacks, call `controller.system.storage.atomic.reserveSequenceRange(...)` directly.
+- Property-level `ScopedSequence` remains the single-value-per-host-row allocator. Share sequence names only when you intend shared counters; otherwise **use distinct `sequenceName` values**.
+- Successful commits keep each reserved range contiguous; rolled-back transactions may leave global gaps (same policy as single-value allocation).
+- Real PostgreSQL dual-connection concurrency is covered by `tests/runtime/postgresqlSequenceRange.spec.ts` (requires `INTERAQT_POSTGRES_DATABASE`).
 
 ### StateMachine.create()
 
@@ -1322,17 +1348,47 @@ Initialize system.
 await controller.setup(true) // Create database tables
 ```
 
-#### dispatch(eventSource, args): Promise\<DispatchResponse\>
-Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` while a **non-business-transaction** storage transaction is active throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'` — use `runInBusinessTransaction` for same-request write + dispatch. Pure `storage.runInTransaction` without `dispatch` remains legal.
+#### maintainEntityRetention(options?): Promise\<RetentionReport\>
+Single official entry that applies declared entity `retention` (cap and/or TTL). Runs in storage transaction(s) **outside** the business dispatch attempt. Entities without retention (or `mode: 'forever'`) are never scanned. Deletes go through `storage.delete` and emit normal mutation events.
 
 ```typescript
-const result = await controller.dispatch(CreatePost, {
-    user: { id: 'user1' },
-    payload: { title: 'Hello', content: 'World' }
+// Explicit maintenance (recommended default)
+await controller.maintainEntityRetention()
+await controller.maintainEntityRetention({ entityNames: ['AuditLog'], now: Date.now() })
+```
+
+Optional auto-hook (default **off**):
+```typescript
+new Controller({
+  // ...
+  entityRetention: { runAfterSuccessfulDispatch: true },
 })
+```
+When enabled, the same API runs after a successful non-replayed dispatch commit (and after BT-owned COMMIT). Failed dispatches and idempotent replays do not prune. This is **not** a substitute for `cleanupAsyncTasks` (async task terminal rows only).
+
+#### dispatch(eventSource, args): Promise\<DispatchResponse\>
+Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction on the **unique pipeline** `admit → open? → map → create → resolve → afterDispatch` (then commit / SAVEPOINT release; `postCommit` only after the owning commit). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` while a **non-business-transaction** storage transaction is active throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'` — use `runInBusinessTransaction` for same-request write + dispatch. Pure `storage.runInTransaction` without `dispatch` remains legal.
+
+**Idempotent dispatch (optional).** Declare `idempotency` on the Interaction / EventSource (key from payload/user — never from a not-yet-created `activityId`). Successful participating responses always carry `outcome: 'applied' | 'replayed'`. Replays re-run **admit** only and skip open/create/resolve/afterDispatch/`postCommit`. Concurrent same-key in-flight attempts surface `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'` (not a unique-constraint guess, and not `replayed`). Do **not** scan `effects` or treat unique conflicts as replay.
+
+```typescript
+const CreateOrder = Interaction.create({
+  name: 'CreateOrder',
+  action: Action.create({ name: 'createOrder' }),
+  // ...
+  idempotency: {
+    // namespace defaults to the event source name when omitted
+    key: (event) => String(event.payload.clientRequestId),
+  },
+})
+
+const first = await controller.dispatch(CreateOrder, { user, payload: { clientRequestId: 'c1', ... } })
+// first.outcome === 'applied'
+const second = await controller.dispatch(CreateOrder, { user, payload: { clientRequestId: 'c1', ... } })
+// second.outcome === 'replayed' — branch on outcome, not effects length
 if (result.error) {
     // soft failure outside business-transaction abort mode
-    // branch on result.error.code (InteractionGuardError), not duck-typed type alone
+    // InteractionGuardError.code / IdempotencyError.code — not duck-typed type alone
 }
 ```
 

@@ -8,6 +8,40 @@ import type { ConstraintInstance } from './Constraint.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
+/**
+ * Hard-deletion computed property name. Kept as a core-side literal so Entity.create
+ * can reject retention on hosts that already own physical hard-delete semantics.
+ * Must stay aligned with `HARD_DELETION_PROPERTY_NAME` in runtime/Controller.
+ */
+const HARD_DELETION_PROPERTY_NAME = '_isDeleted_';
+
+/**
+ * Declarative row retention for ordinary entities (not Relation / filtered / merged).
+ * - forever / omitted: this mechanism never deletes
+ * - cap: keep latest N per partition by explicit orderBy (DESC); optional ttl runs first
+ * - ttl: delete by timestamp only; no orderBy / retainLatest
+ */
+export type EntityRetention =
+  | { mode: 'forever' }
+  | {
+      mode: 'cap'
+      partitionBy?: string[]
+      retainLatest: number
+      orderBy: string[]
+      ttl?: {
+        timestampProperty: string
+        maxAgeMs: number
+      }
+    }
+  | {
+      mode: 'ttl'
+      partitionBy?: string[]
+      ttl: {
+        timestampProperty: string
+        maxAgeMs: number
+      }
+    }
+
 export interface EntityInstance extends IInstance {
   name: string;
   properties: PropertyInstance[];
@@ -17,6 +51,7 @@ export interface EntityInstance extends IInstance {
   inputEntities?: EntityInstance[]; // for Merged Entity
   commonProperties?: PropertyInstance[]; // for Merged Entity
   constraints?: ConstraintInstance[];
+  retention?: EntityRetention;
 }
 
 export interface EntityCreateArgs {
@@ -28,6 +63,194 @@ export interface EntityCreateArgs {
   inputEntities?: EntityInstance[]; // for Merged Entity
   commonProperties?: PropertyInstance[]; // for Merged Entity
   constraints?: ConstraintInstance[];
+  retention?: EntityRetention;
+}
+
+function propertyByName(properties: PropertyInstance[] | undefined, name: string): PropertyInstance | undefined {
+  return (properties || []).find(p => p.name === name);
+}
+
+function assertRetentionPropertyName(
+  entityName: string,
+  fieldLabel: string,
+  propertyName: string,
+  properties: PropertyInstance[] | undefined,
+): PropertyInstance {
+  if (typeof propertyName !== 'string' || !validNameFormatExp.test(propertyName)) {
+    throw new Error(
+      `Entity "${entityName}" retention.${fieldLabel} "${propertyName}" is not a valid property name.`,
+    );
+  }
+  const property = propertyByName(properties, propertyName);
+  if (!property) {
+    throw new Error(
+      `Entity "${entityName}" retention.${fieldLabel} references unknown property "${propertyName}". ` +
+      `Declare the property on the entity, or correct the retention declaration.`,
+    );
+  }
+  return property;
+}
+
+function assertTtlConfig(
+  entityName: string,
+  ttl: { timestampProperty: string; maxAgeMs: number } | undefined,
+  properties: PropertyInstance[] | undefined,
+  required: boolean,
+): void {
+  if (ttl === undefined) {
+    if (required) {
+      throw new Error(`Entity "${entityName}" retention.mode "ttl" requires a ttl configuration.`);
+    }
+    return;
+  }
+  if (ttl === null || typeof ttl !== 'object' || Array.isArray(ttl)) {
+    throw new Error(`Entity "${entityName}" retention.ttl must be an object with timestampProperty and maxAgeMs.`);
+  }
+  const timestampProperty = assertRetentionPropertyName(
+    entityName,
+    'ttl.timestampProperty',
+    ttl.timestampProperty,
+    properties,
+  );
+  // Framework stores absolute instants as number (epoch ms) or timestamp columns.
+  if (timestampProperty.type !== 'number' && timestampProperty.type !== 'timestamp') {
+    throw new Error(
+      `Entity "${entityName}" retention.ttl.timestampProperty "${ttl.timestampProperty}" must have type "number" or "timestamp" (got "${timestampProperty.type}").`,
+    );
+  }
+  if (typeof ttl.maxAgeMs !== 'number' || !Number.isFinite(ttl.maxAgeMs) || ttl.maxAgeMs <= 0) {
+    throw new Error(
+      `Entity "${entityName}" retention.ttl.maxAgeMs must be a positive finite number (milliseconds).`,
+    );
+  }
+}
+
+function assertPartitionBy(
+  entityName: string,
+  partitionBy: string[] | undefined,
+  properties: PropertyInstance[] | undefined,
+): void {
+  if (partitionBy === undefined) return;
+  if (!Array.isArray(partitionBy)) {
+    throw new Error(`Entity "${entityName}" retention.partitionBy must be an array of property names when provided.`);
+  }
+  for (const name of partitionBy) {
+    assertRetentionPropertyName(entityName, 'partitionBy', name, properties);
+  }
+}
+
+/**
+ * Normalize and validate EntityRetention. Returns undefined when omitted.
+ * Fail-fast on filtered/merged hosts, hard-deletion hosts, and malformed unions.
+ */
+export function normalizeEntityRetention(
+  entityName: string,
+  retention: EntityRetention | undefined,
+  context: {
+    properties?: PropertyInstance[]
+    baseEntity?: unknown
+    inputEntities?: unknown
+  },
+): EntityRetention | undefined {
+  if (retention === undefined) return undefined;
+  if (retention === null || typeof retention !== 'object' || Array.isArray(retention)) {
+    throw new Error(
+      `Entity "${entityName}" retention must be a discriminated object with mode "forever" | "cap" | "ttl".`,
+    );
+  }
+  if (context.baseEntity) {
+    throw new Error(
+      `Filtered entity "${entityName}" cannot declare retention. Retention applies only to ordinary (physical) entities — declare it on the base entity instead.`,
+    );
+  }
+  if (context.inputEntities) {
+    throw new Error(
+      `Merged entity "${entityName}" cannot declare retention. Retention applies only to ordinary (physical) entities — declare it on each input entity instead.`,
+    );
+  }
+  const properties = context.properties || [];
+  if (properties.some(p => p.name === HARD_DELETION_PROPERTY_NAME)) {
+    throw new Error(
+      `Entity "${entityName}" cannot declare retention together with hard-deletion property "${HARD_DELETION_PROPERTY_NAME}". ` +
+      `Hard deletion already owns physical removal of host rows; choose one mechanism.`,
+    );
+  }
+
+  const mode = (retention as { mode?: unknown }).mode;
+  if (mode === 'forever') {
+    const extra = Object.keys(retention).filter(k => k !== 'mode');
+    if (extra.length) {
+      throw new Error(
+        `Entity "${entityName}" retention.mode "forever" does not accept fields: ${extra.join(', ')}.`,
+      );
+    }
+    return { mode: 'forever' };
+  }
+
+  if (mode === 'cap') {
+    const cap = retention as Extract<EntityRetention, { mode: 'cap' }>;
+    if (typeof cap.retainLatest !== 'number' || !Number.isInteger(cap.retainLatest) || cap.retainLatest <= 0) {
+      throw new Error(
+        `Entity "${entityName}" retention.mode "cap" requires retainLatest to be a positive integer.`,
+      );
+    }
+    if (!Array.isArray(cap.orderBy) || cap.orderBy.length === 0) {
+      throw new Error(
+        `Entity "${entityName}" retention.mode "cap" requires a non-empty orderBy array (each key sorted descending). ` +
+        `Implicit createdAt is not applied — declare orderBy explicitly.`,
+      );
+    }
+    for (const key of cap.orderBy) {
+      assertRetentionPropertyName(entityName, 'orderBy', key, properties);
+    }
+    assertPartitionBy(entityName, cap.partitionBy, properties);
+    assertTtlConfig(entityName, cap.ttl, properties, false);
+    const normalized: Extract<EntityRetention, { mode: 'cap' }> = {
+      mode: 'cap',
+      retainLatest: cap.retainLatest,
+      orderBy: [...cap.orderBy],
+    };
+    if (cap.partitionBy !== undefined) {
+      normalized.partitionBy = [...cap.partitionBy];
+    }
+    if (cap.ttl !== undefined) {
+      normalized.ttl = {
+        timestampProperty: cap.ttl.timestampProperty,
+        maxAgeMs: cap.ttl.maxAgeMs,
+      };
+    }
+    return normalized;
+  }
+
+  if (mode === 'ttl') {
+    const ttlMode = retention as Extract<EntityRetention, { mode: 'ttl' }> & {
+      retainLatest?: unknown
+      orderBy?: unknown
+    };
+    if (ttlMode.retainLatest !== undefined || ttlMode.orderBy !== undefined) {
+      throw new Error(
+        `Entity "${entityName}" retention.mode "ttl" must not declare retainLatest or orderBy. ` +
+        `Use mode "cap" when a latest-N bound is required (optionally with ttl).`,
+      );
+    }
+    assertTtlConfig(entityName, ttlMode.ttl, properties, true);
+    assertPartitionBy(entityName, ttlMode.partitionBy, properties);
+    const normalized: Extract<EntityRetention, { mode: 'ttl' }> = {
+      mode: 'ttl',
+      ttl: {
+        timestampProperty: ttlMode.ttl.timestampProperty,
+        maxAgeMs: ttlMode.ttl.maxAgeMs,
+      },
+    };
+    if (ttlMode.partitionBy !== undefined) {
+      normalized.partitionBy = [...ttlMode.partitionBy];
+    }
+    return normalized;
+  }
+
+  throw new Error(
+    `Entity "${entityName}" retention.mode must be "forever", "cap", or "ttl" (got ${JSON.stringify(mode)}).`,
+  );
 }
 
 export class Entity implements EntityInstance {
@@ -42,6 +265,7 @@ export class Entity implements EntityInstance {
   public inputEntities?: EntityInstance[]; // for Merged Entity
   public commonProperties?: PropertyInstance[]; // for Merged Entity
   public constraints?: ConstraintInstance[];
+  public retention?: EntityRetention;
   constructor(args: EntityCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
@@ -53,6 +277,7 @@ export class Entity implements EntityInstance {
     this.inputEntities = args.inputEntities;
     this.commonProperties = args.commonProperties;
     this.constraints = args.constraints;
+    this.retention = args.retention;
   }
   
   // 静态属性和方法
@@ -132,7 +357,12 @@ export class Entity implements EntityInstance {
       collection: true as const,
       required: false as const,
       defaultValue: () => []
-    }
+    },
+    retention: {
+      type: 'object' as const,
+      collection: false as const,
+      required: false as const,
+    },
   };
   
   static create(args: EntityCreateArgs, options?: { uuid?: string }): EntityInstance {
@@ -176,7 +406,13 @@ export class Entity implements EntityInstance {
     validatePropertyNamesOnCreate(args.name, args.properties, 'Entity');
     validatePropertyNamesOnCreate(args.name, args.commonProperties, 'Entity');
 
-    const instance = new Entity(args, options);
+    const retention = normalizeEntityRetention(args.name, args.retention, {
+      properties: args.properties,
+      baseEntity: args.baseEntity,
+      inputEntities: args.inputEntities,
+    });
+
+    const instance = new Entity({ ...args, retention }, options);
     
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
@@ -212,7 +448,10 @@ export class Entity implements EntityInstance {
         : instance.commonProperties,
       constraints: deep && instance.constraints
         ? [...instance.constraints]
-        : instance.constraints
+        : instance.constraints,
+      retention: instance.retention
+        ? (JSON.parse(JSON.stringify(instance.retention)) as EntityRetention)
+        : undefined,
     };
     
     return new Entity(args);

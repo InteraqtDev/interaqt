@@ -98,7 +98,7 @@ describe('r8 serialization fixes', () => {
         const source = EventSource.create({
             name: 'SerCron',
             entity: Log,
-            guard: async function(args: unknown) { if (!args) throw new Error('no args') },
+            admit: async function(args: unknown) { if (!args) throw new Error('no args') },
             mapEventData: (args: unknown) => ({ message: String(args) })
         });
 
@@ -115,7 +115,7 @@ describe('r8 serialization fixes', () => {
         //  stringify 只序列化 name/entity（guard/mapEventData 全部丢失）。
         expect(Entity.is(parsed.entity)).toBe(true);
         expect(parsed.entity).toBe(instances.get(Log.uuid));
-        expect(typeof parsed.guard).toBe('function');
+        expect(typeof parsed.admit).toBe('function');
         expect(typeof parsed.mapEventData).toBe('function');
         expect((parsed.mapEventData as (args: unknown) => Record<string, unknown>)('hello')).toEqual({ message: 'hello' });
     });

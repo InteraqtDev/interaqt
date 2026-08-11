@@ -490,13 +490,14 @@ describe('EventSource serialization', () => {
 
     test('clone() preserves callbacks', () => {
         const entity = Entity.create({ name: 'E' });
-        const guard = async () => {};
-        const instance = EventSource.create({ name: 'evt', entity, guard });
+        const admit = async () => {};
+        const instance = EventSource.create({ name: 'evt', entity, admit });
         const cloned = EventSource.clone(instance, false);
         expect(cloned.uuid).not.toBe(instance.uuid);
         expect(cloned.name).toBe('evt');
         expect(cloned.entity).toBe(entity);
-        expect(cloned.guard).toBe(guard);
+        expect(cloned.admit).toBe(admit);
+        expect(cloned.guard).toBe(admit);
     });
 });
 

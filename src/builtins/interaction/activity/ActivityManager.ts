@@ -98,27 +98,35 @@ export class ActivityManager {
     ): EventSourceInstance<InteractionEventArgs> {
         const isHeadInteraction = activityCall.isActivityHead(interaction)
 
-        const wrappedGuard = async function(this: Controller, args: InteractionEventArgs) {
+        // Phase A (admit): conditions / payload only — no Activity create/check/complete.
+        const admit = async function(this: Controller, args: InteractionEventArgs) {
+            await activityCall.fullGuard(this, interaction, args)
+        }
+
+        // Phase L-open: Activity bookkeeping only (create head or check step availability).
+        // Skipped on idempotent replay so completed steps do not throw ActivityStateError.
+        const open = async function(this: Controller, args: InteractionEventArgs) {
             if (isHeadInteraction && !args.activityId) {
-                // 与其余两个分支同走 fullGuard（runInteractionGuard）：三条路径的守卫语义不允许漂移。
-                await activityCall.fullGuard(this, interaction, args)
                 const created = await activityCall.create(this)
                 args.activityId = created.activityId
             } else if (isHeadInteraction && args.activityId) {
-                // 带 activityId 的 head（如 every/race 组里第二个分支的 head）：
-                // CAUTION 必须先 fullGuard 再 checkActivityState（r26 I-1）：
-                //  ActivityStateError 携带完整 currentState 供可观测性，若先于 Condition
-                //  抛出，持有 activityId 的未授权调用方可探测工作流状态树。
-                await activityCall.fullGuard(this, interaction, args)
+                // Head with activityId (e.g. second branch head in every/race): check state only.
+                // Admission already ran; Condition cannot leak ActivityStateError.currentState.
                 await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
             } else {
                 if (!args.activityId) {
                     throw new ActivityStateError('activityId must be provided for non-head interaction of an activity', { activityName: activityCall.activity.name })
                 }
-                // 同上：权限守卫先于状态检查，避免 ActivityStateError.currentState 信息泄漏。
-                await activityCall.fullGuard(this, interaction, args)
                 await activityCall.checkActivityState(this, args.activityId, interaction.uuid)
             }
+        }
+
+        // I7: Activity wrappers must always expose both phases (fail-fast if stripped).
+        if (typeof admit !== 'function' || typeof open !== 'function') {
+            throw new Error(
+                `ActivityManager failed to install admit/open for "${scopedName}". ` +
+                `Activity-wrapped event sources must split fullGuard (admit) from create/check (open).`
+            )
         }
 
         const wrappedMapEventData = async (args: InteractionEventArgs): Promise<Record<string, unknown>> => {
@@ -152,11 +160,17 @@ export class ActivityManager {
             _type: 'EventSource',
             name: scopedName,
             entity: interaction.entity,
-            guard: wrappedGuard,
+            admit,
+            open,
+            // Same reference as admit — no synthetic wrappedGuard dual-track.
+            guard: admit,
             mapEventData: wrappedMapEventData,
             resolve: interaction.resolve,
             afterDispatch: wrappedAfterDispatch,
             postCommit: interaction.postCommit,
+            // Must forward interaction.idempotency (default scope remains eventSource name).
+            idempotency: interaction.idempotency,
+            idempotencyInteractionKey: interaction.idempotencyInteractionKey ?? interaction.uuid,
         } as EventSourceInstance<InteractionEventArgs>
     }
 

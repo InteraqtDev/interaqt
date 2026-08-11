@@ -47,6 +47,26 @@ export type AtomicSequenceTarget = {
     step: number
 }
 
+/**
+ * Target for reserving a contiguous block of sequence values in one atomic
+ * upsert. `count` is the number of values on the step grid (N ≥ 1).
+ */
+export type ReserveSequenceRangeTarget = AtomicSequenceTarget & {
+    count: number
+}
+
+/**
+ * Contiguous closed range on the sequence step grid.
+ * Writable values are `start + i * step` for `i = 0 .. count - 1`.
+ * When step is 1, `end === start + count - 1`.
+ */
+export type SequenceRange = {
+    start: number
+    count: number
+    end: number
+    step: number
+}
+
 export type AtomicSequenceCapability = {
     requiresActiveTransaction: true
     transactional: boolean
@@ -77,6 +97,19 @@ export type SystemSchemaOptions = {
     internalRequirements?: InternalSchemaRequirement[]
 }
 
+/**
+ * Row shape of the internal `_DispatchIdempotency_` ledger.
+ * UNIQUE (namespace, idempotencyKey).
+ */
+export type DispatchIdempotencyRow = {
+    namespace: string
+    idempotencyKey: string
+    state: 'in_flight' | 'succeeded'
+    data?: unknown
+    context?: Record<string, unknown>
+    createdAt: number
+}
+
 export type AtomicStorage = {
     get<T>(target: AtomicTarget): Promise<T | null>
     increment(target: AtomicTarget, delta: number): Promise<number>
@@ -84,6 +117,14 @@ export type AtomicStorage = {
     compareAndSet<T>(target: AtomicTarget, expected: T, next: T, options?: { defaultValue?: T }): Promise<boolean>
     lockGlobal<T>(target: AtomicGlobalTarget): Promise<T | null>
     nextSequenceValue(target: AtomicSequenceTarget): Promise<number>
+    /**
+     * Atomically advances the scoped sequence by `count * step` and returns the
+     * contiguous closed range of newly reserved values. Shares the same
+     * `_ScopedSequence_` row and upsert kernel as `nextSequenceValue`
+     * (`nextSequenceValue` is equivalent to `reserveSequenceRange(..., count: 1)`
+     * then reading `start`). Must run inside an active storage transaction.
+     */
+    reserveSequenceRange(target: ReserveSequenceRangeTarget): Promise<SequenceRange>
     seedSequenceValue(target: AtomicSequenceTarget & { value: number; mode?: 'max' | 'replace' }): Promise<void>
     readSequenceValue(target: Pick<AtomicSequenceTarget, 'sequenceName' | 'scope'>): Promise<number | undefined>
     updateGlobalFields(
@@ -172,6 +213,20 @@ export type Storage = {
     rollbackToSavepoint: (name: string) => Promise<void>
 
     atomic: AtomicStorage
+
+    /**
+     * Internal ledger for dispatch idempotency (`_DispatchIdempotency_`).
+     * Reads/writes must run inside the active dispatch storage transaction.
+     */
+    dispatchIdempotency: {
+        load: (namespace: string, idempotencyKey: string) => Promise<DispatchIdempotencyRow | null>
+        claim: (namespace: string, idempotencyKey: string) => Promise<void>
+        finish: (
+            namespace: string,
+            idempotencyKey: string,
+            payload: { data?: unknown; context?: Record<string, unknown>; createdAt: number },
+        ) => Promise<void>
+    }
 
     dict: {
         get: (key: string) => Promise<unknown>
@@ -321,6 +376,12 @@ export type Database = {
     returnsParsedJSON?: boolean,
     setupInternalComputationState?: () => Promise<void>,
     setupScopedSequenceState?: () => Promise<void>,
+    /**
+     * Creates `_DispatchIdempotency_` (IF NOT EXISTS). Always installed on MonoSystem
+     * setup / migration paths that support dispatch — not gated on whether any
+     * EventSource declares idempotency.
+     */
+    setupDispatchIdempotencyState?: () => Promise<void>,
     atomicSequenceCapability?: AtomicSequenceCapability,
     setupRecordSequences?: (records: Array<{ recordName: string, tableName: string, idField: string }>) => Promise<void>,
     mapToDBFieldType: (type: string, collection?: boolean) => string

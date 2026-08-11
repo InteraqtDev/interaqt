@@ -93,10 +93,10 @@ const sendRequestRelation = Relation.create({
     type: 'n:1',
     computation:  
     Transform.create({
-        callback: async function map(this: Controller,event: any){
-            const MatchExp = this.globals.MatchExp
+        callback: async function map(this: any,event: any){
+            const MatchExp = this.controller.globals.MatchExp
             if (event.interactionName === sendInteraction.name) {
-                const request = await this.system.storage.findOne('Request', MatchExp.atom({
+                const request = await this.controller.system.storage.findOne('Request', MatchExp.atom({
                     key: 'interaction.id',
                     value: ['=', event.id]
                 }), undefined, ['id'] )
@@ -279,12 +279,12 @@ const reviewerRelation = Relation.create({
     // 使用 Transform 从交互事件创建关系
     computation: Transform.create({
         record: InteractionEventEntity,
-        callback: async function(this: Controller, event: any) {
-            const MatchExp = this.globals.MatchExp
+        callback: async function(this: any, event: any) {
+            const MatchExp = this.controller.globals.MatchExp
             
             // 从 sendRequest 创建初始关系
             if (event.interactionName === sendInteraction.name) {
-                const request = await this.system.storage.findOne('Request', MatchExp.atom({
+                const request = await this.controller.system.storage.findOne('Request', MatchExp.atom({
                     key: 'interaction.id',
                     value: ['=', event.id]
                 }), undefined, ['id'])

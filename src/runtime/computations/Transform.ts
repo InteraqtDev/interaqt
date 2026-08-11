@@ -1,4 +1,4 @@
-import { DataContext, DataDepEventContext, EntityDataContext, EventDep, IncrementalPlan } from "./Computation.js";
+import { ComputationActionContext, DataContext, DataDepEventContext, EntityDataContext, EventDep, IncrementalPlan } from "./Computation.js";
 import { Transform, TransformInstance, type ComputationRecord } from "@core";
 import { Controller } from "../Controller.js";
 import { MatchExp } from "@storage";
@@ -18,7 +18,9 @@ import { validateMutationEventPatternKeys, validateMutationEventPatternSurface }
 export class RecordsTransformHandle implements DataBasedComputation {
     static computationType = Transform
     static contextType = ['entity', 'relation'] as const
-    transformCallback: (this: Controller, item: any) => any
+    transformCallback: (this: ComputationActionContext, item: any) => any
+    /** Official callback `this`: controller + atomic (same reference as storage.atomic). */
+    actionContext: ComputationActionContext
     state!: ReturnType<typeof this.createState>
     useLastValue: boolean = false
     dataDeps: {[key: string]: DataDep} = {}
@@ -26,7 +28,11 @@ export class RecordsTransformHandle implements DataBasedComputation {
     eventDeps?: {[key: string]: EventDep}
     constructor(public controller: Controller, public args: TransformInstance, public dataContext: DataContext) {
         assert(!(this.args.record && this.args.eventDeps), 'Transform must have either record or eventDep')
-        this.transformCallback = this.args.callback.bind(this.controller)
+        this.actionContext = {
+            controller: this.controller,
+            atomic: this.controller.system.storage.atomic,
+        }
+        this.transformCallback = this.args.callback.bind(this.actionContext)
         
         if (this.args.eventDeps) {
             // 模式面校验（与 StateMachine trigger 同一声明面、同一实现）：
@@ -77,7 +83,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
 
         const result: ComputationResultPatch[]  = []
         for (const record of records) {
-            const returnRecord = await this.transformCallback.call(this.controller, record)
+            const returnRecord = await this.transformCallback.call(this.actionContext, record)
             const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             transformedRecords.forEach((transformedRecord, index)=> {
                 if (!transformedRecord) return
@@ -113,7 +119,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
     }
     async eventBasedIncrementalPatchCompute(lastValue: any[], mutationEvent: EtityMutationEvent): Promise<ComputationResultPatch | ComputationResultPatch[]|undefined> {
         const results: ComputationResultPatch[] = []
-        const returnRecord = await this.transformCallback.call(this.controller, mutationEvent)
+        const returnRecord = await this.transformCallback.call(this.actionContext, mutationEvent)
         const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
         transformedRecords.forEach((transformedRecord, index) => {
             // 允许返回 Null，表示不插入
@@ -137,7 +143,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
             const matchSourceRecord = MatchExp.atom({key: 'id', value: ['=', mutationEvent.record!.id]})
             const souceDataDep = this.dataDeps._source as RecordsDataDep
             const sourceRecord = await this.controller.system.storage.findOne(souceDataDep.source.name!, matchSourceRecord, undefined, souceDataDep.attributeQuery)
-            const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
+            const returnRecord = await this.transformCallback.call(this.actionContext, sourceRecord)
             const transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
             transformedRecords.forEach((transformedRecord, index) => {
                 // 允许返回 Null，表示不插入
@@ -170,7 +176,7 @@ export class RecordsTransformHandle implements DataBasedComputation {
                 //  那会让已映射的派生行成为孤儿。按 delete 语义继续走下面的流程，
                 //  transformedRecords 为空 → 全部既有映射行进入 delete patch（幂等，与 delete 事件路径一致）。
                 if (sourceRecord) {
-                    const returnRecord = await this.transformCallback.call(this.controller, sourceRecord)
+                    const returnRecord = await this.transformCallback.call(this.actionContext, sourceRecord)
                     transformedRecords = Array.isArray(returnRecord) ? returnRecord : [returnRecord]
                 }
             }

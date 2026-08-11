@@ -35,7 +35,7 @@ function createEventSource(name: string, entity: any, map: (args: any) => any, r
     uuid: `${name}_uuid`,
     name,
     entity,
-    guard: async () => true,
+    admit: async () => true,
     mapEventData: map,
     resolve,
   } as any;
@@ -843,7 +843,7 @@ describe("ScopedSequence", () => {
     await system.destroy();
   });
 
-  test("allows no-initialize migration only when the host table is empty and plans internal schema", async () => {
+  test("allows no-initialize migration only when the host table is empty and keeps atomic sequence table available", async () => {
     const ProjectV1 = new Entity({
       name: "ScopedMatrixNoInitProject",
       properties: [new Property({ name: "name", type: "string" }, { uuid: "scoped-no-init-project-name" })],
@@ -861,6 +861,10 @@ describe("ScopedSequence", () => {
     system.conceptClass = KlassByName;
     const controllerV1 = new Controller({ system, entities: [ProjectV1, MediaV1], relations: [] });
     await controllerV1.setup(true);
+    // Capability drivers always install `_ScopedSequence_` on setup(true), even with no
+    // property-level ScopedSequence declaration (M-03 / needsScopedSequenceTable).
+    const tablesAfterInstall = await (system.storage as any).getExistingTables();
+    expect(tablesAfterInstall.has("_ScopedSequence_")).toBe(true);
     await writeMigrationManifest(controllerV1, createMigrationManifest(controllerV1));
 
     const ProjectV2 = new Entity({
@@ -895,7 +899,9 @@ describe("ScopedSequence", () => {
       targetProperty: "serialNumber",
       expectedHostCount: 0,
     }]);
-    expect(dryRun.schemaPlan?.preRecomputeDDL.some(operation => operation.kind === "create-table" && operation.tableName === "_ScopedSequence_")).toBe(true);
+    // Table already present from V1 install — prepare must not require a second create-table op.
+    // (S2 only prepends CREATE when the table is missing.)
+    expect(dryRun.schemaPlan?.preRecomputeDDL.some(operation => operation.kind === "create-table" && operation.tableName === "_ScopedSequence_")).toBe(false);
     await controllerV2.migrate({ approvedDiff });
     const result = await controllerV2.dispatch(CreateMedia, { payload: { project: PROJECT_1, prefix: "img" } });
     expect(result.error).toBeUndefined();

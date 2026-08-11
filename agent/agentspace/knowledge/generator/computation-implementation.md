@@ -836,6 +836,26 @@ Generation rules:
 
 ## Implementation Steps
 
+
+### 4b. Multi-row sequence ranges (`this.atomic.reserveSequenceRange`)
+
+When a Transform/Custom must number N derived rows contiguously in one transaction, generate:
+
+```typescript
+const { start, step } = await this.atomic.reserveSequenceRange({
+  sequenceName: '…',
+  scope: [/* AtomicSequenceScope */],
+  initialValue: 0,
+  step: 1,
+  count: n,
+})
+```
+
+- Callback `this` is `ComputationActionContext` (`controller` + `atomic` [+ Custom `state`/`getState`]).
+- Do not generate loops of `nextSequenceValue` for multi-row contiguity.
+- Do not generate dual-path access (`this.system…` vs `this.controller.system…`) as the final pattern.
+
+
 ### Step 1: Entity Creation Pattern
 ```typescript
 // 1. Define interaction

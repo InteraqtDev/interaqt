@@ -243,10 +243,10 @@ describe('Version Control Example with Hard Delete', () => {
           }
         }
       },
-      callback: async function(this: Controller, mutationEvent: RecordMutationEvent) {
+      callback: async function(this: any, mutationEvent: RecordMutationEvent) {
         const event = mutationEvent.record!;
         // Copy all current version styles to new version
-        const currentStyles = await this.system.storage.find('Style',
+        const currentStyles = await this.controller.system.storage.find('Style',
           undefined,
           undefined,
           ['*']
@@ -254,7 +254,7 @@ describe('Version Control Example with Hard Delete', () => {
 
         // VersionedStyle 只声明了 content/status/version/createdAt——显式拷贝声明面。
         // （...style 展开会带上 Style 的 _isDeleted_ / bound-state 列，未声明键写入口现在 fail-fast。）
-        return currentStyles.map(style => {
+        return currentStyles.map((style: any) => {
           return {
             content: style.content,
             status: style.status,
@@ -285,13 +285,13 @@ describe('Version Control Example with Hard Delete', () => {
           }
         }
       },
-      callback: async function(this: Controller, mutationEvent: RecordMutationEvent) {
+      callback: async function(this: any, mutationEvent: RecordMutationEvent) {
         const event = mutationEvent.record!;
 
         // Handle style creation
         if (mutationEvent.type === 'create' && event.interactionName === 'CreateStyle') {
           // Get current version info
-          let versionInfo = await this.system.storage.dict.get('currentVersionInfo') as any;
+          let versionInfo = await this.controller.system.storage.dict.get('currentVersionInfo') as any;
           
           return {
             content: event.payload.content,
@@ -304,7 +304,7 @@ describe('Version Control Example with Hard Delete', () => {
           const versionInfo = event.value.raw;
           if (versionInfo.type === 'rollback') {
             // Copy styles from rollback target version
-            const targetStyles = await this.system.storage.find('VersionedStyle',
+            const targetStyles = await this.controller.system.storage.find('VersionedStyle',
               MatchExp.atom({ key: 'version', value: ['=', versionInfo.rollbackTo] }),
               undefined,
               ['*']
@@ -312,7 +312,7 @@ describe('Version Control Example with Hard Delete', () => {
 
             // Style 的声明面是 content/status/version/createdAt——显式拷贝。
             // （...style 展开会带上 VersionedStyle 的 bound-state 列，未声明键写入口现在 fail-fast。）
-            return targetStyles.map(style => ({
+            return targetStyles.map((style: any) => ({
               content: style.content,
               status: style.status,
               createdAt: style.createdAt,

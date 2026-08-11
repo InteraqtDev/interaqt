@@ -418,6 +418,11 @@ export type MigrationManifest = {
             collection: boolean;
             computed: boolean;
         }>;
+        /**
+         * Entity retention declaration (absent / forever / cap / ttl).
+         * Included so retention policy changes participate in modelHash.
+         */
+        retention?: unknown;
     }>;
     relations: Array<{
         id: string;
@@ -989,6 +994,10 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
                 computed: !!property.computation,
             });
             }),
+            // Minimal signature extension: retention policy is part of the entity declaration.
+            // forever and omitted both mean "this mechanism does not delete"; include the
+            // concrete object when present so mode/cap/ttl changes invalidate modelHash.
+            ...(entity.retention !== undefined ? { retention: entity.retention } : {}),
         });
         }),
         ...controller.relations.map(relation => {
