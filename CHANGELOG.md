@@ -1,3 +1,12 @@
+
+
+## [4.9.0](https://github.com/InteraqtDev/interaqt/compare/v4.8.0...v4.9.0) (2026-08-16)
+
+
+### Features
+
+* **runtime:** first-class post-commit phase completion and recoverable rerun ([2f8a073](https://github.com/InteraqtDev/interaqt/commit/2f8a073f5be70d26c97fa5fb159676d3c7b4140d))
+
 # Changelog
 
 ## [Unreleased]
