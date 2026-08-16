@@ -25,6 +25,13 @@ export {
     SideEffectError
 } from './SideEffectError.js'
 
+export {
+    PostCommitRerunError
+} from './PostCommitRerunError.js'
+export type {
+    PostCommitRerunErrorCode
+} from './PostCommitRerunError.js'
+
 // Condition errors
 export {
     ConditionError

@@ -392,6 +392,8 @@ await controller.dispatch(CreatePost, { user: { id: '1' }, payload: { title: 'Hi
 ## When Dispatching Interactions
 
 ```typescript
+import { isPostCommitPhaseComplete } from 'interaqt'
+
 const result = await controller.dispatch(CreatePost, {
   user: { id: 'user-1', role: 'author' },
   payload: {
@@ -402,6 +404,8 @@ const result = await controller.dispatch(CreatePost, {
 
 if (result.error) {
   console.log('Error:', result.error.message)
+} else if (!isPostCommitPhaseComplete(result)) {
+  // Facts committed or replay/notRun. For post-commit IO, this is not complete success.
 }
 ```
 
@@ -417,17 +421,22 @@ try {
 
 ### CORRECT:
 ```typescript
+import { isPostCommitPhaseComplete } from 'interaqt'
+
 const result = await controller.dispatch(CreatePost, {
   user: { id: '1' },
   payload: {}
 })
 if (result.error) {
   console.log('Error:', result.error.message)
+} else if (!isPostCommitPhaseComplete(result)) {
+  // Obligation-sensitive: rerun recoverable create/postCommit hooks. Do not treat
+  // a duplicate admit error as success, and do not pass findOne rows as postCommit data.
 }
 ```
 
 ### WHY
-The framework catches all errors internally and returns them via `result.error`. Exceptions are never thrown to callers (unless `forceThrowDispatchError: true` is set on Controller).
+`result.error` is stage A (the fact transaction). Its absence is not “post-commit IO finished”. Use `isPostCommitPhaseComplete(result)` for that. Stage P failures stay off `error` and do not roll back facts. The framework returns soft errors on top-level dispatch (unless `forceThrowDispatchError: true`); business-transaction abort still throws.
 
 ### WRONG: Passing a name string instead of instance
 ```typescript

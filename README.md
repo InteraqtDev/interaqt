@@ -65,7 +65,9 @@ No update handlers. No sync bugs. When a like relationship is created, `likeCoun
 
 `Controller.dispatch()` is the synchronous fact transaction boundary in interaqt. The framework runs guard checks, `mapEventData`, event record creation, `resolve`, synchronous computations, and `afterDispatch` inside one retryable storage transaction attempt.
 
-If any transaction step fails, the event record and all synchronous derived writes from that attempt are rolled back. `postCommit` and record mutation side effects run only after a successful commit; their failures are reported in `sideEffects` and do not roll back committed facts.
+If any transaction step fails, the event record and all synchronous derived writes from that attempt are rolled back. `postCommit` and record mutation side effects run only after a successful commit; their failures do **not** set `result.error` and do not roll back committed facts. Completion of that post-commit phase is first-class on `result.postCommitPhase`. Callers that only care whether facts committed may keep checking `result.error`. Callers that must know whether post-commit IO finished use `isPostCommitPhaseComplete(result)`.
+
+Default idempotent replay still skips stage P (`outcome: 'replayed'` → `postCommitPhase.status === 'notRun'`). That is not obligation success. Recover create-record mutation side effects with `controller.rerunCreateMutationSideEffects({ recordName, id })` and `postCommit` with `controller.rerunPostCommit(eventSource, args, { data, context })` using this response's resolve values. A duplicate admit error is a stage A failure, not success — do not treat it as “already done”, and do not pass a loaded storage row as `postCommit` data unless `resolve` originally returned that row. Update/delete mutation side effects cannot be reconstructed.
 
 Use these hooks with the transaction boundary in mind:
 
@@ -74,7 +76,7 @@ Use these hooks with the transaction boundary in mind:
 | `guard` / `mapEventData` / `resolve` | Run inside the retryable transaction attempt and may be replayed. |
 | `afterDispatch` | Runs before commit inside the transaction. Use it only for response context or local reversible storage work. Do not perform irreversible external IO here. |
 | `postCommit` | Runs after commit. Use it for external IO, notifications, outbox enqueueing, or non-critical response context. |
-| `RecordMutationSideEffect` | Runs after commit for committed mutation events. Failure is reported in `sideEffects`. |
+| `RecordMutationSideEffect` | Runs after commit for committed mutation events. Failure is reported in `sideEffects` and `postCommitPhase`. Create-record hooks can be rerun with `rerunCreateMutationSideEffects`; update/delete hooks cannot. |
 
 Nested `controller.dispatch()` calls are rejected inside a dispatch call stack with `NestedDispatchError`. Sequential dispatches that must share one atomic boundary with prior storage writes belong in `controller.runInBusinessTransaction` (each dispatch attempt uses a SAVEPOINT; post-commit side effects flush only after the business transaction commits). Calling `dispatch` inside a bare `storage.runInTransaction` (or any non-BT-owned active storage transaction) is a hard runtime error: `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`. Pure storage transactions without `dispatch` remain legal. Dispatching again from `postCommit` or a record mutation side effect is allowed because it starts a new transaction boundary.
 

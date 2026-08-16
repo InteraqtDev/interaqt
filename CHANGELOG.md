@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Features
+
+* **runtime:** first-class post-commit phase completion and recoverable rerun APIs.
+  `DispatchResponse.postCommitPhase` (`complete` | `failed` | `notRun`) plus
+  `isPostCommitPhaseComplete` report whether this response's stage P
+  (`EventSource.postCommit` and `RecordMutationSideEffect`) ran and succeeded.
+  Stage P failures still do not set `result.error` and do not roll back facts.
+  Default idempotent replay still skips stage P (`replayed` → `notRun`).
+  `controller.rerunCreateMutationSideEffects({ recordName, id })` reconstructs a
+  create mutation from storage; `controller.rerunPostCommit` reruns `postCommit`
+  with this response's resolve/`afterDispatch` values. Public export:
+  `SideEffectError`, `PostCommitRerunError`. Update/delete mutation side effects
+  cannot be reconstructed; a create rerun `complete` is not first-P complete.
+
+### Docs
+
+* Usage, generator, README, and pattern guides distinguish stage A (`result.error`)
+  from stage P (`isPostCommitPhaseComplete`). Official composition after admit-dedup
+  or idempotent replay uses the rerun APIs; do not treat duplicate errors as success
+  or pass a loaded storage row as `postCommit` data.
+
 ## [4.8.0](https://github.com/InteraqtDev/interaqt/compare/v4.7.0...v4.8.0) (2026-08-11)
 
 Explicit property type extension for Entity/Relation plugin columns. Design and

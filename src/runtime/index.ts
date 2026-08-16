@@ -18,6 +18,9 @@ export * from './errors/DatabaseErrors.js'
 export { ConditionError } from './errors/ConditionErrors.js'
 export { IdempotencyError } from './errors/IdempotencyError.js'
 export type { IdempotencyErrorCode } from './errors/IdempotencyError.js'
+export { SideEffectError } from './errors/SideEffectError.js'
+export { PostCommitRerunError } from './errors/PostCommitRerunError.js'
+export type { PostCommitRerunErrorCode } from './errors/PostCommitRerunError.js'
 // Export everything from util except indexBy to avoid conflict with shared module
 export { 
   assert, 

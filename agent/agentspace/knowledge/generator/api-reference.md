@@ -3466,11 +3466,12 @@ const result = await controller.dispatch(CreateUserInteraction, {
     payload: { name: 'John', email: 'john@example.com' }
 });
 
-// Access side effect results
-if (result.sideEffects?.userCreatedLogger?.error) {
-    console.warn('Logger failed:', result.sideEffects.userCreatedLogger.error);
+// Access side effect results. Official complete-success check is
+// isPostCommitPhaseComplete(result), not this last-write-wins map.
+if (!isPostCommitPhaseComplete(result)) {
+    console.warn('Stage P incomplete:', result.postCommitPhase)
 } else {
-    console.log('Logger result:', result.sideEffects.userCreatedLogger.result);
+    console.log('Logger result:', result.sideEffects?.userCreatedLogger?.result);
 }
 ```
 
@@ -3484,10 +3485,12 @@ if (result.sideEffects?.userCreatedLogger?.error) {
 
 **Best Practices**
 1. Filter by event type within the content function if needed
-2. Handle errors gracefully - side effect failures shouldn't break the main operation
-3. Keep side effects lightweight to avoid impacting performance
-4. Use descriptive names for debugging
-5. Return meaningful results for monitoring
+2. Handle errors gracefully - side effect failures do not roll back committed facts (`result.error` stays absent). Official completion is `isPostCommitPhaseComplete(result)`, not scanning `sideEffects`.
+3. Callbacks must be safe to run more than once (at-least-once delivery, partial success then full rerun). The framework does not skip already-successful hooks.
+4. Keep side effects lightweight to avoid impacting performance
+5. Use descriptive names for debugging
+6. Return meaningful results for monitoring
+7. Update/delete hooks cannot be reconstructed after the fact; do not treat a create rerun `complete` as “stage P fully converged”.
 
 **Main Methods**
 
@@ -3521,7 +3524,7 @@ async dispatch<TArgs, TResult>(
 **Return Type**
 ```typescript
 type DispatchResponse = {
-  // Soft failure outside business-transaction abort mode
+  // Soft failure outside business-transaction abort mode (stage A only)
   error?: unknown  // InteractionGuardError / IdempotencyError: prefer stable .code
   
   // For events with resolve: contains the resolved data
@@ -3530,7 +3533,8 @@ type DispatchResponse = {
   // Record mutations (create/update/delete) that occurred
   effects?: RecordMutationEvent[]
   
-  // Results from registered RecordMutationSideEffects (after successful commit / BT flush)
+  // Last-write-wins map by side-effect name (after successful commit / BT flush).
+  // Not the official complete-success check.
   sideEffects?: {
     [effectName: string]: {
       result?: unknown
@@ -3543,9 +3547,17 @@ type DispatchResponse = {
     [key: string]: unknown
   }
 
-  // Present only when the EventSource participates in idempotency and the attempt succeeded.
+  // Present when the EventSource participates in idempotency and the attempt succeeded.
   // Branch retries on outcome — never by scanning effects or guessing from unique conflicts.
+  // `replayed` is first-apply vs replay of facts, not “obligations finished”.
   outcome?: 'applied' | 'replayed'
+
+  // Stage P (postCommit + RecordMutationSideEffect) for this response.
+  // Orthogonal to outcome. Official predicate: isPostCommitPhaseComplete(result).
+  postCommitPhase?: {
+    status: 'complete' | 'failed' | 'notRun'
+    failures: { name: string; error: unknown }[]
+  }
 }
 ```
 
@@ -3557,10 +3569,12 @@ type DispatchResponse = {
 5. Execute `resolve` (if provided) - returns data
 6. Execute `afterDispatch` (if provided) inside the retryable transaction attempt - returns context
 7. Finish idempotency success row when participating; commit (top-level) or release SAVEPOINT (inside BT)
-8. Run RecordMutationSideEffects / postCommit only after the owning commit succeeds (deferred under BT); never on `replayed`
+8. Run RecordMutationSideEffects / postCommit only after the owning commit succeeds (deferred under BT); never on `replayed`. Record `postCommitPhase` (`notRun` on replay and stage A errors).
 
 **Example - Dispatch Interaction**
 ```typescript
+import { isPostCommitPhaseComplete } from 'interaqt'
+
 const result = await controller.dispatch(CreatePostInteraction, {
     user: { id: 'user1' },
     payload: { postData: { title: 'Hello', content: 'World' } },
@@ -3568,10 +3582,11 @@ const result = await controller.dispatch(CreatePostInteraction, {
     context: { source: 'agent', tool: 'create_post', timestamp: Date.now() }
 })
 
-// Check for errors (top-level soft failure)
+// Stage A (fact transaction). Absence of error is not “post-commit IO finished”.
 if (result.error) {
     console.error('Dispatch failed:', result.error)
     // Structured Condition reject: (result.error as InteractionGuardError).code
+    // Admit duplicate errors are not success — look up the create row and rerun recoverable hooks.
     return
 }
 
@@ -3579,9 +3594,12 @@ if (result.error) {
 const createdPostId = result.effects?.[0]?.record?.id
 // If idempotency was declared: branch retries on result.outcome ('applied' | 'replayed')
 
-// Check side effects
-if (result.sideEffects?.emailNotification?.error) {
-    console.warn('Email notification failed')
+if (!isPostCommitPhaseComplete(result)) {
+    // Facts committed, or replay / BT-deferred: this response's stage P did not complete.
+    // After replay: rerunPostCommit(source, args, { data: result.data, context: result.context })
+    // and rerunCreateMutationSideEffects({ recordName, id }) per create row.
+    // Do not scan sideEffects as the complete-success check.
+    // Do not pass a findOne row as rerunPostCommit prior.data unless resolve returned that row.
 }
 ```
 
@@ -3604,6 +3622,12 @@ const result = await controller.dispatch(GetAllPostsInteraction, {
 })
 // result.data contains the queried records
 ```
+
+#### rerunCreateMutationSideEffects({ recordName, id })
+Reconstruct a create mutation event from the current stored row and rerun every `RecordMutationSideEffect` registered for that record name. Does not require the first `DispatchResponse.effects`. Does not run `postCommit`. Failures use the same `postCommitPhase` shape as dispatch; they do not throw and do not change facts. Illegal inside an active business transaction.
+
+#### rerunPostCommit(eventSource, args, prior)
+Rerun `EventSource.postCommit` with caller-supplied resolve/`afterDispatch` values (`prior.data` / `prior.context`). On idempotent replay, pass **this response's** pair. On admit-dedup, use a retained first pair or empty `prior` when the hook is args-reentrant — do not pass a `findOne` row as `prior.data` unless `resolve` originally returned that row.
 
 #### runInBusinessTransaction(options, fn)
 Official atomic boundary for “storage writes + sequential dispatches” that must share one connection and commit. Must own the **outermost** storage transaction (cannot start inside `storage.runInTransaction`; cannot nest BT). Each dispatch attempt uses a SAVEPOINT; `postCommit` / record mutation side effects flush only after the BT-owned COMMIT. Calling `dispatch` inside bare `storage.runInTransaction` is illegal (`DISPATCH_IN_NON_BT_TRANSACTION`).
@@ -4206,7 +4230,8 @@ computation), the transaction rolls back — database writes made by the callbac
 back with it, but any **external** side effects (HTTP calls, message queues, logs)
 have already happened and cannot be undone. For external side effects that must only
 fire for committed data, use `RecordMutationSideEffect` instead: it runs **after
-commit** and its results are reported in `DispatchResponse.sideEffects`.
+commit**. Official completion is `DispatchResponse.postCommitPhase` /
+`isPostCommitPhaseComplete`; `sideEffects` is a last-write-wins map by name.
 
 #### AttributeQueryData Format
 
@@ -4433,12 +4458,16 @@ interface EventSourceInstance<TArgs = any, TResult = void> {
 
 // Dispatch response - returned by controller.dispatch()
 type DispatchResponse = {
-    error?: unknown
+    error?: unknown  // stage A only
     data?: unknown
     effects?: RecordMutationEvent[]
     sideEffects?: { [k: string]: { result?: unknown, error?: unknown } }
     context?: { [k: string]: unknown }
-    outcome?: 'applied' | 'replayed'
+    outcome?: 'applied' | 'replayed'  // facts first-apply vs replay; not obligation success
+    postCommitPhase?: {
+        status: 'complete' | 'failed' | 'notRun'
+        failures: { name: string; error: unknown }[]
+    }
 }
 
 // Interaction event arguments (used when dispatching Interactions)

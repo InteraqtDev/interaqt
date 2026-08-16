@@ -1420,9 +1420,20 @@ When enabled, the same API runs after a successful non-replayed dispatch commit 
 #### dispatch(eventSource, args): Promise\<DispatchResponse\>
 Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction on the **unique pipeline** `admit → open? → map → create → resolve → afterDispatch` (then commit / SAVEPOINT release; `postCommit` only after the owning commit). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` while a **non-business-transaction** storage transaction is active throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'` — use `runInBusinessTransaction` for same-request write + dispatch. Pure `storage.runInTransaction` without `dispatch` remains legal.
 
-**Idempotent dispatch (optional).** Declare `idempotency` on the Interaction / EventSource (key from payload/user — never from a not-yet-created `activityId`). Successful participating responses always carry `outcome: 'applied' | 'replayed'`. Replays re-run **admit** only and skip open/create/resolve/afterDispatch/`postCommit`. Concurrent same-key in-flight attempts surface `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'` (not a unique-constraint guess, and not `replayed`). Do **not** scan `effects` or treat unique conflicts as replay.
+**Idempotent dispatch (optional).** Declare `idempotency` on the Interaction / EventSource (key from payload/user — never from a not-yet-created `activityId`). Successful participating responses always carry `outcome: 'applied' | 'replayed'`. Replays re-run **admit** only and skip open/create/resolve/afterDispatch/stage P (`postCommit` and `RecordMutationSideEffect`). Concurrent same-key in-flight attempts surface `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'` (not a unique-constraint guess, and not `replayed`). Do **not** scan `effects` or treat unique conflicts as replay. Do **not** read `replayed` as obligation success: `postCommitPhase.status` is `notRun`.
+
+**Stage P completion.** Every `DispatchResponse` includes `postCommitPhase: { status: 'complete' | 'failed' | 'notRun', failures }`. `result.error` remains stage A only; post-commit failures do not set `error` and do not roll back facts. Official predicate: `isPostCommitPhaseComplete(result)` (true only when `status === 'complete'`). Scanning `sideEffects` is not the complete-success check.
+
+Recoverable obligations (create-record mutation side effects and `postCommit`) after a committed attempt:
+
+- `controller.rerunCreateMutationSideEffects({ recordName, id })` — reconstructs a create event from storage; does not need the first `effects` list; does not run `postCommit`.
+- `controller.rerunPostCommit(eventSource, args, { data, context })` — uses resolve/`afterDispatch` values from **this** successful response (or a retained first response). On admit-dedup (`result.error` for a duplicate business key), do not pass a `findOne` row as `prior.data` unless `resolve` originally returned that row. Empty `prior` is legal only when the hook is args-reentrant.
+
+Update/delete mutation side effects cannot be reconstructed. A later create rerun `complete` does not mean the first stage P fully converged. Do not call `rerun*` inside `runInBusinessTransaction`.
 
 ```typescript
+import { isPostCommitPhaseComplete } from 'interaqt'
+
 const CreateOrder = Interaction.create({
   name: 'CreateOrder',
   action: Action.create({ name: 'createOrder' }),
@@ -1435,11 +1446,24 @@ const CreateOrder = Interaction.create({
 
 const first = await controller.dispatch(CreateOrder, { user, payload: { clientRequestId: 'c1', ... } })
 // first.outcome === 'applied'
+if (first.error) {
+    // stage A soft failure outside business-transaction abort mode
+    // InteractionGuardError.code / IdempotencyError.code — not duck-typed type alone
+    // Duplicate admit errors are not success; look up the create row and rerun recoverable hooks.
+} else if (!isPostCommitPhaseComplete(first)) {
+    // facts committed: rerunPostCommit with this response's data/context;
+    // rerunCreateMutationSideEffects per create id. Not a query of historical completion.
+}
+
 const second = await controller.dispatch(CreateOrder, { user, payload: { clientRequestId: 'c1', ... } })
 // second.outcome === 'replayed' — branch on outcome, not effects length
-if (result.error) {
-    // soft failure outside business-transaction abort mode
-    // InteractionGuardError.code / IdempotencyError.code — not duck-typed type alone
+// second.postCommitPhase.status === 'notRun' (not obligation success)
+if (!second.error && !isPostCommitPhaseComplete(second)) {
+    await controller.rerunPostCommit(CreateOrder, { user, payload: { clientRequestId: 'c1', ... } }, {
+        data: second.data,
+        context: second.context,
+    })
+    // rerunCreateMutationSideEffects per create id that must converge
 }
 ```
 
@@ -1466,6 +1490,12 @@ Boundary failures throw `BusinessTransactionBoundaryError` with stable `code`:
 Inside BT, `RequireSerializableRetry` is **fail-fast** (no isolation upgrade loop); open the BT with
 `isolation: 'SERIALIZABLE'` when those framework paths are required. Full table:
 [06-attributive-permissions.md](./06-attributive-permissions.md#business-transactions-same-request-storage-write--dispatch).
+
+#### rerunCreateMutationSideEffects(input): Promise\<PostCommitRerunResult\>
+Reconstruct a create mutation from the current stored row (`recordName` + `id`) and rerun every `RecordMutationSideEffect` for that name. Does not require the first `effects` list. Does not run `postCommit`. Failures use the same `postCommitPhase` shape as dispatch. Throws `PostCommitRerunError` for caller mistakes (`INVALID_INPUT`, `UNKNOWN_RECORD_NAME`, `RECORD_NOT_FOUND`, `IN_BUSINESS_TRANSACTION`).
+
+#### rerunPostCommit(eventSource, args, prior): Promise\<PostCommitRerunResult\>
+Rerun `postCommit` with resolve/`afterDispatch` values. After idempotent replay, pass this response's `data`/`context`. After admit-dedup, pass a retained first pair or empty `prior` when the hook is args-reentrant. Do not pass a `findOne` row as `prior.data` unless `resolve` originally returned that row.
 
 #### callInteraction(interactionName: string, args: InteractionEventArgs, activityName?: string, activityId?: string)
 Name-based convenience wrapper around dispatch for interaction or activity interaction.

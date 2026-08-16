@@ -66,8 +66,11 @@ export interface EventSourceInstance<TArgs = unknown, TResult = void> extends II
   afterDispatch?: (this: CallbackThis, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
   /**
    * Runs after the dispatch transaction has committed successfully. Failures do
-   * not roll back committed storage changes and are reported in sideEffects.
-   * Skipped on idempotent replay (`outcome: 'replayed'`).
+   * not roll back committed storage changes and are reported in
+   * `result.sideEffects.__postCommit` and `result.postCommitPhase`.
+   * Skipped on idempotent replay (`outcome: 'replayed'`); recoverable
+   * obligations use `rerunPostCommit` with this response's `data`/`context`.
+   * Update/delete mutation side-effect failures cannot be reconstructed.
    */
   postCommit?: (this: CallbackThis, args: TArgs, result: { data?: TResult, context?: Record<string, unknown> }) => Promise<Record<string, unknown> | void>
   /** Optional idempotency declaration; see `EventSourceIdempotencyConfig`. */

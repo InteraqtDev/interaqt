@@ -730,7 +730,7 @@ Condition-thrown `RequireSerializableRetry` is absorbed as a condition failure a
 4. **Action is just an identifier, not an operation**
 5. **Transform is for collection transformations, not property computations**
 6. **Always use object references in StateMachine, not strings**
-7. **Top-level dispatch: check `result.error`; BT default abort: dispatch throws — use try/catch only there**
+7. **Top-level dispatch: check `result.error` for stage A (facts); obligation-sensitive callers also use `isPostCommitPhaseComplete`. BT default abort: dispatch throws — use try/catch only there**
 8. **storage.create() bypasses ALL validation - use only for test setup**
 9. **ALL business logic testing must use `controller.dispatch` (or callInteraction)**
 10. **Never test Entity/Relation directly - test through Interactions**

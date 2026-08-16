@@ -1,5 +1,5 @@
 import { BoolExp, EntityInstance, EntityRetention, RelationInstance, DictionaryInstance, Property, EventSourceInstance } from "@core";
-import { MatchExp } from "@storage";
+import { MatchExp, type AttributeQueryData, type MapData } from "@storage";
 import { ComputationState, RecordMutationEvent, Storage, System, SystemLogger } from "./System.js";
 import './computations/index.js';
 import { Computation, ComputationResult, ComputationResultSkip, ComputationResultPatch, DataContext, EntityDataContext, PropertyDataContext, RelationDataContext } from "./computations/Computation.js";
@@ -15,7 +15,7 @@ import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
 import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
-import { ComputationError, IdempotencyError, SchedulerError, SideEffectError } from "./errors/index.js";
+import { ComputationError, IdempotencyError, PostCommitRerunError, SchedulerError, SideEffectError } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
@@ -106,12 +106,24 @@ export type InteractionContext = {
 
 export type ComputationType = 'global' | 'entity' | 'relation' | 'property'
 
-type SideEffectResult = {
+export type SideEffectResult = {
     result?: unknown,
     error?: unknown
 }
 
 export type DispatchOutcome = 'applied' | 'replayed'
+
+export type PostCommitPhaseStatus = 'complete' | 'failed' | 'notRun'
+
+export type PostCommitPhaseFailure = {
+    name: string
+    error: unknown
+}
+
+export type PostCommitPhase = {
+    status: PostCommitPhaseStatus
+    failures: PostCommitPhaseFailure[]
+}
 
 export type DispatchResponse = {
     error?: unknown
@@ -124,6 +136,120 @@ export type DispatchResponse = {
      * succeeds. Must be absent for non-participating successes and for failures.
      */
     outcome?: DispatchOutcome
+    /**
+     * Completion of stage P (EventSource.postCommit + RecordMutationSideEffect).
+     * Orthogonal to `outcome`: `outcome` is first-apply vs replay of facts;
+     * this field is whether this response's stage P ran and succeeded.
+     */
+    postCommitPhase?: PostCommitPhase
+}
+
+/**
+ * Official predicate: this result object's stage P ran to completion with no failures.
+ * It is not a historical claim that every obligation is recoverably converged.
+ */
+export function isPostCommitPhaseComplete(
+    result: { postCommitPhase?: PostCommitPhase }
+): boolean {
+    return result.postCommitPhase?.status === 'complete'
+}
+
+export type RerunCreateMutationSideEffectsInput = {
+    recordName: string
+    id: string
+}
+
+export type PostCommitRerunResult = {
+    effects: RecordMutationEvent[]
+    sideEffects: { [k: string]: SideEffectResult }
+    postCommitPhase: PostCommitPhase
+}
+
+const RELATION_CREATE_ATTRIBUTE_QUERY: AttributeQueryData = [
+    '*',
+    ['source', { attributeQuery: ['id'] }],
+    ['target', { attributeQuery: ['id'] }],
+]
+
+type CreateMutationRerunClass =
+    | { kind: 'unknown' }
+    | { kind: 'relation'; attributeQuery: AttributeQueryData }
+    | { kind: 'entity'; attributeQuery: AttributeQueryData }
+
+type CreateMutationRerunRecordFlags = {
+    isRelation?: boolean
+    isFilteredRelation?: boolean
+    isMergedAbstract?: boolean
+}
+
+/**
+ * Classify a compiled record name for create-mutation reconstruction.
+ * Reads only `map.data.records[name]` flags. Must not call `getRecordInfo`
+ * (unknown names throw TypeError there instead of UNKNOWN_RECORD_NAME).
+ */
+function classifyCreateMutationRerun(
+    records: Record<string, CreateMutationRerunRecordFlags | undefined>,
+    recordName: string,
+): CreateMutationRerunClass {
+    const rec = records[recordName]
+    if (rec === undefined) return { kind: 'unknown' }
+    if (rec.isRelation === true || rec.isFilteredRelation === true) {
+        return { kind: 'relation', attributeQuery: RELATION_CREATE_ATTRIBUTE_QUERY }
+    }
+    return { kind: 'entity', attributeQuery: ['*'] }
+}
+
+function compiledRecordsFromStorage(storage: Storage): Record<string, CreateMutationRerunRecordFlags | undefined> {
+    const asMapData = storage.map as MapData | undefined
+    if (asMapData?.records && typeof asMapData.records === 'object') {
+        return asMapData.records
+    }
+    const fromHandle = (
+        storage as { queryHandle?: { map?: { data?: MapData } } }
+    ).queryHandle?.map?.data?.records
+    if (fromHandle) {
+        return fromHandle
+    }
+    throw new Error(
+        'Controller storage has no compiled record map; call setup() before rerun APIs',
+    )
+}
+
+const POST_COMMIT_HOOK_FAILURE_NAME = '__postCommit'
+
+const postCommitPhaseFailures = new WeakMap<DispatchResponse, PostCommitPhaseFailure[]>()
+
+function notRunPostCommitPhase(): PostCommitPhase {
+    return { status: 'notRun', failures: [] }
+}
+
+function recordPostCommitPhaseFailure(result: DispatchResponse, name: string, error: unknown): void {
+    let failures = postCommitPhaseFailures.get(result)
+    if (!failures) {
+        failures = []
+        postCommitPhaseFailures.set(result, failures)
+    }
+    failures.push({ name, error })
+}
+
+function finalizePostCommitPhase(result: DispatchResponse): void {
+    const recorded = postCommitPhaseFailures.get(result) ?? []
+    postCommitPhaseFailures.delete(result)
+    result.postCommitPhase = {
+        status: recorded.length === 0 ? 'complete' : 'failed',
+        failures: recorded.slice(),
+    }
+}
+
+function phaseAErrorResponse(error: unknown): DispatchResponse {
+    return {
+        error,
+        data: undefined,
+        effects: [],
+        sideEffects: {},
+        context: undefined,
+        postCommitPhase: notRunPostCommitPhase(),
+    }
 }
 
 export type EntityRetentionControllerOptions = {
@@ -238,15 +364,10 @@ export type BusinessTransactionOptions = {
     onDispatchError?: BusinessTransactionOnDispatchError
 }
 
-type DeferredPostCommit = {
-    kind: 'postCommit'
+type DeferredPostCommitPhase = {
+    kind: 'postCommitPhase'
     eventSource: EventSourceInstance<any, any>
     args: unknown
-    result: DispatchResponse
-}
-
-type DeferredMutationEffects = {
-    kind: 'mutationEffects'
     result: DispatchResponse
 }
 
@@ -255,7 +376,7 @@ type BusinessTransactionContext = {
     name?: string
     isolation: TransactionIsolation
     onDispatchError: BusinessTransactionOnDispatchError
-    deferred: Array<DeferredPostCommit | DeferredMutationEffects>
+    deferred: Array<DeferredPostCommitPhase>
     aborted: boolean
     savepointSeq: number
 }
@@ -1238,19 +1359,15 @@ export class Controller {
             throw error
         }
 
-        // COMMIT succeeded (runInTransaction returned). Flush deferred side effects once.
+        // COMMIT succeeded (runInTransaction returned). Flush deferred stage P once per result.
         const deferred = bt.deferred.splice(0, bt.deferred.length)
         bt.active = false
         let anySuccessfulApplied = false
         for (const item of deferred) {
-            if (item.kind === 'postCommit') {
-                if (!item.result.error && item.result.outcome !== 'replayed') {
-                    anySuccessfulApplied = true
-                }
-                await this.runPostCommitHook(item.eventSource, item.args, item.result, this.system.logger)
-            } else {
-                await this.runRecordChangeSideEffects(item.result, this.system.logger)
+            if (!item.result.error && item.result.outcome !== 'replayed') {
+                anySuccessfulApplied = true
             }
+            await this.runPostCommitPhase(item.eventSource, item.args, item.result)
         }
         // Same optional hook as non-BT dispatch: after owned COMMIT + deferred postCommit.
         if (anySuccessfulApplied && this.entityRetentionOptions.runAfterSuccessfulDispatch) {
@@ -1336,41 +1453,29 @@ export class Controller {
                     bt.aborted = true
                     throw e
                 }
-                result = {
-                    error: e,
-                    data: undefined,
-                    effects: [],
-                    sideEffects: {},
-                    context: undefined
-                }
+                result = phaseAErrorResponse(e)
             } else {
                 if (this.forceThrowDispatchError) throw e
-                // 与成功路径同形态（data/context 显式为 undefined）：直接序列化 DispatchResponse
-                //  的调用方（HTTP 层等）拿到的 JSON 键集合在成功/失败两条路径上保持一致。
-                result = {
-                    error: e,
-                    data: undefined,
-                    effects: [],
-                    sideEffects: {},
-                    context: undefined
-                }
+                // data/context 显式为 undefined，便于直接序列化。阶段 A 错误路径没有
+                // outcome 键（与成功路径不同）；两条路径各自带上 postCommitPhase。
+                result = phaseAErrorResponse(e)
             }
         }
 
         if (!result.error) {
             // P (postCommit + mutation side effects): never on idempotent replay.
             if (result.outcome === 'replayed') {
+                result.postCommitPhase = notRunPostCommitPhase()
                 return result
             }
             if (bt?.active) {
                 // Defer until the business transaction's owned COMMIT succeeds.
+                result.postCommitPhase = notRunPostCommitPhase()
                 bt.deferred.push(
-                    { kind: 'postCommit', eventSource, args: committedAttemptArgs, result },
-                    { kind: 'mutationEffects', result },
+                    { kind: 'postCommitPhase', eventSource, args: committedAttemptArgs, result },
                 )
             } else {
-                await this.runPostCommitHook(eventSource, committedAttemptArgs, result, this.system.logger)
-                await this.runRecordChangeSideEffects(result, this.system.logger)
+                await this.runPostCommitPhase(eventSource, committedAttemptArgs, result)
                 // Optional retention maintenance after successful commit + postCommit.
                 // Independent storage transaction(s); never inside the attempt body.
                 if (this.entityRetentionOptions.runAfterSuccessfulDispatch) {
@@ -1605,6 +1710,24 @@ export class Controller {
         })
     }
 
+    /**
+     * Convergence point for stage P: postCommit, then mutation side effects, then one finalize.
+     * Failures are appended during the loops; status is not inferred from the last-write-wins map.
+     */
+    private async runPostCommitPhase<TArgs = unknown, TResult = unknown>(
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        args: TArgs,
+        result: DispatchResponse,
+    ) {
+        postCommitPhaseFailures.delete(result)
+        if (!result.sideEffects) {
+            result.sideEffects = {}
+        }
+        await this.runPostCommitHook(eventSource, args, result, this.system.logger)
+        await this.runRecordChangeSideEffects(result, this.system.logger)
+        finalizePostCommitPhase(result)
+    }
+
     async runPostCommitHook<TArgs = unknown, TResult = unknown>(
         eventSource: EventSourceInstance<TArgs, TResult>,
         args: TArgs,
@@ -1636,20 +1759,27 @@ export class Controller {
                 }
             )
             logger.error({label: "postCommit", message: eventSource.name, error: sideEffectError})
-            result.sideEffects!.__postCommit = {
+            if (!result.sideEffects) {
+                result.sideEffects = {}
+            }
+            result.sideEffects.__postCommit = {
                 error: sideEffectError,
             }
+            recordPostCommitPhaseFailure(result, POST_COMMIT_HOOK_FAILURE_NAME, sideEffectError)
         }
     }
 
     async runRecordChangeSideEffects(result: DispatchResponse, logger: SystemLogger) {
         const mutationEvents = result.effects as RecordMutationEvent[]
+        if (!result.sideEffects) {
+            result.sideEffects = {}
+        }
         for(let event of mutationEvents || []) {
             const sideEffects = this.recordNameToSideEffects.get(event.recordName)
             if (sideEffects) {
                 for(let sideEffect of sideEffects) {
                     try {
-                        result.sideEffects![sideEffect.name] = {
+                        result.sideEffects[sideEffect.name] = {
                             result: await sideEffect.content.call(this, event),
                         }
                       
@@ -1672,14 +1802,117 @@ export class Controller {
                         )
                         
                         logger.error({label: "recordMutationSideEffect", message: sideEffect.name, error: sideEffectError})
-                        result.sideEffects![sideEffect.name] = {
+                        result.sideEffects[sideEffect.name] = {
                             error: sideEffectError
                         }
+                        recordPostCommitPhaseFailure(result, sideEffect.name, sideEffectError)
                     }
                 }
             }
         }
     }
+
+    /**
+     * Reconstruct a create mutation event from the current stored row and rerun every
+     * RecordMutationSideEffect registered for that record name. Does not run postCommit.
+     * Does not require the original DispatchResponse.effects.
+     */
+    async rerunCreateMutationSideEffects(
+        input: RerunCreateMutationSideEffectsInput,
+    ): Promise<PostCommitRerunResult> {
+        this.assertRerunNotInBusinessTransaction()
+        const recordName = input?.recordName
+        const id = input?.id
+        if (typeof recordName !== 'string' || recordName.length === 0 || id === undefined || id === null || id === '') {
+            throw new PostCommitRerunError({
+                code: 'INVALID_INPUT',
+                recordName,
+                id,
+            })
+        }
+
+        const classified = classifyCreateMutationRerun(
+            compiledRecordsFromStorage(this.system.storage),
+            recordName,
+        )
+        if (classified.kind === 'unknown') {
+            throw new PostCommitRerunError({
+                code: 'UNKNOWN_RECORD_NAME',
+                recordName,
+                id,
+            })
+        }
+
+        const loaded = await this.system.storage.findOne(
+            recordName,
+            MatchExp.atom({ key: 'id', value: ['=', id] }),
+            undefined,
+            classified.attributeQuery,
+        )
+        if (!loaded) {
+            throw new PostCommitRerunError({
+                code: 'RECORD_NOT_FOUND',
+                recordName,
+                id,
+            })
+        }
+
+        const reconstructed: RecordMutationEvent = {
+            type: 'create',
+            recordName,
+            record: loaded,
+        }
+        const result: DispatchResponse = {
+            effects: [reconstructed],
+            sideEffects: {},
+        }
+        postCommitPhaseFailures.delete(result)
+        await this.runRecordChangeSideEffects(result, this.system.logger)
+        return this.toPostCommitRerunResult(result)
+    }
+
+    /**
+     * Rerun EventSource.postCommit with caller-supplied resolve/afterDispatch values (S3).
+     * Must not substitute a loaded storage row for prior.data unless that EventSource's
+     * resolve originally returned that row.
+     */
+    async rerunPostCommit<TArgs = unknown, TResult = unknown>(
+        eventSource: EventSourceInstance<TArgs, TResult>,
+        args: TArgs,
+        prior: Pick<DispatchResponse, 'data' | 'context'> = {},
+    ): Promise<PostCommitRerunResult> {
+        this.assertRerunNotInBusinessTransaction()
+        assert(!!eventSource, 'eventSource is required for rerunPostCommit')
+        const result: DispatchResponse = {
+            effects: [],
+            sideEffects: {},
+            data: prior.data,
+            context: prior.context,
+        }
+        postCommitPhaseFailures.delete(result)
+        await this.runPostCommitHook(eventSource, args, result, this.system.logger)
+        return this.toPostCommitRerunResult(result)
+    }
+
+    private assertRerunNotInBusinessTransaction(): void {
+        const bt = getActiveBusinessTransaction()
+        if (bt?.active) {
+            throw new PostCommitRerunError({
+                code: 'IN_BUSINESS_TRANSACTION',
+                businessTransactionName: bt.name,
+            })
+        }
+    }
+
+    private toPostCommitRerunResult(result: DispatchResponse): PostCommitRerunResult {
+        finalizePostCommitPhase(result)
+        return {
+            effects: result.effects ?? [],
+            sideEffects: result.sideEffects ?? {},
+            postCommitPhase: result.postCommitPhase ?? { status: 'complete', failures: [] },
+        }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findEventSourceByName(name: string): EventSourceInstance<any, any> | undefined {
         return this.eventSourcesByName.get(name)

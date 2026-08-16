@@ -43,7 +43,13 @@ CreateOrder.postCommit = async function(args, result) {
 };
 ```
 
-If `postCommit` fails, committed data is not rolled back; the error is reported in `result.sideEffects.__postCommit.error`. Use `recordMutationSideEffects` when the side effect should be driven by record mutation events rather than by a specific interaction.
+If `postCommit` fails, committed facts are not rolled back and `result.error` stays absent (stage A only). Stage P completion is first-class on `result.postCommitPhase` (`complete` | `failed` | `notRun`). Obligation-sensitive callers use `isPostCommitPhaseComplete(result)` plus the failure list on `postCommitPhase.failures` (includes `'__postCommit'`). Scanning `result.sideEffects` is not the official complete-success check: that map is last-write-wins by side-effect name.
+
+Default idempotent replay still skips stage P (`outcome: 'replayed'` → `postCommitPhase.status === 'notRun'`). That is not obligation success. After replay, pass **this response's** `data` / `context` to `controller.rerunPostCommit`, and call `controller.rerunCreateMutationSideEffects({ recordName, id })` for each create row that must converge. Application-level admit dedup (duplicate business key → `result.error`) is a stage A failure, not success: look up the committed create row, rerun create mutation side effects by id, and rerun `postCommit` only with a retained first `data`/`context` or with an empty `prior` when the hook is args-reentrant. Do **not** pass a `findOne` row as `prior.data` unless that EventSource's `resolve` originally returned that row.
+
+`RecordMutationSideEffect.content` and `postCommit` must be safe to run more than once. The framework does not skip already-successful callbacks and does not schedule retries. Update and delete mutation side effects have no reconstruction primitive (no stored `oldRecord`); a create rerun returning `complete` does not mean the first stage P has fully converged if an update/delete hook failed.
+
+Use `recordMutationSideEffects` when the side effect should be driven by record mutation events rather than by a specific interaction. Do not call `rerun*` inside `runInBusinessTransaction`; wait until the owner COMMIT has flushed stage P.
 
 ## Basic Concepts of Interactions
 
@@ -1311,7 +1317,25 @@ await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async
 
 > **Default (no business transaction)**: `controller.dispatch` / `callInteraction` return a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw). Branch business rejects on stable **`result.error.code`** (and `conditionName` when needed), not duck-typed `type` alone.  
 
-**Idempotency.** When the Interaction declares `idempotency`, successful responses include `outcome: 'applied' | 'replayed'`. Branch client retries on `outcome`. Do not infer replay by scanning `effects` or by treating unique-constraint errors as success. Concurrent same-key attempts that race an in-flight claim throw/return `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'`. Replay still runs admit (conditions) and skips open, event create, resolve, afterDispatch, and postCommit.
+**Idempotency.** When the Interaction declares `idempotency`, successful responses include `outcome: 'applied' | 'replayed'`. Branch client retries on `outcome`. Do not infer replay by scanning `effects` or by treating unique-constraint errors as success. Concurrent same-key attempts that race an in-flight claim throw/return `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'`. Replay still runs admit (conditions) and skips open, event create, resolve, afterDispatch, and stage P (`postCommit` and `RecordMutationSideEffect`). `replayed` is not “obligations already finished”; `postCommitPhase.status` is `notRun`. Recover create mutation side effects and `postCommit` with the rerun APIs above.
+
+**Stage A vs stage P.** `result.error` means the fact transaction failed. Callers that only care whether facts committed may keep checking `result.error`. Callers that must know whether post-commit IO finished use:
+
+```javascript
+import { isPostCommitPhaseComplete } from 'interaqt'
+
+if (result.error) {
+  // Stage A failed. Facts were not committed (top-level soft error / BT continue),
+  // or a duplicate admit check rejected the attempt. That is not success.
+} else if (!isPostCommitPhaseComplete(result)) {
+  // Facts are committed, or this is replay / a business-transaction callback
+  // before owner COMMIT: this response's stage P did not complete or did not run.
+  // After top-level / BT resolve: rerun recoverable hooks (create mutation
+  // side effects and postCommit). Do not treat replayed as obligation success.
+  // Do not treat a later create rerun `complete` as “the first stage P,
+  // including update/delete failures, has converged”.
+}
+```
 
 > **Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`**: failed dispatch **throws** (for example `InteractionGuardError` with `code` / `details` / `conditionName`); the business transaction rejects and rolls back. Use `try/catch` or `expect(...).rejects` only for that path (or when you pass `forceThrowDispatchError`).  
 > **Opt-in `onDispatchError: 'continue'`**: soft `result.error` again; caller owns whether to continue.  

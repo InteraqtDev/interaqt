@@ -24,20 +24,26 @@ const controller = new Controller({
 ```
 
 ## Dispatch Flow
-1. **Guard** — event source validates preconditions (permissions, conditions)
+1. **Admit / guard** — event source validates preconditions (permissions, conditions)
 2. **Map Event Data** — transforms raw event args into internal event data
 3. **Resolve** — executes the action: creates/updates/deletes records
-4. **Computations** — reactive computations triggered by record mutations
-5. **Side Effects** — `RecordMutationSideEffect` callbacks
+4. **Computations** — reactive computations triggered by record mutations (inside the fact transaction)
+5. **Stage P (after commit)** — `EventSource.postCommit` then `RecordMutationSideEffect`. Skipped on idempotent `replayed`. Deferred until owner COMMIT inside `runInBusinessTransaction`.
 
-Returns `DispatchResponse`: `{ error?, data?, effects?, sideEffects?, context? }`
+Returns `DispatchResponse`: `{ error?, data?, effects?, sideEffects?, context?, outcome?, postCommitPhase? }`
+
+- `error` is stage A (the fact transaction) only. Stage P failures do not set `error` and do not roll back facts.
+- `outcome: 'applied' | 'replayed'` is first-apply vs replay of facts, not obligation success.
+- Official stage P check: `isPostCommitPhaseComplete(result)` (`postCommitPhase.status === 'complete'`).
+- Recover create mutation side effects with `controller.rerunCreateMutationSideEffects({ recordName, id })`; recover `postCommit` with `controller.rerunPostCommit(eventSource, args, { data, context })`. Do not call `rerun*` inside an active business transaction. Update/delete mutation side effects cannot be reconstructed.
 
 ## EventSource Abstraction
 All event sources (Interaction, custom types) implement `EventSourceInstance`:
 - `entity` — the entity this event source operates on
-- `guard(args)` — validate and check permissions
+- `guard(args)` / `admit` — validate and check permissions
 - `mapEventData(args)` — transform event args
-- `resolve(system, eventData)` — execute the action
+- `resolve` — execute the action
+- `postCommit` — external IO after successful commit; skipped on idempotent `replayed`
 
 ## Computation Registration
 Computations are classes extending `Computation` with static `handles`:

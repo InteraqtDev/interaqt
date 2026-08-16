@@ -62,7 +62,7 @@ import {
   Equation,
   
   // Storage, Controller, transactions
-  Controller,              // dispatch, runInBusinessTransaction, ...
+  Controller,              // dispatch, runInBusinessTransaction, rerunCreateMutationSideEffects, rerunPostCommit
   MonoSystem,
   getActiveBusinessTransaction,
   // BusinessTransactionOptions  // TypeScript type for runInBusinessTransaction options
@@ -82,6 +82,9 @@ import {
   isTransactionRetryExhaustedError,
   InteractionGuardError,   // condition/payload guard failures (code/details/conditionName) — official
   IdempotencyError,        // IDEMPOTENCY_IN_FLIGHT / IDEMPOTENCY_CONFLICT on declared keys
+  isPostCommitPhaseComplete, // stage P ran and succeeded on this response (not historical)
+  SideEffectError,         // postCommit / RecordMutationSideEffect failures (not result.error)
+  PostCommitRerunError,    // caller errors on rerun APIs (INVALID_INPUT, UNKNOWN_RECORD_NAME, ...)
   ConditionError,          // DEPRECATED historical factory/shape; use InteractionGuardError + .code
   ConstraintViolationError,
   ConstraintSetupError,
@@ -254,3 +257,5 @@ const controller = new Controller({
 9. **Constraint helpers**: `UniqueConstraint`, `ConstraintViolationError`, `ConstraintSetupError`, `findConstraintViolationError`, and `normalizeDatabaseError` are exported for schema-level uniqueness and stable duplicate handling.
 
 10. **Scoped serial allocation**: `ScopedSequence` is exported for number property computations that allocate per-scope serials. Always pair it with a `UniqueConstraint` over the scope fields plus the sequence property.
+
+11. **Stage P completion**: `result.error` is the fact transaction only. Obligation-sensitive callers use `isPostCommitPhaseComplete(result)` (and `result.postCommitPhase`). Recover create mutation side effects with `controller.rerunCreateMutationSideEffects({ recordName, id })` and `postCommit` with `controller.rerunPostCommit(eventSource, args, { data, context })`. `SideEffectError` wraps hook failures; `PostCommitRerunError` is for illegal rerun input (not a side-effect failure). Do not treat `outcome: 'replayed'` or a duplicate admit error as obligation success. Update/delete mutation side effects cannot be reconstructed.

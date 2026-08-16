@@ -230,7 +230,8 @@ describe('r14 improvement fixes', () => {
         const user = await system.storage.create('R14User', { name: 'u' });
         const res = await controller.dispatch(denied, { user });
         expect(res.error).toBeTruthy();
-        expect(Object.keys(res).sort()).toEqual(['context', 'data', 'effects', 'error', 'sideEffects']);
+        expect(Object.keys(res).sort()).toEqual(['context', 'data', 'effects', 'error', 'postCommitPhase', 'sideEffects']);
+        expect(res.postCommitPhase).toEqual({ status: 'notRun', failures: [] });
         expect(res.data).toBeUndefined();
         expect(res.context).toBeUndefined();
         await system.destroy();

@@ -423,7 +423,13 @@ controller.dispatch<TArgs, TResult>(
   args: TArgs
 ): Promise<DispatchResponse>
 
-// DispatchResponse = { error?, data?, effects?, sideEffects?, context? }
+controller.rerunCreateMutationSideEffects(input: { recordName: string; id: string }): Promise<PostCommitRerunResult>
+controller.rerunPostCommit(eventSource, args, prior?: { data?: unknown; context?: Record<string, unknown> }): Promise<PostCommitRerunResult>
+
+// DispatchResponse includes error? (stage A), outcome? ('applied' | 'replayed'),
+// and postCommitPhase ({ status: 'complete' | 'failed' | 'notRun', failures }).
+// Official obligation check: isPostCommitPhaseComplete(result) — not scanning sideEffects,
+// not treating replayed or a duplicate admit error as success.
 ```
 
 Constraints:
@@ -593,7 +599,7 @@ EventSource.create(args: {
 }): EventSourceInstance
 ```
 
-Custom event source for scheduled tasks, webhooks, or any non-interaction trigger. Dispatch via `controller.dispatch(eventSource, args)`. `afterDispatch` runs inside the retryable transaction; use `postCommit` for external IO that must run only after commit.
+Custom event source for scheduled tasks, webhooks, or any non-interaction trigger. Dispatch via `controller.dispatch(eventSource, args)`. `afterDispatch` runs inside the retryable transaction; use `postCommit` for external IO that must run only after commit. Idempotent replay skips `postCommit`; recover with `rerunPostCommit` using this response's `data`/`context`.
 
 ---
 
@@ -617,7 +623,7 @@ RecordMutationSideEffect.create(args: {
 }): RecordMutationSideEffect
 ```
 
-Triggers custom logic on record mutations within dispatch context. Results available in `dispatchResult.sideEffects`.
+Triggers custom logic on record mutations after a successful commit. Last-write-wins results live in `dispatchResult.sideEffects`. Official stage P completion is `isPostCommitPhaseComplete(result)` / `postCommitPhase`; create-record hooks can be rerun with `rerunCreateMutationSideEffects`. Update/delete hooks cannot.
 
 ---
 
@@ -652,6 +658,9 @@ import {
   // System
   Controller, MonoSystem, Dictionary,
   RecordMutationSideEffect,
+  isPostCommitPhaseComplete,
+  SideEffectError,
+  PostCommitRerunError,
   HardDeletionProperty, HARD_DELETION_PROPERTY_NAME,
   NON_DELETED_STATE, DELETED_STATE,
 

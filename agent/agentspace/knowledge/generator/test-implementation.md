@@ -54,33 +54,40 @@ callInteraction(
 ): Promise<InteractionCallResponse>
 ```
 
-The method returns a `InteractionCallResponse` object with the following structure:
+The method returns an `InteractionCallResponse` object. That name is this guide’s alias for the same `DispatchResponse` shape returned by `controller.dispatch`:
 
 ```typescript
 type InteractionCallResponse = {
-  // Contains error information if the interaction failed
+  // Stage A only. Absence of error is not post-commit completion.
   error?: unknown
-  
+
   // For GET interactions: contains the retrieved data
   data?: unknown
-  
-  // The interaction event that was processed
-  event?: InteractionEvent
-  
+
   // Record mutations (create/update/delete) that occurred
   effects?: RecordMutationEvent[]
-  
-  // Results from side effects defined in the interaction
+
+  // Last-write-wins map by side-effect name. Not the official complete-success check.
   sideEffects?: {
     [effectName: string]: {
       result?: unknown
       error?: unknown
     }
   }
-  
+
   // Additional context (e.g., activityId for activity interactions)
   context?: {
     [key: string]: unknown
+  }
+
+  // Facts first-apply vs replay when the EventSource participates in idempotency
+  outcome?: 'applied' | 'replayed'
+
+  // Stage P (postCommit + RecordMutationSideEffect) for this response.
+  // Official predicate: isPostCommitPhaseComplete(result).
+  postCommitPhase?: {
+    status: 'complete' | 'failed' | 'notRun'
+    failures: { name: string; error: unknown }[]
   }
 }
 ```
@@ -234,11 +241,18 @@ const GetStyleBySlug = Interaction.create({  // Don't create this just for tests
 - Only create query interactions if they're actual business requirements
 
 ```typescript
-// 1. Basic success check
+// 1. Basic success check — stage A (facts). Absence of error is not post-commit completion.
 const result = await controller.callInteraction('CreateStyle', {...})
 if (result.error) {
   console.error('Interaction failed:', result.error)
   return
+}
+
+// Obligation-sensitive: this response's stage P
+import { isPostCommitPhaseComplete } from 'interaqt'
+if (!isPostCommitPhaseComplete(result)) {
+  // Facts committed or replay/notRun. Rerun recoverable hooks; do not scan sideEffects
+  // as the complete-success check. Do not treat a duplicate admit error as success.
 }
 
 // 2. Getting data from query interactions
@@ -252,9 +266,10 @@ const queryResult = await controller.callInteraction('GetStyles', {
 expect(queryResult.error).toBeUndefined()
 expect(queryResult.data).toHaveLength(10)
 
-// 3. Checking side effects
+// 3. Checking side effects — last-write-wins map is not the official complete check
 const publishResult = await controller.callInteraction('PublishStyle', {...})
 expect(publishResult.error).toBeUndefined()
+expect(isPostCommitPhaseComplete(publishResult)).toBe(true)
 expect(publishResult.sideEffects?.emailNotification?.result).toBe('sent')
 
 // 4. Activity interactions return activityId
@@ -360,7 +375,7 @@ expect((result.error as any).type).toBe('condition check failed')
 test('should handle all error cases', async () => {
   const result = await controller.callInteraction('UpdateStyle', {...})
   
-  // Always check error first
+  // Always check stage A error first
   if (result.error) {
     // For tests, use expect to verify expected errors
     expect(result.error).toBeDefined()
@@ -368,7 +383,8 @@ test('should handle all error cases', async () => {
     return
   }
   
-  // Only access other properties after confirming no error
+  // Only access other properties after confirming no stage A error.
+  // Obligation-sensitive tests also assert isPostCommitPhaseComplete(result).
   expect(result.effects).toHaveLength(1)
   expect(result.sideEffects?.audit?.result).toBeTruthy()
 })
