@@ -513,7 +513,7 @@ await controller.callInteraction('CreatePost', {
 
 ## 9. Record Identity Mistakes
 
-Logical `id` is the **single application identity**: Relation endpoints, `MatchExp`, and `StateMachine.computeTarget` all use `{ id }` / match-by-id. The physical table primary key `_rowId` is an implementation detail and must not be treated as business identity.
+Logical `id` is the **record identity** used by Relation endpoints, `MatchExp`, and `StateMachine.computeTarget` (`{ id }` / match-by-id). The physical table primary key `_rowId` is an implementation detail and must not be treated as business identity. A separate **natural key** is declared with `Entity.identity` (set-semantic create); that is not a substitute for logical `id` on relations.
 
 ### Rules (create optional, update immutable)
 
@@ -722,6 +722,31 @@ return { allowed: false, code: 'NOPE', details: { … } }
 
 Condition-thrown `RequireSerializableRetry` is absorbed as a condition failure and does **not** upgrade the dispatch isolation. Use declarative `locks` for concurrent admission, or open `runInBusinessTransaction({ isolation: 'SERIALIZABLE' })` when framework SERIALIZABLE gates are required inside a BT.
 
+### ❌ Application CREATE TABLE as occupancy backend
+
+```sql
+-- ❌ WRONG: this table is not an Entity. Install/migrate will not know it,
+-- computations cannot attach, Entity.retention cannot prune it, and other
+-- domains cannot query it through storage.find.
+CREATE TABLE IF NOT EXISTS handshake_tokens (
+  ns TEXT NOT NULL,
+  token TEXT NOT NULL,
+  payload TEXT,
+  PRIMARY KEY (ns, token)
+);
+```
+
+```typescript
+// ✅ CORRECT: Entity.identity + Transform + StateMachine + retention (see 15-entity-crud-patterns.md)
+Entity.create({
+  name: 'HandshakeToken',
+  identity: { name: 'byKey', properties: ['ns', 'token'] },
+  properties: [/* ns, token, payload, holder, expiresAt, createdAt, status */],
+})
+```
+
+Do not catch unique-constraint errors and treat them as "already taken". Do not add a `claim`/`consume` method next to `Controller.dispatch`.
+
 ## Key Takeaways
 
 1. **interaqt provides tools, not pre-built business entities**
@@ -734,7 +759,7 @@ Condition-thrown `RequireSerializableRetry` is absorbed as a condition failure a
 8. **storage.create() bypasses ALL validation - use only for test setup**
 9. **ALL business logic testing must use `controller.dispatch` (or callInteraction)**
 10. **Never test Entity/Relation directly - test through Interactions**
-11. **Logical `id` is the single application identity — optional on create, immutable on update; type must match the driver**
+11. **Logical `id` is the record identity — optional on create, immutable on update; type must match the driver. Natural keys use `Entity.identity`.**
 12. **Prefer returned `storage.create` id or a pregenerated logical id for Relation / computeTarget; `clientId` is only an optional secondary key**
 13. **Concurrent admission: `Condition.locks` + snapshot; same-request write+dispatch: `runInBusinessTransaction`**
 14. **Bare `runInTransaction` + `dispatch` is a hard error (`DISPATCH_IN_NON_BT_TRANSACTION`); branch business rejects on `InteractionGuardError.code`**
@@ -751,4 +776,7 @@ Remember: The framework is about **declaring what data is**, not **how to manipu
 | Infer idempotent replay by scanning `effects` or catching unique conflicts | Declare `idempotency` and branch on `result.outcome` |
 | Hand-written storage prune loops for history caps/TTL | `Entity.retention` + `controller.maintainEntityRetention` |
 | Using `cleanupAsyncTasks` to delete user entity history | Keep async-task cleanup separate; use entity retention for user rows |
+| Application `CREATE TABLE` + dialect SQL for handshake tokens / one-time tickets | `Entity.identity` + Transform register + StateMachine consume + `Entity.retention`; distinguish results with `effects` + query |
+| UniqueConstraint conflict (or catching `23505`) as "already taken" | Identity set semantics: no error, no create event, stored row visible |
+| A `claim` / `consume` method beside `Controller.dispatch` | Occupancy writes go through declared Interactions only |
 

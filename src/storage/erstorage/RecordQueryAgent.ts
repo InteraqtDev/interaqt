@@ -96,8 +96,8 @@ export class RecordQueryAgent implements RecordOperationAgent {
     // 委托给 CreationExecutor。
     // CAUTION 创建/更新两个分支共用同一份实现（CreationExecutor.preprocessSameRowData），
     //  不要在这里再复制一份，两份实现必然随时间分叉。
-    async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData> {
-        return this.creationExecutor.preprocessSameRowData(newEntityData, isUpdate, events, oldRecord)
+    async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false, events?: RecordMutationEvent[], oldRecord?: Record, options?: { skipHostCreateEvent?: boolean }): Promise<NewRecordData> {
+        return this.creationExecutor.preprocessSameRowData(newEntityData, isUpdate, events, oldRecord, options)
     }
 
     /**

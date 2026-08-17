@@ -1,7 +1,7 @@
 import { Database } from "@runtime";
 import { BoolExp } from "@core";
 import { canonicalJSONStringify, normalizeTimestampInputToMs, timestampParamForDialect } from "../utils.js";
-import { getSchemaDialect } from "./SchemaDialect.js";
+import { getSchemaDialect, quoteIdentifier } from "./SchemaDialect.js";
 import { EntityToTableMap, ValueAttribute } from "./EntityToTableMap.js";
 import { FieldMatchAtom, MatchExp } from "./MatchExp.js";
 import { AttributeQuery } from "./AttributeQuery.js";
@@ -636,17 +636,23 @@ ${innerQuerySQL}
      */
     buildInsertSQL(
         recordName: string,
-        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string, args?: object }>
+        fieldAndValues: Array<{ field: string, value: unknown, fieldType?: string, valueType?: string, name?: string, args?: object }>,
+        options?: { onConflictDoNothingFields?: string[] }
     ): [string, unknown[]] {
         const p = this.getPlaceholder()
         const recordInfo = this.map.getRecordInfo(recordName)
         
-        const sql = `
+        let sql = `
 INSERT INTO "${recordInfo.table}"
 (${fieldAndValues.map(f => `"${f.field}"`).join(',')})
 VALUES
 (${fieldAndValues.map(() => p()).join(',')}) 
 `
+        if (options?.onConflictDoNothingFields?.length) {
+            const dialect = getSchemaDialect(this.database)
+            const columns = options.onConflictDoNothingFields.map(field => quoteIdentifier(field, dialect)).join(', ')
+            sql += `ON CONFLICT (${columns}) DO NOTHING\n`
+        }
         const params = fieldAndValues.map(f => this.prepareFieldValue(f.value, f.fieldType!, f.valueType, f.name || f.field, recordName, f.args))
         
         return [sql, params]

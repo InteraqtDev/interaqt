@@ -105,6 +105,12 @@ Migration rules:
 - Do not partial-seed with `initializeFrom.match` when future allocations cover all host rows; otherwise unseeded existing scopes can later collide.
 - Removing a declared `ScopedSequence` must be reviewed explicitly. Do not silently drop the declaration from the manifest while leaving internal counter state behind.
 
+## Entity.identity (concurrent first-writer)
+
+`Entity.identity` uses `INSERT ... ON CONFLICT (identity columns) DO NOTHING`. Concurrent first-writers of the same natural key observe one stored row; the loser is not a `ConstraintViolationError`. Occupancy still goes through `Controller.dispatch` (Transform + StateMachine + retention), not a parallel claim API.
+
+Real PostgreSQL two-connection coverage is `tests/runtime/postgresqlApplicationIdentity.spec.ts` (included in `npm run test:postgres`). PGLite is not a substitute. MySQL setup fail-fasts. UniqueConstraint remains duplicate-is-error.
+
 ## Transaction API
 
 Use callback transactions for storage-only work:
@@ -168,6 +174,13 @@ INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-scoped-sequence
 ```
 
 This is the critical acceptance test for cross-controller scoped counter allocation.
+
+For `Entity.identity` concurrent first-writer / occupancy cells:
+
+```bash
+INTERAQT_POSTGRES_DATABASE=interaqt_test PGHOST=127.0.0.1 PGUSER=interaqt PGPASSWORD=interaqt \
+  npx vitest run tests/runtime/postgresqlApplicationIdentity.spec.ts
+```
 
 Condition admission + business transaction contracts on real PostgreSQL:
 

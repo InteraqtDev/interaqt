@@ -20,6 +20,7 @@ Entity.create(config: EntityConfig): KlassInstance<typeof Entity>
 - `config.baseEntity` (Entity|Relation, optional): Base entity for filtered entity (used to create filtered entities)
 - `config.filterCondition` (MatchExp, optional): Filter condition (used to create filtered entities)
 - `config.retention` (EntityRetention, optional): Declarative row retention for ordinary entities. Omitted or `{ mode: 'forever' }` means this mechanism never deletes. `mode: 'cap'` keeps the latest N rows per partition (`retainLatest` + required `orderBy` DESC keys; optional nested `ttl`). `mode: 'ttl'` deletes only by age (`ttl.timestampProperty` + `ttl.maxAgeMs`; no `orderBy`/`retainLatest`). Filtered/merged entities and hard-deletion hosts cannot declare retention (create-time fail-fast). Pruning runs only through `controller.maintainEntityRetention` (optional auto-hook is off by default).
+- `config.identity` (`{ name, properties }`, optional): Application identity (natural key) for an ordinary entity. The named properties must be scalar `string` / `number` / `boolean`, non-collection, non-computed, without `defaultValue`. They are total, unique, and immutable. Logical create follows set semantics (existing key resolves to the stored row; no create event). Not a UniqueConstraint. Filtered/merged entities cannot declare it; MySQL setup fail-fasts. Occupancy recipe: usage `15-entity-crud-patterns.md`.
 
 **Examples**
 ```typescript
@@ -40,6 +41,16 @@ const ActiveUser = Entity.create({
         key: 'status',
         value: ['=', 'active']
     })
+})
+
+// Application natural key (set-semantic create; not UniqueConstraint)
+const HandshakeToken = Entity.create({
+    name: 'HandshakeToken',
+    identity: { name: 'byKey', properties: ['ns', 'token'] },
+    properties: [
+        Property.create({ name: 'ns', type: 'string' }),
+        Property.create({ name: 'token', type: 'string' }),
+    ]
 })
 ```
 

@@ -36,6 +36,7 @@ Returns `DispatchResponse`: `{ error?, data?, effects?, sideEffects?, context?, 
 - `outcome: 'applied' | 'replayed'` is first-apply vs replay of facts, not obligation success.
 - Official stage P check: `isPostCommitPhaseComplete(result)` (`postCommitPhase.status === 'complete'`).
 - Recover create mutation side effects with `controller.rerunCreateMutationSideEffects({ recordName, id })`; recover `postCommit` with `controller.rerunPostCommit(eventSource, args, { data, context })`. Do not call `rerun*` inside an active business transaction. Update/delete mutation side effects cannot be reconstructed.
+- Occupancy (identity register / consume) has no parallel `claim` / `consume` API. Distinguish insert vs observe with `DispatchResponse.effects` plus a follow-up query. See usage `15-entity-crud-patterns.md`.
 
 ## EventSource Abstraction
 All event sources (Interaction, custom types) implement `EventSourceInstance`:

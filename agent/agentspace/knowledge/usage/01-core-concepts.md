@@ -95,7 +95,7 @@ When a user likes a post, the system automatically:
 ## Core Concepts
 
 ### Entity
-Basic units of data, such as User, Post, Comment, etc.
+Basic units of data, such as User, Post, Comment, etc. Optional `identity` declares an application natural key with set-semantic create (a second insert of the same key observes the stored row). Occupancy (handshake tokens, one-time tickets) is identity plus Transform, StateMachine, and `retention` — see [15-entity-crud-patterns.md](./15-entity-crud-patterns.md). Do not confuse identity with logical `id` or with `UniqueConstraint`.
 
 ### Property
 Fields of entities, can be simple values or automatically computed values based on other data.
@@ -128,4 +128,5 @@ Ordered combinations of multiple related Interactions, implementing complex busi
 - **Content Systems**: Articles, comments, like statistics
 - **Social Networks**: Friend relationships, feed updates
 - **Approval Workflows**: Multi-step, multi-role collaboration
-- **E-commerce Systems**: Order status, inventory calculation 
+- **E-commerce Systems**: Order status, inventory calculation
+- **Occupancy / handshake tokens**: First-writer registration of an application key (`Entity.identity`) 

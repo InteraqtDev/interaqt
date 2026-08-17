@@ -73,6 +73,8 @@ const UserProfile = Relation.create({
 });
 ```
 
+`UniqueConstraint` on an entity or relation means a duplicate is a typed failure. Application natural keys use `Entity.identity` on an **ordinary entity** (set-semantic create). Relations cannot declare identity. See [02-define-entities-properties.md](./02-define-entities-properties.md).
+
 ### Bidirectional Access
 
 In one-to-one relations, you can access either end from the other:

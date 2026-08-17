@@ -21,9 +21,9 @@ import { describe, expect, test } from "vitest";
 import {
     Action, Activity, ActivityGroup, ActivityManager, Controller, Count, Dictionary, Entity,
     Interaction, KlassByName, MonoSystem, Property, StateMachine,
-    StateNode, StateTransfer, Transfer, Transform,
+    StateNode, StateTransfer, Transfer, Transform, UniqueConstraint, Relation,
 } from 'interaqt';
-import { MatchExp } from '@storage';
+import { DBSetup, MatchExp } from '@storage';
 import { PGLiteDB } from '@drivers';
 import { mulberry32, genSchema, type Rng } from "../storage/helpers/fuzzSchema.js";
 
@@ -330,6 +330,164 @@ const TABOO_CELLS: TabooCell[] = [
             }
         },
     },
+    {
+        name: 'identity properties reference an undeclared property (D1)',
+        expectedError: /unknown property/,
+        run: async () => ({
+            phase: 'declare',
+            action: () => Entity.create({
+                name: 'TbIdD1',
+                identity: { name: 'byKey', properties: ['missing'] },
+                properties: [Property.create({ name: 'ns', type: 'string' })],
+            }),
+        }),
+    },
+    {
+        name: 'identity property with a non-scalar type (D2)',
+        expectedError: /must have type "string", "number", or "boolean"/,
+        run: async () => ({
+            phase: 'declare',
+            action: () => Entity.create({
+                name: 'TbIdD2',
+                identity: { name: 'byKey', properties: ['when'] },
+                properties: [Property.create({ name: 'when', type: 'timestamp' })],
+            }),
+        }),
+    },
+    {
+        name: 'identity property with defaultValue (D3)',
+        expectedError: /cannot declare defaultValue/,
+        run: async () => ({
+            phase: 'declare',
+            action: () => Entity.create({
+                name: 'TbIdD3',
+                identity: { name: 'byKey', properties: ['ns'] },
+                properties: [Property.create({ name: 'ns', type: 'string', defaultValue: () => 'n' })],
+            }),
+        }),
+    },
+    {
+        name: 'filtered entity declaring identity (D4)',
+        expectedError: /Filtered entity .* cannot declare identity/,
+        run: async (surrounding, rng, tag) => {
+            const base = mkEntity(`Tb${tag}IdBase`)
+            return {
+                phase: 'declare',
+                action: () => Entity.create({
+                    name: `Tb${tag}IdFilt`,
+                    baseEntity: base,
+                    matchExpression: MatchExp.atom({ key: 'label', value: ['=', 'x'] }),
+                    identity: { name: 'byKey', properties: ['label'] },
+                    properties: [Property.create({ name: 'label', type: 'string' })],
+                }),
+            }
+        },
+    },
+    {
+        name: 'merged entity declaring identity (D4)',
+        expectedError: /Merged entity .* cannot declare identity/,
+        run: async (surrounding, rng, tag) => {
+            const a = mkEntity(`Tb${tag}IdMA`)
+            const b = mkEntity(`Tb${tag}IdMB`)
+            return {
+                phase: 'declare',
+                action: () => Entity.create({
+                    name: `Tb${tag}IdMerged`,
+                    inputEntities: [a, b],
+                    identity: { name: 'byKey', properties: ['label'] },
+                }),
+            }
+        },
+    },
+    {
+        name: 'identity.name with an invalid format (D5)',
+        expectedError: /identity\.name/,
+        run: async () => ({
+            phase: 'declare',
+            action: () => Entity.create({
+                name: 'TbIdD5',
+                identity: { name: 'by-key', properties: ['ns'] },
+                properties: [Property.create({ name: 'ns', type: 'string' })],
+            }),
+        }),
+    },
+    {
+        name: 'identity and UniqueConstraint on the same property set (D6)',
+        expectedError: /cannot declare both identity and UniqueConstraint/,
+        run: async (surrounding, rng, tag) => ({
+            phase: 'declare',
+            action: () => Entity.create({
+                name: `Tb${tag}IdD6`,
+                identity: { name: 'byKey', properties: ['label'] },
+                properties: [Property.create({ name: 'label', type: 'string' })],
+                constraints: [UniqueConstraint.create({
+                    name: `tb${tag}iduniq`,
+                    properties: ['label'],
+                })],
+            }),
+        }),
+    },
+    {
+        name: 'identity entity combined with another entity (S1)',
+        expectedError: /cannot share a physical table/,
+        run: async (surrounding, rng, tag) => {
+            const Token = Entity.create({
+                name: `Tb${tag}IdTok`,
+                identity: { name: 'byKey', properties: ['k'] },
+                properties: [Property.create({ name: 'k', type: 'string' })],
+            })
+            const Other = mkEntity(`Tb${tag}IdOth`)
+            const Rel = Relation.create({
+                name: `Tb${tag}IdRel`,
+                source: Token,
+                sourceProperty: 'other',
+                target: Other,
+                targetProperty: 'token',
+                type: '1:1',
+                isTargetReliance: true,
+            })
+            return {
+                phase: 'setup',
+                action: async () => {
+                    const { system, controller } = await constructController(surrounding, {
+                        entities: [Token, Other],
+                        relations: [Rel],
+                    })
+                    try { await controller.setup(true) } finally { await system.destroy().catch(() => {}) }
+                },
+            }
+        },
+    },
+    {
+        name: 'identity entity on mysql dialect (S2)',
+        expectedError: /not supported on the mysql dialect/,
+        run: async (surrounding, rng, tag) => {
+            const Token = Entity.create({
+                name: `Tb${tag}IdMy`,
+                identity: { name: 'byKey', properties: ['k'] },
+                properties: [Property.create({ name: 'k', type: 'string' })],
+            })
+            const mysqlLike = {
+                schemaDialect: {
+                    name: 'mysql' as const,
+                    maxIdentifierLength: 64,
+                    supportsCreateIndexIfNotExists: false,
+                    enforceMaxIdentifierLength: true,
+                    encodeLiteral: (v: unknown) => JSON.stringify(v),
+                    constraints: { unique: false, filteredUnique: false, nonNull: false },
+                },
+                mapToDBFieldType: (type: string) => type === 'pk' ? 'INT AUTO_INCREMENT PRIMARY KEY' : type === 'id' ? 'INT' : type === 'string' ? 'TEXT' : type,
+            }
+            return {
+                phase: 'setup',
+                action: () => new DBSetup(
+                    [Token, ...surrounding.entities],
+                    surrounding.relations,
+                    mysqlLike as any,
+                ),
+            }
+        },
+    },
 ]
 
 // ---------- 合法双胞胎（守卫不得过度收紧） ----------
@@ -417,6 +575,26 @@ const LEGAL_TWIN_CELLS: LegalTwinCell[] = [
             expect(branchResult.error).toBeUndefined()
             const state = await manager.getActivityCallByName(activityName)!.getState(controller, activityId)
             expect(state.current).toBeUndefined() // 单步 any 分支完成 ⇒ 整活动完成
+            await system.destroy()
+        },
+    },
+    {
+        name: 'ordinary entity with identity setups and observes a duplicate key',
+        run: async (surrounding, rng, tag) => {
+            const Token = Entity.create({
+                name: `Lg${tag}IdTok`,
+                identity: { name: 'byKey', properties: ['k'] },
+                properties: [
+                    Property.create({ name: 'k', type: 'string' }),
+                    Property.create({ name: 'payload', type: 'string' }),
+                ],
+            })
+            const { system, controller } = await constructController(surrounding, { entities: [Token] })
+            await controller.setup(true)
+            const first = await system.storage.create(`Lg${tag}IdTok`, { k: 'one', payload: 'kept' })
+            const second = await system.storage.create(`Lg${tag}IdTok`, { k: 'one', payload: 'discarded' })
+            expect(second.id).toBe(first.id)
+            expect(second.payload).toBe('kept')
             await system.destroy()
         },
     },

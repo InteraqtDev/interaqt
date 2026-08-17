@@ -265,7 +265,7 @@ interaqt works with the database you already use:
 |---|---|---|
 | **PostgreSQL** | `pg` | Production |
 | **SQLite** | `better-sqlite3` | Embedded / edge |
-| **MySQL** | `mysql2` | Production |
+| **MySQL** | `mysql2` | Production (`Entity.identity` and `Controller.dispatch` are not supported) |
 | **PGLite** | `@electric-sql/pglite` | Testing (in-memory) |
 
 ```typescript
@@ -301,6 +301,19 @@ const User = Entity.create({
 ```
 
 `controller.dispatch()` runs event persistence and synchronous computation writes in one transaction. Unique conflicts roll back the whole dispatch attempt and can be handled with `ConstraintViolationError` or `findConstraintViolationError(error)`.
+
+`Entity.identity` is a different contract: an application natural key whose named properties are total, unique, and immutable. Logical create is **set-semantic** (`INSERT ... ON CONFLICT (identity columns) DO NOTHING`). A second insert of the same key observes the stored row, drops this attempt's payload, emits no create event, and does **not** set `result.error`. Use it when the second writer must see the first (handshake tokens, redemption codes, at-least-once ingest) — not for unique emails. Identity is not a `UniqueConstraint`; do not declare both on the same property set. Occupancy (register + one-time consume) is Transform + StateMachine + `Entity.retention`, distinguished by `DispatchResponse.effects` plus query. Writes stay on `controller.dispatch`. Setup fail-fasts on MySQL.
+
+```typescript
+const HandshakeToken = Entity.create({
+  name: 'HandshakeToken',
+  identity: { name: 'byKey', properties: ['ns', 'token'] },
+  properties: [
+    Property.create({ name: 'ns', type: 'string' }),
+    Property.create({ name: 'token', type: 'string' }),
+  ],
+})
+```
 
 For diagnostics and migration planning, inspect the read-only schema metadata:
 
@@ -343,6 +356,8 @@ npm install @electric-sql/pglite
 | **Entity** | A data type (User, Post, Order, ...) |
 | **Property** | A field on an entity — can be a static value or a reactive computation |
 | **Relation** | A typed connection between entities (1:1, 1:n, n:n) |
+| **Entity.identity** | Application natural key: total, unique, immutable; create is set-semantic |
+| **Entity.retention** | Declarative row lifetime (`forever` / `cap` / `ttl`) |
 | **Interaction** | An event triggered by a user — the *only* way new data enters the system |
 | **Action** | An identifier for an interaction type (not a handler — no logic!) |
 | **Computation** | A reactive declaration: Count, Transform, StateMachine, etc. |
@@ -358,7 +373,8 @@ npm install @electric-sql/pglite
 - **Activities** — Compose multi-step business workflows from ordered Interactions
 - **Condition Guards** — Declarative access control with full event context
 - **Dictionary** — Global reactive key-value state
-- **Schema Constraints** — Persistent unique constraints with structured duplicate errors
+- **Schema Constraints** — Persistent unique constraints with structured duplicate errors (`UniqueConstraint`: duplicate is a typed failure)
+- **Application Identity** — `Entity.identity` natural keys with set-semantic create; occupancy is Transform + StateMachine + `Entity.retention` through `dispatch` only
 - **Hard Deletion** — Built-in support for both soft and hard delete patterns
 - **Post-Commit Side Effects** — Use `postCommit` or record mutation side effects for external integrations after commit
 

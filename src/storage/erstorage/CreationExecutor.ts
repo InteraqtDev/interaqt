@@ -1,5 +1,5 @@
 import { EntityIdRef, Database, RecordMutationEvent, ROW_ID_ATTR } from "@runtime";
-import { EntityToTableMap } from "./EntityToTableMap.js";
+import { EntityToTableMap, RecordAttribute } from "./EntityToTableMap.js";
 import { MatchExp, MatchExpressionData, MatchAtom } from "./MatchExp.js";
 import { AttributeQuery, AttributeQueryData } from "./AttributeQuery.js";
 import { LINK_SYMBOL, RecordQuery } from "./RecordQuery.js";
@@ -158,6 +158,10 @@ export class CreationExecutor {
             if (targetRef?.id !== undefined) {
                 await this.ensureRelianceLinkSlotsBeforeCreate(newEntityData.recordName, sourceRef?.id, targetRef.id, events)
             }
+        }
+
+        if (this.map.getRecordInfo(newEntityData.recordName).identity) {
+            return this.createIdentityRecord(newEntityData, queryName, events)
         }
 
         const newEntityDataWithDep = await this.createRecordDependency(newEntityData, events)
@@ -411,7 +415,7 @@ export class CreationExecutor {
      * 预处理同行数据
      * CAUTION 因为这里分配了 id，并且所有的判断逻辑都在，所以事件也放在这里处理，而不是真实插入或者更新数据的时候。
      */
-    async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false, events?: RecordMutationEvent[], oldRecord?: Record): Promise<NewRecordData> {
+    async preprocessSameRowData(newEntityData: NewRecordData, isUpdate = false, events?: RecordMutationEvent[], oldRecord?: Record, options?: { skipHostCreateEvent?: boolean }): Promise<NewRecordData> {
         const newRawDataWithNewIds = newEntityData.getData()
         // CAUTION 特别注意，我们是支持数据使用 外部  id，例如使用外部用户系统的时候，它的  id 就是外部分配的。
         //  还有一种情况是 relocate record 的时候也用了这个函数，这个时候也是不要重新分配 id 的！
@@ -434,14 +438,16 @@ export class CreationExecutor {
         }
 
         if (!isUpdate) {
-            events?.push({
-                type: 'create',
-                recordName: newEntityData.recordName,
-                record: {
-                    ...newEntityData.defaultValues,
-                    ...newRawDataWithNewIds
-                }
-            })
+            if (!options?.skipHostCreateEvent) {
+                events?.push({
+                    type: 'create',
+                    recordName: newEntityData.recordName,
+                    record: {
+                        ...newEntityData.defaultValues,
+                        ...newRawDataWithNewIds
+                    }
+                })
+            }
         } else {
             // 可能只是更新关系，所以这里一定要有自身的 value 才算是 update 自己
             if (newEntityData.valueAttributes.length) {
@@ -838,5 +844,179 @@ export class CreationExecutor {
      * 删除记录的同行数据（用于 flashOut）
      * 这是一个辅助方法，实际的删除逻辑在 RecordQueryAgent 中
      */
+
+    /**
+     * Logical create of an Entity.identity record: INSERT ... ON CONFLICT (identity columns)
+     * DO NOTHING. Observe path returns the stored row and skips nested writes / create events.
+     * Relocate/flash-out still uses insertSameRowData and does not take this path.
+     */
+    private async createIdentityRecord(
+        newEntityData: NewRecordData,
+        queryName?: string,
+        events?: RecordMutationEvent[],
+    ): Promise<EntityIdRef> {
+        const identity = this.map.getRecordInfo(newEntityData.recordName).identity
+        if (!identity) {
+            throw new Error(`createIdentityRecord called without identity metadata on "${newEntityData.recordName}"`)
+        }
+        this.assertIdentityFullySpecified(newEntityData, identity.properties)
+
+        const outcome = await this.insertOrObserveIdentityHost(newEntityData, identity, queryName)
+        if (outcome.kind === 'observed') {
+            return outcome.row
+        }
+
+        const insertedIdRef = { id: outcome.row.id }
+        const createPayload = NewRecordData.completeEventPayloadWithDefaults(
+            this.map,
+            newEntityData.originalRecordName,
+            { ...this.identityHostScalarPayload(newEntityData), id: outcome.row.id },
+        )
+        delete createPayload[ROW_ID_ATTR]
+        events?.push({
+            type: 'create',
+            recordName: newEntityData.recordName,
+            record: createPayload,
+        })
+
+        const withId = newEntityData.merge({ id: outcome.row.id })
+        const withDep = await this.createRecordDependency(withId, events)
+        await this.unlinkOldOwnersOfExclusiveTargets(withDep, events)
+        // Related-record membership snapshots must be taken before the FK patch
+        // that makes those records members — same order as createRecord (collect
+        // after unlink, before physical relation writes). Collecting after
+        // patchIdentityHostRelations makes before === after and drops create
+        // events on reverse filtered views (1:1 peer Count). Host-self filtered
+        // membership still runs via handleRecordCreation after the write.
+        const linkChecks = await this.collectCreationLinkChecks(withDep, events)
+        const prepared = await this.preprocessSameRowData(withDep, false, events, undefined, { skipHostCreateEvent: true })
+        await this.patchIdentityHostRelations(prepared, insertedIdRef)
+        await this.filteredEntityManager.settlePostWriteChecks(events)
+
+        const relianceResult = await this.handleCreationReliance(prepared.merge(insertedIdRef), events)
+        const fullRecord = Object.assign({}, prepared.getData(), insertedIdRef, relianceResult)
+        const membershipEventPayload = Object.assign({}, prepared.defaultValues, fullRecord)
+        delete membershipEventPayload[ROW_ID_ATTR]
+
+        await this.filteredEntityManager.settleMembershipChecks(linkChecks, events)
+        await this.filteredEntityManager.handleRecordCreation(
+            newEntityData.recordName,
+            insertedIdRef.id,
+            membershipEventPayload,
+            events,
+        )
+
+        return Object.assign({}, createPayload, fullRecord, relianceResult)
+    }
+
+    private identityHostScalarPayload(newEntityData: NewRecordData) {
+        const data = { ...newEntityData.defaultValues, ...newEntityData.getData() }
+        const attributes = this.map.getRecordInfo(newEntityData.recordName).data.attributes
+        for (const key of Object.keys(data)) {
+            const attribute = attributes[key]
+            if (attribute && (attribute as RecordAttribute).isRecord) {
+                delete data[key]
+            }
+        }
+        delete data[ROW_ID_ATTR]
+        return data
+    }
+
+    private assertIdentityFullySpecified(newEntityData: NewRecordData, properties: string[]) {
+        const raw = newEntityData.getData() || {}
+        for (const propertyName of properties) {
+            const value = raw[propertyName]
+            if (value === undefined || value === null) {
+                throw new Error(
+                    `identity property "${propertyName}" on "${newEntityData.originalRecordName}" must be supplied and non-null on create. ` +
+                    `Missing identity values are a programmer error, not an occupancy result.`
+                )
+            }
+        }
+    }
+
+    /**
+     * Physical columns of the identity host's own value attributes (including logical `id`).
+     * Logical names are the wrong split: merged-link `id` / `&` properties reuse names like
+     * `id` or `payload` but occupy different columns. Filtering by host `attributes[name].isRecord`
+     * dropped those columns from the second-step patch (relation row missing, 1:1 steal double-owner).
+     */
+    private identityHostScalarPhysicalFields(newEntityData: NewRecordData): Set<string> {
+        const fields = new Set<string>()
+        for (const attr of this.map.getRecordInfo(newEntityData.recordName).valueAttributes) {
+            if (attr.field) fields.add(attr.field)
+        }
+        return fields
+    }
+
+    private identityHostValueFields(newEntityData: NewRecordData) {
+        const hostFields = this.identityHostScalarPhysicalFields(newEntityData)
+        return newEntityData.getSameRowFieldAndValue().filter(field => hostFields.has(field.field))
+    }
+
+    /**
+     * Same-row columns `insertSameRowData` would write that the first identity INSERT did not:
+     * merged FK, link id, `&` properties. Combined children are S1-forbidden on identity hosts.
+     */
+    private identityHostRelationPatchFields(newEntityData: NewRecordData) {
+        const hostFields = this.identityHostScalarPhysicalFields(newEntityData)
+        return newEntityData.getSameRowFieldAndValue().filter(field => !hostFields.has(field.field))
+    }
+
+    private async insertOrObserveIdentityHost(
+        newEntityData: NewRecordData,
+        identity: { properties: string[], fields: string[] },
+        queryName?: string,
+    ): Promise<{ kind: 'inserted', row: EntityIdRef } | { kind: 'observed', row: EntityIdRef }> {
+        const raw = { ...newEntityData.getData() }
+        if (!raw.id) {
+            raw.id = await this.allocateRecordId(newEntityData.recordName)
+        } else if (this.database.noteAllocatedId) {
+            const resolved = this.map.getRecordInfo(newEntityData.recordName).resolvedBaseRecordName ?? newEntityData.recordName
+            await this.database.noteAllocatedId(resolved, raw.id)
+        }
+        const withId = newEntityData.merge({ id: raw.id })
+        const fieldAndValues = this.identityHostValueFields(withId)
+        const [sql, params] = this.sqlBuilder.buildInsertSQL(withId.recordName, fieldAndValues, {
+            onConflictDoNothingFields: identity.fields,
+        })
+        const result = await this.database.insert(sql, params, queryName) as EntityIdRef | undefined
+        if (result === undefined) {
+            const existing = await this.findExistingByIdentity(withId.recordName, identity.properties, withId.getData())
+            if (!existing) {
+                throw new Error(
+                    `identity observe path: ON CONFLICT did not insert, but no existing row was found for "${withId.originalRecordName}" ` +
+                    `(${identity.properties.map(name => `${name}=${JSON.stringify(withId.getData()[name])}`).join(', ')})`
+                )
+            }
+            return { kind: 'observed', row: existing }
+        }
+        return { kind: 'inserted', row: Object.assign({}, withId.getData(), { id: raw.id }) as EntityIdRef }
+    }
+
+    private async findExistingByIdentity(
+        recordName: string,
+        properties: string[],
+        payload: { [k: string]: unknown },
+    ): Promise<EntityIdRef | undefined> {
+        let match = MatchExp.atom({ key: properties[0], value: ['=', payload[properties[0]]] })
+        for (let i = 1; i < properties.length; i++) {
+            match = match.and({ key: properties[i], value: ['=', payload[properties[i]]] })
+        }
+        const rows = await this.agent.findRecords(RecordQuery.create(recordName, this.map, {
+            matchExpression: match,
+            attributeQuery: ['*'],
+        }), `observe existing identity record ${recordName}`)
+        return rows[0]
+    }
+
+    private async patchIdentityHostRelations(newEntityData: NewRecordData, idRef: EntityIdRef) {
+        const relationFields = this.identityHostRelationPatchFields(newEntityData)
+        if (!relationFields.length) return
+        const [sql, params] = this.sqlBuilder.buildUpdateSQL(newEntityData.recordName, idRef, relationFields)
+        if (!sql) return
+        const recordInfo = this.map.getRecordInfo(newEntityData.recordName)
+        await this.database.update(sql, params, recordInfo.idField, `patch identity host relations ${newEntityData.recordName}`)
+    }
 }
 

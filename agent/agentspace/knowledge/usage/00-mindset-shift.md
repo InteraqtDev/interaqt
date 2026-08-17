@@ -301,6 +301,11 @@ const UserOrderRelation = Relation.create({
 - Product inventory = Initial stock - Count(product quantities in orders)
 - Notifications = Transform(interaction events)
 
+### 5. Natural keys and occupancy are declared data
+- Do not add a parallel `CREATE TABLE` occupancy backend or a `claim` / `consume` write API
+- Handshake tokens and one-time tickets are `Entity.identity` plus Transform register, StateMachine consume, and `Entity.retention`, written only through `Controller.dispatch`
+- `UniqueConstraint` means a duplicate is an error. Identity means the second writer observes the stored row
+
 ## Exercise: Transform Your Thinking
 
 When you want to implement a feature, ask yourself:

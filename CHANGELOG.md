@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Features
+
+* **core/runtime/storage:** declarative `Entity.identity` (application natural key).
+  Named properties are total, unique, and immutable. Logical create is set-semantic
+  (`INSERT ... ON CONFLICT (identity columns) DO NOTHING`): an existing key resolves
+  to the stored row, drops this attempt's payload, and emits no create event.
+  Dedicated unique index and column `NOT NULL` — not UniqueConstraint / NonNullConstraint.
+  Occupancy (handshake tokens, one-time tickets) is Transform register + StateMachine
+  consume + `Entity.retention`, distinguished by `DispatchResponse.effects` plus query.
+  Adding identity to an existing entity is additive unique-index DDL; duplicate keys
+  or NULL identity columns fail migration verification. MySQL setup fail-fasts.
+  Design record: `docs/application-key-occupancy/`.
+
+### Docs
+
+* Usage, generator, README, AGENTS.md, and storage USAGE_GUIDE / IMPLEMENTATION_DETAILS
+  document `Entity.identity`, the occupancy result table, `expiresAt` vs retention clocks,
+  TTL re-register, and Transform full-rebuild set semantics. Application `CREATE TABLE`
+  as an occupancy backend is an anti-pattern. UniqueConstraint remains duplicate-is-error;
+  identity is set-semantic observe.
+
 ## [4.9.0](https://github.com/InteraqtDev/interaqt/compare/v4.8.0...v4.9.0) (2026-08-16)
 
 First-class post-commit (stage P) completion and recoverable rerun APIs.

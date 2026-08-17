@@ -130,6 +130,23 @@ system.storage.schema.constraints
 
 This metadata is intended for diagnostics, migration planning, and stable constraint error mapping.
 
+### Application identity
+
+Ordinary entities may declare `identity: { name, properties }`. This is not a `UniqueConstraint`. Setup installs `NOT NULL` on those columns and a dedicated unique index. Logical `create` is set-semantic: `INSERT ... ON CONFLICT (identity columns) DO NOTHING`. If the key already exists, the stored row is returned, nested writes from this attempt are skipped, and no create event is emitted. Identity properties cannot be updated. Filtered and merged entities cannot declare identity. Identity entities cannot share a combined physical table with another entity. MySQL setup fail-fasts.
+
+```typescript
+const HandshakeToken = Entity.create({
+  name: 'HandshakeToken',
+  identity: { name: 'byKey', properties: ['ns', 'token'] },
+  properties: [
+    Property.create({ name: 'ns', type: 'string' }),
+    Property.create({ name: 'token', type: 'string' }),
+  ]
+});
+```
+
+Do not use `UniqueConstraint` as occupancy. Occupancy writes belong on `Controller.dispatch` (Transform register + StateMachine consume + `Entity.retention`), not as a second storage API.
+
 ## Working with Entities
 
 ### Creating Entities
@@ -142,7 +159,11 @@ const user = await entityQueryHandle.create('User', {
   name: 'John Doe',
   age: 30
 });
+```
 
+On an entity with `identity`, `create` follows set semantics: a second call with the same identity values returns the existing row and does not emit a create event. Missing identity values fail loud (programmer error), not as an occupancy result.
+
+```typescript
 // Create an entity with a related entity
 const userWithProfile = await entityQueryHandle.create('User', {
   name: 'Jane Doe',

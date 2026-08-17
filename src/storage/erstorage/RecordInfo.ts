@@ -168,4 +168,12 @@ export class RecordInfo {
     get resolvedMatchExpression() {
         return this.data?.resolvedMatchExpression
     }
+
+    /**
+     * Application identity of the physical base record. Filtered names resolve to the base.
+     */
+    get identity() {
+        const baseName = this.resolvedBaseRecordName ?? this.name
+        return this.map.data.records[baseName]?.identity
+    }
 }

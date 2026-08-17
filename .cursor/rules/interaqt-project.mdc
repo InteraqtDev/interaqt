@@ -33,6 +33,7 @@ Dependency direction: `builtins → runtime → storage → core`. Never import 
 
 ## Key Domain Concepts
 - **Entity** / **Relation** / **Property** — Data model definitions (core)
+- **Entity.identity** — Application natural key on ordinary entities; create is set-semantic (not UniqueConstraint). Occupancy is Transform + StateMachine + `Entity.retention` through `Controller.dispatch` only
 - **EventSource** — Base abstraction for all event-driven triggers (core)
 - **Interaction** — Built-in EventSource for user-triggered actions (builtins)
 - **Controller.dispatch()** — The single entry point for triggering any EventSource

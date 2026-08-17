@@ -186,6 +186,53 @@ export function frameworkLogicalIdUniqueIndexName(recordName: string, idField: s
     return `interaqt_id_${hash}`
 }
 
+/**
+ * Framework application-identity UNIQUE INDEX (Entity.identity).
+ *
+ * Emitted outside the user UniqueConstraint → createUniqueConstraintStatement pipeline.
+ * Index name hashes recordName + identity property names (not the local identity.name),
+ * so two entities may both use identity.name "byKey" without colliding.
+ */
+export type FrameworkApplicationIdentityIndex = {
+    recordName: string
+    table: string
+    properties: string[]
+    fields: string[]
+    indexName: string
+}
+
+export function frameworkApplicationIdentityIndexName(recordName: string, propertyNames: string[]): string {
+    const hash = createHash('sha1').update(`${recordName}\0${propertyNames.join('\0')}`).digest('hex').slice(0, 20)
+    return `interaqt_ident_${hash}`
+}
+
+export function frameworkApplicationIdentityIndexes(map: Pick<MapData, 'records'>): FrameworkApplicationIdentityIndex[] {
+    const result: FrameworkApplicationIdentityIndex[] = []
+    for (const [recordName, record] of Object.entries(map.records)) {
+        if (record.isFilteredEntity || record.isFilteredRelation || record.isRelation) continue
+        const identity = record.identity
+        if (!identity?.fields?.length || !record.table) continue
+        result.push({
+            recordName,
+            table: record.table,
+            properties: [...identity.properties],
+            fields: [...identity.fields],
+            indexName: identity.indexName || frameworkApplicationIdentityIndexName(recordName, identity.properties),
+        })
+    }
+    return result
+}
+
+export function createFrameworkApplicationIdentityIndexSQL(
+    map: Pick<MapData, 'records'>,
+    dialect: SchemaDialect,
+): Array<FrameworkApplicationIdentityIndex & { sql: string }> {
+    return frameworkApplicationIdentityIndexes(map).map(item => ({
+        ...item,
+        sql: createUniqueIndexSQL(item.indexName, item.table, item.fields, dialect),
+    }))
+}
+
 export function frameworkLogicalIdUniqueIndexes(map: Pick<MapData, 'records'>): FrameworkLogicalIdUniqueIndex[] {
     const result: FrameworkLogicalIdUniqueIndex[] = []
     for (const [recordName, record] of Object.entries(map.records)) {

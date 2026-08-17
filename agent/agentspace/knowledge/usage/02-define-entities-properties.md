@@ -376,46 +376,33 @@ const User = Entity.create({
 });
 ```
 
-### Constraints and Validation
+### UniqueConstraint vs Entity.identity
 
-The framework itself does not provide field-level unique constraints and index configuration. These should be implemented at the database level or through business logic:
+Declare uniqueness on the entity. Do **not** emit application `CREATE TABLE` or dialect SQL as a second persistence backend.
+
+| Declaration | Conflict meaning | Use when |
+|-------------|------------------|----------|
+| `UniqueConstraint` | Typed `ConstraintViolationError`; the whole dispatch rolls back | A duplicate is a data/programmer error (for example a unique email that must not silently reuse the existing row) |
+| `Entity.identity` | **Set-semantic observe**: resolve to the stored row, drop this attempt's payload, emit no create event, dispatch has no error | Handshake tokens, redemption codes, at-least-once ingest — the second writer must see the first rather than fail |
+
+Identity properties are total (`NOT NULL`), unique, and immutable. At most one identity per ordinary entity. Do not declare both identity and UniqueConstraint on the **same** property set. Filtered/merged entities cannot declare identity. MySQL fail-fasts at setup (identity insert uses `ON CONFLICT`, and `Controller.dispatch` is unavailable on MySQL).
 
 ```javascript
-const User = Entity.create({
-  name: 'User',
+const HandshakeToken = Entity.create({
+  name: 'HandshakeToken',
+  identity: { name: 'byKey', properties: ['ns', 'token'] },
   properties: [
-    Property.create({ 
-      name: 'email', 
-      type: 'string'
-      // Uniqueness guaranteed through business logic or database constraints
-    }),
-    Property.create({ 
-      name: 'username', 
-      type: 'string'
-      // Same as above
-    })
-  ]
+    Property.create({ name: 'ns', type: 'string' }),
+    Property.create({ name: 'token', type: 'string' }),
+    Property.create({ name: 'payload', type: 'string' }),
+    Property.create({ name: 'holder', type: 'string' }),
+  ],
 });
 ```
 
-If you need to perform uniqueness checks at the application level, you can implement them as a Condition on the relevant Interaction:
+`identity.name` is a local label for errors and docs (two entities may both use `'byKey'`). It is not a UniqueConstraint logical name.
 
-```javascript
-const UniqueEmail = Condition.create({
-  name: 'UniqueEmail',
-  content: async function(event) {
-    const existingUser = await this.system.storage.findOne('User', 
-      MatchExp.atom({ key: 'email', value: ['=', event.payload.user.email] }),
-      undefined,
-      ['id']
-    );
-    return !existingUser || existingUser.id === event.payload.user.id;
-  }
-});
-
-// Attach to the interaction that creates/updates users
-// Interaction.create({ name: 'UpdateUser', ..., conditions: UniqueEmail })
-```
+Admission `Condition` checks remain valid for permissions, but they are **not** a substitute for identity under concurrent registration: locking a key that has no row obtains no lock. The official occupancy recipe (Transform register + StateMachine consume + `Entity.retention`) is in [15-entity-crud-patterns.md](./15-entity-crud-patterns.md).
 
 ## Complete Example
 

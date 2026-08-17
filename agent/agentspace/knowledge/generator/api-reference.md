@@ -21,6 +21,8 @@ Entity.create(config: EntityConfig): EntityInstance
 - `config.matchExpression` (MatchExp, optional): Match expression (used to create filtered entities)
 - `config.inputEntities` (Entity[], optional): Input entities for merged entity (used to create merged entities)
 - `config.commonProperties` (Property[], optional): Common properties that all input entities must have (used with merged entities to define shared attributes)
+- `config.retention` (EntityRetention, optional): Declarative row retention; see Entity.retention below
+- `config.identity` (`{ name, properties }`, optional): Application natural key. Logical create is set-semantic. Not UniqueConstraint. Not supported on MySQL. See occupancy recipe below.
 
 **Examples**
 ```typescript
@@ -1668,6 +1670,47 @@ await controller.maintainEntityRetention()
 ```
 
 Do **not** generate hand-written prune loops as the supported retention pattern. Do not confuse with `cleanupAsyncTasks` (async task terminal rows only).
+
+### Entity.identity occupancy (natural keys)
+
+When generating handshake tokens, redemption codes, or at-least-once ingest:
+
+```typescript
+Entity.create({
+  name: 'HandshakeToken',
+  identity: { name: 'byKey', properties: ['ns', 'token'] },
+  properties: [
+    Property.create({ name: 'ns', type: 'string' }),
+    Property.create({ name: 'token', type: 'string' }),
+    Property.create({ name: 'payload', type: 'string' }),
+    Property.create({ name: 'holder', type: 'string' }),
+    Property.create({ name: 'expiresAt', type: 'number' }),
+    Property.create({ name: 'createdAt', type: 'number' }),
+    Property.create({
+      name: 'status',
+      type: 'string',
+      computation: StateMachine.create({ /* unused → used; computeTarget finds by ns+token and filters expiresAt */ }),
+    }),
+  ],
+  retention: {
+    mode: 'ttl',
+    ttl: { timestampProperty: 'createdAt', maxAgeMs: 86_400_000 },
+  },
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    callback: (event) => event.interactionName === 'Register' ? { /* identity fields + payload + holder nonce + expiresAt + createdAt */ } : null,
+  }),
+})
+```
+
+Generation rules:
+
+- Write path is **only** `Controller.dispatch`. Do not generate `claim`/`consume` methods or application `CREATE TABLE` occupancy backends.
+- Distinguish registered / already taken / consumed / already used / expired / missing row with this dispatch's `effects` plus a post-commit query. Callers must send a unique nonce (`holder`).
+- `expiresAt` is judged at consume/query time (process clock vs stored value). `retention` physically deletes; after delete the same key may be registered again. Keep TTL ≥ business expiry if "expired" must remain observable.
+- UniqueConstraint means conflict is a typed failure and rollback. Do not use it as occupancy. Do not declare UniqueConstraint on the same property set as identity.
+- A full Transform rebuild of an identity entity is set-semantic in **this** rebuild's insert order. Occupancy Transform callback edits should use migration decision `unchanged` / not rebuild output.
+- MySQL: do not generate identity entities (`setup` fail-fast).
 
 ### Custom.create()
 

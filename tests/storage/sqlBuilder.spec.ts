@@ -195,6 +195,19 @@ describe('SQLBuilder', () => {
 
             expect(params[0]).toBe('{"key":"value"}')
         })
+
+        it('should append ON CONFLICT DO NOTHING only when identity arbiter columns are provided', () => {
+            const [sql] = sqlBuilder.buildInsertSQL('User', [
+                { field: 'id', value: '1', fieldType: 'string' },
+                { field: 'name', value: 'Alice', fieldType: 'string' },
+            ], { onConflictDoNothingFields: ['name'] })
+
+            expect(sql).toMatch(/ON CONFLICT \("name"\) DO NOTHING/)
+            const [plain] = sqlBuilder.buildInsertSQL('User', [
+                { field: 'id', value: '1', fieldType: 'string' },
+            ])
+            expect(plain).not.toMatch(/ON CONFLICT/)
+        })
     })
 
     describe('buildUpdateSQL', () => {

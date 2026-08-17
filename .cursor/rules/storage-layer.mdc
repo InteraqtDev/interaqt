@@ -71,6 +71,10 @@ NULL matching: `['=', null]` → `IS NULL`, `['!=', null]` / `['not', null]` →
 
 `MonoSystem` is the standard implementation wrapping a `Database` driver.
 
+## Application identity
+
+`Entity.identity` makes `storage.create` set-semantic (`INSERT ... ON CONFLICT (identity columns) DO NOTHING`). The observe path returns the stored row with no create event. Identity columns are `NOT NULL`, uniquely indexed (not UniqueConstraint), and immutable on update. Identity entities cannot share a combined physical table. MySQL setup fail-fasts. Occupancy writes belong on `Controller.dispatch`, not a parallel storage API.
+
 ## Database Drivers
 All implement the `Database` interface:
 - `open(forceDrop?)`, `close()`, `scheme()`, `query()`, `insert()`, `update()`, `delete()`

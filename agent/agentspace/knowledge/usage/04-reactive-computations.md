@@ -186,6 +186,10 @@ Entity.create({
 
 Call `await controller.maintainEntityRetention()` at a safe point (cron / admin). Do not hand-write prune loops against storage as the official pattern. `cleanupAsyncTasks` only clears internal async-task terminal rows and is a separate mechanism.
 
+### Application identity (natural keys)
+
+`Entity.identity` declares a natural key with set-semantic logical create: a second insert of the same key observes the stored row instead of throwing. Combined with Transform (register), a property StateMachine (one-time consume), and `retention` (bounded lifetime), this is the official path for handshake tokens and one-time tickets. Do not use application `CREATE TABLE` + dialect SQL, UniqueConstraint-as-occupancy, or a write API parallel to `dispatch`. See usage `02-define-entities-properties.md` and `15-entity-crud-patterns.md`.
+
 ### Core Principle: Data Existence
 
 In interaqt, all data has its "reason for existence":

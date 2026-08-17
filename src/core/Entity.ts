@@ -4,7 +4,7 @@ import { Property, PropertyInstance } from './Property.js';
 import { validatePropertyNamesOnCreate } from './propertyNameGuards.js';
 import type { ComputationInstance } from './types.js';
 import type { RelationInstance } from './Relation.js';
-import type { ConstraintInstance } from './Constraint.js';
+import { UniqueConstraint, type ConstraintInstance } from './Constraint.js';
 
 const validNameFormatExp = /^[a-zA-Z0-9_]+$/;
 
@@ -42,6 +42,20 @@ export type EntityRetention =
       }
     }
 
+/**
+ * Declarative application identity (natural key) for an ordinary entity.
+ * The named property set is total (NOT NULL), unique, and immutable; logical
+ * creates follow set semantics (existing key resolves to the stored row).
+ * At most one identity per entity. `name` is a local label and is not a
+ * UniqueConstraint logical name.
+ */
+export type EntityIdentity = {
+  name: string
+  properties: string[]
+}
+
+const IDENTITY_PROPERTY_TYPES = new Set(['string', 'number', 'boolean'])
+
 export interface EntityInstance extends IInstance {
   name: string;
   properties: PropertyInstance[];
@@ -52,6 +66,7 @@ export interface EntityInstance extends IInstance {
   commonProperties?: PropertyInstance[]; // for Merged Entity
   constraints?: ConstraintInstance[];
   retention?: EntityRetention;
+  identity?: EntityIdentity;
 }
 
 export interface EntityCreateArgs {
@@ -64,6 +79,7 @@ export interface EntityCreateArgs {
   commonProperties?: PropertyInstance[]; // for Merged Entity
   constraints?: ConstraintInstance[];
   retention?: EntityRetention;
+  identity?: EntityIdentity;
 }
 
 function propertyByName(properties: PropertyInstance[] | undefined, name: string): PropertyInstance | undefined {
@@ -253,6 +269,129 @@ export function normalizeEntityRetention(
   );
 }
 
+function sortedUniqueNames(names: string[]): string[] {
+  return [...new Set(names)].sort()
+}
+
+/**
+ * Normalize and validate EntityIdentity. Returns undefined when omitted.
+ * Fail-fast on filtered/merged hosts and on the D1–D6 declaration rules.
+ */
+export function normalizeEntityIdentity(
+  entityName: string,
+  identity: EntityIdentity | undefined,
+  context: {
+    properties?: PropertyInstance[]
+    constraints?: ConstraintInstance[]
+    baseEntity?: unknown
+    inputEntities?: unknown
+  },
+): EntityIdentity | undefined {
+  if (identity === undefined) return undefined
+  if (Array.isArray(identity)) {
+    throw new Error(
+      `Entity "${entityName}" cannot declare more than one identity. Application identity is a single { name, properties } object.`,
+    )
+  }
+  if (identity === null || typeof identity !== 'object') {
+    throw new Error(
+      `Entity "${entityName}" identity must be an object with name and properties.`,
+    )
+  }
+  if (context.baseEntity) {
+    throw new Error(
+      `Filtered entity "${entityName}" cannot declare identity. Identity applies only to ordinary (physical) entities — declare it on the base entity instead.`,
+    )
+  }
+  if (context.inputEntities) {
+    throw new Error(
+      `Merged entity "${entityName}" cannot declare identity. Identity applies only to ordinary (physical) entities — declare it on each input entity instead.`,
+    )
+  }
+
+  const name = identity.name
+  if (typeof name !== 'string' || !validNameFormatExp.test(name)) {
+    throw new Error(
+      `Entity "${entityName}" identity.name "${name}" is invalid. Identity names must match ${validNameFormatExp} (letters, numbers and underscore only).`,
+    )
+  }
+
+  const properties = identity.properties
+  if (!Array.isArray(properties) || properties.length === 0) {
+    throw new Error(
+      `Entity "${entityName}" identity.properties must be a non-empty array of property names.`,
+    )
+  }
+  const seen = new Set<string>()
+  for (const propertyName of properties) {
+    if (typeof propertyName !== 'string' || !validNameFormatExp.test(propertyName)) {
+      throw new Error(
+        `Entity "${entityName}" identity.properties "${propertyName}" is not a valid property name.`,
+      )
+    }
+    if (seen.has(propertyName)) {
+      throw new Error(
+        `Entity "${entityName}" identity.properties must be unique; "${propertyName}" is repeated.`,
+      )
+    }
+    seen.add(propertyName)
+    const property = propertyByName(context.properties, propertyName)
+    if (!property) {
+      throw new Error(
+        `Entity "${entityName}" identity.properties references unknown property "${propertyName}". ` +
+        `Declare the property on the entity, or correct the identity declaration.`,
+      )
+    }
+    if (!IDENTITY_PROPERTY_TYPES.has(property.type)) {
+      throw new Error(
+        `Entity "${entityName}" identity property "${propertyName}" must have type "string", "number", or "boolean" (got "${property.type}").`,
+      )
+    }
+    if (property.collection) {
+      throw new Error(
+        `Entity "${entityName}" identity property "${propertyName}" cannot be a collection.`,
+      )
+    }
+    if (property.computed) {
+      throw new Error(
+        `Entity "${entityName}" identity property "${propertyName}" cannot be computed.`,
+      )
+    }
+    if (property.computation) {
+      throw new Error(
+        `Entity "${entityName}" identity property "${propertyName}" cannot declare a computation.`,
+      )
+    }
+    if (property.args !== undefined) {
+      throw new Error(
+        `Entity "${entityName}" identity property "${propertyName}" cannot use an extended property type.`,
+      )
+    }
+    if (property.defaultValue !== undefined) {
+      throw new Error(
+        `Entity "${entityName}" identity property "${propertyName}" cannot declare defaultValue. ` +
+        `Identity properties must be supplied in full by the creator.`,
+      )
+    }
+  }
+
+  const identityKey = sortedUniqueNames(properties).join('\0')
+  for (const constraint of context.constraints || []) {
+    if (!UniqueConstraint.is(constraint)) continue
+    if (sortedUniqueNames(constraint.properties).join('\0') === identityKey) {
+      throw new Error(
+        `Entity "${entityName}" cannot declare both identity and UniqueConstraint "${constraint.name}" on the same property set [${properties.join(', ')}]. ` +
+        `UniqueConstraint means conflict is a typed failure that rolls back the dispatch; identity means set-semantic observe.`,
+      )
+    }
+  }
+
+  return {
+    name,
+    properties: [...properties],
+  }
+}
+
 export class Entity implements EntityInstance {
   public uuid: string;
   public _type = 'Entity';
@@ -266,6 +405,7 @@ export class Entity implements EntityInstance {
   public commonProperties?: PropertyInstance[]; // for Merged Entity
   public constraints?: ConstraintInstance[];
   public retention?: EntityRetention;
+  public identity?: EntityIdentity;
   constructor(args: EntityCreateArgs, options?: { uuid?: string }) {
     this._options = options;
     this.uuid = generateUUID(options);
@@ -278,6 +418,7 @@ export class Entity implements EntityInstance {
     this.commonProperties = args.commonProperties;
     this.constraints = args.constraints;
     this.retention = args.retention;
+    this.identity = args.identity;
   }
   
   // 静态属性和方法
@@ -363,6 +504,11 @@ export class Entity implements EntityInstance {
       collection: false as const,
       required: false as const,
     },
+    identity: {
+      type: 'object' as const,
+      collection: false as const,
+      required: false as const,
+    },
   };
   
   static create(args: EntityCreateArgs, options?: { uuid?: string }): EntityInstance {
@@ -411,8 +557,14 @@ export class Entity implements EntityInstance {
       baseEntity: args.baseEntity,
       inputEntities: args.inputEntities,
     });
+    const identity = normalizeEntityIdentity(args.name, args.identity, {
+      properties: args.properties,
+      constraints: args.constraints,
+      baseEntity: args.baseEntity,
+      inputEntities: args.inputEntities,
+    });
 
-    const instance = new Entity({ ...args, retention }, options);
+    const instance = new Entity({ ...args, retention, identity }, options);
     
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
@@ -451,6 +603,9 @@ export class Entity implements EntityInstance {
         : instance.constraints,
       retention: instance.retention
         ? (JSON.parse(JSON.stringify(instance.retention)) as EntityRetention)
+        : undefined,
+      identity: instance.identity
+        ? (JSON.parse(JSON.stringify(instance.identity)) as EntityIdentity)
         : undefined,
     };
     

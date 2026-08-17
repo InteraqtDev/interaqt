@@ -8,7 +8,7 @@ import { Entity, Property, Relation } from "@core";
 import { BoolExp } from "@core";
 import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
-import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, getSchemaDialect, shouldSkipConstraintForDialect } from "./SchemaDialect.js";
+import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, frameworkApplicationIdentityIndexName, getSchemaDialect, shouldSkipConstraintForDialect } from "./SchemaDialect.js";
 import { resolveFieldType } from "../propertyTypeStorage.js";
 
 // Define the types we need
@@ -312,6 +312,14 @@ export class DBSetup {
             resolvedBaseRecordName: entity.name,
             matchExpression: undefined,
             resolvedMatchExpression: undefined,
+            identity: !isRelation && (entity as EntityInstance).identity
+                ? {
+                    name: (entity as EntityInstance).identity!.name,
+                    properties: [...(entity as EntityInstance).identity!.properties],
+                    fields: [],
+                    indexName: '',
+                }
+                : undefined,
         } as RecordMapItem
     }
     createFilteredEntityRecord(entity: EntityInstance) {
@@ -735,6 +743,66 @@ export class DBSetup {
         this.relations.forEach(relation => validate(relation, true))
     }
 
+    private assertMysqlDoesNotSupportIdentity() {
+        if (getSchemaDialect(this.database).name !== 'mysql') return
+        const named = this.entities.find(entity => entity.identity)
+        if (!named) return
+        throw new Error(
+            `Entity.identity is not supported on the mysql dialect (entity "${named.name}"). ` +
+            `Application identity requires INSERT ... ON CONFLICT DO NOTHING, which is not MySQL SQL, and Controller.dispatch is unavailable on MySQL.`
+        )
+    }
+
+    private identityPhysicalFieldsOnTable(tableName: string): Set<string> {
+        const fields = new Set<string>()
+        for (const record of Object.values(this.map.records)) {
+            if (!record.identity || record.table !== tableName) continue
+            for (const field of record.identity.fields) fields.add(field)
+        }
+        return fields
+    }
+
+    private finalizeApplicationIdentity() {
+        for (const [recordName, record] of Object.entries(this.map.records)) {
+            if (!record.identity || record.isFilteredEntity || record.isRelation) continue
+            record.identity.fields = record.identity.properties.map(propertyName => {
+                const attribute = record.attributes[propertyName] as ValueAttribute | undefined
+                if (!attribute?.field) {
+                    throw new Error(
+                        `identity property "${propertyName}" on "${recordName}" cannot be resolved to a physical field`
+                    )
+                }
+                return attribute.field
+            })
+            record.identity.indexName = frameworkApplicationIdentityIndexName(recordName, record.identity.properties)
+        }
+        this.assertIdentityTablePlacement()
+    }
+
+    /**
+     * S1: an identity entity's physical table must not be combined with another
+     * non-filtered entity. Merged link relation records on the same table are allowed;
+     * the entity's own filtered views sharing the base table are allowed.
+     */
+    private assertIdentityTablePlacement() {
+        for (const [recordName, record] of Object.entries(this.map.records)) {
+            if (!record.identity || record.isFilteredEntity || record.isRelation) continue
+            const occupants = this.tableToRecordsMap.get(record.table)
+            if (!occupants) continue
+            for (const otherName of occupants) {
+                if (otherName === recordName) continue
+                const other = this.map.records[otherName]
+                if (!other) continue
+                if (other.isFilteredEntity || other.isFilteredRelation) continue
+                if (other.isRelation) continue
+                throw new Error(
+                    `Entity "${recordName}" declares identity and cannot share a physical table with another entity "${otherName}". ` +
+                    `Combined (1:1) placement, isTargetReliance auto-combine, and explicit mergeLinks that co-locate another entity are not supported for identity entities.`
+                )
+            }
+        }
+    }
+
     /**
      * 生成基础 entity records
      */
@@ -938,6 +1006,9 @@ export class DBSetup {
         // -1. 校验所有 entity/relation 的 name（name 会直接进入 SQL，必须先于一切处理）
         this.validateRecordNames();
 
+        // -0.75. Entity.identity is not MySQL SQL (INSERT ... ON CONFLICT) and dispatch is unavailable.
+        this.assertMysqlDoesNotSupportIdentity();
+
         // -0.5. 校验保留属性名（id/_rowId/source/target）与重复属性名
         this.validatePropertyNames();
 
@@ -973,6 +1044,9 @@ export class DBSetup {
         
         // 7. 分配表名和字段名
         this.assignTableAndField();
+
+        // 7.5. 身份列物理字段、合表放置守卫、MySQL fail-fast
+        this.finalizeApplicationIdentity();
         
         // 8. 预生成所有可能的表别名
         this.pregenerateTableAliases();
@@ -1339,12 +1413,14 @@ export class DBSetup {
                     throw new Error(`fieldType not found for ${(attribute as ValueAttribute).field} ${(attribute as ValueAttribute).type}`)
                 }
                 const valueAttribute = attribute as ValueAttribute
+                const identityFields = this.identityPhysicalFieldsOnTable(record.table)
                 this.tables[record.table].columns[valueAttribute.field] = {
                     name: valueAttribute.field,
                     type: valueAttribute.type,
                     fieldType: valueAttribute.fieldType,
                     defaultValue: valueAttribute.defaultValue,
                     attribute: valueAttribute,
+                    ...(identityFields.has(valueAttribute.field) ? { notNull: true } : {}),
                 }
             })
         })
@@ -1376,6 +1452,9 @@ export class DBSetup {
 CREATE TABLE "${tableName}" (
 ${Object.values(this.tables[tableName].columns).map(column => {
     let sql = `    "${column.name}" ${column.fieldType}`;
+    if (column.notNull) {
+        sql += ' NOT NULL';
+    }
     // 移除 DEFAULT 子句生成，改为程序控制
     // defaultValue 将在创建记录时由程序处理
     return sql;

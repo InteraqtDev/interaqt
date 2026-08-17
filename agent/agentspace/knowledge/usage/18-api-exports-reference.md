@@ -10,6 +10,7 @@ import {
   Entity,
   Property,
   UniqueConstraint,
+  // EntityIdentity, EntityRetention  // TypeScript types (identity / retention on Entity.create)
 
   // Property type extension (Entity/Relation columns only)
   definePropertyType,
@@ -175,6 +176,8 @@ import {
 
 `UniqueConstraint` declares persistent database uniqueness at Entity or Relation level. Runtime duplicate writes are reported with `ConstraintViolationError`; setup/index creation problems are reported with `ConstraintSetupError`. Use `findConstraintViolationError(error)` when the top-level error may be a wrapped computation error.
 
+`Entity.identity` is a different uniqueness contract on ordinary entities: set-semantic create (observe the stored row; no `ConstraintViolationError`). It is declared on `Entity.create`, not as a `UniqueConstraint`. TypeScript types `EntityIdentity` and `EntityRetention` are exported from `'interaqt'` (`import type { EntityIdentity, EntityRetention } from 'interaqt'`). They are not runtime values.
+
 ### Complete CRUD Setup
 ```javascript
 import { 
@@ -254,8 +257,10 @@ const controller = new Controller({
 
 8. **Condition admission & typed rejection**: `Condition.locks` + `AdmissionSnapshot`, structured `{ allowed, code }` results, and `InteractionGuardError.code` / `details` / `conditionName` are the official surfaces. Do not hand-write dialect row locks in Condition content; do not mutate `payload` / `event.error` to pass admission context (use `{ allowed: true, context }` → `event.context.admission`). `ConditionError` is historical/deprecated — still exported, but branch on `InteractionGuardError.code`, not duck-typed `type` alone.
 
-9. **Constraint helpers**: `UniqueConstraint`, `ConstraintViolationError`, `ConstraintSetupError`, `findConstraintViolationError`, and `normalizeDatabaseError` are exported for schema-level uniqueness and stable duplicate handling.
+9. **Constraint helpers**: `UniqueConstraint`, `ConstraintViolationError`, `ConstraintSetupError`, `findConstraintViolationError`, and `normalizeDatabaseError` are exported for schema-level uniqueness and stable duplicate handling. Application natural keys use `Entity.identity` on `Entity.create` (set-semantic observe), not UniqueConstraint-as-occupancy.
 
 10. **Scoped serial allocation**: `ScopedSequence` is exported for number property computations that allocate per-scope serials. Always pair it with a `UniqueConstraint` over the scope fields plus the sequence property.
 
 11. **Stage P completion**: `result.error` is the fact transaction only. Obligation-sensitive callers use `isPostCommitPhaseComplete(result)` (and `result.postCommitPhase`). Recover create mutation side effects with `controller.rerunCreateMutationSideEffects({ recordName, id })` and `postCommit` with `controller.rerunPostCommit(eventSource, args, { data, context })`. `SideEffectError` wraps hook failures; `PostCommitRerunError` is for illegal rerun input (not a side-effect failure). Do not treat `outcome: 'replayed'` or a duplicate admit error as obligation success. Update/delete mutation side effects cannot be reconstructed.
+
+12. **Application identity types**: `EntityIdentity` and `EntityRetention` are TypeScript types on `Entity.create`. Occupancy writes stay on `Controller.dispatch`; there is no exported `claim` / `consume` helper.

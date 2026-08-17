@@ -411,3 +411,7 @@ Entity.create({
 
 Operators call `controller.maintainEntityRetention()`. Do not generate ad-hoc storage delete loops as the supported retention API. Filtered/merged entities cannot declare retention.
 
+### Entity.identity (natural keys / occupancy)
+
+When a use case needs first-writer registration of an application key (handshake token, one-time ticket, at-least-once ingest), generate `Entity.identity` on an ordinary entity and drive writes through Transform / StateMachine / `dispatch`. Do **not** generate application `CREATE TABLE` occupancy backends or a `claim`/`consume` helper. UniqueConstraint remains "duplicate is a typed failure". See generator `api-reference.md` Entity.identity occupancy.
+

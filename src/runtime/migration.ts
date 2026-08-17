@@ -429,6 +429,12 @@ export type MigrationManifest = {
          * Included so retention policy changes participate in modelHash.
          */
         retention?: unknown;
+        /**
+         * Entity application identity declaration (absent / { name, properties }).
+         * Named applicationIdentity so it does not overwrite MigrationIdentity `identity`.
+         * Included so identity changes participate in modelHash.
+         */
+        applicationIdentity?: unknown;
     }>;
     relations: Array<{
         id: string;
@@ -1027,6 +1033,10 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
             // forever and omitted both mean "this mechanism does not delete"; include the
             // concrete object when present so mode/cap/ttl changes invalidate modelHash.
             ...(entity.retention !== undefined ? { retention: entity.retention } : {}),
+            // Entity.identity cannot reuse the key `identity`: that field is the
+            // MigrationIdentity of this record. Hash the application identity under
+            // a sibling name so declaration changes still invalidate modelHash.
+            ...(entity.identity !== undefined ? { applicationIdentity: entity.identity } : {}),
         });
         }),
         ...controller.relations.map(relation => {
@@ -1590,6 +1600,14 @@ export function buildMigrationDiff(
                 changeType: "changed",
                 dataContext: `${record.kind}:${record.name}`,
                 reason: "record kind or name changed",
+            });
+        } else if (!isEqualValue(old.applicationIdentity, record.applicationIdentity)) {
+            changes.push({
+                kind: "record",
+                id: record.id,
+                changeType: "changed",
+                dataContext: `${record.kind}:${record.name}`,
+                reason: "entity application identity changed",
             });
         }
 

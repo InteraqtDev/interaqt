@@ -77,6 +77,16 @@ export type RecordMapItem = {
     // merged 编译把全部 input 的属性合并进同一物理表，attributes 表因此是共享命名空间——
     // 没有这个集合，以 input A 的名义写 input B 的特有属性会静默落库（跨视图列污染）。
     writablePropertyNames?: string[]
+    /**
+     * Application identity (Entity.identity) compiled onto the physical base record.
+     * Filtered views inherit lookup via resolvedBaseRecordName; they do not carry their own copy.
+     */
+    identity?: {
+        name: string
+        properties: string[]
+        fields: string[]
+        indexName: string
+    }
 }
 
 type RecordMap = {

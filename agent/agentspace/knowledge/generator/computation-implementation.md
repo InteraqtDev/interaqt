@@ -43,9 +43,9 @@ Transform converts one collection (source) into another collection (target). Und
    }
    ```
 
-3. **Logical `id` on insert is optional (single identity)**:
+3. **Logical `id` on insert is optional (record identity)**:
    - Omit top-level `id` → the framework allocates one (`getAutoId` / uuidv7 depending on driver).
-   - Supply a top-level `id` on **create/insert** → that value becomes the record's application identity (must be unique; type must match the driver: UUID on PGLite, integer on SQLite/PostgreSQL/MySQL). Duplicate logical ids fail loud via the framework unique index.
+   - Supply a top-level `id` on **create/insert** → that value becomes the record's logical identity (must be unique; type must match the driver: UUID on PGLite, integer on SQLite/PostgreSQL/MySQL). Duplicate logical ids fail loud via the framework unique index.
    - **Do not** use top-level `id` to *update* an existing row's identity. Data-based Transform update patches and `applyResultPatch` strip `data.id`; location is always `affectedId` / match.
    - Data-based maps that need an **independent** identity should strip the source id (`({id: _, ...rest}) => rest`) or assign a new unique id. Spreading the source (`(r) => ({...r})`) reuses the source id value; if a target row already has that id, create fails (unique constraint)—it does not silently create a second row.
 
@@ -74,7 +74,25 @@ Transform converts one collection (source) into another collection (target). Und
    })
    ```
 
-4. **Entity References Use ID**: When referencing existing entities in relations, use `{ id: ... }`
+4. **Entity.identity (natural key) on the Transform target**: if the **output** entity declares `identity`, logical create is set-semantic. A second insert of the same natural key observes the stored row (no create event, this payload is dropped). Other unique indexes (Transform `(sourceRecordId, transformIndex)`, UniqueConstraint, logical `id`) still fail loud. Occupancy / handshake tokens belong here — not UniqueConstraint-as-occupancy, and not application `CREATE TABLE`. A full rebuild of that Transform is set-semantic in this rebuild's insert order; prefer migration `unchanged` for occupancy callback edits.
+
+   ```typescript
+   // ✅ Handshake token: identity on the entity, Transform supplies the natural key
+   Entity.create({
+     name: 'HandshakeToken',
+     identity: { name: 'byKey', properties: ['ns', 'token'] },
+     computation: Transform.create({
+       record: InteractionEventEntity,
+       callback: (event) => event.interactionName === 'Register' ? {
+         ns: event.payload.ns,
+         token: event.payload.token,
+         holder: event.payload.nonce,
+       } : null,
+     }),
+   })
+   ```
+
+5. **Entity References Use ID**: When referencing existing entities in relations, use `{ id: ... }`
    ```typescript
    // ✅ CORRECT: Reference existing entity
    callback: function(event) {

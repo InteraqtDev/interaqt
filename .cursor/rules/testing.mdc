@@ -76,7 +76,8 @@ await system.storage.find('EntityName',
 ```
 
 ## Common Pitfalls
-- Don't manually set entity IDs — UUIDs are auto-generated
+- Logical `id` is optional on create (omit for framework allocation) and immutable on update; do not rewrite `id` to relocate rows
 - Transform creates new records, doesn't update existing ones — use StateMachine for updates
 - Always `await controller.setup(true)` before dispatching
 - Test data fixtures live in `tests/runtime/data/` and `tests/storage/data/`
+- `Entity.identity` create is set-semantic: a duplicate key is observe, not `result.error`. When touching identity / `ON CONFLICT` / occupancy, run `tests/runtime/applicationIdentity.spec.ts`, `tests/runtime/applicationIdentityMigration.spec.ts`, and env-gated `tests/runtime/postgresqlApplicationIdentity.spec.ts`

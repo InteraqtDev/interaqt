@@ -99,6 +99,8 @@ const User = Entity.create({
 });
 ```
 
+Optional `identity: { name, properties }` declares an **application natural key** (total, unique, immutable). Logical create is set-semantic: a second insert of the same key observes the stored row and emits no create event. This is not `UniqueConstraint` (duplicate is a typed error) and not logical `id`. Occupancy (handshake tokens, one-time tickets) is Transform register + StateMachine consume + `Entity.retention` through `Controller.dispatch` only — not application `CREATE TABLE` and not a parallel `claim` / `consume` API. Filtered and merged entities cannot declare identity. MySQL setup fail-fasts. See usage `02-define-entities-properties.md` and `15-entity-crud-patterns.md`.
+
 ### Relation
 
 Connections between entities; relations are special entities.
@@ -153,6 +155,8 @@ An ordered composition of related Interactions for complex workflows.
 | **EventSource** | Base for all event-driven triggers |
 | **Controller.dispatch()** | Single entry point for triggering any EventSource |
 | **Property** | Fields on entities, optionally backed by computations |
+| **Entity.identity** | Application natural key; create is set-semantic observe, not UniqueConstraint |
+| **Entity.retention** | Declarative row lifetime (`forever` / `cap` / `ttl`) |
 
 Flow: `Interaction → Event → Computation → Data`
 
@@ -226,7 +230,8 @@ Core types use: interface → CreateArgs → `Entity.create(args)` → static re
 - Use **PGLiteDB** for tests when possible
 - **Real-PostgreSQL suites are mandatory**: `tests/runtime/postgresql*.spec.ts` require a live PostgreSQL server and silently **skip** without `INTERAQT_POSTGRES_DATABASE` — a plain `npm test` run does NOT cover them. PGLite is not a substitute (different id allocation, connection model, and concurrency semantics; the r24 fatal `getAutoId` id-type split lived only on real PG). Run them before considering driver/storage/migration/concurrency changes verified — see "Build and test commands" for setup
 - File naming: `*.spec.ts`
-- Logical `id` is optional on create (omit for framework allocation, or supply a unique driver-compatible value) and immutable on update; do not rely on rewriting `id` to relocate rows
+- Logical `id` is optional on create (omit for framework allocation, or supply a unique driver-compatible value) and immutable on update; do not rely on rewriting `id` to relocate rows. `Entity.identity` is a separate natural-key contract (set-semantic create); do not treat identity columns as a substitute for logical `id` on relations or `computeTarget`
+- When touching `Entity.identity`, storage create / `ON CONFLICT`, or occupancy: run `tests/runtime/applicationIdentity.spec.ts`, `tests/runtime/applicationIdentityMigration.spec.ts`, and real-PG `tests/runtime/postgresqlApplicationIdentity.spec.ts` (env-gated). PGLite is not a substitute for identity two-connection / dialect cells
 - Always `await controller.setup(true)` before dispatching
 - When adding a test **matrix**, consult the dimension registry in `tests/runtime/WritingComputationTests.md` — every dimension (including degenerate values and the mechanism axes) must be explicitly decided
 - **Structural fuzzing**: `tests/storage/writePathStructuralFuzz.spec.ts` generates random schemas (all physical topologies emerge from declarations) × random nested write sequences, judged by the event-completeness oracle + structural invariants. When touching the storage write path, run it with an extended seed pool (`FUZZ_SEED_START=100 FUZZ_SEED_COUNT=100 FUZZ_OPS=40 npx vitest run tests/storage/writePathStructuralFuzz.spec.ts`); a failing seed prints its schema and full op log for deterministic reproduction (`FUZZ_SEED_START=<seed> FUZZ_SEED_COUNT=1 FUZZ_VERBOSE=1`). The extended mode (filtered/merged entities in the generation domain) uses `FUZZ_FILTERED_SEED_START/COUNT`; since r32 the merged generation domain includes x:1/combined endpoints by default (EXT-1 closed; only mergeLinks endpoints stay excluded). Historical finding families are tracked in `agentspace/output/quality-foundation-plan-r27.md` §1.4/§1.4b
@@ -421,19 +426,21 @@ database with FORCE — never point it at a database you care about.
 - PGLite does not support `GENERATED ALWAYS AS IDENTITY`
 - PGLite requires single-quoted string defaults
 - Avoid dynamic functions in `defaultValue`
-- The MySQL driver declares `transactions: false` — `Controller.dispatch` requires transactions and fails fast with `TransactionCapabilityError` on MySQL; use PostgreSQL/PGLite/SQLite for dispatch-driven applications
+- The MySQL driver declares `transactions: false` — `Controller.dispatch` requires transactions and fails fast with `TransactionCapabilityError` on MySQL; use PostgreSQL/PGLite/SQLite for dispatch-driven applications. `Entity.identity` also fail-fasts at setup on MySQL (`INSERT ... ON CONFLICT` is not MySQL SQL)
 
 ### Common pitfalls
 
 1. **Transform** creates new entities/relations; it does not update existing ones — use **StateMachine** for property updates
 2. Always define state nodes before using them in StateMachine
 3. Nested `controller.dispatch()` inside a dispatch call stack throws `NestedDispatchError`. For multi-step work that must share one atomic boundary (storage writes + sequential interactions), use `controller.runInBusinessTransaction` and dispatch sequentially inside its callback — not nested dispatch. Calling `dispatch` inside a bare `storage.runInTransaction` (or any non-BT-owned active storage transaction) throws `BusinessTransactionBoundaryError` with `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`. Pure `runInTransaction` without `dispatch` remains legal.
+4. **`UniqueConstraint` vs `Entity.identity`:** UniqueConstraint means a duplicate is a typed failure and rolls back the dispatch. Identity means set-semantic observe (no error, no create event). Do not use UniqueConstraint as occupancy, and do not declare both on the same property set.
+5. Occupancy (handshake tokens, one-time tickets) is Transform register + StateMachine consume + `Entity.retention` through `dispatch` only. Application `CREATE TABLE` occupancy backends and a parallel `claim` / `consume` API are anti-patterns.
 
 ## Knowledge base
 
 | Path | Contents |
 |------|----------|
-| `agent/agentspace/knowledge/usage/` | Usage guides (mindset, entities, interactions, computations, testing) |
+| `agent/agentspace/knowledge/usage/` | Usage guides (mindset, entities, interactions, computations, testing). `02` UniqueConstraint vs identity; `15` occupancy recipe |
 | `agent/agentspace/knowledge/generator/` | Code generation guides |
 | `agentspace/knowledge/` | Technical deep-dives (filtered entities, cascade, storage) |
 | `src/storage/USAGE_GUIDE.md` | Storage layer usage |
@@ -470,6 +477,9 @@ A: Use FilteredEntity, design computations carefully, avoid unnecessary derivati
 
 **Q: How do I debug reactive computations?**
 A: Enable logging, listen to mutation events, write thorough dispatch-based tests.
+
+**Q: How do I claim a unique token or handshake key?**
+A: Declare `Entity.identity` and occupancy as Transform register + StateMachine consume + `Entity.retention`. Distinguish insert vs observe with `DispatchResponse.effects` plus query. Do not add a `claim` / `consume` API or an application `CREATE TABLE` occupancy backend.
 
 ## Agent output
 

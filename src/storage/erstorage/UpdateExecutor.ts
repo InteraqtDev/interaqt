@@ -85,6 +85,7 @@ export class UpdateExecutor {
                     }
                 }
             }
+            this.assertIdentityPropertiesUnchanged(entityName, matchedEntity, newEntityData)
             // CAUTION changedFields 必须是"实际写入集合"而不是 payload 键：
             //  computed 属性会随输入字段联动重算并落库（getSameRowFieldAndValue，与 update 事件的 keys 同源）。
             //  filtered entity 的谓词可能建立在 computed 列上——若这里只用 payload 键做依赖过滤，
@@ -362,6 +363,20 @@ export class UpdateExecutor {
         }
 
         return result
+    }
+
+    private assertIdentityPropertiesUnchanged(entityName: string, matchedEntity: Record, newEntityData: NewRecordData) {
+        const identity = this.map.getRecordInfo(entityName).identity
+        if (!identity) return
+        const payload = newEntityData.rawData || {}
+        for (const propertyName of identity.properties) {
+            if (!Object.prototype.hasOwnProperty.call(payload, propertyName)) continue
+            throw new Error(
+                `cannot change identity property "${propertyName}" of "${entityName}" ` +
+                `(current: ${JSON.stringify(matchedEntity[propertyName])}, new: ${JSON.stringify(payload[propertyName])}). ` +
+                `Application identity properties are immutable.`
+            )
+        }
     }
 
     /**

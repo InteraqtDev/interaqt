@@ -44,7 +44,7 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { canonicalJSONStringify, createFrameworkLogicalIdUniqueIndexSQL, createUniqueIndexSQL, frameworkLogicalIdUniqueIndexes, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
+import { canonicalJSONStringify, createFrameworkApplicationIdentityIndexSQL, createFrameworkLogicalIdUniqueIndexSQL, createUniqueIndexSQL, frameworkApplicationIdentityIndexes, frameworkLogicalIdUniqueIndexes, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
 import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 
 function JSONStringify(value: unknown) {
@@ -549,6 +549,7 @@ RETURNING "lastValue" AS value`,
         // Framework logical-id UNIQUE INDEX (identity contract): per non-filtered entity/relation
         // on physical idField, via createUniqueIndexSQL — not user UniqueConstraint pipeline.
         await this.setupFrameworkLogicalIdUniqueIndexes(dbSetup)
+        await this.setupFrameworkApplicationIdentityIndexes(dbSetup)
         if (this.db.setupRecordSequences) {
             const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
             await this.db.setupRecordSequences(Object.keys(dbSetup.map.records).map(recordName => {
@@ -822,13 +823,19 @@ RETURNING "lastValue" AS value`,
                 driver: this.db.constructor?.name,
             })
         }
-        const verificationDDL = constraintSchemaItems.map(item => ({
-            kind: 'verify' as const,
-            sql: item.kind === 'unique' ? this.createUniqueVerificationSQL(item) : this.createNonNullVerificationSQL(item),
-            tableName: item.tableName,
-            logicalPath: item.kind === 'unique' ? `${item.recordName}.${item.properties.join('.')}` : `${item.recordName}.${item.property}`,
-            description: `migration verify constraint ${item.constraintName}`,
-        }))
+        const verificationDDL = [
+            ...constraintSchemaItems.map(item => ({
+                kind: 'verify' as const,
+                sql: item.kind === 'unique' ? this.createUniqueVerificationSQL(item) : this.createNonNullVerificationSQL(item),
+                tableName: item.tableName,
+                logicalPath: item.kind === 'unique' ? `${item.recordName}.${item.properties.join('.')}` : `${item.recordName}.${item.property}`,
+                description: `migration verify constraint ${item.constraintName}`,
+            })),
+            // Entity.identity is not a UniqueConstraint / NonNullConstraint. Adding it to an
+            // existing table is still additive unique-index DDL, but existing NULL identity
+            // columns or duplicate keys are a blocked shape and must fail before CREATE INDEX.
+            ...this.createApplicationIdentityVerificationDDL(dbSetup),
+        ]
         const postRecomputeDDL = [
             ...dbSetup.createConstraintSQL().map(statement => ({
                 kind: 'create-constraint' as const,
@@ -847,6 +854,13 @@ RETURNING "lastValue" AS value`,
                 logicalPath: `${item.recordName}.id`,
                 description: `migration setup framework logical id unique index ${item.recordName}`,
             })),
+            ...createFrameworkApplicationIdentityIndexSQL(dbSetup.map, dialect).map(item => ({
+                kind: 'create-constraint' as const,
+                sql: item.sql,
+                tableName: item.table,
+                logicalPath: `${item.recordName}.identity.${item.properties.join('.')}`,
+                description: `migration setup framework application identity unique index ${item.recordName}`,
+            })),
         ]
         return { verificationDDL, postRecomputeDDL }
     }
@@ -856,6 +870,46 @@ RETURNING "lastValue" AS value`,
             throw new Error('expected non-null constraint')
         }
         return `SELECT "${item.field}" FROM "${item.tableName}" WHERE "${item.field}" IS NULL LIMIT 1`
+    }
+
+    /**
+     * Application-identity blocked-shape probes: any NULL identity column, then
+     * duplicate non-null identity tuples. Same verify-then-CREATE INDEX order as
+     * UniqueConstraint; identity is not registered on constraintSchemaItems.
+     */
+    private createApplicationIdentityVerificationDDL(dbSetup: DBSetup): AdditiveDDLOperation[] {
+        return frameworkApplicationIdentityIndexes(dbSetup.map).flatMap(item => [
+            {
+                kind: 'verify' as const,
+                sql: this.createIdentityNotNullVerificationSQL(item.table, item.fields),
+                tableName: item.table,
+                logicalPath: `${item.recordName}.identity.${item.properties.join('.')}.notNull`,
+                description: `migration verify application identity not-null ${item.recordName}`,
+            },
+            {
+                kind: 'verify' as const,
+                sql: this.createUniqueVerificationSQL({
+                    kind: 'unique',
+                    constraintName: item.indexName,
+                    physicalName: item.indexName,
+                    recordName: item.recordName,
+                    tableName: item.table,
+                    properties: item.properties,
+                    fields: item.fields,
+                }),
+                tableName: item.table,
+                logicalPath: `${item.recordName}.identity.${item.properties.join('.')}`,
+                description: `migration verify application identity unique ${item.recordName}`,
+            },
+        ])
+    }
+
+    private createIdentityNotNullVerificationSQL(tableName: string, fields: string[]) {
+        if (!fields.length) {
+            throw new Error('application identity verification requires at least one physical field')
+        }
+        const where = fields.map(field => `"${field}" IS NULL`).join(' OR ')
+        return `SELECT ${fields.map(field => `"${field}"`).join(', ')} FROM "${tableName}" WHERE ${where} LIMIT 1`
     }
 
     private createUniqueVerificationSQL(item: Extract<ConstraintSchemaItem, { kind: 'unique' }>) {
@@ -1048,6 +1102,38 @@ RETURNING "lastValue" AS value`,
                         recordName: item.recordName,
                         tableName: item.table,
                         properties: ['id'],
+                        driver: this.db.constructor?.name,
+                        rawCode: normalized.rawCode,
+                        causedBy: error instanceof Error ? error : undefined,
+                    }
+                )
+            }
+        }
+    }
+
+    /**
+     * Entity.identity UNIQUE INDEX via createUniqueIndexSQL — not UniqueConstraint.
+     * Not registered on constraintSchemaItems: identity conflict is ON CONFLICT observe,
+     * and a leftover 23505 from this index is a product bug, not occupancy.
+     */
+    private async setupFrameworkApplicationIdentityIndexes(dbSetup: DBSetup) {
+        const dialect = getSchemaDialect(this.db)
+        for (const item of createFrameworkApplicationIdentityIndexSQL(dbSetup.map, dialect)) {
+            try {
+                await this.db.scheme(item.sql, `setup framework application identity unique index ${item.recordName}`)
+            } catch (error) {
+                const normalized = normalizeDatabaseError(error, this.db)
+                if (normalized.isIndexAlreadyExists) {
+                    continue
+                }
+                throw new ConstraintSetupError(
+                    `Failed to setup application identity unique index on "${item.recordName}" (${item.table}.${item.fields.join(',')})`,
+                    {
+                        constraintName: item.indexName,
+                        physicalName: item.indexName,
+                        recordName: item.recordName,
+                        tableName: item.table,
+                        properties: item.properties,
                         driver: this.db.constructor?.name,
                         rawCode: normalized.rawCode,
                         causedBy: error instanceof Error ? error : undefined,

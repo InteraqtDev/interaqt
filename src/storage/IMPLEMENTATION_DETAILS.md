@@ -12,6 +12,7 @@ This document explains the internal architecture of the storage layer (`src/stor
 6. [Relation Handling](#relation-handling)
 7. [Query Execution](#query-execution)
 8. [Internal Data Representation](#internal-data-representation)
+9. [Application identity](#application-identity)
 
 ## Overall Architecture
 
@@ -125,8 +126,8 @@ The `RecordQueryAgent` is the facade of the execution engine that translates hig
 The actual work is split across executors, which the agent wires together (they call back into the agent through the explicit `RecordOperationAgent` contract):
 
 - `QueryExecutor` — executes SELECT queries, structures raw rows, resolves x:1 via JOIN and x:n via secondary (batched) queries
-- `CreationExecutor` — record creation, dependency resolution, link creation, same-row data preprocessing (`preprocessSameRowData`, shared by create and update paths)
-- `UpdateExecutor` — record updates, same-row data updates (`updateSameRowData`), reliance updates (`handleUpdateReliance`)
+- `CreationExecutor` — record creation, dependency resolution, link creation, same-row data preprocessing (`preprocessSameRowData`, shared by create and update paths). Entities with `identity` use `createIdentityRecord`: first `INSERT` of host value columns with `ON CONFLICT (identity columns) DO NOTHING`; the observe path returns the stored row and skips nested writes / create events; the insert path then patches remaining same-row columns by physical field (merged FK, link id, `&`)
+- `UpdateExecutor` — record updates, same-row data updates (`updateSameRowData`), reliance updates (`handleUpdateReliance`). Identity properties are immutable
 - `DeletionExecutor` — record deletion, unlink, cascade deletion, deletion events
 - `SQLBuilder` — builds all SQL statements
 - `FilteredEntityManager` — filtered entity dependency analysis and stateless membership diffing (before-snapshot/settle hooks around every mutation path emit filtered create/delete events; membership is never persisted, the SQL predicate evaluation is the single source of truth)
@@ -368,6 +369,24 @@ When operations like create, update, or delete are performed, mutation events ar
 ```
 
 These events can be captured and used for audit logging, triggering side effects, etc.
+
+## Application identity
+
+`Entity.identity` compiles onto the physical base record in `EntityToTableMap` (`records[].identity`). The migration signature key is `records[].applicationIdentity` so it does not overwrite `MigrationIdentity` (`records[].identity`). Filtered names resolve identity to the base record.
+
+Setup:
+
+- `NOT NULL` on identity columns and a dedicated unique index (not `UniqueConstraint`)
+- fail-fast if the identity entity shares a combined physical table with another entity (1:1 combine, `isTargetReliance` auto-combine, or `mergeLinks` co-location)
+- fail-fast on MySQL (`INSERT ... ON CONFLICT DO NOTHING` is not MySQL SQL, and `Controller.dispatch` is unavailable)
+
+Create (`CreationExecutor.createIdentityRecord`):
+
+1. First `INSERT` writes host value columns with `ON CONFLICT (identity columns) DO NOTHING`
+2. Observe: return the stored row; skip nested writes and create events
+3. Insert: emit a create event, then patch remaining same-row columns by **physical field** (merged FK, link id, `&`), not by host `attributes[name].isRecord`
+
+Update: identity properties cannot be rewritten (`UpdateExecutor`). Relocate / flash-out still uses `insertSameRowData` and does not take the identity create path.
 
 ## Conclusion
 

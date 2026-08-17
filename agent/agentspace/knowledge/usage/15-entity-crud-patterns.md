@@ -1156,6 +1156,92 @@ await controller.callInteraction('DeleteArticle', {
 });
 ```
 
+## Application identity occupancy (handshake tokens, one-time tickets)
+
+Cross-replica first-writer registration and at-most-once consume must live on a framework entity, not on application `CREATE TABLE` + dialect SQL. Official path: **declaration + `Controller.dispatch`**.
+
+```typescript
+const unused = StateNode.create({ name: 'unused' })
+const used = StateNode.create({ name: 'used' })
+
+const HandshakeToken = Entity.create({
+  name: 'HandshakeToken',
+  identity: { name: 'byKey', properties: ['ns', 'token'] },
+  properties: [
+    Property.create({ name: 'ns', type: 'string' }),
+    Property.create({ name: 'token', type: 'string' }),
+    Property.create({ name: 'payload', type: 'string' }),
+    Property.create({ name: 'holder', type: 'string' }),
+    Property.create({ name: 'expiresAt', type: 'number' }),
+    Property.create({ name: 'createdAt', type: 'number' }),
+    Property.create({
+      name: 'status',
+      type: 'string',
+      computation: StateMachine.create({
+        states: [unused, used],
+        initialState: unused,
+        transfers: [
+          StateTransfer.create({
+            current: unused,
+            next: used,
+            trigger: {
+              recordName: InteractionEventEntity.name,
+              type: 'create',
+              record: { interactionName: 'Consume' },
+            },
+            computeTarget: async function (this: Controller, event) {
+              const row = await this.system.storage.findOne(
+                'HandshakeToken',
+                BoolExp.atom({ key: 'ns', value: ['=', event.record.payload.ns] })
+                  .and({ key: 'token', value: ['=', event.record.payload.token] }),
+                undefined,
+                ['id', 'expiresAt'],
+              )
+              if (!row) return undefined
+              if (!(row.expiresAt > Date.now())) return undefined
+              return { id: row.id }
+            },
+          }),
+        ],
+      }),
+    }),
+  ],
+  retention: {
+    mode: 'ttl',
+    ttl: { timestampProperty: 'createdAt', maxAgeMs: 86_400_000 },
+  },
+  computation: Transform.create({
+    record: InteractionEventEntity,
+    attributeQuery: ['interactionName', 'payload'],
+    callback: (event) => event.interactionName === 'Register' ? {
+      ns: event.payload.ns,
+      token: event.payload.token,
+      payload: event.payload.data,
+      holder: event.payload.nonce,
+      expiresAt: event.payload.expiresAt,
+      createdAt: Date.now(),
+    } : null,
+  }),
+})
+```
+
+Callers put a **unique nonce** in the payload (`holder`). Results are distinguished with this dispatch's `effects` plus a post-commit query — no extra response channel, no parallel `claim`/`consume` API.
+
+| Result | This dispatch `effects` | Query after commit |
+|--------|-------------------------|--------------------|
+| Registered | Entity `create` and `record.holder ===` my nonce | `holder ===` my nonce |
+| Already taken | No entity `create`, no `error` | Row exists, `holder` is not mine |
+| Consumed (took payload) | `status` `update` | `status === 'used'` |
+| Already used | No `update`, no `error` | `status === 'used'` and not me |
+| Expired | No `update`, no `error` | Row still present, `status === 'unused'`, `expiresAt <= now` |
+| No row at consume | No `update`, no `error` | No row for the key |
+
+**Two clocks.** `expiresAt` is judged at consume/query time against the querying process clock. `Entity.retention` physically deletes rows. After retention removes a row the key is free and may be registered again. Keep the retention window no shorter than business expiry if you still need to observe "expired". Applications that must never reuse a key should not TTL-delete (or should keep an audit copy).
+
+**Full Transform rebuild** of an identity entity is set-semantic in **this** rebuild's insert order, not "keep the historical race winner". Occupancy Transform callback changes should use migration decision `unchanged` / not rebuild output.
+
+Do not: UniqueConstraint conflict as "already taken"; condition-update on a missing row; dispatch idempotency ledger as an application ticket; in-process maps as multi-replica authority; application `CREATE TABLE` as the occupancy backend.
+
 ## Best Practices
 
 1. **Prefer Soft Delete**: In reactive systems, soft delete preserves data integrity and historical traceability. Only use hard delete when absolutely necessary (compliance, privacy laws).
@@ -1174,7 +1260,9 @@ await controller.callInteraction('DeleteArticle', {
    - Consider cascading effects on related entities
    - Document why hard delete is necessary
 
-7. **Never Use Transform in Property Computation**: Transform is designed for collection-to-collection transformation (Entity/Relation creation). For property-level computations, use:
+7. **Application identity for occupancy**: handshake tokens, redemption codes, and at-least-once ingest use `Entity.identity` + Transform + StateMachine + `Entity.retention`. Do not `CREATE TABLE` a private occupancy backend.
+
+8. **Never Use Transform in Property Computation**: Transform is designed for collection-to-collection transformation (Entity/Relation creation). For property-level computations, use:
    - **StateMachine**: For state management and interaction-driven updates
    - **computed/getValue**: For simple derived values
    - **Count/Summation/Every/Any**: For aggregations based on relations
