@@ -1,3 +1,12 @@
+
+
+## [4.10.0](https://github.com/InteraqtDev/interaqt/compare/v4.9.0...v4.10.0) (2026-08-17)
+
+
+### Features
+
+* **core/runtime/storage:** declarative Entity.identity natural keys ([dfc8228](https://github.com/InteraqtDev/interaqt/commit/dfc8228f7f7f96eeee49d0cfd32afa4e7cd7d951))
+
 # Changelog
 
 ## [Unreleased]
