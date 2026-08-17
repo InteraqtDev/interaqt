@@ -1,19 +1,16 @@
-
-
-## [4.10.0](https://github.com/InteraqtDev/interaqt/compare/v4.9.0...v4.10.0) (2026-08-17)
-
-
-### Features
-
-* **core/runtime/storage:** declarative Entity.identity natural keys ([dfc8228](https://github.com/InteraqtDev/interaqt/commit/dfc8228f7f7f96eeee49d0cfd32afa4e7cd7d951))
-
 # Changelog
 
 ## [Unreleased]
 
+## [4.10.0](https://github.com/InteraqtDev/interaqt/compare/v4.9.0...v4.10.0) (2026-08-17)
+
+Declarative `Entity.identity` application natural keys. Design and audit record:
+`docs/application-key-occupancy/`.
+
 ### Features
 
-* **core/runtime/storage:** declarative `Entity.identity` (application natural key).
+* **core/runtime/storage:** declarative `Entity.identity` (application natural key)
+  ([dfc8228](https://github.com/InteraqtDev/interaqt/commit/dfc8228f7f7f96eeee49d0cfd32afa4e7cd7d951)).
   Named properties are total, unique, and immutable. Logical create is set-semantic
   (`INSERT ... ON CONFLICT (identity columns) DO NOTHING`): an existing key resolves
   to the stored row, drops this attempt's payload, and emits no create event.
@@ -22,7 +19,6 @@
   consume + `Entity.retention`, distinguished by `DispatchResponse.effects` plus query.
   Adding identity to an existing entity is additive unique-index DDL; duplicate keys
   or NULL identity columns fail migration verification. MySQL setup fail-fasts.
-  Design record: `docs/application-key-occupancy/`.
 
 ### Docs
 
