@@ -338,7 +338,10 @@ export class Relation implements RelationInstance {
     }
   };
   
-  static create(args: RelationCreateArgs, options?: { uuid?: string }): RelationInstance {
+  // 声明期校验的单一事实来源：create（用户声明）与 derive（框架派生定义）共用，
+  // 保证两条构造路径的合法面与错误信息完全一致。构造函数内的 merged/filtered/对称/reliance
+  // 守卫随 new Relation 一并对两条路径生效。
+  private static validateCreateArgs(args: RelationCreateArgs): void {
     // 强制执行 nameFormat 约束：显式提供的 name 会被用作表名/字段名/别名直接进入 SQL，必须严格校验。
     // 未显式提供 name 时使用 computed name（由 source/target 名和 property 名拼接，各部分单独校验）。
     if (args.name !== undefined && (typeof args.name !== 'string' || !validNameFormatExp.test(args.name))) {
@@ -370,16 +373,28 @@ export class Relation implements RelationInstance {
     // commonProperties 与 properties 共享同一物理属性命名空间，走同一守卫（r25：此前绕过）。
     validatePropertyNamesOnCreate(args.name ?? `${args.source?.name}_${args.sourceProperty}_${args.targetProperty}_${args.target?.name}`, args.properties, 'Relation');
     validatePropertyNamesOnCreate(args.name ?? `${args.source?.name}_${args.sourceProperty}_${args.targetProperty}_${args.target?.name}`, args.commonProperties, 'Relation');
+  }
+
+  static create(args: RelationCreateArgs, options?: { uuid?: string }): RelationInstance {
+    Relation.validateCreateArgs(args);
     const instance = new Relation(args, options);
-    
+
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
       throw new Error(`duplicate uuid in options ${instance.uuid}, Relation`);
     }
-    
+
     this.instances.push(instance);
     return instance;
+  }
+
+  // 框架内部专用：在 setup / migration / storage 编译期合成派生定义（不进用户声明注册表，
+  // 不参与 stringifyAllInstances，不复用显式 uuid）。与 clone 的「运行时工作副本不登记」
+  // 语义同族，但携带与 create 相同的声明期校验。用户声明必须走 create()。
+  static derive(args: RelationCreateArgs): RelationInstance {
+    Relation.validateCreateArgs(args);
+    return new Relation(args);
   }
   
   static stringify(instance: RelationInstance): string {

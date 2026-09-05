@@ -396,7 +396,7 @@ function rebaseAsFilteredItem(
         const existing = refContainer.getRelationByName(name);
         if (!existing) return;
         const baseRelation = baseItem as RelationInstance;
-        const filtered = Relation.create({
+        const filtered = Relation.derive({
             name,
             baseRelation,
             sourceProperty: existing.sourceProperty,
@@ -415,7 +415,7 @@ function rebaseAsFilteredItem(
 function createTypeProperty(typeValueByName: Map<string, string>): PropertyInstance {
     // CAUTION 复制成普通对象，避免闭包持有整个 Map（也便于调试时直接查看）。
     const valueByName = Object.fromEntries(typeValueByName);
-    return Property.create({
+    return Property.derive({
         name: MERGED_TYPE_ATTR,
         type: 'string',
         defaultValue: (_record: any, creatingName: string) => valueByName[creatingName],
@@ -533,10 +533,10 @@ function transformMergedItem<T extends MergedItem>(
     memberCondition: MatchExpressionData | undefined,
 ): [T, T] {
     if (isEntity(mergedItem)) {
-        const transformedEntity = Entity.create({ name: mergedItem.name });
+        const transformedEntity = Entity.derive({ name: mergedItem.name });
 
         if (memberCondition) {
-            const virtualBaseEntity = Entity.create({
+            const virtualBaseEntity = Entity.derive({
                 name: `${mergedItem.name}_base`,
                 properties: mergedProperties,
             });
@@ -550,7 +550,7 @@ function transformMergedItem<T extends MergedItem>(
     } else {
         const relation = mergedItem as RelationInstance;
         const relationName = getItemName(relation);
-        const transformedRelation = Relation.create({
+        const transformedRelation = Relation.derive({
             name: relation.name,
             source: relation.source,
             sourceProperty: relation.sourceProperty,
@@ -561,7 +561,7 @@ function transformMergedItem<T extends MergedItem>(
         });
 
         if (memberCondition) {
-            const virtualBaseRelation = Relation.create({
+            const virtualBaseRelation = Relation.derive({
                 name: `__${relationName}_base`,
                 source: relation.source,
                 sourceProperty: `__${relation.sourceProperty}_base`,

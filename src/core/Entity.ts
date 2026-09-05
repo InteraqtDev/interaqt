@@ -511,7 +511,13 @@ export class Entity implements EntityInstance {
     },
   };
   
-  static create(args: EntityCreateArgs, options?: { uuid?: string }): EntityInstance {
+  // 声明期校验与规范化的单一事实来源：create（用户声明）与 derive（框架派生定义）共用，
+  // 保证两条构造路径的合法面与错误信息完全一致。retention / identity 在此规范化一次，
+  // 两条路径直接消费返回值。
+  private static validateCreateArgs(args: EntityCreateArgs): {
+    retention: EntityRetention | undefined;
+    identity: EntityIdentity | undefined;
+  } {
     // 强制执行 nameFormat 约束：name 会被用作表名/字段名/别名直接进入 SQL，必须严格校验。
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`Entity name "${args.name}" is invalid. Entity names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
@@ -564,16 +570,30 @@ export class Entity implements EntityInstance {
       inputEntities: args.inputEntities,
     });
 
+    return { retention, identity };
+  }
+
+  static create(args: EntityCreateArgs, options?: { uuid?: string }): EntityInstance {
+    const { retention, identity } = Entity.validateCreateArgs(args);
+
     const instance = new Entity({ ...args, retention, identity }, options);
-    
+
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
       throw new Error(`duplicate uuid in options ${instance.uuid}, Entity`);
     }
-    
+
     this.instances.push(instance);
     return instance;
+  }
+
+  // 框架内部专用：在 setup / migration / storage 编译期合成派生定义（不进用户声明注册表，
+  // 不参与 stringifyAllInstances，不复用显式 uuid）。与 clone 的「运行时工作副本不登记」
+  // 语义同族，但携带与 create 相同的声明期校验。用户声明必须走 create()。
+  static derive(args: EntityCreateArgs): EntityInstance {
+    const { retention, identity } = Entity.validateCreateArgs(args);
+    return new Entity({ ...args, retention, identity });
   }
   
   static stringify(instance: EntityInstance): string {

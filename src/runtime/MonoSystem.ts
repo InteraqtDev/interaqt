@@ -2346,54 +2346,11 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     async setup(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], options: boolean | SystemSchemaOptions = false){
         const install = typeof options === 'boolean' ? options : options.install === true
         const schemaOptions = typeof options === 'boolean' ? { install } : options
-        // Use RefContainer to handle cloning and reference updates
-        const container = new RefContainer(originalEntities, originalRelations);
-        
-        // Get cloned entities and relations with all references automatically updated
-        const { entities, relations } = container.getAll();
-        
-        // Process states to inject properties into entities/relations
-        states.forEach(({dataContext, state}) => {
-            Object.entries(state).forEach(([stateName, stateItem]) => {
-                if (stateItem instanceof RecordBoundState) { 
-                    if (!stateItem.record) {
-                        return;
-                    }
-                    let rootEntity: EntityInstance|RelationInstance | undefined = container.getEntityByName(stateItem.record);
-                    if (!rootEntity) {
-                        rootEntity = container.getRelationByName(stateItem.record);
-                    }
-                    if (!rootEntity) {
-                        throw new Error(`Entity or Relation not found: ${stateItem.record}`);
-                    }
+        const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
 
-                    // 考虑 filtered entity 和 filtered relation 的级联问题，这里要找到根
-                    while ((rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation) {
-                        rootEntity = (rootEntity as EntityInstance).baseEntity || (rootEntity as RelationInstance).baseRelation!
-                    }
-
-                    if (stateItem.defaultValue instanceof Property) {
-                        // CAUTION 特别注意这里改了 name
-                        stateItem.defaultValue.name = stateItem.key
-                        rootEntity.properties.push(stateItem.defaultValue)
-                    } else {
-                        const defaultValuetype = typeof stateItem.defaultValue
-                        rootEntity.properties.push(Property.create({
-                            name: stateItem.key,
-                            type: defaultValuetype,
-                            // 应该系统定义
-                            collection: Array.isArray(stateItem.defaultValue),
-                            defaultValue: () => stateItem.defaultValue
-                        }))
-                    }
-                }
-            })
-        })
-
-        
         // Pass the prepared entities to storage.setup
         await this.storage.setup(
-            [...entities, DictionaryEntity, SystemEntity], 
+            entities,
             relations,
             install,
             schemaOptions
@@ -2401,6 +2358,10 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         await this.setupTransformUniqueIndexes(states)
     }
 
+    // setup（install 轨）与 migration 轨（prepareMigrationSchema / migrateSchema）共用的
+    // 声明图编译入口：RefContainer 克隆 + RecordBoundState 系统属性注入。此前两处各自
+    // 维护逐字同构的注入循环，是运行时派生 Property 的重复登记点；汇合于此保证全部
+    // 轨道的派生定义都走 Property.derive（不进用户声明注册表）。
     private prepareEntitiesForStorage(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[]) {
         // Use RefContainer to handle cloning and reference updates
         const container = new RefContainer(originalEntities, originalRelations);
@@ -2433,13 +2394,17 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
                         stateItem.defaultValue.name = stateItem.key
                         rootEntity.properties.push(stateItem.defaultValue)
                     } else {
-                        const defaultValuetype = typeof stateItem.defaultValue
-                        rootEntity.properties.push(Property.create({
+                        const defaultValue = stateItem.defaultValue
+                        const defaultValuetype = typeof defaultValue
+                        rootEntity.properties.push(Property.derive({
                             name: stateItem.key,
                             type: defaultValuetype,
                             // 应该系统定义
-                            collection: Array.isArray(stateItem.defaultValue),
-                            defaultValue: () => stateItem.defaultValue
+                            collection: Array.isArray(defaultValue),
+                            // 闭包只捕获默认值所需的纯值，不捕获 stateItem 本身——
+                            // RecordBoundState 持有 controller，捕获它会让派生 Property
+                            // （及其被 clone / mergeProperties 复用出的所有副本）间接持有整个 Controller 图。
+                            defaultValue: () => defaultValue
                         }))
                     }
                 }

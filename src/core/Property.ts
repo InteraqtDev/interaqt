@@ -108,7 +108,9 @@ export class Property implements PropertyInstance {
     }
   };
   
-  static create(args: PropertyCreateArgs, options?: { uuid?: string }): PropertyInstance {
+  // 声明期校验的单一事实来源：create（用户声明）与 derive（框架派生定义）共用，
+  // 保证两条构造路径的合法面与错误信息完全一致。
+  private static validateCreateArgs(args: PropertyCreateArgs): void {
     // 强制执行 format 约束：property 名会被用作 SQL 列名/别名，必须严格校验。
     if (typeof args.name !== 'string' || !validNameFormatExp.test(args.name)) {
       throw new Error(`Property name "${args.name}" is invalid. Property names must match ${validNameFormatExp} (letters, numbers and underscore only).`);
@@ -162,17 +164,29 @@ export class Property implements PropertyInstance {
     //  Promise 会被序列化成 "{}" 持久化（字符串列静默、数值列裸驱动报错）——r35，声明期拒绝。
     assertSynchronousFunctionArg(`Property "${args.name}"`, 'defaultValue', args.defaultValue);
     assertSynchronousFunctionArg(`Property "${args.name}"`, 'computed', args.computed);
+  }
+
+  static create(args: PropertyCreateArgs, options?: { uuid?: string }): PropertyInstance {
+    Property.validateCreateArgs(args);
 
     const instance = new Property(args, options);
-    
+
     // 检查 uuid 是否重复
     const existing = this.instances.find(i => i.uuid === instance.uuid);
     if (existing) {
       throw new Error(`duplicate uuid in options ${instance.uuid}, Property`);
     }
-    
+
     this.instances.push(instance);
     return instance;
+  }
+
+  // 框架内部专用：在 setup / migration / storage 编译期合成派生定义（不进用户声明注册表，
+  // 不参与 stringifyAllInstances，不复用显式 uuid）。与 clone 的「运行时工作副本不登记」
+  // 语义同族，但携带与 create 相同的声明期校验。用户声明必须走 create()。
+  static derive(args: PropertyCreateArgs): PropertyInstance {
+    Property.validateCreateArgs(args);
+    return new Property(args);
   }
   
   static stringify(instance: PropertyInstance): string {
