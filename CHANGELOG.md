@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.10.1](https://github.com/InteraqtDev/interaqt/compare/v4.10.0...v4.10.1) (2026-09-05)
+
 Runtime-derived definitions no longer linger in the user-declaration registries; a
 controller graph is collectable after `system.destroy()`. Design and audit record:
 `docs/controller-retention-via-property-instances/`.
