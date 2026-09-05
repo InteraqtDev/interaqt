@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+Runtime-derived definitions no longer linger in the user-declaration registries; a
+controller graph is collectable after `system.destroy()`. Design and audit record:
+`docs/controller-retention-via-property-instances/`.
+
+### Bug Fixes
+
+* **core/runtime/storage:** runtime-derived definitions are no longer registered into
+  the Klass static registries. Framework paths that synthesize definitions during
+  `setup` / migration / storage compilation (bound-state system properties for
+  `RecordBoundState` computations, merged discriminator columns, transformed merged
+  items, virtual base entities/relations, rebased filtered input relations) previously
+  called `Entity/Relation/Property.create()`, so every `Controller` setup permanently
+  registered a batch of controller-bound definitions: registry lengths grew monotonically
+  with each construct → `setup(true)` → destroy cycle, and the bound-state property
+  `defaultValue` closure captured the whole `RecordBoundState` (which holds the
+  controller), keeping Controller / System / Database reachable after `destroy()`
+  (observed as ~250 MB RSS growth per cycle on a PGLite application aggregate).
+  These paths now use the non-registering `derive` construction and the closure captures
+  only the plain default value. After `await system.destroy()` plus dropping references,
+  no framework-side static structure holds the controller graph and all three objects
+  are garbage-collectable. `stringifyAllInstances()` output no longer contains
+  system-bound properties (`_..._bound_...`) or storage-synthesized merged definitions —
+  it now serializes exactly the user declaration graph (no reader depended on the old
+  output; the migration manifest never read the registries). Enforced by
+  `tests/runtime/derivedDefinitionRetention.spec.ts` and
+  `tests/core/runtimeCreateSiteAllowlist.spec.ts`.
+
+### Features
+
+* **core:** `Entity.derive(args)` / `Relation.derive(args)` / `Property.derive(args)` —
+  the single construction path for framework-internal derived definitions: same
+  declaration-time validation as `create()`, but the instance is not registered into
+  `instances`, does not participate in `stringifyAllInstances()`, and always gets a
+  fresh uuid. This is an internal path used by the framework's setup / migration /
+  storage compilation stages; application code should keep using `create()` for
+  declarations.
+
+### Docs
+
+* `agentspace/knowledge/controller-lifecycle-and-declaration-registry.md` (new) documents
+  the declaration-registry design scope, the derived-definition `derive` path, both
+  retention-chain families with causal evidence, and the controller end-of-life contract
+  (`system.destroy()` + drop references; `Controller.teardown()` is the separate
+  controller-replacement tool). `agent/agentspace/knowledge/usage/13-testing.md` gains a
+  "Controller lifecycle and cleanup" section.
+
 ## [4.10.0](https://github.com/InteraqtDev/interaqt/compare/v4.9.0...v4.10.0) (2026-08-17)
 
 Declarative `Entity.identity` application natural keys. Design and audit record:

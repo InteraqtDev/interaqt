@@ -158,6 +158,30 @@ INTERAQT_POSTGRES_DATABASE=interaqt_test npm run test:postgres-scoped-sequence
 
 Scoped sequence tests must cover allocation through `controller.dispatch`, not direct `storage.create`. Include first-value semantics, multi-scope isolation, manual import behavior, rollback/delete behavior, migration seeding from existing data, and real PostgreSQL two-controller concurrency.
 
+### Controller Lifecycle and Cleanup
+
+A test file that constructs many controllers (one per test, or per seed in fuzz suites) must end each controller graph's lifecycle explicitly. The end-of-life contract is:
+
+```typescript
+// End of life for a whole controller graph:
+await system.destroy()   // → storage.destroy() → db.close()
+// ...then drop all references to controller / system / db
+```
+
+After `system.destroy()` completes and the application holds no more references to the Controller / System / Database, the framework guarantees:
+
+1. The declaration registries (`Entity.instances`, `Relation.instances`, `Property.instances`, ... via `KlassByName`) hold **nothing** from that controller graph — no framework-side static structure keeps it reachable. Runtime-derived definitions (bound-state system properties like `_User_postCount_bound_count`, merged discriminator columns, virtual base entities) are built through the non-registering `derive` path and never enter the registries, so registry lengths do not grow across repeated construct → setup → destroy cycles.
+2. `stringifyAllInstances()` output is identical to before `setup` — it contains only user declarations.
+3. Controller, System, and Database become garbage-collectable (`WeakRef.deref()` returns `undefined`).
+4. Using that controller afterwards (`dispatch` / `setup`) is undefined behavior (same as before: the closed driver errors out).
+5. Module-level user declarations (`Entity.create(...)` at the top of your file) live for the whole process and are **not** affected — that is by design, not a leak.
+
+Do **not** call `clearAllInstances(...)` to "clean up" between lifecycles: it is a test-isolation tool that wipes user declarations themselves, and the framework performs no implicit registry clearing.
+
+`controller.teardown()` is a different tool for a different scenario: the system (and its database connection) stays alive and you only replace the controller (hot reload, multi-tenant single process). It unregisters that controller's reactive computation listeners so the old controller stops reacting; it does not close the database and is not the end-of-life entry point. Whole-graph end = `system.destroy()` + drop references; controller-only replacement = `teardown()` + drop the controller reference. Ending the whole graph does not require calling `teardown()` first.
+
+This contract is enforced by `tests/runtime/derivedDefinitionRetention.spec.ts` (registry invariants, `stringifyAllInstances` purity, `WeakRef` collectability, per-site registration assertions). Framework internals: `agentspace/knowledge/controller-lifecycle-and-declaration-registry.md`.
+
 ### Key API Methods
 
 #### 1. Controller APIs
