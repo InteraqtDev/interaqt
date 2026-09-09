@@ -292,7 +292,7 @@ const AutoStartUpload = Transform.create({
   callback: async ({ payload, result }) => {
     // 延迟 100ms 后自动开始上传
     setTimeout(() => {
-      controller.callInteraction('StartUpload', {
+      controller.dispatch(StartUpload, {
         payload: { fileId: result.file.id }
       })
     }, 100)
@@ -304,7 +304,7 @@ const AutoProcessFile = Transform.create({
   name: 'autoProcessFile',
   record: FinishUpload,
   callback: async ({ payload }) => {
-    await controller.callInteraction('ProcessFile', {
+    await controller.dispatch(ProcessFile, {
       payload: { fileId: payload.fileId }
     })
   }
@@ -322,7 +322,7 @@ const AutoRetryUpload = Transform.create({
       const delay = Math.pow(2, file.retryCount) * 1000
       
       setTimeout(() => {
-        controller.callInteraction('RetryUpload', {
+        controller.dispatch(RetryUpload, {
           payload: { fileId: payload.fileId }
         })
       }, delay)
@@ -350,7 +350,7 @@ export class UploadService {
   
   async initiateUpload(userId: string, file: Express.Multer.File) {
     // 创建文件记录和上传会话
-    const result = await this.controller.callInteraction('InitiateUpload', {
+    const result = await this.controller.dispatch(InitiateUpload, {
       payload: {
         userId,
         fileName: file.originalname,
@@ -384,11 +384,11 @@ export class UploadService {
       
       if (record.eventName === 's3:ObjectCreated:Put') {
         // 文件上传成功
-        await this.controller.callInteraction('FinishUpload', {
+        await this.controller.dispatch(FinishUpload, {
           payload: { fileId }
         })
         
-        await this.controller.callInteraction('CompleteUpload', {
+        await this.controller.dispatch(CompleteUpload, {
           payload: {
             fileId,
             s3Key,
@@ -407,7 +407,7 @@ export class UploadService {
       if (file.mimeType.startsWith('image/')) {
         const thumbnailUrl = await this.generateThumbnail(file.s3Key)
         
-        await this.controller.callInteraction('CompleteProcessing', {
+        await this.controller.dispatch(CompleteProcessing, {
           payload: { fileId }
         })
         
@@ -415,12 +415,12 @@ export class UploadService {
         await this.storage.update('File', fileId, { thumbnailUrl })
       } else {
         // 其他类型文件直接标记为完成
-        await this.controller.callInteraction('CompleteProcessing', {
+        await this.controller.dispatch(CompleteProcessing, {
           payload: { fileId }
         })
       }
     } catch (error) {
-      await this.controller.callInteraction('ProcessingFailed', {
+      await this.controller.dispatch(ProcessingFailed, {
         payload: {
           fileId,
           error: error.message
@@ -459,7 +459,7 @@ export async function uploadRoutes(app: FastifyInstance) {
   app.post('/api/upload/progress', async (request, reply) => {
     const { fileId, progress } = request.body
     
-    await app.controller.callInteraction('UpdateUploadProgress', {
+    await app.controller.dispatch(UpdateUploadProgress, {
       payload: { fileId, progress }
     })
     
@@ -498,7 +498,7 @@ export async function uploadRoutes(app: FastifyInstance) {
   app.post('/api/upload/retry/:fileId', async (request, reply) => {
     const { fileId } = request.params
     
-    await app.controller.callInteraction('RetryUpload', {
+    await app.controller.dispatch(RetryUpload, {
       payload: { fileId }
     })
     
@@ -831,9 +831,10 @@ const HandleStripeWebhook = Interaction.create({
           'charge.refunded': 'RefundPayment'
         }
         
-        const interaction = eventHandlers[payload.eventType]
-        if (interaction) {
-          await controller.callInteraction(interaction, {
+        const interactionName = eventHandlers[payload.eventType]
+        if (interactionName) {
+          const es = controller.findEventSourceByName(interactionName)!
+          await controller.dispatch(es, {
             payload: {
               paymentId: createdEvent.paymentId,
               ...payload.payload
@@ -871,7 +872,7 @@ export class PaymentService {
     description: string
   ) {
     // 创建本地支付记录
-    const result = await this.controller.callInteraction('CreatePayment', {
+    const result = await this.controller.dispatch(CreatePayment, {
       payload: {
         userId,
         amount,
@@ -899,7 +900,7 @@ export class PaymentService {
     })
     
     // 开始处理支付
-    await this.controller.callInteraction('ProcessPayment', {
+    await this.controller.dispatch(ProcessPayment, {
       payload: { paymentId: result.payment.id }
     })
     
@@ -924,7 +925,7 @@ export class PaymentService {
     }
     
     // 处理事件
-    await this.controller.callInteraction('HandleStripeWebhook', {
+    await this.controller.dispatch(HandleStripeWebhook, {
       payload: {
         stripeEventId: event.id,
         eventType: event.type,
@@ -951,7 +952,7 @@ export class PaymentService {
     })
     
     // 更新本地状态
-    await this.controller.callInteraction('RefundPayment', {
+    await this.controller.dispatch(RefundPayment, {
       payload: {
         paymentId,
         refundAmount: refund.amount / 100,
@@ -1135,13 +1136,13 @@ const RetryWithBackoff = Transform.create({
       )
       
       setTimeout(() => {
-        controller.callInteraction('RetryOperation', {
+        controller.dispatch(RetryOperation, {
           payload: { resourceId: payload.resourceId }
         })
       }, delay)
     } else {
       // 标记为永久失败
-      await controller.callInteraction('MarkAsFailed', {
+      await controller.dispatch(MarkAsFailed, {
         payload: {
           resourceId: payload.resourceId,
           reason: 'Max retries exceeded'
@@ -1179,7 +1180,7 @@ async function handleWebhook(signature: string, payload: object) {
   }
   
   // 3. 创建事件记录
-  await controller.callInteraction('RecordWebhookEvent', {
+  await controller.dispatch(RecordWebhookEvent, {
     payload: {
       externalEventId: payload.id,
       eventType: payload.type,
@@ -1188,7 +1189,7 @@ async function handleWebhook(signature: string, payload: object) {
   })
   
   // 4. 处理事件
-  await controller.callInteraction('ProcessWebhookEvent', {
+  await controller.dispatch(ProcessWebhookEvent, {
     payload: { eventId: event.id }
   })
   
@@ -1289,7 +1290,7 @@ describe('FileUpload', () => {
     mockS3.upload.mockResolvedValueOnce({ Location: 'https://...' })
     
     // 初始化上传
-    await controller.callInteraction('InitiateUpload', {
+    await controller.dispatch(InitiateUpload, {
       payload: { fileName: 'test.pdf', fileSize: 1000 }
     })
     
@@ -1302,7 +1303,7 @@ describe('FileUpload', () => {
     expect(file.status).toBe('pending')
     
     // 触发上传失败
-    await controller.callInteraction('StartUpload', {
+    await controller.dispatch(StartUpload, {
       payload: { fileId: file.id }
     })
     
@@ -1316,7 +1317,7 @@ describe('FileUpload', () => {
     expect(file.retryCount).toBe(1)
     
     // 触发重试
-    await controller.callInteraction('RetryUpload', {
+    await controller.dispatch(RetryUpload, {
       payload: { fileId: file.id }
     })
     

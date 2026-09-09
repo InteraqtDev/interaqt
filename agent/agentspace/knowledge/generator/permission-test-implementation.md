@@ -4,7 +4,7 @@
 Permission testing verifies that conditions correctly control access to interactions. Tests should cover both allowed and denied scenarios for different user roles and data states.
 
 ### Key Testing Pattern
-When testing permission failures on **top-level** `dispatch` / `callInteraction` (soft errors), always verify:
+When testing permission failures on **top-level** `dispatch` (soft errors), always verify:
 1. **Error exists**: `expect(result.error).toBeDefined()`
 2. **Stable business code** (official discriminant): `expect((result.error as InteractionGuardError).code).toBe('NOT_ADMIN')`  
    - Structured `{ allowed: false, code }` → that `code`  
@@ -22,7 +22,7 @@ Inside `runInBusinessTransaction` with default `onDispatchError: 'abort'`, Condi
 ```typescript
 // ✅ CORRECT (top-level soft error): Check error in result with code + conditionName
 import { InteractionGuardError } from "interaqt"
-const result = await controller.callInteraction('DeleteStyle', { 
+const result = await controller.dispatch(DeleteStyle, { 
   user: viewer,
   payload: { style: { id: styleId } }
 })
@@ -48,7 +48,7 @@ await expect(
 
 // ❌ WRONG for top-level soft mode: assuming every failure throws
 try {
-  await controller.callInteraction('DeleteStyle', {
+  await controller.dispatch(DeleteStyle, {
     user: viewer,
     payload: { style: { id: styleId } }
   })
@@ -190,14 +190,14 @@ test('role-based permission', async () => {
   })
   
   // Step 3: Test admin (allowed)
-  const adminResult = await controller.callInteraction('DeleteStyle', {
+  const adminResult = await controller.dispatch(DeleteStyle, {
     user: admin,
     payload: { style: { id: style.id } }
   })
   expect(adminResult.error).toBeUndefined()
   
   // Step 4: Test operator (denied)
-  const operatorResult = await controller.callInteraction('DeleteStyle', {
+  const operatorResult = await controller.dispatch(DeleteStyle, {
     user: operator,
     payload: { style: { id: style.id } }
   })
@@ -206,7 +206,7 @@ test('role-based permission', async () => {
   expect((operatorResult.error as InteractionGuardError).conditionName).toBe('AdminRole')
   
   // Step 5: Test viewer (denied)
-  const viewerResult = await controller.callInteraction('DeleteStyle', {
+  const viewerResult = await controller.dispatch(DeleteStyle, {
     user: viewer,
     payload: { style: { id: style.id } }
   })
@@ -270,21 +270,21 @@ test('combined permissions with BoolExp', async () => {
   })
   
   // Test admin with published style (allowed)
-  const result1 = await controller.callInteraction('UpdateStyle', {
+  const result1 = await controller.dispatch(UpdateStyle, {
     user: admin,
     payload: { style: { id: publishedStyle.id } }
   })
   expect(result1.error).toBeUndefined()
   
   // Test operator with published style (allowed)
-  const result2 = await controller.callInteraction('UpdateStyle', {
+  const result2 = await controller.dispatch(UpdateStyle, {
     user: operator,
     payload: { style: { id: publishedStyle.id } }
   })
   expect(result2.error).toBeUndefined()
   
   // Test viewer with published style (denied)
-  const result3 = await controller.callInteraction('UpdateStyle', {
+  const result3 = await controller.dispatch(UpdateStyle, {
     user: viewer,
     payload: { style: { id: publishedStyle.id } }
   })
@@ -294,7 +294,7 @@ test('combined permissions with BoolExp', async () => {
   expect((result3.error as InteractionGuardError).conditionName).toBeDefined()
   
   // Test admin with offline style (denied - even admin can't update offline)
-  const result4 = await controller.callInteraction('UpdateStyle', {
+  const result4 = await controller.dispatch(UpdateStyle, {
     user: admin,
     payload: { style: { id: offlineStyle.id } }
   })
@@ -367,14 +367,14 @@ test('resource ownership permission', async () => {
   })
   
   // Owner can delete (allowed)
-  const ownerResult = await controller.callInteraction('DeleteOwnStyle', {
+  const ownerResult = await controller.dispatch(DeleteOwnStyle, {
     user: owner,
     payload: { style: { id: style.id } }
   })
   expect(ownerResult.error).toBeUndefined()
   
   // Other user cannot delete (denied)
-  const otherResult = await controller.callInteraction('DeleteOwnStyle', {
+  const otherResult = await controller.dispatch(DeleteOwnStyle, {
     user: otherUser,
     payload: { style: { id: style.id } }
   })
@@ -384,7 +384,7 @@ test('resource ownership permission', async () => {
   expect((otherResult.error as InteractionGuardError).conditionName).toBe('OwnerOnly')
   
   // Admin can delete any style (allowed)
-  const adminResult = await controller.callInteraction('DeleteOwnStyle', {
+  const adminResult = await controller.dispatch(DeleteOwnStyle, {
     user: admin,
     payload: { style: { id: style.id } }
   })
@@ -469,7 +469,7 @@ test('data retrieval permissions based on query', async () => {
   })
   
   // Admin can view private documents
-  const adminResult = await controller.callInteraction('GetUserDocuments', {
+  const adminResult = await controller.dispatch(GetUserDocuments, {
     user: admin,
     query: {
       match: MatchExp.atom({ key: 'status', value: ['=', 'private'] }),
@@ -479,7 +479,7 @@ test('data retrieval permissions based on query', async () => {
   expect(adminResult.error).toBeUndefined()
   
   // User can view own documents
-  const ownResult = await controller.callInteraction('GetUserDocuments', {
+  const ownResult = await controller.dispatch(GetUserDocuments, {
     user: user1,
     query: {
       match: MatchExp.atom({ key: 'owner.id', value: ['=', user1.id] }),
@@ -489,7 +489,7 @@ test('data retrieval permissions based on query', async () => {
   expect(ownResult.error).toBeUndefined()
   
   // User cannot view others' documents
-  const othersResult = await controller.callInteraction('GetUserDocuments', {
+  const othersResult = await controller.dispatch(GetUserDocuments, {
     user: user1,
     query: {
       match: MatchExp.atom({ key: 'owner.id', value: ['=', user2.id] }),
@@ -581,14 +581,14 @@ test('payload validation in conditions', async () => {
   })
   
   // Published style can be shared (allowed)
-  const result1 = await controller.callInteraction('ShareStyle', {
+  const result1 = await controller.dispatch(ShareStyle, {
     user: operator,
     payload: { style: { id: publishedStyle.id } }
   })
   expect(result1.error).toBeUndefined()
   
   // Draft style cannot be shared (denied)
-  const result2 = await controller.callInteraction('ShareStyle', {
+  const result2 = await controller.dispatch(ShareStyle, {
     user: operator,
     payload: { style: { id: draftStyle.id } }
   })
@@ -613,7 +613,7 @@ test('comprehensive permission coverage', async () => {
       role: role
     })
     
-    const result = await controller.callInteraction('AdminOnlyAction', {
+    const result = await controller.dispatch(AdminOnlyAction, {
       user: user
     })
     
@@ -632,21 +632,21 @@ test('comprehensive permission coverage', async () => {
 ```typescript
 test('edge cases in permissions', async () => {
   // Test with null user
-  const result1 = await controller.callInteraction('RequireAuth', {
+  const result1 = await controller.dispatch(RequireAuth, {
     user: null
   })
   expect(result1.error).toBeDefined()
   
   // Test with missing payload data
   const user = await system.storage.create('User', { role: 'admin' })
-  const result2 = await controller.callInteraction('UpdateStyle', {
+  const result2 = await controller.dispatch(UpdateStyle, {
     user: user,
     payload: {} // Missing style
   })
   expect(result2.error).toBeDefined()
   
   // Test with non-existent resource
-  const result3 = await controller.callInteraction('UpdateStyle', {
+  const result3 = await controller.dispatch(UpdateStyle, {
     user: user,
     payload: { style: { id: 'non-existent-id' } }
   })
@@ -705,7 +705,7 @@ test('complex permission logic', async () => {
 ```typescript
 test('verify detailed condition error information', async () => {
   // When a condition fails, verify all error details
-  const result = await controller.callInteraction('AdminOnlyAction', {
+  const result = await controller.dispatch(AdminOnlyAction, {
     user: normalUser
   })
   
@@ -717,7 +717,7 @@ test('verify detailed condition error information', async () => {
   expect((result.error as InteractionGuardError).conditionName).toBe('AdminRole')
   
   // For combined conditions, test each failure scenario
-  const complexResult = await controller.callInteraction('ComplexAction', {
+  const complexResult = await controller.dispatch(ComplexAction, {
     user: unverifiedAdmin  // Admin but not verified
   })
   expect(complexResult.error).toBeDefined()
@@ -755,7 +755,7 @@ test('structured rejection codes and messages', async () => {
     credits: 5
   })
   
-  const result = await controller.callInteraction('PremiumAction', {
+  const result = await controller.dispatch(PremiumAction, {
     user: poorUser
   })
   
@@ -812,17 +812,17 @@ test('state-dependent permissions', async () => {
   })
   
   // Only verified, non-banned user can post
-  const result1 = await controller.callInteraction('PostComment', {
+  const result1 = await controller.dispatch(PostComment, {
     user: verifiedUser
   })
   expect(result1.error).toBeUndefined()
   
-  const result2 = await controller.callInteraction('PostComment', {
+  const result2 = await controller.dispatch(PostComment, {
     user: unverifiedUser
   })
   expect(result2.error).toBeDefined()
   
-  const result3 = await controller.callInteraction('PostComment', {
+  const result3 = await controller.dispatch(PostComment, {
     user: bannedUser
   })
   expect(result3.error).toBeDefined()
@@ -864,7 +864,7 @@ test('conditional state updates', async () => {
   })
   
   // First delete succeeds
-  const result1 = await controller.callInteraction('DeleteStyle', {
+  const result1 = await controller.dispatch(DeleteStyle, {
     user: admin,
     payload: { style: { id: style.id } }
   })
@@ -874,7 +874,7 @@ test('conditional state updates', async () => {
   await system.storage.update('Style', style.id, { isDeleted: true })
   
   // Second delete fails
-  const result2 = await controller.callInteraction('DeleteStyle', {
+  const result2 = await controller.dispatch(DeleteStyle, {
     user: admin,
     payload: { style: { id: style.id } }
   })

@@ -228,9 +228,7 @@ const controller = new Controller({
 
   relations: relations,
 
-  activities: activities,
-
-  interactions: interactions,
+  eventSources: interactions,  // Interactions and custom EventSources; activities go through ActivityManager
 
   dict: dictionaries,
 

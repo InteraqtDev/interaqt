@@ -290,11 +290,11 @@ color: blue
    **⚠️ Testing Integration Event Entity Computations:**
    - When testing computations based on **Integration Event Entities** (NOT InteractionEventEntity):
      - Use `controller.system.storage.create('${EventEntityName}', {...})` to directly create event records
-     - Do NOT use `controller.callInteraction()` - integration events are created by external systems
+     - Do NOT use `controller.dispatch()` - integration events are created by external systems
      - Example: For StripePaymentEvent entity, use `controller.system.storage.create(StripePaymentEvent.name, { transactionId: '...', paymentStatus: 'success', ... })`
      - This simulates the webhook/callback from external systems that creates these events
    - When testing computations based on **InteractionEventEntity**:
-     - Use `controller.callInteraction()` as normal - these are triggered by user interactions
+     - Use `controller.dispatch()` as normal - these are triggered by user interactions
    
    Example patterns:
    ```typescript
@@ -316,7 +316,7 @@ color: blue
    
    test('Post entity with ownerProperties (createdAt, status)', async () => {
      // Create Post - ownerProperties should be set by entity's Transform
-     const result = await controller.callInteraction('CreatePost', {
+     const result = await controller.dispatch(CreatePost, {
        user: testUser,
        payload: { title: 'Test Post', content: 'Content' }
      })
@@ -336,7 +336,7 @@ color: blue
    
    test('Order entity with createdWithRelations (OrderItemRelation)', async () => {
      // Create Order with items - relations created automatically via sourceProperty
-     const result = await controller.callInteraction('CreateOrder', {
+     const result = await controller.dispatch(CreateOrder, {
        user: testUser,
        payload: { 
          orderNumber: 'ORD001',
@@ -363,7 +363,7 @@ color: blue
    
    test('Article.state transitions correctly', async () => {
      // Create article in draft state
-     const result = await controller.callInteraction('CreateArticle', {
+     const result = await controller.dispatch(CreateArticle, {
        user: testUser,
        payload: { title: 'Test', content: 'Content' }
      })
@@ -378,7 +378,7 @@ color: blue
      expect(article.state).toBe('draft')
      
      // Transition to published
-     await controller.callInteraction('PublishArticle', {
+     await controller.dispatch(PublishArticle, {
        user: testUser,
        payload: { id: article.id }
      })
@@ -418,11 +418,11 @@ color: blue
      /**
       * Test Plan: Testing computation based on Integration Event Entity
       * This tests computations triggered by external system events (StripePaymentEvent)
-      * Use storage.create() to simulate webhook data, NOT callInteraction()
+      * Use storage.create() to simulate webhook data, NOT controller.dispatch()
       */
      
      // Create an order first (via interaction)
-     const orderResult = await controller.callInteraction('CreateOrder', {
+     const orderResult = await controller.dispatch(CreateOrder, {
        user: testUser,
        payload: { orderNumber: 'ORD001', amount: 100 }
      })

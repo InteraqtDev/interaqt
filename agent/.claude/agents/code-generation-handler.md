@@ -263,7 +263,7 @@ When testing business logic that depends on external integrations, you do NOT ne
 
 **Testing Pattern for Integration Event Entities:**
 
-1. **Use `storage.create()` to simulate external events**, NOT `callInteraction()`:
+1. **Use `storage.create()` to simulate external events**, NOT `controller.dispatch()`:
    ```typescript
    // ✅ CORRECT: Simulating external webhook creating an event
    const ttsEvent = await controller.system.storage.create(
@@ -279,7 +279,7 @@ When testing business logic that depends on external integrations, you do NOT ne
    
    ```typescript
    // ❌ WRONG: Trying to create integration event via interaction
-   const result = await controller.callInteraction('CreateTTSEvent', {
+   const result = await controller.dispatch(CreateTTSEvent, {
      user: testUser,
      payload: { voiceUrl: 'test.mp3' }
    })
@@ -295,7 +295,7 @@ When testing business logic that depends on external integrations, you do NOT ne
 3. **Example test flow for Type 1 integration (api-call-with-return)**:
    ```typescript
    // Step 1: User creates a business entity that needs external API result
-   const greetingResult = await controller.callInteraction('CreateGreeting', {
+   const greetingResult = await controller.dispatch(CreateGreeting, {
      user: testUser,
      payload: { text: 'Hello world' }
    })

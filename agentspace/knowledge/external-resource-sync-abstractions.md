@@ -584,7 +584,7 @@ const UploadFile = Interaction.create({
 })
 
 // 使用示例
-await controller.callInteraction('UploadFile', {
+await controller.dispatch(UploadFile, {
   payload: {
     fileName: 'document.pdf',
     fileSize: 1024000,
@@ -593,17 +593,17 @@ await controller.callInteraction('UploadFile', {
 })
 
 // 开始上传
-await controller.callInteraction('StartSync', {
+await controller.dispatch(StartSync, {
   payload: { resourceId: fileId }
 })
 
 // 更新进度
-await controller.callInteraction('UpdateUploadProgress', {
+await controller.dispatch(UpdateUploadProgress, {
   payload: { fileId, progress: 50 }
 })
 
 // 完成上传
-await controller.callInteraction('CompleteSync', {
+await controller.dispatch(CompleteSync, {
   payload: {
     resourceId: fileId,
     externalId: 's3-key-123',
@@ -654,7 +654,7 @@ const ProcessWebhookTransform = Transform.create({
     // 根据事件类型触发相应的交互
     switch (event.eventType) {
       case 'payment.authorized':
-        await controller.callInteraction('AuthorizePayment', {
+        await controller.dispatch(AuthorizePayment, {
           payload: {
             paymentId: event.resourceId,
             authorizationCode: event.payload.authCode
@@ -662,7 +662,7 @@ const ProcessWebhookTransform = Transform.create({
         })
         break
       case 'file.uploaded':
-        await controller.callInteraction('CompleteSync', {
+        await controller.dispatch(CompleteSync, {
           payload: {
             resourceId: event.resourceId,
             externalId: event.payload.s3Key,
@@ -736,7 +736,7 @@ const AutoRetryTransform = Transform.create({
     if (resource.retryCount < 3) {
       // 延迟重试
       setTimeout(() => {
-        controller.callInteraction('RetrySync', {
+        controller.dispatch(RetrySync, {
           payload: { resourceId: payload.resourceId }
         })
       }, Math.pow(2, resource.retryCount) * 1000)  // 指数退避
@@ -904,7 +904,7 @@ class WebhookController {
     }
     
     // 创建 Webhook 事件
-    await this.controller.callInteraction('ReceiveWebhook', {
+    await this.controller.dispatch(ReceiveWebhook, {
       payload: {
         resourceId: payload.resourceId,
         eventType: payload.type,
@@ -914,7 +914,7 @@ class WebhookController {
     })
     
     // 触发处理
-    await this.controller.callInteraction('ProcessWebhook', {
+    await this.controller.dispatch(ProcessWebhook, {
       payload: { eventId: webhookEvent.id }
     })
   }
@@ -932,7 +932,7 @@ class SyncService {
     const resource = await this.getResource(resourceId)
     
     // 开始同步
-    await this.controller.callInteraction('StartSync', {
+    await this.controller.dispatch(StartSync, {
       payload: { resourceId }
     })
     
@@ -942,7 +942,7 @@ class SyncService {
       const result = await adapter.sync(resource)
       
       // 完成同步
-      await this.controller.callInteraction('CompleteSync', {
+      await this.controller.dispatch(CompleteSync, {
         payload: {
           resourceId,
           externalId: result.externalId,
@@ -951,7 +951,7 @@ class SyncService {
       })
     } catch (error) {
       // 同步失败
-      await this.controller.callInteraction('FailSync', {
+      await this.controller.dispatch(FailSync, {
         payload: {
           resourceId,
           error: error.message
@@ -991,7 +991,7 @@ class PollingScheduler {
       if (resource.syncStatus === 'syncing') {
         const syncDuration = Date.now() - new Date(resource.syncStartedAt).getTime()
         if (syncDuration > 60000) {  // 1 分钟超时
-          await this.controller.callInteraction('FailSync', {
+          await this.controller.dispatch(FailSync, {
             payload: {
               resourceId,
               error: 'Sync timeout'

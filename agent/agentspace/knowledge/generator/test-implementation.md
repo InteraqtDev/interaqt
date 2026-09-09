@@ -6,10 +6,10 @@ Testing in interaqt focuses on event sources as the primary way to verify busine
 ## 🔴 CRITICAL: Testing Philosophy
 
 ### Core Principles
-1. **Test Through Interactions Only**: All business logic testing must use `callInteraction()`
+1. **Test Through Interactions Only**: All business logic testing must go through `controller.dispatch()`
 2. **Storage APIs Bypass Validation**: `storage.create/update/delete` are ONLY for test setup
 3. **No Entity/Relation Unit Tests**: These are implementation details tested through event sources
-4. **Error Handling**: top-level `dispatch` / `callInteraction` return failures in `result.error` (soft). Exceptions still apply for nested `dispatch` (`NestedDispatchError`), `forceThrowDispatchError`, and default `runInBusinessTransaction` abort mode.
+4. **Error Handling**: top-level `dispatch` returns failures in `result.error` (soft). Exceptions still apply for nested `dispatch` (`NestedDispatchError`), `forceThrowDispatchError`, and default `runInBusinessTransaction` abort mode.
 
 ### Common Mistakes
 ```typescript
@@ -23,13 +23,13 @@ await storage.create('Style', { ... })  // Bypasses ALL validation!
 
 // ❌ WRONG for top-level soft mode: only try-catch, ignoring result.error
 try {
-  await controller.callInteraction(...)
+  await controller.dispatch(...)
 } catch (e) {
   // top-level soft failures usually do not throw
 }
 
 // ✅ CORRECT: Test through interactions; inspect result.error
-const result = await controller.callInteraction('CreateStyle', { ... })
+const result = await controller.dispatch(CreateStyle, { ... })
 expect(result.error).toBeUndefined()
 
 // ✅ CORRECT when using business transactions (default abort throws)
@@ -40,21 +40,19 @@ await expect(
 ).resolves.toBeDefined()
 ```
 
-## callInteraction Return Value
+## dispatch Return Value
 
-The `controller.callInteraction()` method is used for both regular interactions and activity interactions. 
+The `controller.dispatch()` method is used for both regular interactions and activity interactions (activity steps are dispatched through the `"ActivityName:interactionName"` event sources produced by `ActivityManager`, with `activityId` carried in the args).
 
 **Method Signature:**
 ```typescript
-callInteraction(
-  interactionName: string, 
-  args: InteractionEventArgs, 
-  activityName?: string,    // Optional: for activity interactions
-  activityId?: string       // Optional: for activity interactions
+dispatch(
+  eventSource: EventSourceInstance,  // Interaction instance or custom EventSource
+  args: InteractionEventArgs         // { user, payload?, query?, activityId? }
 ): Promise<InteractionCallResponse>
 ```
 
-The method returns an `InteractionCallResponse` object. That name is this guide’s alias for the same `DispatchResponse` shape returned by `controller.dispatch`:
+The method returns an `InteractionCallResponse` object. That name is this guide’s alias for the `DispatchResponse` shape returned by `controller.dispatch`:
 
 ```typescript
 type InteractionCallResponse = {
@@ -101,7 +99,7 @@ When calling interactions that create, update, or delete data, the `result.effec
 ```typescript
 // Example: Getting created record ID and data from effects
 test('should create a style and get the created record from effects', async () => {
-  const result = await controller.callInteraction('CreateStyle', {
+  const result = await controller.dispatch(CreateStyle, {
     user: adminUser,
     payload: { label: 'Modern', slug: 'modern' }
   })
@@ -126,7 +124,7 @@ test('should create a style and get the created record from effects', async () =
 
 // Example: Tracking multiple mutations in one interaction
 test('should track all mutations when creating related data', async () => {
-  const result = await controller.callInteraction('CreatePostWithTags', {
+  const result = await controller.dispatch(CreatePostWithTags, {
     user: authorUser,
     payload: {
       title: 'Test Post',
@@ -152,7 +150,7 @@ test('should track all mutations when creating related data', async () => {
 
 // Example: Accessing old and new values in updates
 test('should track old and new values in update effects', async () => {
-  const updateResult = await controller.callInteraction('UpdateStyle', {
+  const updateResult = await controller.dispatch(UpdateStyle, {
     user: adminUser,
     payload: {
       id: existingStyle.id,
@@ -197,7 +195,7 @@ type RecordMutationEvent = {
 - **Storage queries are better for**: Verifying computed properties, checking related data, confirming final state
 
 **ScopedSequence testing:**
-- Create records through `controller.dispatch` / `controller.callInteraction`, not direct `storage.create`, so the post-create/pre-commit allocator runs.
+- Create records through `controller.dispatch`, not direct `storage.create`, so the post-create/pre-commit allocator runs.
 - Verify first value semantics (`initialValue + step`), independent scopes, manual value rejection, and uniqueness.
 - For rollback/delete behavior, assert the next successful allocation follows the documented transactional counter semantics.
 - For existing data migration, assert every existing scope is seeded to `MAX(serialNumber)` and the next allocation returns `max + step`.
@@ -210,7 +208,7 @@ When testing interactions, **directly use storage.find/findOne to verify results
 // ✅ CORRECT: Use storage APIs to verify interaction results
 test('should create and update style', async () => {
   // Execute business logic through interaction
-  const createResult = await controller.callInteraction('CreateStyle', {
+  const createResult = await controller.dispatch(CreateStyle, {
     user: adminUser,
     payload: { label: 'Test Style', slug: 'test-style' }
   })
@@ -242,7 +240,7 @@ const GetStyleBySlug = Interaction.create({  // Don't create this just for tests
 
 ```typescript
 // 1. Basic success check — stage A (facts). Absence of error is not post-commit completion.
-const result = await controller.callInteraction('CreateStyle', {...})
+const result = await controller.dispatch(CreateStyle, {...})
 if (result.error) {
   console.error('Interaction failed:', result.error)
   return
@@ -256,7 +254,7 @@ if (!isPostCommitPhaseComplete(result)) {
 }
 
 // 2. Getting data from query interactions
-const queryResult = await controller.callInteraction('GetStyles', {
+const queryResult = await controller.dispatch(GetStyles, {
   user: currentUser,
   query: {
     match: MatchExp.atom({ key: 'status', value: ['=', 'active'] }),
@@ -267,18 +265,15 @@ expect(queryResult.error).toBeUndefined()
 expect(queryResult.data).toHaveLength(10)
 
 // 3. Checking side effects — last-write-wins map is not the official complete check
-const publishResult = await controller.callInteraction('PublishStyle', {...})
+const publishResult = await controller.dispatch(PublishStyle, {...})
 expect(publishResult.error).toBeUndefined()
 expect(isPostCommitPhaseComplete(publishResult)).toBe(true)
 expect(publishResult.sideEffects?.emailNotification?.result).toBe('sent')
 
-// 4. Activity interactions return activityId
-const activityResult = await controller.callInteraction(
-  'StartApproval',
-  {...},
-  'ApprovalWorkflow',
-  undefined
-)
+// 4. Activity interactions: dispatch the "ActivityName:interactionName" event
+//    source produced by ActivityManager; the head dispatch returns the activityId
+const startApproval = controller.findEventSourceByName('ApprovalWorkflow:StartApproval')!
+const activityResult = await controller.dispatch(startApproval, {...})
 const activityId = activityResult.context?.activityId
 ```
 
@@ -300,7 +295,7 @@ const AssignStyles = Interaction.create({
 })
 
 // ✅ CORRECT: Array of objects with id
-await controller.callInteraction('AssignStyles', {
+await controller.dispatch(AssignStyles, {
   user: adminUser,
   payload: {
     styles: [
@@ -318,7 +313,7 @@ await controller.callInteraction('AssignStyles', {
 
 ## Error Checking
 
-Top-level `dispatch` / `callInteraction` wrap admit and most domain failures in `result.error`, so success/failure tests usually inspect the return value rather than try-catch.
+Top-level `dispatch` wraps admit and most domain failures in `result.error`, so success/failure tests usually inspect the return value rather than try-catch.
 
 **Exception — business transactions:** with default `onDispatchError: 'abort'`, `dispatch` **throws** inside `runInBusinessTransaction` and the BT promise rejects. Use try-catch or `expect(...).rejects` for those paths. Nested `dispatch` and `forceThrowDispatchError` also throw.
 
@@ -326,7 +321,7 @@ Top-level `dispatch` / `callInteraction` wrap admit and most domain failures in 
 
 ```typescript
 // 1. Permission errors (condition checks)
-const result = await controller.callInteraction('DeleteStyle', {
+const result = await controller.dispatch(DeleteStyle, {
   user: viewerUser,  // viewer role cannot delete
   payload: { id: style.id }
 })
@@ -337,7 +332,7 @@ expect((result.error as any).error.data.name).toBe('AdminOnly')  // which condit
 // expect((result.error as any).code).toBe('NOT_ADMIN')
 
 // 2. Payload content validation errors (also condition checks)
-const result = await controller.callInteraction('PublishStyle', {
+const result = await controller.dispatch(PublishStyle, {
   user: adminUser,
   payload: { 
     id: offlineStyle.id  // Cannot publish offline styles
@@ -347,7 +342,7 @@ expect(result.error).toBeDefined()
 expect((result.error as any).type).toBe('condition check failed')
 
 // 3. Missing required fields
-const result = await controller.callInteraction('CreateStyle', {
+const result = await controller.dispatch(CreateStyle, {
   user: adminUser,
   payload: {
     // Missing required 'label' field
@@ -358,7 +353,7 @@ expect(result.error).toBeDefined()
 expect((result.error as any).type).toBe('label missing')
 
 // 4. Business rule violations (condition checks)
-const result = await controller.callInteraction('CreateStyle', {
+const result = await controller.dispatch(CreateStyle, {
   user: adminUser,
   payload: {
     label: 'Duplicate',
@@ -373,7 +368,7 @@ expect((result.error as any).type).toBe('condition check failed')
 
 ```typescript
 test('should handle all error cases', async () => {
-  const result = await controller.callInteraction('UpdateStyle', {...})
+  const result = await controller.dispatch(UpdateStyle, {...})
   
   // Always check stage A error first
   if (result.error) {
@@ -395,7 +390,7 @@ test('should handle all error cases', async () => {
 When an interaction fails unexpectedly, use `console.log` to inspect the full error object:
 
 ```typescript
-const result = await controller.callInteraction('CreateStyle', {...})
+const result = await controller.dispatch(CreateStyle, {...})
 if (result.error) {
   // Print full error details for debugging
   console.log('Interaction error:', result.error)
@@ -434,7 +429,7 @@ const testData = await system.storage.create('Post', {
 test('should set correct timestamp', async () => {
   const beforeTime = Math.floor(Date.now()/1000)
   
-  const result = await controller.callInteraction('CreatePost', {...})
+  const result = await controller.dispatch(CreatePost, {...})
   
   const afterTime = Math.floor(Date.now()/1000)
   const post = await system.storage.findOne('Post', ...)
@@ -487,7 +482,7 @@ const adminUser = await system.storage.create('User', {
 })
 
 // ✅ CORRECT: Use pre-authenticated user in interactions
-await controller.callInteraction('CreatePost', {
+await controller.dispatch(CreatePost, {
   user: adminUser,  // Already authenticated user
   payload: { ... }
 })
@@ -712,7 +707,7 @@ const userFavoriteRelation = await system.storage.findRelationByName(
 - Don't test implementation details
 
 ## Validation Checklist
-- [ ] All tests use callInteraction for business logic
+- [ ] All tests use controller.dispatch for business logic
 - [ ] Storage APIs only used for test setup
 - [ ] All findOne/find calls include attributeQuery
 - [ ] Error checking uses result.error pattern for top-level soft failures

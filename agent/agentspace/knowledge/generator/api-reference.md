@@ -3261,7 +3261,7 @@ const ViewContent = Interaction.create({
 ```
 
 **Error Handling**
-- Top-level `dispatch` / `callInteraction` (outside business-transaction abort): failures are soft — check `result.error`
+- Top-level `dispatch` (outside business-transaction abort): failures are soft — check `result.error`
 - Official business branch surface: stable `code` / `details` / `conditionName` on `InteractionGuardError` (or soft `result.error`)
 - Historical duck fields (`type: 'condition check failed'`, `error.data.name`) may still appear; **do not** use them as the sole discriminant. `ConditionError` is deprecated for new code — use `InteractionGuardError`
 - Assert `result.error.code` (or thrown `InteractionGuardError.code`) for structured rejections; use `conditionName` when identifying which Condition failed

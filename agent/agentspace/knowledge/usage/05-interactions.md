@@ -15,7 +15,7 @@ When using this framework, please note:
 For example, when executing interactions, user information is passed as a parameter:
 ```javascript
 // User identity provided by external system
-const result = await controller.callInteraction('CreatePost', {
+const result = await controller.dispatch(CreatePost, {
   user: { id: 'user123', name: 'John', role: 'author' },  // Already authenticated user
   payload: { /* ... */ }
 });
@@ -1250,7 +1250,7 @@ const Payment = Entity.create({
 
 ### Basic Execution
 
-Prefer `controller.dispatch(eventSource, args)` with the **Interaction / EventSource object** (see testing guide). `callInteraction(name, args)` remains a name-based convenience wrapper.
+Use `controller.dispatch(eventSource, args)` with the **Interaction / EventSource object** (see testing guide). There is no name-based dispatch wrapper (`callInteraction` was removed); when only a name is available, look the instance up with `controller.findEventSourceByName(name)`.
 
 ```javascript
 // Preferred: dispatch the Interaction object
@@ -1263,8 +1263,9 @@ const result = await controller.dispatch(CreatePost, {
   }
 });
 
-// Name-based convenience (legacy examples may still show this)
-// const result = await controller.callInteraction('CreatePost', { user, payload });
+// Name-based lookup when only the interaction name is available:
+// const createPost = controller.findEventSourceByName('CreatePost')!
+// const result = await controller.dispatch(createPost, { user, payload });
 
 console.log('Interaction result:', result);
 ```
@@ -1317,7 +1318,7 @@ await controller.runInBusinessTransaction({ name: 'create-and-activate' }, async
 
 ## Error Handling
 
-> **Default (no business transaction)**: `controller.dispatch` / `callInteraction` return a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw). Branch business rejects on stable **`result.error.code`** (and `conditionName` when needed), not duck-typed `type` alone.  
+> **Default (no business transaction)**: `controller.dispatch` returns a `DispatchResponse`. Guard and validation failures are soft — check `result.error` (do not assume a throw). Branch business rejects on stable **`result.error.code`** (and `conditionName` when needed), not duck-typed `type` alone.  
 
 **Idempotency.** When the Interaction declares `idempotency`, successful responses include `outcome: 'applied' | 'replayed'`. Branch client retries on `outcome`. Do not infer replay by scanning `effects` or by treating unique-constraint errors as success. Concurrent same-key attempts that race an in-flight claim throw/return `IdempotencyError` with `code: 'IDEMPOTENCY_IN_FLIGHT'`. Replay still runs admit (conditions) and skips open, event create, resolve, afterDispatch, and stage P (`postCommit` and `RecordMutationSideEffect`). `replayed` is not “obligations already finished”; `postCommitPhase.status` is `notRun`. Recover create mutation side effects and `postCommit` with the rerun APIs above.
 

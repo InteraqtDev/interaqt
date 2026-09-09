@@ -23,9 +23,7 @@ const controller = new Controller({
 
   relations: relations,
 
-  activities: [],
-
-  interactions: interactions,
+  eventSources: interactions,
 
   dict: computations,
 

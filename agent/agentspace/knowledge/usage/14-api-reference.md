@@ -969,16 +969,15 @@ const activeUsers = Dictionary.create({
 
 **Usage in Controller**
 
-Dictionaries are passed as the 6th parameter to Controller:
+Dictionaries are passed through the `dict` option of Controller:
 
 ```typescript
 const controller = new Controller({
   system: system,
   entities: entities,
   relations: relations,
-  activities: activities,
-  interactions: interactions,
-  dict: [userCountDict, systemConfig, currentTime, activeUsers],, // Dictionaries
+  eventSources: interactions,  // Interactions and custom EventSources
+  dict: [userCountDict, systemConfig, currentTime, activeUsers], // Dictionaries
   recordMutationSideEffects: []
 });
 ```
@@ -1393,8 +1392,7 @@ new Controller({
     system: System,
     entities: KlassInstance<typeof Entity>[],
     relations: KlassInstance<typeof Relation>[],
-    activities: KlassInstance<typeof Activity>[],
-    interactions: KlassInstance<typeof Interaction>[],
+    eventSources: EventSourceInstance[],  // Interactions and custom EventSources; ActivityManager output for activities
     dict?: KlassInstance<typeof Property>[],  // Note: This is for global dictionaries, NOT computations
     recordMutationSideEffects?: RecordMutationSideEffect[]
 })
@@ -1508,32 +1506,30 @@ Reconstruct a create mutation from the current stored row (`recordName` + `id`) 
 #### rerunPostCommit(eventSource, args, prior): Promise\<PostCommitRerunResult\>
 Rerun `postCommit` with resolve/`afterDispatch` values. After idempotent replay, pass this response's `data`/`context`. After admit-dedup, pass a retained first pair or empty `prior` when the hook is args-reentrant. Do not pass a `findOne` row as `prior.data` unless `resolve` originally returned that row.
 
-#### callInteraction(interactionName: string, args: InteractionEventArgs, activityName?: string, activityId?: string)
-Name-based convenience wrapper around dispatch for interaction or activity interaction.
+#### findEventSourceByName(name: string): EventSourceInstance | undefined
+Look up a registered event source by name. There is no name-based dispatch wrapper (`controller.callInteraction` was removed): `dispatch` takes the event source instance, so use this lookup when only a name is available. `ActivityManager` registers each activity interaction under `"ActivityName:interactionName"`.
 
 **Parameters:**
-- `interactionName`: The name of the interaction to call
-- `args`: The interaction event arguments containing user and payload
-- `activityName` (optional): The name of the activity when calling an activity interaction
-- `activityId` (optional): The ID of the activity instance when calling an activity interaction
+- `name`: The registered event source name (for activity interactions, the `"ActivityName:interactionName"` form)
 
 **Example - Regular Interaction:**
 ```typescript
-const result = await controller.callInteraction('createPost', {
+const result = await controller.dispatch(createPost, {
     user: { id: 'user1' },
     payload: { postData: { title: 'Hello', content: 'World' } }
 })
-// Prefer: await controller.dispatch(CreatePost, { user, payload })
+// Name-based lookup when the instance is not in scope:
+// const createPost = controller.findEventSourceByName('createPost')!
 ```
 
 **Example - Activity Interaction:**
 ```typescript
-const result = await controller.callInteraction(
-    'confirmOrder',
-    { user: { id: 'user1' }, payload: { orderData: {...} } },
-    'OrderProcess',
-    'activity-instance-1'
-)
+const confirmOrder = controller.findEventSourceByName('OrderProcess:confirmOrder')!
+const result = await controller.dispatch(confirmOrder, {
+    user: { id: 'user1' },
+    payload: { orderData: {...} },
+    activityId: 'activity-instance-1'  // from the head dispatch's result.context!.activityId
+})
 ```
 
 
@@ -1855,15 +1851,14 @@ const controller = new Controller({
     system, // System implementation
     entities: [User, Post], // Entities
     relations: [UserPostRelation, PostLikeRelation], // Relations
-    activities: [], // Activities
-    interactions: [CreatePostInteraction, LikePostInteraction] // Interactions
+    eventSources: [CreatePostInteraction, LikePostInteraction] // Interactions and custom EventSources
 })
 
 await controller.setup(true)
 
 // 5. Use APIs
 // Create post
-const result = await controller.callInteraction('createPost', {
+const result = await controller.dispatch(CreatePostInteraction, {
     user: { id: 'user1' },
     payload: {
         postData: {
@@ -1873,11 +1868,16 @@ const result = await controller.callInteraction('createPost', {
     }
 })
 
+// The created record id comes from the create event in result.effects
+const createdPost = (result.effects ?? []).find(
+    (e) => e.type === 'create' && e.recordName === 'Post'
+)!
+
 // Like post
-await controller.callInteraction('likePost', {
+await controller.dispatch(LikePostInteraction, {
     user: { id: 'user2' },
     payload: {
-        post: { id: result.recordId }
+        post: { id: createdPost.record!.id }
     }
 })
 ```

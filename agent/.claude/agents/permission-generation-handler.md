@@ -158,7 +158,7 @@ import {
   - [ ] Add test cases in `tests/{module}.permission.test.ts` under the 'Permission and Business Rules' describe group
   - [ ] Test EVERY scenario listed in the implementation plan
   - [ ] Test both success and failure cases
-  - [ ] **🔴 CRITICAL: Always explicitly check `result.error` after `controller.callInteraction`:**
+  - [ ] **🔴 CRITICAL: Always explicitly check `result.error` after `controller.dispatch`:**
     - For expected success: `expect(result.error).toBeUndefined()`
     - For expected permission failures: `expect(result.error).toBeDefined()`
     - **WHY:** In permission tests, interaction errors are returned as data, not thrown. Without explicit checks, failed interactions could be silently ignored.
