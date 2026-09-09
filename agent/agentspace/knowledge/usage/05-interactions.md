@@ -1,6 +1,6 @@
 # How to Define and Execute Interactions
 
-Interactions are the only way users interact with the system in interaqt, and the source of all data changes in the system. By defining interactions, you can describe what operations users can perform and how these operations affect data in the system.
+Interactions are how users interact with the system in interaqt: they are the built-in, user-facing kind of EventSource. All data changes enter the system through EventSources dispatched via `Controller.dispatch` (entries that have no user by design are covered in [21-system-event-sources.md](./21-system-event-sources.md)). By defining interactions, you can describe what operations users can perform and how these operations affect data in the system.
 
 ## Important Note: About User Identity
 
@@ -21,13 +21,15 @@ const result = await controller.callInteraction('CreatePost', {
 });
 ```
 
+**There is no framework-level user gate.** `Controller.dispatch` does not validate `user` at the entry point: an Interaction without `conditions` dispatches successfully even when the args contain no `user` at all, and the framework neither rejects the call nor fills in a subject. The required `user` field of `InteractionEventArgs` is a TypeScript contract, not a runtime check. Rejecting anonymous calls is the declaration's job: a Condition that reads `event.user` and returns a structured rejection (for example `{ allowed: false, code: 'AUTH_REQUIRED' }`) is the only mechanism that keeps anonymous dispatches out of a user-facing Interaction. See `06-attributive-permissions.md` for Conditions and typed rejection, and `21-system-event-sources.md` for entries that have no subject by design (registration, verification-code issuance, partner provisioning) and their recipe.
+
 ## Retry-Safe Interaction Callbacks
 
 `Controller.dispatch()` runs interaction processing inside a retryable transaction. PostgreSQL SERIALIZABLE promotion or retryable SQLSTATE errors (`40001`, `40P01`) may replay the transaction attempt.
 
 These interaction callbacks must be deterministic and retry-safe:
 
-- `guard`
+- `admit`
 - `mapEventData`
 - `resolve`
 - `afterDispatch`

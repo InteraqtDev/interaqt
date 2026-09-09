@@ -53,7 +53,7 @@ No update handlers. No sync bugs. When a like relationship is created, `likeCoun
 
 ## Core Ideas
 
-**1. Only Interactions create data** — User interactions are the single source of truth. Everything else is derived.
+**1. Only dispatched EventSources create data** — Every data change enters through an EventSource dispatched via `Controller.dispatch`: `Interaction` is the built-in, user-facing kind, and custom EventSources cover system and anonymous entries. Everything else is derived.
 
 **2. Data is a function of events** — Properties, counts, states, and aggregates are declared as computations over events and relations, not manually maintained.
 
@@ -63,7 +63,7 @@ No update handlers. No sync bugs. When a like relationship is created, `likeCoun
 
 ## Dispatch Transactions
 
-`Controller.dispatch()` is the synchronous fact transaction boundary in interaqt. The framework runs guard checks, `mapEventData`, event record creation, `resolve`, synchronous computations, and `afterDispatch` inside one retryable storage transaction attempt.
+`Controller.dispatch()` is the synchronous fact transaction boundary in interaqt. The framework runs admit checks, `mapEventData`, event record creation, `resolve`, synchronous computations, and `afterDispatch` inside one retryable storage transaction attempt.
 
 If any transaction step fails, the event record and all synchronous derived writes from that attempt are rolled back. `postCommit` and record mutation side effects run only after a successful commit; their failures do **not** set `result.error` and do not roll back committed facts. Completion of that post-commit phase is first-class on `result.postCommitPhase`. Callers that only care whether facts committed may keep checking `result.error`. Callers that must know whether post-commit IO finished use `isPostCommitPhaseComplete(result)`.
 
@@ -73,7 +73,7 @@ Use these hooks with the transaction boundary in mind:
 
 | Hook | Transaction boundary |
 |---|---|
-| `guard` / `mapEventData` / `resolve` | Run inside the retryable transaction attempt and may be replayed. |
+| `admit` / `mapEventData` / `resolve` | Run inside the retryable transaction attempt and may be replayed. |
 | `afterDispatch` | Runs before commit inside the transaction. Use it only for response context or local reversible storage work. Do not perform irreversible external IO here. |
 | `postCommit` | Runs after commit. Use it for external IO, notifications, outbox enqueueing, or non-critical response context. |
 | `RecordMutationSideEffect` | Runs after commit for committed mutation events. Failure is reported in `sideEffects` and `postCommitPhase`. Create-record hooks can be rerun with `rerunCreateMutationSideEffects`; update/delete hooks cannot. |
@@ -358,7 +358,7 @@ npm install @electric-sql/pglite
 | **Relation** | A typed connection between entities (1:1, 1:n, n:n) |
 | **Entity.identity** | Application natural key: total, unique, immutable; create is set-semantic |
 | **Entity.retention** | Declarative row lifetime (`forever` / `cap` / `ttl`) |
-| **Interaction** | An event triggered by a user — the *only* way new data enters the system |
+| **Interaction** | The built-in, user-facing EventSource — a user-triggered event; new data enters through dispatched EventSources |
 | **Action** | An identifier for an interaction type (not a handler — no logic!) |
 | **Computation** | A reactive declaration: Count, Transform, StateMachine, etc. |
 | **Activity** | An ordered sequence of related Interactions for complex workflows |
@@ -402,7 +402,7 @@ npm run build            # Build to dist/
 
 In interaqt, you never write update logic. You declare:
 - *what* each piece of data is (a count, a sum, a state, a transformation)
-- *when* entities and relations come into existence (through Interactions)
+- *when* entities and relations come into existence (through dispatched EventSources)
 
 The framework handles propagation, consistency, and persistence. Your business logic becomes a clear, auditable set of declarations rather than a tangled web of imperative handlers.
 

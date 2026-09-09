@@ -163,7 +163,7 @@ Scoped sequence tests must cover allocation through `controller.dispatch`, not d
 #### 1. Controller APIs
 
 ```typescript
-// Call an interaction (the ONLY way to execute business logic)
+// Call an interaction (the user-facing entry for executing business logic)
 const result = await controller.callInteraction(interactionName: string, args: {
   user: { id: string, [key: string]: any },  // Required user object
   payload?: { [key: string]: any }           // Optional payload
@@ -276,15 +276,15 @@ Testing is a crucial component for ensuring the quality of interaqt applications
 
 ## ⚠️ CRITICAL: interaqt Testing Philosophy
 
-**In the interaqt framework, ALL data is derived from interaction events.** This fundamental principle changes how we approach testing:
+**In the interaqt framework, ALL data changes flow from EventSources dispatched through `Controller.dispatch`** (Interactions are the built-in, user-facing kind). This fundamental principle changes how we approach testing:
 
-1. **Focus on Interaction Testing**: Since all Entity and Relation data are created, modified, and deleted through Interactions, comprehensive Interaction testing naturally covers all data operations.
+1. **Focus on EventSource Testing**: Since all Entity and Relation data are created, modified, and deleted through dispatched EventSources, testing all declared EventSources covers all data operations.
 
-2. **No Separate Entity/Relation Tests**: You should NOT write separate unit tests for Entity CRUD operations or Relation creation/deletion. These are implementation details that are automatically tested when you test the Interactions that use them.
+2. **No Separate Entity/Relation Tests**: You should NOT write separate unit tests for Entity CRUD operations or Relation creation/deletion. These are implementation details that are automatically tested when you test the EventSources that use them.
 
-3. **Coverage Through Interactions**: If your test coverage is below 100% after testing all Interactions, it indicates:
-   - Missing Interaction definitions in your design
-   - Insufficient edge case testing for existing Interactions
+3. **Coverage Through EventSources**: If your test coverage is below 100% after testing all declared EventSources, it indicates:
+   - Missing EventSource definitions in your design
+   - Insufficient edge case testing for existing EventSources
    - Unused code that should be removed
 
 4. **Test What Matters**: Test the business logic and user scenarios through Interactions, not the framework mechanics.
@@ -1169,4 +1169,4 @@ describe('User Management Interactions', () => {
 });
 ```
 
-Testing is a crucial aspect of building reliable interaqt applications. By focusing on comprehensive Interaction testing, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Remember: in interaqt, all data flows from Interactions, so testing Interactions thoroughly is sufficient to achieve complete test coverage. Skip entity and relation unit tests - they're automatically covered when you test the Interactions that use them. Proper test organization, edge case coverage, and permission testing make tests maintainable and effective for long-term development.
+Testing is a crucial aspect of building reliable interaqt applications. By focusing on comprehensive EventSource testing, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Remember: in interaqt, all data changes flow from EventSources dispatched through `Controller.dispatch`, so thorough testing of all declared EventSources yields complete test coverage. Skip entity and relation unit tests - they're automatically covered when you test the EventSources that use them. Proper test organization, edge case coverage, and permission testing make tests maintainable and effective for long-term development.

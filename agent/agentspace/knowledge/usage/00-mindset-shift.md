@@ -4,7 +4,7 @@
 
 The interaqt framework requires a fundamental **mindset shift**. If you continue to use traditional imperative thinking with this framework, you will not be able to realize its true value.
 
-## Core Principle: Only Interactions Create Data, Everything Else is a "Shadow" of Data
+## Core Principle: Only Dispatched EventSources Create Data, Everything Else is a "Shadow" of Data
 
 ### Traditional Thinking vs interaqt Thinking
 
@@ -285,8 +285,8 @@ const UserOrderRelation = Relation.create({
 ## Key Mental Models
 
 ### 1. Interactions are "Seeds" of Data
-- Only Interactions can generate new data
-- All other data are "derivatives" of Interaction data
+- Only dispatched EventSources can generate new data — Interactions are the built-in, user-facing kind
+- All other data are "derivatives" of event data
 
 ### 2. Actions are "Event Type Labels"
 - Actions are like event names, containing no logic

@@ -591,7 +591,8 @@ Global state values. Pass to Controller's `dict` parameter. Access via `system.s
 EventSource.create(args: {
   name: string                        // Event source identifier
   entity: EntityInstance              // Entity to persist event records
-  guard?: (this: Controller, args: TArgs) => Promise<void>
+  admit?: (this: Controller, args: TArgs) => Promise<void>
+  open?: (this: Controller, args: TArgs) => Promise<void>
   mapEventData?: (args: TArgs) => Record<string, any>
   resolve?: (this: Controller, args: TArgs) => Promise<TResult>
   afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>

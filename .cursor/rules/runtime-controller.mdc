@@ -41,7 +41,7 @@ Returns `DispatchResponse`: `{ error?, data?, effects?, sideEffects?, context?, 
 ## EventSource Abstraction
 All event sources (Interaction, custom types) implement `EventSourceInstance`:
 - `entity` — the entity this event source operates on
-- `guard(args)` / `admit` — validate and check permissions
+- `admit(args)` (legacy alias `guard`) — validate and check permissions
 - `mapEventData(args)` — transform event args
 - `resolve` — execute the action
 - `postCommit` — external IO after successful commit; skipped on idempotent `replayed`

@@ -16,7 +16,7 @@ interaqt now uses PostgreSQL as the concurrency coordinator for multi-process de
 
 The following callbacks may be replayed after SERIALIZABLE promotion, `40001`, or `40P01`:
 
-- `guard`
+- `admit`
 - `mapEventData`
 - `resolve`
 - computation callbacks

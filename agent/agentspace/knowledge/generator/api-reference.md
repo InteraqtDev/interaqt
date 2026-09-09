@@ -546,7 +546,7 @@ EventSource.create<TArgs, TResult>(
 **Parameters**
 - `config.name` (string, required): Event source name, used for identification and lookup
 - `config.entity` (EntityInstance, required): The entity used to persist event records. Each dispatch creates a record in this entity.
-- `config.guard` (function, optional): Validation function called before the event is processed. Throw an error to reject the event.
+- `config.admit` (function, optional): Validation function called before the event is processed. Throw an error to reject the event. (The legacy `guard` key is rejected at declaration time: `EventSource.create` throws and tells you to move the callback to `admit`.)
   ```typescript
   async function(this: Controller, args: TArgs): Promise<void>
   ```
@@ -570,7 +570,8 @@ interface EventSourceInstance<TArgs = any, TResult = void> {
   _type: string
   name: string
   entity: EntityInstance
-  guard?: (this: Controller, args: TArgs) => Promise<void>
+  admit?: (this: Controller, args: TArgs) => Promise<void>
+  open?: (this: Controller, args: TArgs) => Promise<void>
   mapEventData?: (args: TArgs) => Record<string, any>
   resolve?: (this: Controller, args: TArgs) => Promise<TResult>
   afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>
@@ -594,7 +595,7 @@ const ScheduledTaskEvent = Entity.create({
 const scheduledTaskSource = EventSource.create({
     name: 'scheduledTask',
     entity: ScheduledTaskEvent,
-    guard: async function(this: Controller, args: { taskName: string, payload: any }) {
+    admit: async function(this: Controller, args: { taskName: string, payload: any }) {
         if (!args.taskName) {
             throw new Error('Task name is required')
         }
@@ -639,7 +640,7 @@ const WebhookEvent = Entity.create({
 const webhookSource = EventSource.create({
     name: 'webhook',
     entity: WebhookEvent,
-    guard: async function(this: Controller, args: { source: string, secret: string, eventType: string, data: any }) {
+    admit: async function(this: Controller, args: { source: string, secret: string, eventType: string, data: any }) {
         const validSecret = await this.system.storage.get('config', `webhook_secret_${args.source}`)
         if (args.secret !== validSecret) {
             throw new Error('Invalid webhook secret')
@@ -666,12 +667,12 @@ const result = await controller.dispatch(webhookSource, {
 
 **Key Points**
 1. Every event source must have an `entity` to persist event records
-2. `guard` runs before event processing; throw to reject the event
+2. `admit` runs before event processing; throw to reject the event
 3. `mapEventData` converts dispatch args into the format stored in the entity
 4. `resolve` returns data to the caller (useful for query-type events)
 5. `afterDispatch` runs inside the retryable transaction attempt and can return additional context
 6. The Controller automatically registers the event source's entity if not already in the entities list
-7. Interaction is a built-in EventSource type that provides pre-built `guard`, `mapEventData`, and `resolve` implementations
+7. Interaction is a built-in EventSource type that provides pre-built `admit`, `mapEventData`, and `resolve` implementations
 
 ## 13.3 Computation-Related APIs
 
@@ -2640,7 +2641,7 @@ const bulkApproveTransfer = StateTransfer.create({
 
 ## 13.4 Interaction-Related APIs
 
-Interaction is a built-in EventSource type provided by interaqt. It implements `EventSourceInstance<InteractionEventArgs>` and provides pre-built guard (condition checks, user validation, payload validation), event data mapping, and data retrieval logic.
+Interaction is a built-in EventSource type provided by interaqt. It implements `EventSourceInstance<InteractionEventArgs>` and provides pre-built admit (condition checks, payload validation), event data mapping, and data retrieval logic. The required `user` field of `InteractionEventArgs` is a TypeScript contract — `Controller.dispatch` does not validate `user` at the entry point; a Condition reading `event.user` is what rejects anonymous calls.
 
 ### Interaction.create()
 
@@ -3544,7 +3545,7 @@ await controller.setup(true) // Create database tables
 ```
 
 #### dispatch(eventSource, args)
-Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction (guard → event record → resolve → sync computations). Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` inside a non-BT active storage transaction throws `BusinessTransactionBoundaryError` (`code: 'DISPATCH_IN_NON_BT_TRANSACTION'`). For multi-step work that must share one atomic boundary, use `runInBusinessTransaction` and dispatch sequentially inside its callback. Pure `storage.runInTransaction` without `dispatch` remains legal.
+Primary entry: run an Interaction or other EventSource. Top-level calls open a retryable storage transaction on the **unique pipeline** `admit → open? → map → create → resolve → afterDispatch`. Nested `dispatch` inside an active dispatch stack throws `NestedDispatchError`. Calling `dispatch` inside a non-BT active storage transaction throws `BusinessTransactionBoundaryError` (`code: 'DISPATCH_IN_NON_BT_TRANSACTION'`). For multi-step work that must share one atomic boundary, use `runInBusinessTransaction` and dispatch sequentially inside its callback. Pure `storage.runInTransaction` without `dispatch` remains legal.
 
 **Syntax**
 ```typescript
@@ -3558,7 +3559,7 @@ async dispatch<TArgs, TResult>(
 - `eventSource` (EventSourceInstance, required): The event source instance to dispatch (object reference, not a name string)
 - `args` (TArgs, required): Event-specific arguments. For Interactions, this is `InteractionEventArgs` containing `user`, `payload`, `context`, and optional `query`.
 
-**Note about ignoreGuard**: When `controller.ignoreGuard` is set to `true`, dispatch will bypass all guard checks (conditions, user validation, payload validation) defined in the event source.
+**Note about ignoreGuard**: When `controller.ignoreGuard` is set to `true`, dispatch will bypass all guard checks (conditions, payload validation) defined in the event source.
 
 **Error mode**
 - **Top-level** (default): failures are soft — inspect `result.error` (do not assume throw). `forceThrowDispatchError` makes top-level throw instead.
@@ -4268,7 +4269,7 @@ storage.listen(async (events) => {
 ```
 
 ⚠️ **Transaction semantics**: `listen` callbacks run **inside** the dispatch transaction,
-**before** it commits. If a later step of the same dispatch fails (guard, resolve,
+**before** it commits. If a later step of the same dispatch fails (admit, resolve,
 computation), the transaction rolls back — database writes made by the callback roll
 back with it, but any **external** side effects (HTTP calls, message queues, logs)
 have already happened and cannot be undone. For external side effects that must only
@@ -4493,7 +4494,8 @@ interface EventSourceInstance<TArgs = any, TResult = void> {
     _type: string
     name: string
     entity: EntityInstance
-    guard?: (this: Controller, args: TArgs) => Promise<void>
+    admit?: (this: Controller, args: TArgs) => Promise<void>
+    open?: (this: Controller, args: TArgs) => Promise<void>
     mapEventData?: (args: TArgs) => Record<string, any>
     resolve?: (this: Controller, args: TArgs) => Promise<TResult>
     afterDispatch?: (this: Controller, args: TArgs, result: { data?: TResult }) => Promise<Record<string, unknown> | void>

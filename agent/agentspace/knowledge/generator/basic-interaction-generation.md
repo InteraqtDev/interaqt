@@ -73,7 +73,7 @@ const UpdateStyle = Interaction.create({
 
 ### What is an Interaction?
 - User-triggered actions that modify system state
-- The ONLY way to create, update, or delete data
+- The built-in, user-facing EventSource for data changes (all data changes enter through EventSources dispatched via `Controller.dispatch`)
 - Contains: name, action (identifier), payload (parameters)
 - NO operational logic - that's handled by Computations
 

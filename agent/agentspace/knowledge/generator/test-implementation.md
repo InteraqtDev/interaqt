@@ -1,14 +1,14 @@
 # Test Implementation Guide
 
 ## Overview
-Testing in interaqt focuses on interactions as the primary way to verify business logic. Since all data creation, updates, and deletions flow through interactions, comprehensive interaction testing provides complete coverage.
+Testing in interaqt focuses on event sources as the primary way to verify business logic. Since all data creation, updates, and deletions flow from EventSources dispatched through `Controller.dispatch`, testing all declared EventSources provides complete coverage.
 
 ## 🔴 CRITICAL: Testing Philosophy
 
 ### Core Principles
 1. **Test Through Interactions Only**: All business logic testing must use `callInteraction()`
 2. **Storage APIs Bypass Validation**: `storage.create/update/delete` are ONLY for test setup
-3. **No Entity/Relation Unit Tests**: These are implementation details tested through interactions
+3. **No Entity/Relation Unit Tests**: These are implementation details tested through event sources
 4. **Error Handling**: top-level `dispatch` / `callInteraction` return failures in `result.error` (soft). Exceptions still apply for nested `dispatch` (`NestedDispatchError`), `forceThrowDispatchError`, and default `runInBusinessTransaction` abort mode.
 
 ### Common Mistakes
@@ -318,7 +318,7 @@ await controller.callInteraction('AssignStyles', {
 
 ## Error Checking
 
-Top-level `dispatch` / `callInteraction` wrap guard and most domain failures in `result.error`, so success/failure tests usually inspect the return value rather than try-catch.
+Top-level `dispatch` / `callInteraction` wrap admit and most domain failures in `result.error`, so success/failure tests usually inspect the return value rather than try-catch.
 
 **Exception — business transactions:** with default `onDispatchError: 'abort'`, `dispatch` **throws** inside `runInBusinessTransaction` and the BT promise rejects. Use try-catch or `expect(...).rejects` for those paths. Nested `dispatch` and `forceThrowDispatchError` also throw.
 

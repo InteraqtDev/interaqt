@@ -12,11 +12,11 @@ interaqt is a **declarative reactive** backend framework with the core philosoph
 
 > **Stop thinking about "how to operate data", start thinking about "what data essentially is"**
 
-### Core Principle: Only Interactions Generate Data, Everything Else is a "Shadow" of Data
+### Core Principle: Only Dispatched EventSources Generate Data, Everything Else is a "Shadow" of Data
 
 In interaqt:
-- **Only user interactions can generate new data**
-- **All other data are computation results of interaction data**
+- **Only EventSources dispatched through `Controller.dispatch` generate new data — Interactions are the built-in, user-facing kind**
+- **All other data are computation results of event data**
 - **Never try to "operate" data, only "declare" what data is**
 
 ### Basic Paradigm: data = computation(events)
@@ -104,7 +104,7 @@ Fields of entities, can be simple values or automatically computed values based 
 Connections between entities, such as like relationships between users and posts.
 
 ### Interaction
-Events triggered by users, the **only source** of data changes in the system. Interactions only declare "what users can do", containing no operational logic.
+Events triggered by users — the built-in, user-facing EventSource. All data changes enter the system through EventSources dispatched via `Controller.dispatch`. Interactions only declare "what users can do", containing no operational logic.
 
 ### Action
 ⚠️ **Important Clarification**: Action is not an "operation", but an **identifier** for interaction types, like event names. It contains no execution logic.
@@ -117,7 +117,7 @@ Ordered combinations of multiple related Interactions, implementing complex busi
 
 ## How Reactive Computation Works
 
-1. **Event Source**: All data changes originate from user Interactions
+1. **Event Source**: All data changes originate from EventSources dispatched via `Controller.dispatch` (Interactions are the built-in, user-facing kind)
 2. **Change Tracking**: System automatically generates change events
 3. **Dependency Graph**: Computations declare dependencies on which data
 4. **Automatic Propagation**: When dependent data changes, related computations automatically re-execute

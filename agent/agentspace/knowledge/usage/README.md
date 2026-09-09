@@ -95,7 +95,7 @@ Property.create({
 
 ## 🔥 Core Points
 
-1. **Only Interactions generate data**: All other data are computed results of Interactions
+1. **Data changes come only from dispatched EventSources**: Interactions are the built-in, user-facing kind; all other data are computed results of event data
 2. **Action is identifier**: Contains no operational logic
 3. **Declare data essence**: Don't think "how to compute", think "what data is"
 4. **Unidirectional data flow**: Interaction → Event → Transform/Count → Data
@@ -143,6 +143,7 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 19. [API Exports Reference](./18-api-exports-reference.md) - Complete list of available imports
 20. [Common Anti-Patterns](./19-common-anti-patterns.md) - Mistakes to avoid
 21. [PostgreSQL Concurrency Migration](./20-postgresql-concurrency-migration.md) - Retry, async, PostgreSQL ids, and ScopedSequence migration notes
+22. [System Event Sources](./21-system-event-sources.md) - Entries without a user: registration, verification codes, partner provisioning
 
 ## 📞 Need Help?
 
