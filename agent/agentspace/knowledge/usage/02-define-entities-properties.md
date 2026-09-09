@@ -385,7 +385,7 @@ Declare uniqueness on the entity. Do **not** emit application `CREATE TABLE` or 
 | `UniqueConstraint` | Typed `ConstraintViolationError`; the whole dispatch rolls back | A duplicate is a data/programmer error (for example a unique email that must not silently reuse the existing row) |
 | `Entity.identity` | **Set-semantic observe**: resolve to the stored row, drop this attempt's payload, emit no create event, dispatch has no error | Handshake tokens, redemption codes, at-least-once ingest — the second writer must see the first rather than fail |
 
-Identity properties are total (`NOT NULL`), unique, and immutable. At most one identity per ordinary entity. Do not declare both identity and UniqueConstraint on the **same** property set. Filtered/merged entities cannot declare identity. MySQL fail-fasts at setup (identity insert uses `ON CONFLICT`, and `Controller.dispatch` is unavailable on MySQL).
+Identity properties are total (`NOT NULL`), unique, and immutable. At most one identity per ordinary entity. Do not declare both identity and UniqueConstraint on the **same** property set. Filtered/merged entities cannot declare identity. Relations cannot declare identity (`Relation.create` has no identity parameter). MySQL fail-fasts at setup (identity insert uses `ON CONFLICT`, and `Controller.dispatch` is unavailable on MySQL).
 
 ```javascript
 const HandshakeToken = Entity.create({

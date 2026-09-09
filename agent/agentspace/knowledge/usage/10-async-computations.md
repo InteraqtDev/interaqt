@@ -149,8 +149,7 @@ const controller = new Controller({
   system: system,
   entities: entities,
   relations: relations,
-  activities: [],
-  interactions: [],
+  eventSources: [],
   dict: [weatherDictionary], // Dictionary array
   computations: GlobalWeatherHandles // Pass custom computation handlers
 });

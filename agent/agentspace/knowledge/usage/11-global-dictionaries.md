@@ -245,8 +245,7 @@ const controller = new Controller({
   system,
   entities: [userEntity],           // Entities
   relations: [],                    // Relations
-  activities: [],                   // Activities
-  interactions: [],                 // Interactions
+  eventSources: [],                 // Interactions and custom EventSources
   dict: [totalUsers, activeUsers],  // Dictionaries
   recordMutationSideEffects: []     // recordMutationSideEffects
 });

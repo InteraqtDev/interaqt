@@ -15,8 +15,8 @@ storage.findByProperty('Entity', 'prop')   // ❌ No such method
 controller.execute()                       // ❌ No such method
 
 // ✅ CORRECT: Use these APIs instead
-controller.callInteraction('InteractionName', args)  // ✅ Call interaction by name
-controller.dispatch(InteractionObject, args)         // ✅ Dispatch an event source object
+controller.dispatch(InteractionObject, args)         // ✅ Dispatch an event source (Interaction or custom EventSource)
+controller.findEventSourceByName('InteractionName')  // ✅ Look up a registered event source by name
 storage.findOne('Entity', MatchExp)                  // ✅ Find single record
 storage.find('Entity', MatchExp)                     // ✅ Find multiple records
 storage.create('Entity', data)                       // ✅ Create record
@@ -26,7 +26,7 @@ storage.create('Entity', data)                       // ✅ Create record
 
 ```typescript
 import { describe, test, expect, beforeEach } from 'vitest'
-import { Controller, MonoSystem, KlassByName, MatchExp } from 'interaqt'
+import { ActivityManager, Controller, MonoSystem, KlassByName, MatchExp } from 'interaqt'
 import { PGLiteDB } from 'interaqt/drivers'
 import { entities, relations, interactions, activities } from '../backend'
 // If you need UUID, install and import it:
@@ -47,12 +47,16 @@ describe('Feature Tests', () => {
     // - User + Post → UserPost
     // - Post + Comment → PostComment
     
+    // Activities are compiled by ActivityManager; spread its output into the
+    // controller declarations (drop these two lines when the app has no activities)
+    const activityManager = new ActivityManager(activities)
+    const activityOutput = activityManager.getOutput()
+
     controller = new Controller({
       system,
-      entities,
-      relations,       // Relations with auto-generated names
-      activities,      // Activities
-      interactions,    // Interactions
+      entities: [...entities, ...activityOutput.entities],
+      relations: [...relations, ...activityOutput.relations],  // Relations with auto-generated names
+      eventSources: [...interactions, ...activityOutput.eventSources],  // Interactions and custom EventSources
       dict: [],        // Global dictionaries (NOT computations)
       recordMutationSideEffects: []  // Side effects
     })
@@ -61,8 +65,9 @@ describe('Feature Tests', () => {
   })
 
   test('interaction test example', async () => {
-    // ✅ CORRECT: Use callInteraction
-    const result = await controller.callInteraction('CreateUser', {
+    // ✅ CORRECT: Dispatch the Interaction event source
+    const createUser = controller.findEventSourceByName('CreateUser')!
+    const result = await controller.dispatch(createUser, {
       user: { id: 'system', role: 'admin' },  // Must include user object
       payload: {
         username: 'testuser',
@@ -187,19 +192,20 @@ This contract is enforced by `tests/runtime/derivedDefinitionRetention.spec.ts` 
 #### 1. Controller APIs
 
 ```typescript
-// Call an interaction (the ONLY way to execute business logic)
-const result = await controller.callInteraction(interactionName: string, args: {
-  user: { id: string, [key: string]: any },  // Required user object
+// Dispatch an interaction (the user-facing entry for executing business logic)
+const result = await controller.dispatch(interactionInstance, {
+  user: { id: string, [key: string]: any },  // Required by InteractionEventArgs at the type level
   payload?: { [key: string]: any }           // Optional payload
 })
 
-// Call activity interaction (using the same callInteraction method)
-const result = await controller.callInteraction(
-  interactionName: string,
-  args: InteractionEventArgs,
-  activityName: string,    // Optional: for activity interactions
-  activityId: string       // Optional: for activity interactions
-)
+// Dispatch an activity interaction: ActivityManager registers each one under
+// "activityName:interactionName"; subsequent steps carry the activityId
+const es = controller.findEventSourceByName('ActivityName:interactionName')!
+const result = await controller.dispatch(es, {
+  user,
+  payload,
+  activityId,  // omit on the head interaction; read it from result.context!.activityId
+})
 ```
 
 #### 2. Storage APIs
@@ -207,7 +213,7 @@ const result = await controller.callInteraction(
 ⚠️ **WARNING: Storage APIs bypass ALL validation and business logic!**
 - Use `storage.create/update/delete` ONLY for test data setup
 - NEVER use them to test validation or business logic
-- ALL business logic tests must use `callInteraction`
+- ALL business logic tests must go through `controller.dispatch`
 
 🔴 **CRITICAL: Always specify attributeQuery when using find/findOne!**
 - Without `attributeQuery`, only the `id` field is returned
@@ -277,7 +283,7 @@ MatchExp.atom({ key: 'user.profile.city', value: ['=', 'Beijing'] })
 ```typescript
 test('should handle errors correctly', async () => {
   // ✅ CORRECT: Check error field in result
-  const result = await controller.callInteraction('SomeInteraction', {
+  const result = await controller.dispatch(SomeInteraction, {
     user: { id: 'user1' },
     payload: { invalid: 'data' }
   })
@@ -287,7 +293,7 @@ test('should handle errors correctly', async () => {
 
   // ❌ WRONG: interaqt doesn't throw exceptions
   // try {
-  //   await controller.callInteraction(...)
+  //   await controller.dispatch(...)
   // } catch (e) {
   //   // This won't work
   // }
@@ -300,15 +306,15 @@ Testing is a crucial component for ensuring the quality of interaqt applications
 
 ## ⚠️ CRITICAL: interaqt Testing Philosophy
 
-**In the interaqt framework, ALL data is derived from interaction events.** This fundamental principle changes how we approach testing:
+**In the interaqt framework, ALL data changes flow from EventSources dispatched through `Controller.dispatch`** (Interactions are the built-in, user-facing kind). This fundamental principle changes how we approach testing:
 
-1. **Focus on Interaction Testing**: Since all Entity and Relation data are created, modified, and deleted through Interactions, comprehensive Interaction testing naturally covers all data operations.
+1. **Focus on EventSource Testing**: Since all Entity and Relation data are created, modified, and deleted through dispatched EventSources, testing all declared EventSources covers all data operations.
 
-2. **No Separate Entity/Relation Tests**: You should NOT write separate unit tests for Entity CRUD operations or Relation creation/deletion. These are implementation details that are automatically tested when you test the Interactions that use them.
+2. **No Separate Entity/Relation Tests**: You should NOT write separate unit tests for Entity CRUD operations or Relation creation/deletion. These are implementation details that are automatically tested when you test the EventSources that use them.
 
-3. **Coverage Through Interactions**: If your test coverage is below 100% after testing all Interactions, it indicates:
-   - Missing Interaction definitions in your design
-   - Insufficient edge case testing for existing Interactions
+3. **Coverage Through EventSources**: If your test coverage is below 100% after testing all declared EventSources, it indicates:
+   - Missing EventSource definitions in your design
+   - Insufficient edge case testing for existing EventSources
    - Unused code that should be removed
 
 4. **Test What Matters**: Test the business logic and user scenarios through Interactions, not the framework mechanics.
@@ -317,7 +323,7 @@ Testing is a crucial component for ensuring the quality of interaqt applications
    - `storage.create()`, `storage.update()`, `storage.delete()` bypass ALL validation and business logic
    - Use them ONLY for test data setup (creating prerequisite records)
    - NEVER use them to test validation failures - they will always succeed!
-   - ALL business logic testing must go through `callInteraction()`
+   - ALL business logic testing must go through `controller.dispatch()`
 
 ## 12.1 Testing Reactive Computations
 
@@ -369,10 +375,7 @@ describe('Count Computation', () => {
       relations: [],
 
     
-      activities: [],
-
-    
-      interactions: [],
+      eventSources: [],
 
     
       dict: [totalUsersDict, activeUsersDict],
@@ -480,10 +483,7 @@ describe('Transform Computation', () => {
       relations: [],
 
     
-      activities: [],
-
-    
-      interactions: [],
+      eventSources: [],
 
     
       dict: [userStatsDict],
@@ -561,14 +561,13 @@ describe('User Interactions', () => {
       system,
       entities: [userEntity],
       relations: [],
-      activities: [],  // activities
-      interactions: [registerInteraction],  // interactions
+      eventSources: [registerInteraction],  // Interactions and custom EventSources
       dict: []
     });
     await controller.setup(true);
     
     // Execute registration interaction
-    const result = await controller.callInteraction(registerInteraction.name, {
+    const result = await controller.dispatch(registerInteraction, {
       user: { id: 'test-user' },  // Add user object
       payload: {
         userData: {
@@ -681,13 +680,13 @@ describe('Approval Process Activity', () => {
 > 
 > ```javascript
 > // ✅ Correct testing approach
-> const result = await controller.callInteraction('SomeInteraction', {...});
+> const result = await controller.dispatch(SomeInteraction, {...});
 > expect(result.error).toBeTruthy();
 > expect(result.error.message).toContain('permission denied');
 > 
 > // ❌ Wrong testing approach
 > try {
->   await controller.callInteraction('SomeInteraction', {...});
+>   await controller.dispatch(SomeInteraction, {...});
 >   fail('Should have thrown error');
 > } catch (e) {
 >   // This code will never execute as the framework doesn't throw exceptions
@@ -715,8 +714,7 @@ describe('Permission Testing', () => {
       system,
       entities,
       relations,
-      activities,
-      interactions,
+      eventSources: interactions,  // activities go through ActivityManager (see 12.2)
       dict: []
     });
     
@@ -740,7 +738,7 @@ describe('Basic Role Permission Testing', () => {
     });
 
     // Test that admin can perform privileged operations
-    const result = await controller.callInteraction('CreateDormitory', {
+    const result = await controller.dispatch(CreateDormitory, {
       user: admin,
       payload: {
         name: 'Admin Created Dormitory',
@@ -771,7 +769,7 @@ describe('Basic Role Permission Testing', () => {
     });
 
     // Regular student should not be able to create dormitory
-    const result = await controller.callInteraction('CreateDormitory', {
+    const result = await controller.dispatch(CreateDormitory, {
       user: student,
       payload: {
         name: 'Student Attempted Dormitory',
@@ -833,7 +831,7 @@ describe('Complex Permission Logic Testing', () => {
     });
 
     // Test that leader can record scores
-    const leaderResult = await controller.callInteraction('RecordScore', {
+    const leaderResult = await controller.dispatch(RecordScore, {
       user: leader,
       payload: {
         memberId: normalMember,
@@ -845,7 +843,7 @@ describe('Complex Permission Logic Testing', () => {
     expect(leaderResult.error).toBeUndefined();
 
     // Test that regular member cannot record scores
-    const memberResult = await controller.callInteraction('RecordScore', {
+    const memberResult = await controller.dispatch(RecordScore, {
       user: member,
       payload: {
         memberId: leaderMember,
@@ -912,7 +910,7 @@ describe('Payload-level Permission Testing', () => {
     });
 
     // Leader 1 should be able to operate on own dormitory members
-    const validResult = await controller.callInteraction('RecordScore', {
+    const validResult = await controller.dispatch(RecordScore, {
       user: leader1,
       payload: {
         memberId: member1,
@@ -924,7 +922,7 @@ describe('Payload-level Permission Testing', () => {
     expect(validResult.error).toBeUndefined();
 
     // Leader 1 should not be able to operate on other dormitory members
-    const invalidResult = await controller.callInteraction('RecordScore', {
+    const invalidResult = await controller.dispatch(RecordScore, {
       user: leader1,
       payload: {
         memberId: member2,
@@ -976,7 +974,7 @@ describe('Permission Edge Case Testing', () => {
     }
 
     // Try to apply to full dormitory
-    const result = await controller.callInteraction('ApplyForDormitory', {
+    const result = await controller.dispatch(ApplyForDormitory, {
       user: student,
       payload: {
         dormitoryId: fullDormitory,
@@ -1021,7 +1019,7 @@ describe('Permission Edge Case Testing', () => {
     });
 
     // Try to apply to dormitory2
-    const result = await controller.callInteraction('ApplyForDormitory', {
+    const result = await controller.dispatch(ApplyForDormitory, {
       user: student,
       payload: {
         dormitoryId: dormitory2,
@@ -1082,7 +1080,7 @@ describe('State Machine Permission Testing', () => {
     });
 
     // Execute ApproveKickRequest interaction, trigger state machine
-    const result = await controller.callInteraction('ApproveKickRequest', {
+    const result = await controller.dispatch(ApproveKickRequest, {
       user: admin,
       payload: {
         kickRequestId: kickRequest,
@@ -1116,7 +1114,7 @@ describe('Permission Debugging and Error Handling', () => {
       email: 'student@example.com'
     });
 
-    const result = await controller.callInteraction('CreateDormitory', {
+    const result = await controller.dispatch(CreateDormitory, {
       user: student,
       payload: {
         name: 'Test Dormitory',
@@ -1139,7 +1137,7 @@ describe('Permission Debugging and Error Handling', () => {
     });
 
     // Pass invalid ID to trigger query error
-    const result = await controller.callInteraction('RecordScore', {
+    const result = await controller.dispatch(RecordScore, {
       user: student,
       payload: {
         memberId: { id: 'invalid-member-id' },
@@ -1193,4 +1191,4 @@ describe('User Management Interactions', () => {
 });
 ```
 
-Testing is a crucial aspect of building reliable interaqt applications. By focusing on comprehensive Interaction testing, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Remember: in interaqt, all data flows from Interactions, so testing Interactions thoroughly is sufficient to achieve complete test coverage. Skip entity and relation unit tests - they're automatically covered when you test the Interactions that use them. Proper test organization, edge case coverage, and permission testing make tests maintainable and effective for long-term development.
+Testing is a crucial aspect of building reliable interaqt applications. By focusing on comprehensive EventSource testing, developers can ensure their reactive applications work correctly and maintain quality as they evolve. Remember: in interaqt, all data changes flow from EventSources dispatched through `Controller.dispatch`, so thorough testing of all declared EventSources yields complete test coverage. Skip entity and relation unit tests - they're automatically covered when you test the EventSources that use them. Proper test organization, edge case coverage, and permission testing make tests maintainable and effective for long-term development.

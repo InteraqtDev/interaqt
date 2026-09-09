@@ -222,7 +222,7 @@ const SomeInteraction = Interaction.create({
 });
 
 // User context provided when calling
-await controller.callInteraction('SomeInteraction', {
+await controller.dispatch(SomeInteraction, {
   user: { id: 'user123', name: 'John' },  // Passed here
   payload: { /* ... */ }
 });
@@ -375,7 +375,7 @@ Always pair `ScopedSequence` with a `UniqueConstraint` over the scope fields plu
 // ❌ WRONG: interaqt doesn't throw exceptions
 test('should fail validation', async () => {
   try {
-    await controller.callInteraction('SomeInteraction', {...});
+    await controller.dispatch(SomeInteraction, {...});
     fail('Should have thrown error');
   } catch (e) {
     // This code will never execute!
@@ -384,7 +384,7 @@ test('should fail validation', async () => {
 
 // ✅ CORRECT: Check error field in result
 test('should fail validation', async () => {
-  const result = await controller.callInteraction('SomeInteraction', {...});
+  const result = await controller.dispatch(SomeInteraction, {...});
   expect(result.error).toBeTruthy();
   expect(result.error.message).toContain('validation failed');
 });
@@ -405,7 +405,7 @@ test('should fail with invalid data', async () => {
 
 // ✅ CORRECT: Test validation through Interactions
 test('should fail with invalid data', async () => {
-  const result = await controller.callInteraction('CreateStyle', {
+  const result = await controller.dispatch(CreateStyle, {
     user: testUser,
     payload: {
       label: '',    // Empty label
@@ -447,7 +447,7 @@ test('should create User entity', async () => {
 
 // ✅ CORRECT: Test through Interactions
 test('should create user through interaction', async () => {
-  const result = await controller.callInteraction('CreateUser', {
+  const result = await controller.dispatch(CreateUser, {
     user: adminUser,
     payload: {
       name: 'John',
@@ -505,7 +505,7 @@ const UserLogin = Interaction.create({
 // ✅ CORRECT: Authentication is external
 // User identity should be provided by external system (JWT, Session, etc.)
 // When calling interactions, user is already authenticated:
-await controller.callInteraction('CreatePost', {
+await controller.dispatch(CreatePost, {
   user: authenticatedUser,  // Pre-authenticated by external system
   payload: { /* ... */ }
 });
@@ -757,7 +757,7 @@ Do not catch unique-constraint errors and treat them as "already taken". Do not 
 6. **Always use object references in StateMachine, not strings**
 7. **Top-level dispatch: check `result.error` for stage A (facts); obligation-sensitive callers also use `isPostCommitPhaseComplete`. BT default abort: dispatch throws — use try/catch only there**
 8. **storage.create() bypasses ALL validation - use only for test setup**
-9. **ALL business logic testing must use `controller.dispatch` (or callInteraction)**
+9. **ALL business logic testing must use `controller.dispatch`**
 10. **Never test Entity/Relation directly - test through Interactions**
 11. **Logical `id` is the record identity — optional on create, immutable on update; type must match the driver. Natural keys use `Entity.identity`.**
 12. **Prefer returned `storage.create` id or a pregenerated logical id for Relation / computeTarget; `clientId` is only an optional secondary key**

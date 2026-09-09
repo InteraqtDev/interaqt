@@ -1612,8 +1612,7 @@ describe('{IntegrationName} Integration', () => {
       {
         entities: [/* test entities */],
         relations: [],
-        activities: [],
-        interactions: [],
+        eventSources: [],
         dict: []
       },
       {}

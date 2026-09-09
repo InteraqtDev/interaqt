@@ -53,6 +53,7 @@ Combine conditions with `Conditions.create({ content: BoolExp.atom(a).and(b).or(
 ## Contract
 
 - Conditions run inside the dispatch transaction, before the event record is persisted.
+- `Controller.dispatch` has no framework-level user gate: a Condition reading `event.user` is what rejects an anonymous call (`05-interactions.md`; no-subject entries and their recipe in `21-system-event-sources.md`).
 - **Result algebra (fail-closed)**:
   - `true` — allow
   - `false` — reject with default code `CONDITION_REJECTED` (boolean polarity; inverted by BoolExp `not`)

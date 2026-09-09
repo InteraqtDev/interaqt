@@ -83,7 +83,7 @@ const SendMessage = Interaction.create({
 });
 
 // Usage:
-await controller.callInteraction('SendMessage', {
+await controller.dispatch(SendMessage, {
   user: currentUser,
   payload: {
     message: 'Hello World',
@@ -168,7 +168,7 @@ const DeleteComment = Interaction.create({
 });
 
 // Usage:
-await controller.callInteraction('DeleteComment', {
+await controller.dispatch(DeleteComment, {
   user: currentUser,
   payload: {
     comment: { id: 'comment-123' }  // Only id is required
@@ -197,7 +197,7 @@ const CreateProduct = Interaction.create({
 });
 
 // Usage:
-await controller.callInteraction('CreateProduct', {
+await controller.dispatch(CreateProduct, {
   user: currentUser,
   payload: {
     product: {
@@ -241,7 +241,7 @@ const TagPosts = Interaction.create({
 });
 
 // Usage:
-await controller.callInteraction('TagPosts', {
+await controller.dispatch(TagPosts, {
   user: currentUser,
   payload: {
     posts: [
@@ -293,7 +293,7 @@ const SharePost = Interaction.create({
 });
 
 // This will succeed:
-await controller.callInteraction('SharePost', {
+await controller.dispatch(SharePost, {
   user: currentUser,
   payload: {
     post: { id: 'published-post-id' }
@@ -301,7 +301,7 @@ await controller.callInteraction('SharePost', {
 });
 
 // This will fail validation:
-await controller.callInteraction('SharePost', {
+await controller.dispatch(SharePost, {
   user: currentUser,
   payload: {
     post: { id: 'draft-post-id' }  // Assuming this post has status: 'draft'
@@ -393,7 +393,7 @@ const InviteUsers = Interaction.create({
 });
 
 // This will fail if ANY user in the array is not verified
-await controller.callInteraction('InviteUsers', {
+await controller.dispatch(InviteUsers, {
   user: currentUser,
   payload: {
     users: [
@@ -569,7 +569,7 @@ const EditComment = Interaction.create({
 
 ```javascript
 // In your application code
-const result = await controller.callInteraction('SharePost', {
+const result = await controller.dispatch(SharePost, {
   user: currentUser,
   payload: { post: { id: postId } }
 });

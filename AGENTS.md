@@ -119,7 +119,7 @@ const Friendship = Relation.create({
 
 ### Interaction
 
-User-triggered events — the **only source** of data changes in the system.
+User-triggered events — the built-in, user-facing EventSource. All data changes enter the system through EventSources dispatched via `Controller.dispatch`.
 
 ```typescript
 const CreatePost = Interaction.create({

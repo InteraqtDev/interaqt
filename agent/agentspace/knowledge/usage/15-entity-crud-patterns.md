@@ -1124,7 +1124,7 @@ const UserArticleRelation = Relation.create({
 
 // === Usage Examples ===
 // 1. Create article
-await controller.callInteraction('CreateArticle', {
+await controller.dispatch(CreateArticle, {
   user: { id: 'user123' },
   payload: {
     title: 'My First Article',
@@ -1134,7 +1134,7 @@ await controller.callInteraction('CreateArticle', {
 });
 
 // 2. Publish article
-await controller.callInteraction('PublishArticle', {
+await controller.dispatch(PublishArticle, {
   user: { id: 'user123' },
   payload: {
     articleId: 'article456'
@@ -1148,7 +1148,7 @@ const activeArticles = await controller.find('ActiveArticle');
 const publishedArticles = await controller.find('PublishedArticle');
 
 // 5. Delete article (soft delete)
-await controller.callInteraction('DeleteArticle', {
+await controller.dispatch(DeleteArticle, {
   user: { id: 'user123' },
   payload: {
     articleId: 'article456'

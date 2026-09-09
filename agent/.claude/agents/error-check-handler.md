@@ -49,7 +49,7 @@ In `docs/{module}.data-design.json`, integration event entities MUST have:
 - ❌ **NOT in creates array**: Don't include in interaction's data.creates
 - ✅ **IS documented in**: `{module}.integration.json` (Task 1.3)
 - ✅ **IS designed as**: Event entity in `{module}.data-concepts.json` (Task 1.4)
-- ✅ **IS tested with**: `storage.create()`, not `callInteraction()`
+- ✅ **IS tested with**: `storage.create()`, not `controller.dispatch()`
 
 ### Why This Matters
 - **Conceptual clarity**: Separates user actions from external system events
@@ -257,8 +257,8 @@ Before starting any checks, create a comprehensive checklist document in `docs/{
 - [ ] ERROR_CI_009: `_owner` properties not set in owner's creation logic
 - [ ] ERROR_CI_010: **CRITICAL**: Computation directly uses `controller.storage.create/update/delete` for data mutations
 - [ ] ERROR_CI_011: Relation queried using hardcoded name instead of `.name` property
-- [ ] ERROR_CI_012: Integration Event Entity tested with `callInteraction()` instead of `storage.create()`
-- [ ] ERROR_CI_013: InteractionEventEntity tested with `storage.create()` instead of `callInteraction()`
+- [ ] ERROR_CI_012: Integration Event Entity tested with `controller.dispatch()` instead of `storage.create()`
+- [ ] ERROR_CI_013: InteractionEventEntity tested with `storage.create()` instead of `controller.dispatch()`
 - [ ] ERROR_CI_014: Test missing `attributeQuery` parameter in storage queries
 - [ ] ERROR_CI_015: Test not checking all `ownerProperties` after entity creation
 - [ ] ERROR_CI_016: Test not verifying all `createdWithRelations` were created
@@ -284,7 +284,7 @@ Before starting any checks, create a comprehensive checklist document in `docs/{
 - [ ] ERROR_PR_005: Conditions added to wrong section of file (should be at end after exports)
 - [ ] ERROR_PR_006: Missing imports (Condition, Conditions, BoolExp)
 - [ ] ERROR_PR_007: Relation queried in condition using hardcoded name instead of `.name` property
-- [ ] ERROR_PR_008: Test not explicitly checking `result.error` after `callInteraction()`
+- [ ] ERROR_PR_008: Test not explicitly checking `result.error` after `controller.dispatch()`
 - [ ] ERROR_PR_009: Expected success case missing `expect(result.error).toBeUndefined()`
 - [ ] ERROR_PR_010: Expected failure case missing `expect(result.error).toBeDefined()`
 - [ ] ERROR_PR_011: Tests cheating with `.skip()`, `.todo()`, or fake data
@@ -376,11 +376,11 @@ grep -A 20 "\"name\".*\".*Event\"" docs/{module}.data-design.json | grep -E "isI
 grep "storage.find\\('[A-Z].*Relation'" tests/{module}.business.test.ts
 
 # Check for missing error checks in permission tests (ERROR_PR_008)
-grep -A 5 "callInteraction" tests/{module}.permission.test.ts | grep -v "result.error"
+grep -A 5 "controller.dispatch" tests/{module}.permission.test.ts | grep -v "result.error"
 
-# Check for integration event tested with callInteraction (ERROR_CI_012)
-# Integration events should use storage.create(), not callInteraction()
-grep -B 5 "Event" tests/{module}.business.test.ts | grep "callInteraction"
+# Check for integration event tested with controller.dispatch (ERROR_CI_012)
+# Integration events should use storage.create(), not controller.dispatch()
+grep -B 5 "Event" tests/{module}.business.test.ts | grep "controller.dispatch"
 
 # Check for module boundary violation - User entity (ERROR_DC_016, ERROR_DC_017)
 # Non-basic modules should NOT define User entity
@@ -878,10 +878,10 @@ grep -B 2 -A 5 '"UserGiftProfile"\|"UserPreferences"\|"UserStats"' requirements/
 }
 ```
 
-**❌ WRONG: Testing integration event with callInteraction**
+**❌ WRONG: Testing integration event with controller.dispatch**
 ```typescript
 // In test file - WRONG!
-const result = await controller.callInteraction('CreateTTSEvent', {
+const result = await controller.dispatch(CreateTTSEvent, {
   user: testUser,
   payload: { voiceUrl: 'test.mp3' }
 })
@@ -1039,7 +1039,7 @@ const GetMyDonations = Interaction.create({
 
 **❌ WRONG:**
 ```typescript
-const result = await controller.callInteraction('CreateDormitory', {
+const result = await controller.dispatch(CreateDormitory, {
   user: nonAdmin,
   payload: { name: 'Test' }
 })
@@ -1049,7 +1049,7 @@ expect(result.data).toBeDefined()
 
 **✅ CORRECT:**
 ```typescript
-const result = await controller.callInteraction('CreateDormitory', {
+const result = await controller.dispatch(CreateDormitory, {
   user: nonAdmin,
   payload: { name: 'Test' }
 })

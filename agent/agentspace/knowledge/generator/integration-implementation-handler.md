@@ -30,8 +30,7 @@ export type IIntegration = {
 export type IIntegrationConstructorArgs = {
     entities: EntityInstance[],
     relations: RelationInstance[],
-    activities: ActivityInstance[],
-    interactions: InteractionInstance[],
+    eventSources: EventSourceInstance[],  // Interactions and custom EventSources
     dict: DictionaryInstance[]
 }
 

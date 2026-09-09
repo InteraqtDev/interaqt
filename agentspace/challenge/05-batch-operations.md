@@ -170,7 +170,7 @@ const SYSTEM_USER = { id: 'system', role: 'admin' };
 
 // 批量创建 Interaction 事件
 for (const product of products) {
-  await controller.callInteraction('ImportProduct', {
+  await controller.dispatch(ImportProduct, {
     user: SYSTEM_USER,
     payload: { productData: product }
   });
