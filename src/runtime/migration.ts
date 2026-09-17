@@ -3656,9 +3656,9 @@ class MigrationScheduler {
             throw new UnrebuildableComputationError(`Migration requires full compute support for ${dataContextPath(computation.dataContext)}`);
         }
 
-        if (item.rebuildState && !item.rebuildOutput) {
+        if (item.rebuildState) {
             await this.rebuildStateDefaults(computation);
-            continue;
+            if (!item.rebuildOutput) continue;
         }
 
         // r34-A5：迁移重建是一次「绕过 task 代理的产出纪元」（与 live 的同步/resolved 直出

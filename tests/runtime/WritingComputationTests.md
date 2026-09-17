@@ -4,6 +4,10 @@
 
 ## 测试结构概述
 
+### 迁移后的状态与后续事件（2026-09-17）
+
+迁移矩阵必须分别决定 `rebuildState` 和 `rebuildOutput`，涵盖状态与输出同时重建、仅状态、仅输出和不重建。对 `RecordBoundState` 与 `GlobalBoundState` 都应检查内部状态，并在迁移后执行新的 Interaction、读取实际输出；仅断言迁移处理器返回值不能证明状态机仍能转换。状态名改变与保持不变必须有对照。`migrationStateRebuild.spec.ts` 覆盖状态与输出同时重建及仅输出的 property/global 生命周期；`migration.spec.ts` 保留 state-only 和 unchanged 的现有覆盖。
+
 编写 Computation 的测试通常遵循以下结构：
 
 1. **设置测试环境** - 定义实体、关系和计算属性
