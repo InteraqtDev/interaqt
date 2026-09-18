@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.11.0](https://github.com/InteraqtDev/interaqt/compare/v4.10.1...v4.11.0) (2026-09-18)
+
+### Features
+
+* **migration:** map StateMachine persisted currentState when the state graph changes ([21cebbd](https://github.com/InteraqtDev/interaqt/commit/21cebbdadb15a8a6b01ba4dea8cbe3a86bb6e542))
+
 ## [Unreleased]
 
 ## [4.10.1](https://github.com/InteraqtDev/interaqt/compare/v4.10.0...v4.10.1) (2026-09-05)
