@@ -144,6 +144,7 @@ Remember: **Stop thinking "how to do", start thinking "what is"**!
 20. [Common Anti-Patterns](./19-common-anti-patterns.md) - Mistakes to avoid
 21. [PostgreSQL Concurrency Migration](./20-postgresql-concurrency-migration.md) - Retry, async, PostgreSQL ids, and ScopedSequence migration notes
 22. [System Event Sources](./21-system-event-sources.md) - Entries without a user: registration, verification codes, partner provisioning
+23. [StateMachine State Graph Migration](./22-state-machine-state-graph-migration.md) - State renames under migration: the `state-graph-mapping` decision, legality invariant, and repair paths
 
 ## 📞 Need Help?
 
