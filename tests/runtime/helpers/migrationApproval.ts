@@ -11,6 +11,8 @@ export async function approveGeneratedMigrationDiff(controller: Controller, opti
     eventHandlers?: Record<string, string>;
     asyncHandlers?: Record<string, string>;
     computationDecisions?: Record<string, "changed" | "unchanged" | "state-only" | "unrebuildable">;
+    /** dataContext -> 旧状态名 -> 新状态名（或 null = 映射到新初始态）。缺省时按 requirement 给出默认推荐映射（改名按 added 名一一配对，删除映射 null）。 */
+    stateMappings?: Record<string, Record<string, string | null>>;
 } = {}) {
     const diff = await controller.generateMigrationDiff({
         includeFunctionText: options.includeFunctionText ?? true,
@@ -33,6 +35,22 @@ export async function approveGeneratedMigrationDiff(controller: Controller, opti
                     kind: "event-rebuild-handler" as const,
                     dataContext: requirement.dataContext,
                     handlerRef: options.eventHandlers?.[requirement.dataContext] || requirement.dataContext,
+                    reason: "approved by migration test",
+                };
+            }
+            if (requirement.kind === "state-graph-mapping") {
+                const mapping = options.stateMappings?.[requirement.dataContext] || Object.fromEntries(
+                    // 默认推荐：removed 旧名按 added 新名排序一一配对（典型的重命名形态），
+                    // 多出的 removed（纯删除）映射 null（降级到新初始态）。
+                    requirement.removedStateNames.map((removed, index) => [
+                        removed,
+                        index < requirement.addedStateNames.length ? requirement.addedStateNames[index] : null,
+                    ]),
+                );
+                return {
+                    kind: "state-graph-mapping" as const,
+                    dataContext: requirement.dataContext,
+                    mapping,
                     reason: "approved by migration test",
                 };
             }

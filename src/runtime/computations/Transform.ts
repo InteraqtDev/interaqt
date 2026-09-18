@@ -18,6 +18,13 @@ import { validateMutationEventPatternKeys, validateMutationEventPatternSurface }
 export class RecordsTransformHandle implements DataBasedComputation {
     static computationType = Transform
     static contextType = ['entity', 'relation'] as const
+    /**
+     * 状态所有权声明（迁移期 rebuildStateDefaults 的路由依据）：本计算的全部 bound state
+     * （sourceRecordId / transformIndex）由输出重建路径拥有——compute 每次重写全部行，逐行
+     * 重置为默认值会让全部既有行坍缩到同一键（'' : 0），在唯一索引方言上崩溃、在无索引
+     * 方言上产生重复行与空来源指针。迁移不得对这些状态做「重置为默认值」。
+     */
+    static ownsStateOnRebuild = true
     transformCallback: (this: ComputationActionContext, item: any) => any
     /** Official callback `this`: controller + atomic (same reference as storage.atomic). */
     actionContext: ComputationActionContext

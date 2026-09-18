@@ -137,6 +137,13 @@ function requireAggregationRecord(args: AggregationArgs, dataContext: DataContex
  * Global（records 源）聚合模板。
  */
 export abstract class GlobalRecordsAggregationHandle<V extends AggregationItemValue, TResult, TArgs extends AggregationArgs = AggregationArgs> implements DataBasedComputation {
+    /**
+     * 状态所有权声明（迁移期 rebuildStateDefaults 的路由依据）：聚合的全部 bound state
+     * （聚合值 + 逐项贡献）由输出路径拥有——compute / persistFullResult 全量重算时重写它们。
+     * 先重置再重算至多是冗余；state-only 计划（只重置不重算）对聚合从来不是正确动作，
+     * 所有权路由后跳过重置（旧行为依赖「下次全量重算纠正」的巧合）。
+     */
+    static ownsStateOnRebuild = true
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 状态形状由子类 createState 决定
     state!: any
     useLastValue: boolean = false
@@ -264,6 +271,8 @@ export abstract class GlobalRecordsAggregationHandle<V extends AggregationItemVa
  * relatedAttribute 定位到关系/关联实体上的 create/delete/update。
  */
 export abstract class PropertyRelationAggregationHandle<V extends AggregationItemValue, TResult, TArgs extends AggregationArgs = AggregationArgs> implements DataBasedComputation {
+    /** 状态所有权声明，语义同 GlobalRecordsAggregationHandle.ownsStateOnRebuild。 */
+    static ownsStateOnRebuild = true
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     state!: any
     useLastValue: boolean = false

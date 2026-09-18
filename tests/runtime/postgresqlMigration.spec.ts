@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  Action,
   Any,
   Average,
   Controller,
@@ -9,10 +10,14 @@ import {
   Entity,
   Every,
   Expression,
+  Interaction,
+  InteractionEventEntity,
   KlassByName,
   MatchExp,
   MonoSystem,
   NonNullConstraint,
+  Payload,
+  PayloadItem,
   Property,
   RealTime,
   Relation,
@@ -38,6 +43,7 @@ const dbOptions = {
 
 async function approveGeneratedMigrationDiff(controller: Controller, options: {
   computationDecisions?: Record<string, "changed" | "unchanged" | "state-only" | "unrebuildable">;
+  stateMappings?: Record<string, Record<string, string | null>>;
 } = {}) {
   const diff = await controller.generateMigrationDiff({ includeDestructiveScope: true });
   return {
@@ -98,6 +104,19 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
         if (requirement.kind === "scoped-sequence-seed" || requirement.kind === "scoped-sequence-no-seed") {
           return {
             ...requirement,
+            reason: "approved by PostgreSQL migration test",
+          };
+        }
+        if (requirement.kind === "state-graph-mapping") {
+          return {
+            kind: "state-graph-mapping" as const,
+            dataContext: requirement.dataContext,
+            mapping: options.stateMappings?.[requirement.dataContext] || Object.fromEntries(
+              requirement.removedStateNames.map((removed, index) => [
+                removed,
+                index < requirement.addedStateNames.length ? requirement.addedStateNames[index] : null,
+              ]),
+            ),
             reason: "approved by PostgreSQL migration test",
           };
         }
@@ -636,6 +655,236 @@ describeIfPostgres("PostgreSQL migration integration", () => {
     const columnNames = columns.map(column => column.column_name);
     expect(columnNames).toContain(dryRunPlan.schemaPlan!.preRecomputeDDL[0].columnName);
     expect(columnNames).toContain(dryRunPlan.schemaPlan!.preRecomputeDDL[1].columnName);
+    await systemV2.destroy();
+  });
+});
+
+// M-05（migration-state-machine-state-remap）：真实 PostgreSQL 上的状态映射对照。
+// property 级 StateMachine `pending → approved → archived`，转移由 Approve/Archive 交互触发；
+// 非初始改名（approved → accepted，机制 B 形态：rebuildState=false，映射由批准决策触发）与
+// 初始改名（pending → queued，机制 A 形态：rebuildState && rebuildOutput 双真）各迁移一次，
+// 迁移后执行依赖该状态的 Interaction，断言输出值与持久化 currentState 双面。
+describeIfPostgres("PostgreSQL state graph mapping migration", () => {
+  // 迁移后读取持久化 currentState 的唯一可信途径是 bound state 列本身（输出值可能被
+  // event rebuild handler 改写）；列名由 Scheduler.getBoundStateName 固定派生。
+  const STATUS_COLUMN = "_PgStateMapTicket_status_bound_currentState";
+  // event rebuild handler 的合约是 ({ controller, dataContext, record })，record 的
+  // bound-state 列在输出重建前已被映射施加改写为新名（设计 §3.3 顺序）。
+  const statusFromMappedState = async ({ record }: any) => record[STATUS_COLUMN] ?? record.status;
+
+  function buildStateMapModel(stateNames: string[], initialStateName: string) {
+    const node = (name: string) => new StateNode({ name }, { uuid: `pg-state-map-node-${name}` });
+    const machine = new StateMachine({
+      states: stateNames.map(name => node(name)),
+      transfers: [
+        new StateTransfer({
+          trigger: { recordName: InteractionEventEntity.name, type: "create", record: { interactionName: "PgStateMapApproveTicket" } },
+          current: node(stateNames[0]),
+          next: node(stateNames[1]),
+          computeTarget: (event: any) => ({ id: event.record.payload.ticketId }),
+        }, { uuid: "pg-state-map-transfer-approve" }),
+        new StateTransfer({
+          trigger: { recordName: InteractionEventEntity.name, type: "create", record: { interactionName: "PgStateMapArchiveTicket" } },
+          current: node(stateNames[1]),
+          next: node(stateNames[2]),
+          computeTarget: (event: any) => ({ id: event.record.payload.ticketId }),
+        }, { uuid: "pg-state-map-transfer-archive" }),
+      ],
+      initialState: node(initialStateName),
+    }, { uuid: "pg-state-map-state-machine" });
+    const Ticket = new Entity({
+      name: "PgStateMapTicket",
+      properties: [
+        new Property({ name: "title", type: "string" }, { uuid: "pg-state-map-ticket-title" }),
+        new Property({ name: "status", type: "string", computation: machine }, { uuid: "pg-state-map-ticket-status" }),
+      ],
+    }, { uuid: "pg-state-map-ticket" });
+    return { Ticket };
+  }
+
+  // Interaction 必须用静态工厂 Interaction.create：只有它注入 _Interaction_ event entity，
+  // new 出的实例不会注册进 storage schema，StateMachine 的 trigger 监听会因未知名被拒绝。
+  function buildStateMapInteractions() {
+    const ticketPayload = () => Payload.create({
+      items: [PayloadItem.create({ name: "ticketId", type: "string", required: true })],
+    });
+    return {
+      approve: Interaction.create({ name: "PgStateMapApproveTicket", action: Action.create({ name: "PgStateMapApproveTicket" }), payload: ticketPayload() }),
+      archive: Interaction.create({ name: "PgStateMapArchiveTicket", action: Action.create({ name: "PgStateMapArchiveTicket" }), payload: ticketPayload() }),
+    };
+  }
+
+  async function setupStateMapV1(database: string) {
+    const { Ticket } = buildStateMapModel(["pending", "approved", "archived"], "pending");
+    const interactions = buildStateMapInteractions();
+    const system = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    system.conceptClass = KlassByName;
+    const controller = new Controller({
+      system,
+      entities: [Ticket],
+      relations: [],
+      eventSources: [interactions.approve, interactions.archive],
+    });
+    await controller.setup(true);
+    return { system, controller, interactions };
+  }
+
+  async function readStateMapTicket(system: MonoSystem, ticketId: unknown) {
+    return system.storage.findOne("PgStateMapTicket", MatchExp.atom({ key: "id", value: ["=", ticketId] }), undefined, ["*", STATUS_COLUMN]);
+  }
+
+  test("non-initial state rename maps persisted currentState on PostgreSQL and the next interaction works", async () => {
+    const database = `${process.env.INTERAQT_POSTGRES_DATABASE!}_state_map_b`;
+    const { system, controller, interactions } = await setupStateMapV1(database);
+    const user = { id: "pg-state-map-user" };
+    const pendingTicket = await system.storage.create("PgStateMapTicket", { title: "stays-pending" });
+    const approvedTicket = await system.storage.create("PgStateMapTicket", { title: "was-approved" });
+    await controller.dispatch(interactions.approve, { user, payload: { ticketId: String(approvedTicket.id) } });
+    expect((await readStateMapTicket(system, approvedTicket.id))[STATUS_COLUMN]).toBe("approved");
+    await system.destroy();
+
+    // V2：approved -> accepted（非初始改名）。rebuildState=false——若映射只挂在 rebuildState
+    // 分支上，本场景会静默丢失（机制 B）。
+    const { Ticket: TicketV2 } = buildStateMapModel(["pending", "accepted", "archived"], "pending");
+    const interactionsV2 = buildStateMapInteractions();
+    const systemV2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    systemV2.conceptClass = KlassByName;
+    const controllerV2 = new Controller({
+      system: systemV2,
+      entities: [TicketV2],
+      relations: [],
+      eventSources: [interactionsV2.approve, interactionsV2.archive],
+    });
+    const diff = await controllerV2.generateMigrationDiff();
+    expect(diff.requiredDecisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "state-graph-mapping",
+        dataContext: "property:PgStateMapTicket.status",
+        removedStateNames: ["approved"],
+        addedStateNames: ["accepted"],
+      }),
+    ]));
+    const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+      stateMappings: { "property:PgStateMapTicket.status": { approved: "accepted" } },
+    });
+    await controllerV2.migrate({
+      approvedDiff,
+      handlers: { eventRebuild: { "property:PgStateMapTicket.status": statusFromMappedState } },
+    });
+
+    // 迁移后：输出值与持久化 currentState 都在新图名下；未转移记录不受影响。
+    const migratedApproved = await readStateMapTicket(systemV2, approvedTicket.id);
+    expect(migratedApproved[STATUS_COLUMN]).toBe("accepted");
+    expect(migratedApproved.status).toBe("accepted");
+    const migratedPending = await readStateMapTicket(systemV2, pendingTicket.id);
+    expect(migratedPending[STATUS_COLUMN]).toBe("pending");
+
+    // 迁移后的下一次交互必须有效：accepted --archive--> archived。
+    const dispatchResult = await controllerV2.dispatch(interactionsV2.archive, { user, payload: { ticketId: String(approvedTicket.id) } });
+    expect(dispatchResult.error).toBeUndefined();
+    const afterArchive = await readStateMapTicket(systemV2, approvedTicket.id);
+    expect(afterArchive[STATUS_COLUMN]).toBe("archived");
+    expect(afterArchive.status).toBe("archived");
+    await systemV2.destroy();
+  });
+
+  test("initial state rename maps persisted currentState on PostgreSQL and the next interaction works", async () => {
+    const database = `${process.env.INTERAQT_POSTGRES_DATABASE!}_state_map_a`;
+    const { system, controller, interactions } = await setupStateMapV1(database);
+    const user = { id: "pg-state-map-user" };
+    const pendingTicket = await system.storage.create("PgStateMapTicket", { title: "stays-pending" });
+    const approvedTicket = await system.storage.create("PgStateMapTicket", { title: "was-approved" });
+    await controller.dispatch(interactions.approve, { user, payload: { ticketId: String(approvedTicket.id) } });
+    await system.destroy();
+
+    // V2：pending -> queued（初始态改名）。stateSignature 变化使 rebuildState=rebuildOutput=true
+    // 同时为真——机制 A 的双真组合此前会跳过状态重建。
+    const { Ticket: TicketV2 } = buildStateMapModel(["queued", "approved", "archived"], "queued");
+    const interactionsV2 = buildStateMapInteractions();
+    const systemV2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    systemV2.conceptClass = KlassByName;
+    const controllerV2 = new Controller({
+      system: systemV2,
+      entities: [TicketV2],
+      relations: [],
+      eventSources: [interactionsV2.approve, interactionsV2.archive],
+    });
+    const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+      stateMappings: { "property:PgStateMapTicket.status": { pending: "queued" } },
+    });
+    await controllerV2.migrate({
+      approvedDiff,
+      handlers: { eventRebuild: { "property:PgStateMapTicket.status": statusFromMappedState } },
+    });
+
+    // 未转移过的记录：currentState 从 pending 映射到 queued（不是无差别重置）。
+    const migratedPending = await readStateMapTicket(systemV2, pendingTicket.id);
+    expect(migratedPending[STATUS_COLUMN]).toBe("queued");
+    expect(migratedPending.status).toBe("queued");
+    // 已转移到 approved 的记录：名字在新图中仍合法，不受映射影响。
+    const migratedApproved = await readStateMapTicket(systemV2, approvedTicket.id);
+    expect(migratedApproved[STATUS_COLUMN]).toBe("approved");
+
+    // 迁移后：queued --approve--> approved 必须生效（否则表现为 dispatch 成功但静默无效）。
+    const dispatchResult = await controllerV2.dispatch(interactionsV2.approve, { user, payload: { ticketId: String(pendingTicket.id) } });
+    expect(dispatchResult.error).toBeUndefined();
+    const afterApprove = await readStateMapTicket(systemV2, pendingTicket.id);
+    expect(afterApprove[STATUS_COLUMN]).toBe("approved");
+    expect(afterApprove.status).toBe("approved");
+    await systemV2.destroy();
+  });
+
+  // 审计轮 7 补强（验证缺口直接闭合，M-05）：映射施加与合法性扫描都写在真实连接的
+  // 迁移重算事务里；PGLite 上的 N2/N6 回滚断言不能作为真实 PG 事务语义的完成证明
+  // （AGENTS.md：驱动差异须以真实驱动复验）。本场景与 PGLite N2 同形：改名 + 正确映射
+  // + 另一条记录被腐蚀为图外名 ghost——不变量必须在事务内发现 ghost 并整体回滚，
+  // 已施加的映射写（approved→accepted）不得残留。
+  test("invariant failure on PostgreSQL rolls back the applied state mapping in-transaction", async () => {
+    const database = `${process.env.INTERAQT_POSTGRES_DATABASE!}_state_map_c`;
+    const { system, controller, interactions } = await setupStateMapV1(database);
+    const user = { id: "pg-state-map-user" };
+    const approvedTicket = await system.storage.create("PgStateMapTicket", { title: "was-approved" });
+    const ghostTicket = await system.storage.create("PgStateMapTicket", { title: "corrupted" });
+    await controller.dispatch(interactions.approve, { user, payload: { ticketId: String(approvedTicket.id) } });
+    // 探针 F 同法：直接把一条记录的持久化 currentState 写成图外名（迁移路径外的腐蚀）。
+    await system.storage.atomic.replace({ recordName: "PgStateMapTicket", id: ghostTicket.id as string, field: STATUS_COLUMN }, "ghost");
+    expect((await readStateMapTicket(system, ghostTicket.id))[STATUS_COLUMN]).toBe("ghost");
+    await system.destroy();
+
+    const { Ticket: TicketV2 } = buildStateMapModel(["pending", "accepted", "archived"], "pending");
+    const interactionsV2 = buildStateMapInteractions();
+    const systemV2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    systemV2.conceptClass = KlassByName;
+    const controllerV2 = new Controller({
+      system: systemV2,
+      entities: [TicketV2],
+      relations: [],
+      eventSources: [interactionsV2.approve, interactionsV2.archive],
+    });
+    const approvedDiff = await approveGeneratedMigrationDiff(controllerV2, {
+      stateMappings: { "property:PgStateMapTicket.status": { approved: "accepted" } },
+    });
+
+    let migrationError: unknown;
+    try {
+      await controllerV2.migrate({
+        approvedDiff,
+        handlers: { eventRebuild: { "property:PgStateMapTicket.status": statusFromMappedState } },
+      });
+    } catch (error) {
+      migrationError = error;
+    }
+    // 不用 expect().rejects：迁移意外成功的红灯形态下 vitest 会序列化整个 MigrationPlan，
+    // diff 输出足以 OOM（实现轮 5 实测同型问题，见 migrationStateMachineStateGraph N2 注释）。
+    expect(migrationError).toBeInstanceOf(Error);
+    expect(String(migrationError)).toMatch(/property:PgStateMapTicket\.status[\s\S]*ghost[\s\S]*pending, accepted, archived/);
+
+    // 真实 PG 事务回滚：approved 记录的映射写与 ghost 记录都保持迁移前事实；非法名
+    // 既没被静默放过，也没被 rebuildStateDefaults 洗白成合法初始名。
+    const rolledBackApproved = await readStateMapTicket(systemV2, approvedTicket.id);
+    expect(rolledBackApproved[STATUS_COLUMN]).toBe("approved");
+    const rolledBackGhost = await readStateMapTicket(systemV2, ghostTicket.id);
+    expect(rolledBackGhost[STATUS_COLUMN]).toBe("ghost");
     await systemV2.destroy();
   });
 });

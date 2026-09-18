@@ -50,6 +50,12 @@ function resolveNextRecomputeTime(
 export class GlobalRealTimeComputation implements DataBasedComputation {
     static computationType = RealTime
     static contextType = 'global' as const
+    /**
+     * 状态所有权声明（迁移期 rebuildStateDefaults 的路由依据）：lastRecomputeTime /
+     * nextRecomputeTime 由输出路径拥有——compute 每次以当前时间重写两者；重置为默认值
+     * null 会让时间驱动的重算调度丢失下一次触发点。
+     */
+    static ownsStateOnRebuild = true
     state!: ReturnType<typeof this.createState>
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>;
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>;
@@ -104,6 +110,8 @@ export class GlobalRealTimeComputation implements DataBasedComputation {
 export class PropertyRealTimeComputation implements DataBasedComputation {
     static computationType = RealTime
     static contextType = 'property' as const
+    /** 状态所有权声明，语义同 GlobalRealTimeComputation.ownsStateOnRebuild。 */
+    static ownsStateOnRebuild = true
     state!: ReturnType<typeof this.createState>
     incrementalCompute?: (...args: any[]) => Promise<ComputationResult|any>;
     incrementalPatchCompute?: (...args: any[]) => Promise<ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined>;

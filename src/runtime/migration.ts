@@ -80,6 +80,7 @@ export type MigrationChange =
             eventDepsChanged?: boolean;
             outputSignatureChanged?: boolean;
             stateSignatureChanged?: boolean;
+            stateGraphChanged?: boolean;
             functionTextChanged?: boolean;
             functionHash?: string;
             previousFunctionHash?: string;
@@ -174,6 +175,20 @@ export type MigrationDecisionRequirement =
         reason: string;
     }
     | {
+        // StateMachine 状态图节点集合/初始态在迁移中变化时，持久化 currentState 的旧名
+        // 必须被显式映射到新图合法名（null = 映射到新初始态，用于「状态被删除」的显式
+        // 降级决策）。removedStateNames 恰好是决策 mapping 必须覆盖的键集合；value 必须
+        // 属于 nextNodeNames（null 除外）。未提供该决策时 migrate() 在 validateApprovedDiff
+        // 阶段 fail-fast，而不是静默放行非法状态名。
+        kind: "state-graph-mapping";
+        dataContext: string;
+        removedStateNames: string[];
+        addedStateNames: string[];
+        nextNodeNames: string[];
+        nextInitialStateName: string;
+        reason: string;
+    }
+    | {
         kind: "async-completion-handler";
         dataContext: string;
         reason: string;
@@ -242,6 +257,15 @@ export type MigrationDecision =
         kind: "event-rebuild-handler";
         dataContext: string;
         handlerRef: string;
+        reason: string;
+    }
+    | {
+        // 对 requirement（kind: "state-graph-mapping"）的批准：mapping 的键必须恰好
+        // 覆盖 requirement.removedStateNames（所有不再合法的旧名），value 是新图合法名
+        // 或 null（映射到新初始态）。调度器据此对持久化 currentState 施加逐记录映射。
+        kind: "state-graph-mapping";
+        dataContext: string;
+        mapping: Record<string, string | null>;
         reason: string;
     }
     | {
@@ -376,6 +400,19 @@ export type ComputationManifest = {
     stateSignature: string;
     structuralSignature: string;
     argsSignature: string;
+    /**
+     * StateMachine state graph (node names + initial state name), present only
+     * on StateMachine-typed computations. This is diff-detection input, NOT
+     * signature input: it is excluded from modelHash (hashComputations strips
+     * it, like functionSignature.text) so deployed modelHash values stay
+     * stable. Persisted StateMachine `currentState` values are constrained
+     * facts — when the node set changes, migration must map them explicitly
+     * (state-graph-mapping decision) instead of silently leaving stale names.
+     */
+    stateGraph?: {
+        nodeNames: string[];
+        initialStateName: string;
+    };
     functionSignature?: ComputationFunctionSignature;
     allocation?: {
         kind: "scoped-sequence";
@@ -915,6 +952,25 @@ function createArgsSignature(args: Record<string, unknown>): string {
     return hash(canonicalizeArgsForSignature(args));
 }
 
+// StateMachine 的持久化 currentState 受状态图约束（合法值集合 = states[].name）。
+// manifest 层为 diff 检测保留节点集合与初始态名；该字段不进入任何签名（见
+// hashComputations 的显式排除）。提取自活 handle 的 args（StateNode.name /
+// args.initialState.name），Custom 等其它类型不填充——它们的 bound state 值域是
+// 应用语义，框架不解释（设计 §3.1 的界定）。
+function createStateGraphManifest(computation: Computation): ComputationManifest["stateGraph"] | undefined {
+    const args = computation.args as Record<string, unknown> | undefined;
+    const semanticType = computation.constructor
+        ? (computation.constructor as unknown as { computationType?: { displayName?: string } }).computationType?.displayName
+        : undefined;
+    if (semanticType !== "StateMachine" && args?._type !== "StateMachine") return undefined;
+    const states = args?.states as unknown[] | undefined;
+    const initialState = args?.initialState as { name?: unknown } | undefined;
+    const nodeNames = (states || []).map(node => (node as { name?: unknown } | null)?.name).filter((name): name is string => typeof name === "string");
+    const initialStateName = initialState?.name;
+    if (!nodeNames.length || typeof initialStateName !== "string") return undefined;
+    return { nodeNames, initialStateName };
+}
+
 function createComputationManifest(computation: Computation, includeFunctionText = false): ComputationManifest {
     const args = computation.args as Record<string, unknown>;
     const deps = serializeDataDeps(computation as Partial<DataBasedComputation>);
@@ -983,6 +1039,7 @@ function createComputationManifest(computation: Computation, includeFunctionText
         stateSignature,
         structuralSignature,
         argsSignature,
+        stateGraph: createStateGraphManifest(computation),
         functionSignature,
         allocation,
         allocationSignature,
@@ -1098,6 +1155,10 @@ export function createMigrationManifest(controller: Controller, storageSchema: S
     ]);
     const hashComputations = computations.map(computation => ({
         ...computation,
+        // stateGraph 是 diff 检测输入，不是签名输入：与 functionSignature.text 同一排除
+        //  模式。填充与否不得影响 modelHash（否则升级后首次重新生成 manifest 会让全部
+        //  未变更模型被判为变更）。
+        stateGraph: undefined,
         functionSignature: computation.functionSignature ? {
             ...computation.functionSignature,
             text: undefined,
@@ -1124,6 +1185,57 @@ export function getChangedComputations(oldManifest: MigrationManifest, newManife
         const oldItem = oldById.get(item.id);
         return !oldItem || oldItem.signature !== item.signature;
     });
+}
+
+export type StateGraphChange = {
+    removedStateNames: string[];
+    addedStateNames: string[];
+    previousInitialStateName: string;
+    nextInitialStateName: string;
+};
+
+/**
+ * 状态图节点集合比较（StateMachine 的迁移期映射合同触发面）。
+ *
+ * 旧侧 manifest 缺 stateGraph 字段（框架升级后的首次迁移，见 MIGRATION_MANIFEST_GENERATOR_VERSION
+ * 注释）时定义为「不比较」：返回 undefined，不产生 renamed/removed/added 判定、不生成映射
+ * 要求——防止把升级后首次迁移变成全体 StateMachine 的映射要求噪声。该残余暴露由迁移
+ * 执行路径的合法性不变量兜住（宽口径扫描，M-04）。新侧没有 stateGraph（computation
+ * 不再是 StateMachine）时同理不比较：类型变更由 structuralSignature/removed+added 覆盖。
+ */
+export function getStateGraphChange(previous: ComputationManifest | undefined, next: ComputationManifest): StateGraphChange | undefined {
+    if (!previous?.stateGraph || !next.stateGraph) return undefined;
+    const previousNames = new Set(previous.stateGraph.nodeNames);
+    const nextNames = new Set(next.stateGraph.nodeNames);
+    const removedStateNames = [...previousNames].filter(name => !nextNames.has(name)).sort();
+    const addedStateNames = [...nextNames].filter(name => !previousNames.has(name)).sort();
+    return {
+        removedStateNames,
+        addedStateNames,
+        previousInitialStateName: previous.stateGraph.initialStateName,
+        nextInitialStateName: next.stateGraph.initialStateName,
+    };
+}
+
+/**
+ * 状态图变化是否要求显式映射决策。初始态改名时旧初始名仍在合法集合中，但持久化语义上
+ * 它对应的是「新的初始态」——bisect 判据：旧名集合 ∩ 新名集合的补集 ∪ {旧初始名（若改
+ * 名）}。仅新增节点（无移除、初始态不变）不需要映射：既有持久化名仍全部合法。
+ */
+export function requiresStateGraphMapping(change: StateGraphChange): boolean {
+    return change.removedStateNames.length > 0 || change.previousInitialStateName !== change.nextInitialStateName;
+}
+
+function createStateGraphMappingRequirement(computation: ComputationManifest, change: StateGraphChange): Extract<MigrationDecisionRequirement, { kind: "state-graph-mapping" }> {
+    return {
+        kind: "state-graph-mapping",
+        dataContext: computation.dataContext,
+        removedStateNames: change.removedStateNames,
+        addedStateNames: change.addedStateNames,
+        nextNodeNames: computation.stateGraph!.nodeNames,
+        nextInitialStateName: change.nextInitialStateName,
+        reason: `StateMachine state graph changed (removed: [${change.removedStateNames.join(", ")}], added: [${change.addedStateNames.join(", ")}], initialState: ${change.previousInitialStateName} -> ${change.nextInitialStateName}); persisted currentState names require an explicit mapping to the new graph`,
+    };
 }
 
 // No backward compatibility: manifests written by a different generator version
@@ -1186,6 +1298,41 @@ function handlerForDecision<THandler>(handlers: Record<string, THandler> | undef
 function getEventRebuildHandler(options: MigrationOptions | undefined, dataContext: string) {
     const decision = getDecision(options?.approvedDiff, item => item.kind === "event-rebuild-handler" && item.dataContext === dataContext) as Extract<MigrationDecision, { kind: "event-rebuild-handler" }> | undefined;
     return handlerForDecision(options?.handlers?.eventRebuild, decision?.handlerRef);
+}
+
+/**
+ * 以 handle 的静态 computationType 判定「StateMachine 语义」——不猜测 Custom 等
+ * createState 计算的状态语义（值域是应用语义，框架不解释）。
+ */
+function isStateMachineComputation(computation: Computation) {
+    return (computation.constructor as { computationType?: { displayName?: string } }).computationType?.displayName === "StateMachine";
+}
+
+/**
+ * 状态图映射决策的调度器侧读取：按 dataContext 取已批准的 state-graph-mapping 决策。
+ * 仅当计算确实是 StateMachine（以其 handle 的 computationType 为准——不猜测 Custom 的
+ * 状态语义）时才生效；映射施加时机以此决策的存在为触发面（机制 B 的计划项
+ * rebuildState=false，标志触发面会漏掉它）。
+ */
+function getStateGraphMappingDecision(options: MigrationOptions | undefined, computation: Computation) {
+    if (!isStateMachineComputation(computation)) return undefined;
+    const decision = getDecision(options?.approvedDiff, item => item.kind === "state-graph-mapping" && item.dataContext === dataContextPath(computation.dataContext)) as Extract<MigrationDecision, { kind: "state-graph-mapping" }> | undefined;
+    if (!decision) return decision;
+    const nextInitialStateName = (computation as unknown as { initialState?: { name?: string } }).initialState?.name;
+    if (!nextInitialStateName) return undefined;
+    return { ...decision, nextInitialStateName };
+}
+
+/**
+ * 状态所有权路由（设计 §3.2，机制 D 的收口）：compute handle 以静态声明
+ * `ownsStateOnRebuild = true` 表明自己的全部 bound state 由输出重建路径拥有（Transform 的
+ * sourceRecordId/transformIndex、聚合家族的聚合值/逐项贡献、RealTime 的时间戳）。
+ * 迁移对这些计算不做「重置为默认值」——输出重建每次重写它们，重置要么冗余、要么破坏性
+ * （Transform 的键坍缩）。StateMachine 的 currentState 不属于此类（持久化事实，走映射）；
+ * Custom 的状态语义由应用自决（默认重置，M-02 已覆盖）。
+ */
+function stateOwnedByOutputPath(computation: Computation) {
+    return (computation.constructor as { ownsStateOnRebuild?: boolean }).ownsStateOnRebuild === true;
 }
 
 function getAsyncCompletionHandler(options: MigrationOptions | undefined, dataContext: string) {
@@ -1748,11 +1895,13 @@ export function buildMigrationDiff(
 
     for (const computation of nextManifest.computations) {
         const old = oldById.get(computation.id);
+        const stateGraphChange = getStateGraphChange(old, computation);
         const detected = {
             dataDepsChanged: old ? !isEqualValue(old.deps, computation.deps) : true,
             eventDepsChanged: old ? !isEqualValue(old.eventDeps, computation.eventDeps) : true,
             outputSignatureChanged: old ? old.outputSignature !== computation.outputSignature : true,
             stateSignatureChanged: old ? old.stateSignature !== computation.stateSignature : true,
+            stateGraphChanged: stateGraphChange ? requiresStateGraphMapping(stateGraphChange) : false,
             allocationSignatureChanged: old ? old.allocationSignature !== computation.allocationSignature : computation.allocationSignature !== undefined,
             allocationSignature: computation.allocationSignature,
             previousAllocationSignature: old?.allocationSignature,
@@ -1822,6 +1971,13 @@ export function buildMigrationDiff(
             if (seedRequirement) {
                 requiredDecisions.push(seedRequirement);
             }
+        }
+        // 状态图映射要求独立于 computation 推荐决策追加（与 event-rebuild-handler 要求
+        // 可并存）：节点集合/初始态变化即使分类为 state-only / possibly-changed 也必须
+        // 给出映射。旧 manifest 缺 stateGraph 字段时 getStateGraphChange 返回 undefined
+        // （「不比较」降级），不产生要求。
+        if (stateGraphChange && requiresStateGraphMapping(stateGraphChange)) {
+            requiredDecisions.push(createStateGraphMappingRequirement(computation, stateGraphChange));
         }
         // Handler requirements (event rebuild / async completion) are added later
         // from the provisional rebuild plan: only computations whose output will
@@ -2069,6 +2225,55 @@ export function validateApprovedDiff(
             }
             if (!handlers?.eventRebuild?.[decision.handlerRef]) {
                 throw new MigrationError(`Missing migration event rebuild handler '${decision.handlerRef}' for ${decision.dataContext}`);
+            }
+        }
+        if (decision.kind === "state-graph-mapping") {
+            if (!requirementKeys.has(key)) {
+                throw new MigrationError(`Migration state graph mapping decision does not match a required review item: ${decision.dataContext}`);
+            }
+            const requirement = expectedReview.requiredDecisions.find((item): item is Extract<MigrationDecisionRequirement, { kind: "state-graph-mapping" }> =>
+                item.kind === "state-graph-mapping" && item.dataContext === decision.dataContext
+            );
+            if (!requirement) {
+                throw new MigrationError(`Migration state graph mapping decision does not match a required review item: ${decision.dataContext}`);
+            }
+            const mappedKeys = Object.keys(decision.mapping);
+            const requiredKeys = new Set(requirement.removedStateNames);
+            if (mappedKeys.some(mappedKey => !requiredKeys.has(mappedKey))) {
+                throw new MigrationError(
+                    `Migration state graph mapping for ${decision.dataContext} maps state names that remain legal in the new graph: ${mappedKeys.filter(mappedKey => !requiredKeys.has(mappedKey)).join(", ")}. Only [${requirement.removedStateNames.join(", ")}] require mapping.`,
+                );
+            }
+            const missingKeys = requirement.removedStateNames.filter(removed => !mappedKeys.includes(removed));
+            if (missingKeys.length) {
+                throw new MigrationError(
+                    `Migration state graph mapping for ${decision.dataContext} is missing entries for state names that no longer exist in the new graph: [${missingKeys.join(", ")}]. Map each to a legal name (${requirement.nextNodeNames.join(", ")}) or null to fall back to the new initial state "${requirement.nextInitialStateName}".`,
+                );
+            }
+            const legalTargets = new Set(requirement.nextNodeNames);
+            const illegalTargets = mappedKeys.filter(mappedKey => {
+                const target = decision.mapping[mappedKey];
+                return target !== null && !legalTargets.has(target);
+            });
+            if (illegalTargets.length) {
+                throw new MigrationError(
+                    `Migration state graph mapping for ${decision.dataContext} maps to names outside the new state graph: ${illegalTargets.map(mappedKey => `${mappedKey} -> ${String(decision.mapping[mappedKey])}`).join(", ")}. Legal targets: ${requirement.nextNodeNames.join(", ")} (or null for the new initial state).`,
+                );
+            }
+            // 映射只能搭载进入 rebuild 计划的计算：getChangedComputationsFromApprovedDiff
+            // 只为 changed/state-only 播种计划，unchanged 不会进入调度器，已批准的映射会被
+            // 静默丢弃（持久化 currentState 停留旧名，后续交互静默 skip）。矛盾组合必须在
+            // 审批对账阶段 fail-fast，而不是替审批者改主意。
+            const mappedComputation = nextManifest.computations.find(item => item.dataContext === decision.dataContext);
+            if (mappedComputation) {
+                const computationDecision = approvedDiff.decisions.find(item =>
+                    item.kind === "computation" && item.id === mappedComputation.id
+                ) as Extract<MigrationDecision, { kind: "computation" }> | undefined;
+                if (computationDecision && (computationDecision.decision === "unchanged" || computationDecision.decision === "unrebuildable")) {
+                    throw new MigrationError(
+                        `Migration computation decision '${computationDecision.decision}' for ${decision.dataContext} contradicts the approved state graph mapping: the computation stays out of the rebuild plan, so the mapping would be silently dropped and persisted currentState names would remain outside the new graph. Approve 'changed' or 'state-only' for this computation.`,
+                    );
+                }
             }
         }
         if (decision.kind === "async-completion-handler") {
@@ -3656,9 +3861,47 @@ class MigrationScheduler {
             throw new UnrebuildableComputationError(`Migration requires full compute support for ${dataContextPath(computation.dataContext)}`);
         }
 
-        if (item.rebuildState && !item.rebuildOutput) {
-            await this.rebuildStateDefaults(computation);
-            continue;
+        // 状态图改名（state-graph-mapping 决策）可能落在 rebuildState=false 的计划项上
+        // （机制 B：非初始改名只改 outputSignature 相关的结构签名），因此映射施加以「批准
+        // 决策存在」为触发面，不能只看 rebuildState 标志。先施加映射再跑输出重建（§3.3）：
+        // event rebuild handler 收到的 record 里 bound-state 列已是新名，输出值与状态由同
+        // 一事实推导。kill-resume 下随 SERIALIZABLE 事务回滚/重放，与其它 bound-state 写
+        // 入同一恢复语义。Custom createState 的应用自定义状态不进入该机制（以 computation
+        // type 为准，不猜测 Custom 的状态语义）。
+        const stateGraphMappingDecision = getStateGraphMappingDecision(this.options, computation);
+        if (stateGraphMappingDecision) {
+            await this.applyStateGraphMapping(computation, stateGraphMappingDecision.mapping, stateGraphMappingDecision.nextInitialStateName);
+        }
+
+        // 持久化状态名合法性不变量（设计 §3.4，Task 要求 3）：StateMachine 的 currentState
+        // 是受状态图约束的持久化事实。本计划的 rebuild 项被触发（rebuildState 或
+        // rebuildOutput 任一为真——宽口径，升级窗口兜底；含 state-only 计划项，审计轮 5
+        // D-2：不得因状态重建分支的 `if (!item.rebuildOutput) continue` 跳过扫描）后，每条
+        // 宿主记录/全局字典的 currentState 必须属于当前状态图节点名集合；否则迁移事务
+        // fail-fast，而不是迁移成功、下一次交互静默 skip。检查在映射施加之后（映射是使
+        // 旧名合法的官方路径）、重置与输出重建之前——rebuildStateDefaults 会把全部记录
+        // 无差别重写为新初始态名，图外名先被「洗白」再扫描就永远拦不住（审计 §2.1 的
+        // 无映射升级窗口格）。未进入 rebuild 计划的 StateMachine 不扫（成本边界）；运行期
+        // setup/dispatch 不做全量检查（探针 F 边界：迁移不变量的辖区是「迁移不得制造或
+        // 放过非法状态」）。
+        if (item.rebuildState || item.rebuildOutput) {
+            await this.assertPersistedStatesLegal(computation);
+        }
+
+        if (item.rebuildState || stateGraphMappingDecision) {
+            if (!stateGraphMappingDecision) {
+                if (stateOwnedByOutputPath(computation)) {
+                    // 状态所有权路由（机制 D 的收口）：Transform 的 sourceRecordId/transformIndex、
+                    // 聚合的聚合值/逐项贡献、RealTime 的时间戳由输出重建路径拥有——compute /
+                    // persistFullResult 每次重写它们，逐行重置为默认值会让 Transform 全部既有行
+                    // 坍缩到同一键（'' : 0）：唯一索引方言在 setInternal 处崩溃，无索引方言产生
+                    // 重复行与空来源指针。跳过重置；rebuildOutput 的全量重算本身就是这些状态的
+                    // 唯一正确重建方式，state-only 计划对它们不是正确动作（设计 §3.2）。
+                } else {
+                    await this.rebuildStateDefaults(computation);
+                }
+            }
+            if (!item.rebuildOutput) continue;
         }
 
         // r34-A5：迁移重建是一次「绕过 task 代理的产出纪元」（与 live 的同步/resolved 直出
@@ -3772,6 +4015,84 @@ class MigrationScheduler {
                 const globalState = state as GlobalBoundState<unknown>;
                 await globalState.setInternal(globalState.defaultValue);
             }
+        }
+    }
+
+    /**
+     * 状态图映射施加（机制 C 的正确动作）：逐记录（record 作用域）或单值（global 作用域）
+     * 把持久化 currentState 的旧名改写为批准决策给出的新名。逐记录、有意图——值已是新图
+     * 合法名的记录不动（不是无差别重置到初始态）；null 目标降级到新初始态。只写
+     * StateMachine 的 currentState，不动其它 bound state；Transform 等输出路径拥有的状态
+     * 不进入本方法（所有权路由是 M-03 的范围）。
+     */
+    private async applyStateGraphMapping(computation: Computation, mapping: Record<string, string | null>, nextInitialStateName: string) {
+        const state = computation.state?.currentState;
+        if (!state) return;
+        const mapValue = (value: unknown): { changed: boolean; next: unknown } => {
+            // Object.hasOwn（而非 value in mapping）：in 走原型链，名为 "constructor"/"toString"
+            // 的状态名会误命中映射表（今日声明面被 TransitionFinder 拒绝，防御性收口）。
+            if (typeof value !== "string" || !Object.hasOwn(mapping, value)) return { changed: false, next: value };
+            const target = mapping[value];
+            return { changed: true, next: target === null ? nextInitialStateName : target };
+        };
+        if ("record" in state) {
+            const recordState = state as RecordBoundState<string>;
+            if (!recordState.record) return;
+            const records = await this.controller.system.storage.find(recordState.record, undefined, undefined, ["id", recordState.key]);
+            for (const record of records) {
+                const { changed, next } = mapValue(record[recordState.key]);
+                if (changed) await recordState.setInternal(record, next as string);
+            }
+        } else {
+            const globalState = state as GlobalBoundState<string>;
+            const current = await globalState.get();
+            const { changed, next } = mapValue(current);
+            if (changed) await globalState.setInternal(next as string);
+        }
+    }
+
+    /**
+     * 持久化状态名合法性不变量（设计 §3.4，Task 要求 3）：StateMachine 的每条宿主记录
+     * （record 作用域，单列扫描）或全局字典（global 作用域）的持久化 currentState 必须
+     * 属于当前状态图节点名集合。非法值以 MigrationError fail-fast（信息含 dataContext、
+     * 非法值集合与合法集合），随迁移重算事务回滚——迁移完成后不允许存在「下一次交互才
+     * 暴露的静默 skip」（TransitionFinder.findNextState 对未知名返回 null）。
+     *
+     * 辖界：只在迁移执行路径调用（rebuild 计划项触发时，宽口径）；setup/dispatch 不做
+     * 全量检查（成本边界），运行期防御非法写入不在迁移不变量的职责内。simulate 模式
+     * （级联删除 scope 发现）复用同一检查——模拟事务回滚，发现非法名时按既有降级路径
+     * 回退分析性 scope。
+     */
+    private async assertPersistedStatesLegal(computation: Computation) {
+        if (!isStateMachineComputation(computation)) return;
+        const state = computation.state?.currentState;
+        if (!state) return;
+        // 合法集合取自活 handle 的声明（args.states[].name）——迁移时刻的当前状态图。
+        const args = computation.args as { states?: Array<{ name?: unknown }> } | undefined;
+        const legalNames = new Set(
+            (args?.states || []).map(node => node?.name).filter((name): name is string => typeof name === "string"),
+        );
+        if (!legalNames.size) return;
+        const describe = () => `StateMachine ${dataContextPath(computation.dataContext)}`;
+        const assertLegal = (values: string[]) => {
+            const illegal = [...new Set(values.filter(value => !legalNames.has(value)))].sort();
+            if (illegal.length) {
+                throw new MigrationError(
+                    `${describe()} has persisted currentState values outside the current state graph after migration processing: [${illegal.join(", ")}]. ` +
+                    `Legal state names: [${[...legalNames].join(", ")}]. ` +
+                    `Provide a state-graph-mapping decision mapping every removed old name, or fix the corrupted persisted state before migrating.`,
+                );
+            }
+        };
+        if ("record" in state) {
+            const recordState = state as RecordBoundState<string>;
+            if (!recordState.record) return;
+            const records = await this.controller.system.storage.find(recordState.record, undefined, undefined, ["id", recordState.key]);
+            assertLegal(records.map(record => record[recordState.key]).filter((value): value is string => typeof value === "string"));
+        } else {
+            const globalState = state as GlobalBoundState<string>;
+            const current = await globalState.get();
+            assertLegal(typeof current === "string" ? [current] : []);
         }
     }
 
