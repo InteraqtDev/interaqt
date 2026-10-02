@@ -31,7 +31,7 @@ import {
   Transfer,
   clearAllInstances,
 } from 'interaqt'
-import { PGLiteDB } from '@drivers'
+import { PGLiteDB, SQLiteDB } from '@drivers'
 
 async function tableExists(system: MonoSystem, tableName: string): Promise<boolean> {
   const rows = await (system.storage as any).db.query(
@@ -337,6 +337,64 @@ describe('dispatch idempotency — standalone Interaction', () => {
     expect(result.outcome).toBeUndefined()
 
     await system.destroy()
+  })
+
+  test('a conflicting claim preserves the transaction and maps the stored state on PGLite and SQLite', async () => {
+    for (const [driver, createDatabase] of [
+      ['PGLite', () => new PGLiteDB()],
+      ['SQLite', () => new SQLiteDB(':memory:')],
+    ] as const) {
+      clearAllInstances()
+      const source = Interaction.create({
+        name: `IdemClaimConflict${driver}`,
+        action: Action.create({ name: `idemClaimConflict${driver}` }),
+        idempotency: {
+          key: (args: any) => args.context?.requestId || null,
+        },
+      })
+      const system = new MonoSystem(createDatabase())
+      system.conceptClass = KlassByName
+      const controller = new Controller({ system, eventSources: [source] })
+      await controller.setup(true)
+
+      const applied = await controller.dispatch(source, {
+        user: user(),
+        context: { requestId: 'succeeded' },
+      })
+      expect(applied.error).toBeUndefined()
+      expect(applied.outcome).toBe('applied')
+
+      await system.storage.runInTransaction({ name: `${driver}-seed-inflight` }, async () => {
+        await system.storage.dispatchIdempotency.claim(source.name, 'in-flight')
+      })
+
+      const expectConflictWithReadableRow = async (
+        key: string,
+        expectedCode: 'IDEMPOTENCY_CONFLICT' | 'IDEMPOTENCY_IN_FLIGHT',
+        expectedState: 'succeeded' | 'in_flight',
+      ) => {
+        let conflict: unknown
+        let loadedState: string | undefined
+        await system.storage.runInTransaction({ name: `${driver}-conflicting-claim-${key}` }, async () => {
+          try {
+            await system.storage.dispatchIdempotency.claim(source.name, key)
+          } catch (error) {
+            conflict = error
+          }
+          const stored = await system.storage.dispatchIdempotency.load(source.name, key)
+          loadedState = stored?.state
+        })
+        expect(conflict).toBeInstanceOf(IdempotencyError)
+        expect((conflict as IdempotencyError).code).toBe(expectedCode)
+        expect(loadedState).toBe(expectedState)
+      }
+
+      // The claim conflict is intentionally caught inside its owner transaction:
+      // the subsequent read distinguishes a typed conflict from an aborted SQL transaction.
+      await expectConflictWithReadableRow('in-flight', 'IDEMPOTENCY_IN_FLIGHT', 'in_flight')
+      await expectConflictWithReadableRow('succeeded', 'IDEMPOTENCY_CONFLICT', 'succeeded')
+      await system.destroy()
+    }
   })
 })
 
