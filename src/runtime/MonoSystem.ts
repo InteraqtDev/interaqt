@@ -1414,6 +1414,30 @@ RETURNING "lastValue" AS value`,
         this.requireTransaction('dispatchIdempotency.claim')
         const p = this.getPlaceholder()
         const createdAt = Date.now()
+
+        // A unique violation aborts a PostgreSQL transaction. Use a conflict-safe
+        // insert on dialects that support it so the existing row can be read and
+        // translated to the idempotency contract without leaving the transaction
+        // unusable. The dialect is resolved through getSchemaDialect, like every
+        // other dialect decision in this class, so a driver that declares no
+        // schemaDialect is treated as postgres. MySQL has no dispatch transactions
+        // and keeps the unique-error path below.
+        const dialectName = getSchemaDialect(this.db).name
+        const supportsConflictSafeInsert = dialectName === 'postgres' || dialectName === 'sqlite'
+        if (supportsConflictSafeInsert) {
+            const inserted = await this.db.query<{ namespace: string }>(
+                `INSERT INTO "_DispatchIdempotency_" ("namespace", "idempotencyKey", "state", "data", "context", "createdAt")
+                 VALUES (${p()}, ${p()}, 'in_flight', NULL, NULL, ${p()})
+                 ON CONFLICT ("namespace", "idempotencyKey") DO NOTHING
+                 RETURNING "namespace"`,
+                [namespace, idempotencyKey, createdAt],
+                'claim dispatch idempotency row',
+            )
+            if (inserted.length > 0) return
+            // The row already exists; the helper always throws the typed error.
+            return this.rejectDispatchIdempotencyClaim(namespace, idempotencyKey)
+        }
+
         try {
             // Use update (not insert): driver insert always appends RETURNING "_rowId",
             // and this internal table has no _rowId column.
@@ -1427,25 +1451,30 @@ RETURNING "lastValue" AS value`,
         } catch (error) {
             if (normalizeDatabaseError(error, this.db).isUniqueViolation) {
                 // Concurrent claim lost the race — re-load under the same transaction and map.
-                const existing = await this.loadDispatchIdempotencyRow(namespace, idempotencyKey)
-                if (existing?.state === 'succeeded') {
-                    // Caller should have loaded first; treat as conflict rather than replay here.
-                    throw new IdempotencyError({
-                        code: 'IDEMPOTENCY_CONFLICT',
-                        namespace,
-                        idempotencyKey,
-                        causedBy: error instanceof Error ? error : undefined,
-                    })
-                }
-                throw new IdempotencyError({
-                    code: 'IDEMPOTENCY_IN_FLIGHT',
+                await this.rejectDispatchIdempotencyClaim(
                     namespace,
                     idempotencyKey,
-                    causedBy: error instanceof Error ? error : undefined,
-                })
+                    error instanceof Error ? error : undefined,
+                )
             }
             throw error
         }
+    }
+
+    private async rejectDispatchIdempotencyClaim(
+        namespace: string,
+        idempotencyKey: string,
+        causedBy?: Error,
+    ): Promise<never> {
+        const existing = await this.loadDispatchIdempotencyRow(namespace, idempotencyKey)
+        throw new IdempotencyError({
+            // Caller should have loaded first; succeeded here means a concurrent
+            // dispatch completed between that read and its claim.
+            code: existing?.state === 'succeeded' ? 'IDEMPOTENCY_CONFLICT' : 'IDEMPOTENCY_IN_FLIGHT',
+            namespace,
+            idempotencyKey,
+            causedBy,
+        })
     }
 
     private async finishDispatchIdempotencyRow(
