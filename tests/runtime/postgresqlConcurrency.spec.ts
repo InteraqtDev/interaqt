@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Entity, Property, Dictionary, Controller, MonoSystem, MatchExp, KlassByName, Relation, Custom, Interaction, InteractionEventEntity, Action, Payload, PayloadItem, ComputationResult, runWithTransactionRetry } from 'interaqt';
+import { Entity, Property, Dictionary, Controller, MonoSystem, MatchExp, KlassByName, Relation, Custom, Interaction, InteractionEventEntity, Action, Payload, PayloadItem, ComputationResult, runWithTransactionRetry, isRetryableTransactionError } from 'interaqt';
 import { PostgreSQLDB } from '@drivers';
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -375,6 +375,86 @@ describeIfPostgres('PostgreSQL computation concurrency', () => {
       expect(events.filter((event: any) => event.payload?.requestId === 'winner-rolls-back')).toHaveLength(1);
     } finally {
       for (const control of controls.values()) control.releaseFirstResolve.resolve();
+      await Promise.all([system1.destroy(), system2.destroy()]);
+    }
+  }, 120000);
+
+  test('keeps the retryable serialization failure of a SERIALIZABLE claim that loses to a first claim', async () => {
+    const source = Interaction.create({
+      name: 'pgDispatchIdempotencySerializableClaim',
+      action: Action.create({ name: 'pgDispatchIdempotencySerializableClaim' }),
+      idempotency: {
+        key: (args: any) => args.context?.requestId || null,
+      },
+    });
+    const key = 'serializable-claim';
+    const system1 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    const system2 = new MonoSystem(new PostgreSQLDB(database, dbOptions));
+    system1.conceptClass = KlassByName;
+    system2.conceptClass = KlassByName;
+    const controller1 = new Controller({ system: system1, eventSources: [source] });
+    const controller2 = new Controller({ system: system2, eventSources: [source] });
+    const winnerFinished = deferred<void>();
+    const releaseWinner = deferred<void>();
+
+    try {
+      await controller1.setup(true);
+      await controller2.setup(false);
+
+      // The winner claims and finishes the key but has not committed yet.
+      const winner = system1.storage.runInTransaction({ name: 'pg-serializable-claim-winner', isolation: 'SERIALIZABLE' }, async () => {
+        await system1.storage.dispatchIdempotency.claim(source.name, key);
+        await system1.storage.dispatchIdempotency.finish(source.name, key, { data: { winner: true }, createdAt: Date.now() });
+        winnerFinished.resolve();
+        await releaseWinner.promise;
+      });
+      await winnerFinished.promise;
+
+      // Neighbouring cell of the READ COMMITTED race above: this cell behaves the same before
+      // and after the conflict-safe insert, and is pinned so it cannot regress. The winner's
+      // finish() reads the key after inserting it, and the loser read the key through load(),
+      // so PostgreSQL's serializable conflict detection sees a read/write cycle and reports
+      // 40001 for a plain INSERT and for ON CONFLICT DO NOTHING alike. The framework retries
+      // 40001 in a new transaction whose snapshot contains the committed row, so the loser
+      // ends up reading the winner's result. The loser claims while the winner is still
+      // uncommitted, so its INSERT is blocked on the winner when the winner commits.
+      const waitUntilClaimIsBlocked = async () => {
+        const observer = (system1.storage as any).db;
+        for (let poll = 0; poll < 100; poll++) {
+          const rows = await observer.query(
+            `SELECT count(*)::int AS "blocked" FROM pg_stat_activity
+             WHERE datname = current_database() AND wait_event_type = 'Lock'
+               AND query LIKE '%_DispatchIdempotency_%'`,
+            [],
+            'observe blocked idempotency claim',
+          );
+          if (Number(rows[0].blocked) > 0) return;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        throw new Error('the loser claim never blocked on the winner');
+      };
+      let firstAttemptError: unknown;
+      const outcome = await runWithTransactionRetry('pg-serializable-claim-loser', async (_isolation, attempt) =>
+        system2.storage.runInTransaction({ name: 'pg-serializable-claim-loser', isolation: 'SERIALIZABLE' }, async () => {
+          const stored = await system2.storage.dispatchIdempotency.load(source.name, key);
+          if (stored) return { attempt, state: stored.state, data: stored.data };
+          expect(attempt).toBe(1);
+          const claimResult = system2.storage.dispatchIdempotency.claim(source.name, key).then(() => undefined, (error: unknown) => error);
+          await waitUntilClaimIsBlocked();
+          releaseWinner.resolve();
+          await winner;
+          firstAttemptError = await claimResult;
+          if (!firstAttemptError) throw new Error('claim unexpectedly succeeded');
+          throw firstAttemptError;
+        })
+      );
+
+      expect(firstAttemptError).toBeDefined();
+      expect((firstAttemptError as { code?: string }).code).toBe('40001');
+      expect(isRetryableTransactionError(firstAttemptError)).toBe(true);
+      expect(outcome).toEqual({ attempt: 2, state: 'succeeded', data: { winner: true } });
+    } finally {
+      releaseWinner.resolve();
       await Promise.all([system1.destroy(), system2.destroy()]);
     }
   }, 120000);

@@ -339,10 +339,19 @@ describe('dispatch idempotency — standalone Interaction', () => {
     await system.destroy()
   })
 
-  test('a conflicting claim preserves the transaction and maps the stored state on PGLite and SQLite', async () => {
+  test('a conflicting claim preserves the transaction and maps the stored state on PGLite, SQLite, and a driver without a declared dialect', async () => {
+    // A driver that declares no schemaDialect is resolved as postgres by getSchemaDialect
+    // (the dialect every other MonoSystem decision uses), so it must take the same
+    // conflict-safe claim path and keep its transaction usable.
+    const createPGLiteWithoutDialect = () => {
+      const database = new PGLiteDB()
+      ;(database as { schemaDialect?: unknown }).schemaDialect = undefined
+      return database
+    }
     for (const [driver, createDatabase] of [
       ['PGLite', () => new PGLiteDB()],
       ['SQLite', () => new SQLiteDB(':memory:')],
+      ['PGLiteWithoutDialect', createPGLiteWithoutDialect],
     ] as const) {
       clearAllInstances()
       const source = Interaction.create({

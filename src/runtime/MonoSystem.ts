@@ -1418,9 +1418,12 @@ RETURNING "lastValue" AS value`,
         // A unique violation aborts a PostgreSQL transaction. Use a conflict-safe
         // insert on dialects that support it so the existing row can be read and
         // translated to the idempotency contract without leaving the transaction
-        // unusable. MySQL and custom dialects retain the unique-error path below.
-        const supportsConflictSafeInsert = this.db.schemaDialect?.name === 'postgres'
-            || this.db.schemaDialect?.name === 'sqlite'
+        // unusable. The dialect is resolved through getSchemaDialect, like every
+        // other dialect decision in this class, so a driver that declares no
+        // schemaDialect is treated as postgres. MySQL has no dispatch transactions
+        // and keeps the unique-error path below.
+        const dialectName = getSchemaDialect(this.db).name
+        const supportsConflictSafeInsert = dialectName === 'postgres' || dialectName === 'sqlite'
         if (supportsConflictSafeInsert) {
             const inserted = await this.db.query<{ namespace: string }>(
                 `INSERT INTO "_DispatchIdempotency_" ("namespace", "idempotencyKey", "state", "data", "context", "createdAt")
@@ -1431,7 +1434,8 @@ RETURNING "lastValue" AS value`,
                 'claim dispatch idempotency row',
             )
             if (inserted.length > 0) return
-            await this.rejectDispatchIdempotencyClaim(namespace, idempotencyKey)
+            // The row already exists; the helper always throws the typed error.
+            return this.rejectDispatchIdempotencyClaim(namespace, idempotencyKey)
         }
 
         try {
