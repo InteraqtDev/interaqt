@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.11.1](https://github.com/InteraqtDev/interaqt/compare/v4.11.0...v4.11.1) (2026-10-03)
+
+### Bug Fixes
+
+* **runtime:** preserve transactions on idempotency conflicts ([#52](https://github.com/InteraqtDev/interaqt/issues/52)) ([9ffbcd7](https://github.com/InteraqtDev/interaqt/commit/9ffbcd745dae78c17504127d0b1e590c8b7ac33d))
+
 ## [4.11.0](https://github.com/InteraqtDev/interaqt/compare/v4.10.1...v4.11.0) (2026-09-18)
 
 ### Features
