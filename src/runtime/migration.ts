@@ -3853,8 +3853,10 @@ class MigrationScheduler {
         const computation = this.handles.get(item.computationId);
         if (!computation) continue;
 
-        // 硬删除属性的「审批存在性」门槛：模拟模式（scope 发现本身）没有审批可查，跳过。
-        if (this.audit.mode !== "simulate" && computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
+        // 只有重建输出才可能把硬删除属性写为删除态并删除宿主行。state-only 只重建
+        // computation state，不执行输出计算，因此不需要 destructive-scope approval。
+        // 模拟模式（scope 发现本身）也没有审批可查，继续跳过该检查。
+        if (item.rebuildOutput && this.audit.mode !== "simulate" && computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
             throw new DestructiveComputedOutputError(`Migration refuses to recompute destructive property ${dataContextPath(computation.dataContext)} without approved destructive scope`);
         }
         if (typeof (computation as DataBasedComputation).compute !== "function" && !getEventRebuildHandler(this.options, dataContextPath(computation.dataContext))) {
