@@ -372,6 +372,14 @@ This covers:
 
 `generateMigrationDiff({ includeDestructiveScope: true })` reports candidate scopes. `migrate({ dryRun: true })` recalculates actual scope and fails if approved ids differ. Execution recalculates again before recompute.
 
+A rebuild item needs a `destructive-scope` decision only when it can delete stored rows. All three conditions must hold:
+
+- it rebuilds output: the computation is approved as `changed` (a `state-only` decision never writes output, so it never deletes);
+- its output can delete records: an entity/relation output, or the `_isDeleted_` hard-deletion property;
+- the record whose rows would be deleted exists in the source schema. A record introduced by the same migration has no stored rows: a new entity with a `HardDeletionProperty`, or a new Transform output entity, needs no destructive-scope decision, even when the migration itself creates rows in it and the new `_isDeleted_` deletes some of them.
+
+The diff is generated before the computation decisions, so it estimates scopes as if every changed computation rebuilds output. When you approve a computation as `state-only`, either omit its estimated `destructive-scope` decision or approve it with empty `ids`; approving non-empty ids for a deletion that will not run is a scope mismatch. An empty estimate (`ids: []`) on an existing table does not mean nothing will be deleted. When the diff cannot evaluate the computation (for example, an event-based `_isDeleted_` without handlers), `ids` is empty and `count` is the number of stored rows. Use `migrate({ dryRun: true, handlers })`: it fails with the exact ids to approve.
+
 ---
 
 ## Safety Gates
