@@ -2783,7 +2783,9 @@ export function getRecomputeBlockingChanges(controller: Controller, rebuildPlan:
             });
             continue;
         }
-        if (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContext)) {
+        // Same applicability as the scope readers and the scheduler guard (getDestructiveScopeRecordName):
+        // a hard-deletion host created by this migration has no stored rows to delete.
+        if (computation.dataContext.type === "property" && getDestructiveScopeRecordName(computation as Computation, { rebuildOutput: true }, oldManifest) && !hasDecision(options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContext)) {
             blockingChanges.push({ kind: "destructive-computed-output", logicalPath: dataContext, reason: "destructive computed output requires an approved destructive-scope decision" });
         }
         if ((computation as DataBasedComputation).asyncReturn && !getAsyncCompletionHandler(options, dataContext)) {
@@ -3146,6 +3148,36 @@ async function resolveDataDepsForMigration(controller: Controller, computation: 
     return Object.fromEntries(entries);
 }
 
+/**
+ * Destructive-scope applicability: the single answer to "can this rebuild item delete
+ * stored rows, and therefore does it need an approved `destructive-scope` decision?".
+ * Returns the name of the record whose stored rows the item can delete, or undefined.
+ *
+ * All three conditions must hold:
+ *  1. the item rebuilds output (`rebuildOutput`; a state-only item never writes output);
+ *  2. its output can delete records: an entity/relation output (stale rows) or the
+ *     `_isDeleted_` hard-deletion property (its host rows);
+ *  3. that record exists in the source schema. Rows of a record introduced by the same
+ *     migration are all created by the migration itself, so deleting them destroys no
+ *     stored data. An unknown source schema counts as existing (fail closed).
+ *
+ * Every reader routes through this function so the diff, the migrate-time check, the
+ * recompute blocking gate, the scheduler guard and the execution-time audit cannot
+ * disagree (issue #55: six readers previously re-implemented different subsets of it).
+ */
+export function getDestructiveScopeRecordName(computation: Computation, item: Pick<ComputationRebuildItem, "rebuildOutput">, oldManifest?: MigrationManifest): string | undefined {
+    if (!item.rebuildOutput) return undefined;
+    const context = computation.dataContext;
+    const recordName = context.type === "entity" || context.type === "relation"
+        ? context.id.name
+        : context.type === "property" && context.id.name === HARD_DELETION_PROPERTY_NAME
+            ? context.host.name
+            : undefined;
+    if (!recordName) return undefined;
+    if (oldManifest && !oldManifest.storage.records.some(record => record.recordName === recordName)) return undefined;
+    return recordName;
+}
+
 export async function getDestructiveDeletionScope(controller: Controller, rebuildPlan: ComputationRebuildItem[], oldManifest?: MigrationManifest, readHandle?: MigrationReadHandle) {
     const handles = computationById(controller);
     const scope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }> = [];
@@ -3170,7 +3202,8 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
     };
     for (const item of rebuildPlan) {
         const computation = handles.get(item.computationId);
-        if (computation?.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME) {
+        if (!computation || !getDestructiveScopeRecordName(computation, item, oldManifest)) continue;
+        if (computation.dataContext.type === "property") {
             const hostName = computation.dataContext.host.name!;
             const records = await readExistingRecords(hostName);
             const ids: string[] = [];
@@ -3195,8 +3228,7 @@ export async function getDestructiveDeletionScope(controller: Controller, rebuil
             });
         }
         if (
-            (computation?.dataContext.type === "entity" || computation?.dataContext.type === "relation") &&
-            oldManifest?.storage.records.some(record => record.recordName === computation.dataContext.id.name) &&
+            (computation.dataContext.type === "entity" || computation.dataContext.type === "relation") &&
             typeof (computation as DataBasedComputation).compute === "function"
         ) {
             if (!(controller.system.storage as unknown as { queryHandle?: unknown }).queryHandle) continue;
@@ -3244,7 +3276,11 @@ export function assertDestructiveScopeAllowed(options: MigrationOptions, actualS
     if (idExactness) {
         for (const item of expected) {
             if (takeoverContexts.has(item.dataContext)) continue;
-            if (!actualKeys.has(key(item))) {
+            // An approved empty scope without an actual entry approves no deletion and
+            //  none happens (e.g. the diff estimated a scope for a computation that is then
+            //  approved as state-only). assertExecutedDeletionsApproved already treats this
+            //  pair as equal; the entry check must not refuse what execution accepts.
+            if (!actualKeys.has(key(item)) && (item.ids || []).length > 0) {
                 throw new DestructiveComputedOutputError(`Destructive migration scope mismatch for ${item.dataContext}`);
             }
         }
@@ -3272,7 +3308,8 @@ export function assertDestructiveScopeAllowed(options: MigrationOptions, actualS
  *   以「实际执行的删除 == 已批准的 destructive-scope」双向对账；不一致则抛错，
  *   外层 SERIALIZABLE 事务回滚（任何未经审计的销毁都无法提交）。
  *
- * 辖区：实体/关系计算输出的 record 删除 + 硬删除属性（_isDeleted_）的宿主删除。
+ * 辖区：实体/关系计算输出的 record 删除 + 硬删除属性（_isDeleted_）的宿主删除，且仅限
+ *  迁移前 schema 中已存在的记录类型（getDestructiveScopeRecordName，与审批面同一判定）。
  *  经 event-rebuild-handler 的全量替换（applyResult 的 delete-all + recreate）不在
  *  本审计辖区——该路径的授权模型是人工批准的 handler 决策本身。
  */
@@ -3285,12 +3322,13 @@ export function createMigrationDeletionAudit(mode: MigrationDeletionAudit["mode"
     return { mode, collected: new Map() };
 }
 
-function collectAuditedDeletions(audit: MigrationDeletionAudit, computation: Computation, events: RecordMutationEvent[]) {
+function collectAuditedDeletions(audit: MigrationDeletionAudit, computation: Computation, item: ComputationRebuildItem, events: RecordMutationEvent[], oldManifest?: MigrationManifest) {
+    // 审计辖区与审批面同源（getDestructiveScopeRecordName）：同一迁移新建的记录类型，其行
+    //  全部由本次迁移产生，删除它们不销毁存量数据，不入审计——否则 diff 不要求审批、执行期
+    //  对账却要求，且模拟与真实执行分配的 id 不同，审批永远无法匹配（issue #55）。
+    const recordName = getDestructiveScopeRecordName(computation, item, oldManifest);
+    if (!recordName) return;
     const context = computation.dataContext;
-    const collectible = context.type === "entity" || context.type === "relation" ||
-        (context.type === "property" && context.id.name === HARD_DELETION_PROPERTY_NAME);
-    if (!collectible) return;
-    const recordName = context.type === "property" ? context.host.name! : context.id.name!;
     for (const event of events) {
         if (event.type !== "delete") continue;
         // 只有 recordName 与计算输出（或硬删除宿主）一致的 delete 计入本计算的删除足迹。
@@ -3673,7 +3711,7 @@ export async function recomputeChangedComputations(controller: Controller, rebui
     //  不一致则抛错，外层 SERIALIZABLE 事务回滚——未经审计的销毁仍然无法提交，且错误一次性
     //  给出全部差异（含级联删除的精确 id），批准后单次重试收敛。
     const audit = createMigrationDeletionAudit("enforce");
-    const scheduler = new MigrationScheduler(controller, rebuildPlan, options, initialEvents, audit);
+    const scheduler = new MigrationScheduler(controller, rebuildPlan, options, initialEvents, audit, oldManifest);
     const events = await scheduler.run();
     assertExecutedDeletionsApproved(options, audit);
     return events;
@@ -3756,7 +3794,7 @@ async function simulateCascadeDeletionScope(
             const initialEvents = simulation.previousManifest && simulation.nextManifest
                 ? await recomputeFilteredMemberships(controller, simulation.previousManifest, simulation.nextManifest)
                 : [];
-            const scheduler = new MigrationScheduler(controller, rebuildPlan, simulation.options || {}, initialEvents, audit);
+            const scheduler = new MigrationScheduler(controller, rebuildPlan, simulation.options || {}, initialEvents, audit, simulation.previousManifest);
             await scheduler.run();
             throw sentinel;
         });
@@ -3799,11 +3837,8 @@ export async function getCascadeAwareDeletionScope(
 ): Promise<{ entries: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>; exact: boolean }> {
     const handles = computationById(controller);
     const mayDelete = rebuildPlan.some(item => {
-        if (!item.rebuildOutput) return false;
         const computation = handles.get(item.computationId);
-        if (!computation) return false;
-        return computation.dataContext.type === "entity" || computation.dataContext.type === "relation" ||
-            (computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME);
+        return computation !== undefined && getDestructiveScopeRecordName(computation, item, oldManifest) !== undefined;
     });
     if (!mayDelete) return { entries: [], exact: true };
     if (simulation) {
@@ -3813,7 +3848,7 @@ export async function getCascadeAwareDeletionScope(
             const byKey = new Map(simulated.map(entry => [`${entry.dataContext}:${entry.recordName || ""}`, entry]));
             for (const item of rebuildPlan) {
                 const computation = handles.get(item.computationId);
-                if (!item.rebuildOutput || computation?.dataContext.type !== "property" || computation.dataContext.id.name !== HARD_DELETION_PROPERTY_NAME) continue;
+                if (computation?.dataContext.type !== "property" || !getDestructiveScopeRecordName(computation, item, oldManifest)) continue;
                 const hostName = computation.dataContext.host.name!;
                 const key = `${dataContextPath(computation.dataContext)}:${hostName}`;
                 if (!byKey.has(key)) {
@@ -3838,7 +3873,7 @@ class MigrationScheduler {
     private affectedIds = new Set(this.rebuildPlan.map(item => item.computationId));
     private pendingEventsByComputation = new Map<string, RecordMutationEvent[]>();
 
-    constructor(private controller: Controller, private rebuildPlan: ComputationRebuildItem[], private options: MigrationOptions = {}, private initialEvents: RecordMutationEvent[] = [], private audit: MigrationDeletionAudit = createMigrationDeletionAudit("enforce")) {
+    constructor(private controller: Controller, private rebuildPlan: ComputationRebuildItem[], private options: MigrationOptions = {}, private initialEvents: RecordMutationEvent[] = [], private audit: MigrationDeletionAudit = createMigrationDeletionAudit("enforce"), private oldManifest?: MigrationManifest) {
         this.sourceMapManager.initialize(new Set(
             Array.from(this.handles.entries())
                 .filter(([id]) => this.affectedIds.has(id))
@@ -3854,7 +3889,9 @@ class MigrationScheduler {
         if (!computation) continue;
 
         // 硬删除属性的「审批存在性」门槛：模拟模式（scope 发现本身）没有审批可查，跳过。
-        if (this.audit.mode !== "simulate" && computation.dataContext.type === "property" && computation.dataContext.id.name === HARD_DELETION_PROPERTY_NAME && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
+        //  适用性与审批面同源（getDestructiveScopeRecordName）：state-only 项不重建输出、
+        //  同一迁移新建的宿主没有存量行，二者都不能删除存量数据，不需要审批（issue #54/#55）。
+        if (this.audit.mode !== "simulate" && computation.dataContext.type === "property" && getDestructiveScopeRecordName(computation, item, this.oldManifest) && !hasDecision(this.options.approvedDiff, decision => decision.kind === "destructive-scope" && decision.dataContext === dataContextPath(computation.dataContext))) {
             throw new DestructiveComputedOutputError(`Migration refuses to recompute destructive property ${dataContextPath(computation.dataContext)} without approved destructive scope`);
         }
         if (typeof (computation as DataBasedComputation).compute !== "function" && !getEventRebuildHandler(this.options, dataContextPath(computation.dataContext))) {
@@ -3901,8 +3938,13 @@ class MigrationScheduler {
                     await this.rebuildStateDefaults(computation);
                 }
             }
-            if (!item.rebuildOutput) continue;
         }
+        // rebuildOutput=false 的计划项绝不进入输出重建。此前该 continue 只在状态重建分支内：
+        //  无 bound state 的计算（如 Custom 的 _isDeleted_）被批准为 state-only 时得到
+        //  rebuildState=false 且 rebuildOutput=false 的计划项，越过该分支落入全量输出重算——
+        //  「保留输出」的决策被静默违背；硬删除时更是在审批面与审计都按「不重建输出」判定为
+        //  无需审批的前提下删除存量行（issue #55 修复的连带前提）。
+        if (!item.rebuildOutput) continue;
 
         // r34-A5：迁移重建是一次「绕过 task 代理的产出纪元」（与 live 的同步/resolved 直出
         //  同族，见 Scheduler.invalidateUnappliedAsyncTasks 头注）。旧纪元遗留的 pending/success
@@ -3920,7 +3962,7 @@ class MigrationScheduler {
             : await this.runFullRecompute(computation);
         // r30-E：本计算实际执行的输出删除进入审计足迹（收敛收集点——三条删除来路
         //  stale 清理 / takeover 清空 / delete patch / 硬删除重算都以 delete 事件出账）。
-        collectAuditedDeletions(this.audit, computation, events);
+        collectAuditedDeletions(this.audit, computation, item, events, this.oldManifest);
         emittedEvents.push(...events);
         if (item.propagateOutputEvents) {
             this.queueEvents(events, item.computationId);

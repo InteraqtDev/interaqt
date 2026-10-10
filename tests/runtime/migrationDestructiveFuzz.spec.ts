@@ -27,6 +27,18 @@
  *   9. transformValueChange（r36）：Transform 输出**值**变化（行集不变、value 减半系数）——
  *      filtered 视图（value>50）的成员资格经 update 事件**退出/留存**，下游 Summation
  *      必须看到退出面（r35 F-4 家族的机器化：合成事件流缺派生事件时聚合残留退出成员旧值）。
+ *  10. hardDeletionNewHost（issue #55）：v2 新增实体 Mir（Transform 自 A 镜像 label/score）并带
+ *      `_isDeleted_`（score 非 ≥50 即删除）——宿主由同一迁移新建、行由同一迁移产生又被删除，
+ *      不销毁任何存量数据，diff 不得要求 destructive-scope、迁移不经该审批即收敛。
+ *  11. hardDeletionStateOnly（issue #54/#55）：v2 给已有宿主 B 加 `_isDeleted_`（同变异 2）
+ *      但批准为 state-only——输出不重建、零删除；审批取「省略」或「批准空 ids」两种合法形态。
+ *      Custom 无 bound state ⇒ 计划项 rebuildState=false 且 rebuildOutput=false（调度器
+ *      不得落入全量输出重算）。
+ *
+ * 预言机 0b（issue #55 复盘：审批面的必要性）：每个 destructive-scope 要求/决策所指的记录
+ *  类型必须在 v1 schema 中声明过（独立事实 = v1 的实体/关系名）。此前审批助手批准 diff
+ *  要求的一切，scope 预言机只有「批准 == 执行」（相对）与「ids ⊆ 迁移前行」（上界），
+ *  对「要求了一个不覆盖任何存量记录的审批」完全失明。
  *
  * 全部变异共享一条 filtered 链（Derived → Big(value>50) → Summation bigSum），
  * 由「绝对朴素重算预言机」在每个非阻塞种子上对账（不依赖事件流自身）。
@@ -61,11 +73,14 @@ type DestructiveMutation =
     | { kind: 'computationTypeChange' }
     | { kind: 'takeover' }
     | { kind: 'transformValueChange' }
+    | { kind: 'hardDeletionNewHost' }
+    | { kind: 'hardDeletionStateOnly', approval: 'omit' | 'empty' }
 
 const MUTATION_MENU: DestructiveMutation['kind'][] = [
     'transformShrink', 'hardDeletion', 'removeEmptyEntity', 'countChange',
     'blockedRemoveNonEmptyEntity', 'blockedTypeChange',
     'computationTypeChange', 'takeover', 'transformValueChange',
+    'hardDeletionNewHost', 'hardDeletionStateOnly',
 ]
 
 // CAUTION 两版共用代码路径的回调必须字面量相同（函数哈希参与 changed 判定），
@@ -81,6 +96,8 @@ function naiveDerivedValues(aRows: Row[], mutation: DestructiveMutation): number
     return aRows.filter(r => (r.score as number) > 0).map(r => r.score as number)
 }
 const COUNT_CALLBACK_V2 = function (row: Row) { return (row.score as number) > 50 }
+/** hardDeletionNewHost：Mir 行的存活谓词（_isDeleted_ 取反；预言机侧同一表达式独立求值） */
+const mirSurvives = (row: Row) => typeof row.score === 'number' && row.score >= 50
 
 function buildVersion(tag: string, version: 1 | 2, mutation: DestructiveMutation) {
     const uuid = (suffix: string) => `migd-${tag}-${suffix}`
@@ -104,7 +121,7 @@ function buildVersion(tag: string, version: 1 | 2, mutation: DestructiveMutation
     const A = new Entity({ name: `MigD${tag}A`, properties: aProps }, { uuid: uuid('a') })
     const bLabelType = mutation.kind === 'blockedTypeChange' && version === 2 ? 'number' : 'string'
     const bProps = mkValueProps('b', bLabelType as 'string')
-    if (mutation.kind === 'hardDeletion' && version === 2) {
+    if ((mutation.kind === 'hardDeletion' || mutation.kind === 'hardDeletionStateOnly') && version === 2) {
         bProps.push(new Property({
             name: '_isDeleted_', type: 'boolean',
             computation: new Custom({
@@ -159,6 +176,27 @@ function buildVersion(tag: string, version: 1 | 2, mutation: DestructiveMutation
 
     const entities: unknown[] = [A, Derived, Big]
     if (!removeB) entities.push(B)
+    if (mutation.kind === 'hardDeletionNewHost' && version === 2) {
+        entities.push(new Entity({
+            name: `MigD${tag}Mir`,
+            properties: [
+                new Property({ name: 'label', type: 'string' }, { uuid: uuid('mir-label') }),
+                new Property({ name: 'score', type: 'number' }, { uuid: uuid('mir-score') }),
+                new Property({
+                    name: '_isDeleted_', type: 'boolean',
+                    computation: new Custom({
+                        name: `MigD${tag}MirLow`,
+                        dataDeps: { current: { type: 'property', attributeQuery: ['score'] } },
+                        compute: async (_deps: unknown, record: Row) => !(typeof record.score === 'number' && record.score >= 50),
+                    }, { uuid: uuid('mir-low-computation') }),
+                }, { uuid: uuid('mir-isdeleted') }),
+            ],
+            computation: new Transform({
+                record: A, attributeQuery: ['label', 'score'],
+                callback: function (row: Row) { return { label: row.label, score: row.score } },
+            } as any, { uuid: uuid('mir-transform') }),
+        } as any, { uuid: uuid('mir') }))
+    }
     if (mutation.kind === 'removeEmptyEntity' && version === 1) {
         entities.push(new Entity({
             name: `MigD${tag}Retired`,
@@ -174,7 +212,7 @@ function buildVersion(tag: string, version: 1 | 2, mutation: DestructiveMutation
         names: {
             A: `MigD${tag}A`, B: `MigD${tag}B`, Derived: `MigD${tag}Drv`,
             Big: `MigD${tag}Big`, bigSum: `migd${tag}BigSum`,
-            Retired: `MigD${tag}Retired`,
+            Retired: `MigD${tag}Retired`, Mir: `MigD${tag}Mir`,
             relation: relation ? (relation as { name?: string }).name! : null,
             cntA: `migd${tag}CntA`, cntB: `migd${tag}CntB`,
         },
@@ -193,7 +231,9 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
     const mutationKind = pick(rng, MUTATION_MENU)
     const mutation: DestructiveMutation = mutationKind === 'countChange'
         ? { kind: 'countChange', decision: chance(rng, 0.5) ? 'changed' : 'unchanged' }
-        : { kind: mutationKind } as DestructiveMutation
+        : mutationKind === 'hardDeletionStateOnly'
+            ? { kind: 'hardDeletionStateOnly', approval: chance(rng, 0.5) ? 'omit' : 'empty' }
+            : { kind: mutationKind } as DestructiveMutation
     const blocked = mutation.kind === 'blockedRemoveNonEmptyEntity' || mutation.kind === 'blockedTypeChange'
     const injectFault = !blocked && seed % 2 === 0
 
@@ -296,17 +336,54 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
 
     const approve = async (controller: Controller) => {
         const computationDecisions: Record<string, 'changed' | 'unchanged' | 'state-only' | 'unrebuildable'> = {}
-        if (mutation.kind === 'countChange' && mutation.decision === 'unchanged') {
+        const bIsDeleted = `property:${v1.names.B}._isDeleted_`
+        if ((mutation.kind === 'countChange' && mutation.decision === 'unchanged') || mutation.kind === 'hardDeletionStateOnly') {
             const diff = await controller.generateMigrationDiff({ includeFunctionText: true, includeDestructiveScope: true })
             for (const requirement of diff.requiredDecisions) {
-                if (requirement.kind === 'computation' && requirement.dataContext === `global:${v1.names.cntA}`) {
+                if (requirement.kind !== 'computation') continue
+                if (mutation.kind === 'countChange' && requirement.dataContext === `global:${v1.names.cntA}`) {
                     computationDecisions[requirement.id] = 'unchanged'
+                }
+                if (mutation.kind === 'hardDeletionStateOnly' && requirement.dataContext === bIsDeleted) {
+                    computationDecisions[requirement.id] = 'state-only'
                 }
             }
         }
-        const approvedDiff = await approveGeneratedMigrationDiff(controller, { computationDecisions })
+        const generated = await approveGeneratedMigrationDiff(controller, { computationDecisions })
+        assertScopeRecordsExistInSource(generated)
+        // state-only：diff 在决策之前生成，按「重建输出」预估了 B._isDeleted_ 的 scope；运维方
+        //  选择 state-only 后的两种合法审批形态——省略该 scope，或批准空 ids（不批准任何删除）。
+        const approvedDiff = mutation.kind === 'hardDeletionStateOnly'
+            ? {
+                ...generated,
+                decisions: generated.decisions.flatMap(decision => {
+                    if (decision.kind !== 'destructive-scope' || decision.dataContext !== bIsDeleted) return [decision]
+                    return mutation.approval === 'omit' ? [] : [{ ...decision, ids: [] }]
+                }),
+            }
+            : generated
         await assertScopeIdsAreExistingRows(approvedDiff)
         return approvedDiff
+    }
+
+    // 预言机 0b（issue #55 复盘：审批面的必要性）：destructive-scope 只能指向迁移前 schema 中
+    //  存在的记录类型——同一迁移新建的记录没有存量行，要求对它审批等于要求批准一个不覆盖
+    //  任何数据的范围（新宿主的 _isDeleted_ 曾被如此要求，state-only 时更是批与不批都失败）。
+    //  地面真值是 v1 声明面（独立于 manifest 与 scope 实现）。
+    const v1RecordNames = new Set([
+        ...(v1.entities as Array<{ name: string }>).map(entity => entity.name),
+        ...(v1.relations as Array<{ name?: string }>).map(relation => relation.name!),
+    ])
+    const assertScopeRecordsExistInSource = (diff: { requiredDecisions: unknown[], safety: { destructiveScopes: unknown[] } }) => {
+        const scopes = [
+            ...(diff.requiredDecisions as Array<{ kind: string, recordName?: string, dataContext?: string }>).filter(item => item.kind === 'destructive-scope'),
+            ...(diff.safety.destructiveScopes as Array<{ recordName?: string, dataContext?: string }>),
+        ]
+        for (const scope of scopes) {
+            if (!scope.recordName || !v1RecordNames.has(scope.recordName)) {
+                failWith(`destructive-scope ${scope.dataContext} names record ${JSON.stringify(scope.recordName)}, which does not exist in the source (v1) schema: an approval that covers no stored row (issue #55). v1 records: ${JSON.stringify([...v1RecordNames])}`)
+            }
+        }
     }
 
     // 预言机 0（r35 复盘：审批面的绝对下界）：destructive-scope 的 ids 必须是该 recordName
@@ -392,6 +469,7 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
     // ---- 预言机 1：无关面存量保真 ----
     const afterSnapshot = await snapshotLogicalState(storageV2, snapshotSchema)
     const expectDeletedB = mutation.kind === 'hardDeletion' ? goneBIds : new Set<string>()
+    // hardDeletionStateOnly：expectDeletedB 为空——'gone' 行必须原样保留（输出不重建）
     assertSnapshotEqual(beforeSnapshot, afterSnapshot, expectDeletedB, new Set([v1.names.B]), failWith, 'post-migration fidelity')
 
     // ---- 预言机 2：变异特定终态（朴素重算对照） ----
@@ -436,6 +514,24 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
         const cntB = await storageV2.dict.get(v1.names.cntB)
         if (cntB !== bRows.length) {
             failWith(`hardDeletion: downstream count ${v1.names.cntB} = ${JSON.stringify(cntB)}, survivors = ${bRows.length}`)
+        }
+    } else if (mutation.kind === 'hardDeletionStateOnly') {
+        const bRows = await storageV2.find(v1.names.B, undefined, undefined, ['id']) as Row[]
+        const expectedIds = [...beforeSnapshot.get(v1.names.B)!.keys()].sort()
+        if (JSON.stringify(bRows.map(r => String(r.id)).sort()) !== JSON.stringify(expectedIds)) {
+            failWith(`hardDeletionStateOnly: state-only must not rebuild output, but B rows changed\nexpected: ${JSON.stringify(expectedIds)}\nactual: ${JSON.stringify(bRows.map(r => r.id))}`)
+        }
+        const cntB = await storageV2.dict.get(v1.names.cntB)
+        if (cntB !== bRows.length) {
+            failWith(`hardDeletionStateOnly: ${v1.names.cntB} = ${JSON.stringify(cntB)}, B rows = ${bRows.length}`)
+        }
+    } else if (mutation.kind === 'hardDeletionNewHost') {
+        const mirRows = await storageV2.find(v1.names.Mir, undefined, undefined, ['label', 'score']) as Row[]
+        const key = (row: Row) => `${JSON.stringify(row.label ?? null)}|${JSON.stringify(row.score ?? null)}`
+        const actual = mirRows.map(key).sort()
+        const expected = aRows.filter(mirSurvives).map(key).sort()
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+            failWith(`hardDeletionNewHost: mirrored rows diverge from naive (A rows with score >= 50)\nexpected: ${JSON.stringify(expected)}\nactual:   ${JSON.stringify(actual)}`)
         }
     } else if (mutation.kind === 'removeEmptyEntity') {
         const tables = await (storageV2 as unknown as { getExistingTables: () => Promise<Set<string>> }).getExistingTables()
@@ -507,6 +603,24 @@ async function runDestructiveMigrationFuzzCase(seed: number, opsCount: number) {
     if (Math.abs(bigSumAfterSmoke - (bigSumActual + smokeDerivedValue)) > 1e-9) {
         failWith(`post-migration smoke: ${v1.names.bigSum} ${bigSumActual} -> ${bigSumAfterSmoke}, expected +${smokeDerivedValue} (filtered chain not wired live)`)
     }
+    // 新宿主的硬删除 live 接线：score 80 的冒烟行已镜像且存活；score 10 的行镜像后立即被硬删除
+    if (mutation.kind === 'hardDeletionNewHost') {
+        const mirCount = async () => (await storageV2.find(v1.names.Mir, undefined, undefined, ['id']) as Row[]).length
+        const mirAfterSmoke = await mirCount()
+        if (mirAfterSmoke !== aRows.filter(mirSurvives).length + 1) {
+            failWith(`post-migration smoke: ${v1.names.Mir} has ${mirAfterSmoke} rows, expected ${aRows.filter(mirSurvives).length + 1} (live Transform into the new host not wired)`)
+        }
+        await storageV2.create(v1.names.A, { label: 'post-low', score: 10 })
+        if (await mirCount() !== mirAfterSmoke) {
+            failWith(`post-migration smoke: a mirrored score-10 row survived; the new host's _isDeleted_ is not wired live`)
+        }
+    }
+    // state-only 的硬删除 live 接线：迁移后新建的 'gone' 行由新代码当场删除
+    if (mutation.kind === 'hardDeletionStateOnly') {
+        const created = await storageV2.create(v1.names.B, { label: 'gone', score: 1 }) as Row
+        const found = await storageV2.findOne(v1.names.B, MatchExp.atom({ key: 'id', value: ['=', created.id] }), undefined, ['id'])
+        if (found) failWith(`post-migration smoke: a new 'gone' B row survived; _isDeleted_ is not wired live after a state-only migration`)
+    }
 
     await (controllerV2.system as MonoSystem).destroy()
     return { seed, executed, mutation, blockedRejected: false }
@@ -551,12 +665,13 @@ function assertSnapshotEqual(
 }
 
 // ---------- 入口 ----------
-// 默认池 1–44（r36 菜单扩到 9 种 + filtered 链后重派生宇宙）：9 种变异全命中——
-//  transformValueChange @ 4,36(fault),43(非 fault)；takeover @ 30(fault),41,44；
-//  transformShrink @ 7,19,23,35,39；hardDeletion @ 8(fault),9,29；removeEmptyEntity @ 12,15,24；
-//  countChange changed @ 21,27 / unchanged @ 18,28,32；computationTypeChange @ 2,3,5,17,20,31,38；
-//  blocked 两种散布其余。
-// CAUTION 决策流契约（r36 版）：菜单扩容重派了 seed→mutation 映射，r34 默认池编号失效。
+// 默认池 1–44（issue #55 菜单扩到 11 种后重派生宇宙；f = kill-resume 种子）：11 种变异全命中——
+//  hardDeletionNewHost @ 30f,41,44f；hardDeletionStateOnly omit @ 4f,43 / empty @ 36f；
+//  hardDeletion @ 8f,23；transformValueChange @ 2f,20f；takeover @ 3,5,17,31,38f,40f；
+//  transformShrink @ 7,19,35,39；removeEmptyEntity @ 9,15,29；countChange changed @ 12f / unchanged @ 24f；
+//  computationTypeChange @ 1,13,16f,22f,25,33,34f,42f；blocked 两种散布其余。
+//  每个变异形态 × {fault, 非 fault} 全覆盖需要 1–151（夜间扩展池负责；PR 池保持 44 个种子的成本）。
+// CAUTION 决策流契约（issue #55 版）：菜单扩容重派了 seed→mutation 映射，r36 默认池编号失效。
 const SEED_START = Number(process.env.FUZZ_MIGD_SEED_START ?? 1)
 const SEED_COUNT = Number(process.env.FUZZ_MIGD_SEED_COUNT ?? 44)
 const OPS = Number(process.env.FUZZ_MIGD_OPS ?? 10)
