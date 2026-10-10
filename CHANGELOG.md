@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.11.2](https://github.com/InteraqtDev/interaqt/compare/v4.11.1...v4.11.2) (2026-10-10)
+
+### Bug Fixes
+
+* **migration:** require destructive-scope approval only when stored rows can be deleted ([#56](https://github.com/InteraqtDev/interaqt/issues/56)) ([613e0fe](https://github.com/InteraqtDev/interaqt/commit/613e0fe8f0e0118081957a62fb40200c7330b867)), closes [#55](https://github.com/InteraqtDev/interaqt/issues/55) [#54](https://github.com/InteraqtDev/interaqt/issues/54)
+
 ## [4.11.1](https://github.com/InteraqtDev/interaqt/compare/v4.11.0...v4.11.1) (2026-10-03)
 
 ### Bug Fixes
