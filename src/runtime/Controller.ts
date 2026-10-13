@@ -624,8 +624,11 @@ export class Controller {
         for (const computation of this.scheduler.computationsHandles.values()) {
             if (!this.scheduler.isAsyncComputation(computation)) continue
             const taskRecordName = this.scheduler.getAsyncTaskRecordKey(computation)
-            const removed = await this.system.storage.runInTransaction(
-                { name: `cleanupAsyncTasks:${taskRecordName}` },
+            const transactionName = `cleanupAsyncTasks:${taskRecordName}`
+            // Deleting task rows emits normal mutation events; a computation that reads the task
+            // link can require SERIALIZABLE, so take the same upgrade-and-retry path as dispatch.
+            const removed = await runWithTransactionRetry(transactionName, (isolation) => this.system.storage.runInTransaction(
+                { name: transactionName, isolation },
                 async () => {
                     // 快照未投递行占用的 freshnessKey 分区（通常极少：pending/success 是瞬态）。
                     const unappliedRows = await this.system.storage.find(
@@ -642,7 +645,7 @@ export class Controller {
                     const deleted = await this.system.storage.delete(taskRecordName, terminalMatch) as unknown as unknown[]
                     return Array.isArray(deleted) ? deleted.length : 0
                 }
-            ) as number
+            )) as number
             results.push({ taskRecordName, removed })
         }
         return results
@@ -651,9 +654,10 @@ export class Controller {
     /**
      * Single entry point for declarative entity row retention (FR-RET-01).
      *
-     * Scans only entities that declare a non-forever `retention`. Runs in independent
-     * storage transaction(s) outside any business attempt. Does not clean internal
-     * async-task tables — use `cleanupAsyncTasks` for those.
+     * Scans only entities that declare a non-forever `retention`. Runs one independent
+     * storage transaction per entity, outside any business attempt, with the same
+     * isolation upgrade and retry as dispatch (`runWithTransactionRetry`). Does not clean
+     * internal async-task tables — use `cleanupAsyncTasks` for those.
      *
      * Combination order for `mode:'cap'` with optional `ttl`: expire by TTL first, then
      * apply per-partition latest-N by explicit `orderBy` (each key DESC).
@@ -702,10 +706,14 @@ export class Controller {
             const retention = entity.retention
             if (!retention || retention.mode === 'forever') continue
             const activeRetention = retention
-            const removed = await this.system.storage.runInTransaction(
-                { name: `maintainEntityRetention:${entity.name}` },
+            const transactionName = `maintainEntityRetention:${entity.name}`
+            // Retention deletes trigger the computations that read this entity (e.g. the delete patch
+            // of a data-based Transform), which can require SERIALIZABLE: take the same
+            // upgrade-and-retry path as dispatch.
+            const removed = await runWithTransactionRetry(transactionName, (isolation) => this.system.storage.runInTransaction(
+                { name: transactionName, isolation },
                 async () => this.applyEntityRetention(entity.name, activeRetention, now),
-            ) as number
+            )) as number
             entities.push({ entityName: entity.name, removed })
             removedTotal += removed
         }

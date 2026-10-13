@@ -1,6 +1,6 @@
 import {
     Controller, Entity, MonoSystem, Property, MatchExp, DataDep, PropertyDataContext,
-    DataBasedComputation, ComputationResult, Dictionary, GlobalDataContext, KlassByName
+    DataBasedComputation, ComputationResult, Dictionary, GlobalDataContext, KlassByName, Transform
 } from "interaqt";
 import { PGLiteDB } from '@drivers';
 import { describe, expect, test } from "vitest";
@@ -249,6 +249,62 @@ describe('async task retention (C1)', () => {
         const summary = await controller.cleanupAsyncTasks()
         expect(summary.find(s => s.taskRecordName === taskRecordName)!.removed).toBe(1)
         expect(await system.storage.dict.get('retGlobal')).toBe('dict_g1')
+
+        await system.destroy()
+    })
+
+    test('a data-based Transform that reads the task link: cleanup takes the SERIALIZABLE upgrade', async () => {
+        // A property-level async computation links each task row to its host record through
+        // the framework-declared 1:1 relation exposed on the host as `_<property>_task`.
+        // A data-based Transform whose attributeQuery traverses that link receives an update
+        // of its source record when cleanup deletes the task row; the update patch requires
+        // SERIALIZABLE (RequireSerializableRetry under READ COMMITTED).
+        const itemEntity = Entity.create({
+            name: 'RetLinkedItem',
+            properties: [
+                Property.create({ name: 'title', type: 'string' }),
+                Property.create({
+                    name: 'summary', type: 'string',
+                    computation: AsyncFieldComputed.create({ source: 'title' }) as never
+                })
+            ]
+        })
+        const itemViewEntity = Entity.create({
+            name: 'RetLinkedItemView',
+            properties: [Property.create({ name: 'title', type: 'string' })],
+            computation: Transform.create({
+                record: itemEntity,
+                attributeQuery: ['title', ['_summary_task', { attributeQuery: ['status'] }]],
+                callback: (item: { title: string }) => ({ title: item.title })
+            })
+        })
+        const system = new MonoSystem(new PGLiteDB())
+        system.conceptClass = KlassByName
+        const controller = new Controller({
+            system,
+            entities: [itemEntity, itemViewEntity],
+            relations: [],
+            computations: [AsyncFieldComputation]
+        })
+        await controller.setup(true)
+        const computation = Array.from(controller.scheduler.computationsHandles.values()).find(
+            c => c.dataContext.type === 'property' && (c.dataContext as PropertyDataContext).host.name === 'RetLinkedItem'
+        )! as DataBasedComputation
+        const taskRecordName = controller.scheduler.getAsyncTaskRecordKey(computation)
+
+        const item = await system.storage.create('RetLinkedItem', { title: 'linked' })
+        const tasks = await system.storage.find(taskRecordName, undefined, undefined, ['id'])
+        expect(tasks).toHaveLength(1)
+        await deliverTask(controller, computation, system, taskRecordName, tasks[0].id, 'done')
+
+        const summary = await controller.cleanupAsyncTasks()
+        expect(summary.find(s => s.taskRecordName === taskRecordName)!.removed).toBe(1)
+        expect(await system.storage.find(taskRecordName, undefined, undefined, ['id'])).toHaveLength(0)
+
+        const itemRow = await system.storage.findOne('RetLinkedItem', MatchExp.atom({ key: 'id', value: ['=', item.id] }), {}, ['title', 'summary'])
+        expect(itemRow.summary).toBe('computed_done')
+        const views = await system.storage.find('RetLinkedItemView', undefined, undefined, ['title'])
+        expect(views.map(v => v.title)).toEqual(['linked'])
 
         await system.destroy()
     })

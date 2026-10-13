@@ -11,6 +11,10 @@
  * 7. Auto-hook default off; when enabled, still calls the same maintainEntityRetention.
  * 8. Deletes go through storage.delete (mutation events observable via storage.listen).
  * 9. BT path: auto-hook runs only after owned COMMIT + deferred postCommit, not inside attempt.
+ * 10. A retained entity that is the source of a data-based Transform: the delete patch requires
+ *     SERIALIZABLE, so each per-entity transaction must take the same RequireSerializableRetry
+ *     upgrade as dispatch. Covered for the direct call (ttl, later entities still pruned) and
+ *     for the auto-hook after dispatch (cap).
  */
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
@@ -24,6 +28,7 @@ import {
   MatchExp,
   MonoSystem,
   Property,
+  Transform,
   clearAllInstances,
   createMigrationManifest,
 } from 'interaqt'
@@ -545,6 +550,118 @@ describe('entity retention — maintainEntityRetention contracts', () => {
       expect(remaining).toEqual([expect.objectContaining({ seq: 3 })])
       await system.destroy()
     }
+  })
+
+  test('data-based Transform source: expired source rows and their derived rows are removed; later entities still run', async () => {
+    // Deleting a data-based Transform source row produces a delete patch, which requires
+    // SERIALIZABLE isolation (RequireSerializableRetry under READ COMMITTED). The retained
+    // source entity is declared before a plain retained entity so that a failure on the
+    // first entity would also leave the second one unpruned.
+    const Ticket = Entity.create({
+      name: 'RetTfTicket',
+      properties: [
+        Property.create({ name: 'label', type: 'string' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: {
+        mode: 'ttl',
+        ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 },
+      },
+    })
+    const TicketView = Entity.create({
+      name: 'RetTfTicketView',
+      properties: [Property.create({ name: 'label', type: 'string' })],
+      computation: Transform.create({
+        record: Ticket,
+        attributeQuery: ['label'],
+        callback: (ticket: { label: string }) => ({ label: ticket.label }),
+      }),
+    })
+    const Later = Entity.create({
+      name: 'RetTfLaterLog',
+      properties: [
+        Property.create({ name: 'label', type: 'string' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: {
+        mode: 'ttl',
+        ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 },
+      },
+    })
+    const { system, controller } = await setupController([Ticket, TicketView, Later])
+
+    const now = 1_700_000_000_000
+    await system.storage.create('RetTfTicket', { label: 'expired-1', createdAt: now - 5000 })
+    await system.storage.create('RetTfTicket', { label: 'expired-2', createdAt: now - 2000 })
+    await system.storage.create('RetTfTicket', { label: 'fresh', createdAt: now - 500 })
+    await system.storage.create('RetTfLaterLog', { label: 'expired', createdAt: now - 5000 })
+    await system.storage.create('RetTfLaterLog', { label: 'fresh', createdAt: now })
+
+    const labelsOf = async (entityName: string) =>
+      ((await system.storage.find(entityName, undefined, undefined, ['label'])) as unknown as Array<{ label: string }>)
+        .map(row => row.label)
+        .sort()
+    expect(await labelsOf('RetTfTicketView')).toEqual(['expired-1', 'expired-2', 'fresh'])
+
+    const report = await controller.maintainEntityRetention({ now })
+    expect(report).toEqual({
+      entities: [
+        { entityName: 'RetTfTicket', removed: 2 },
+        { entityName: 'RetTfLaterLog', removed: 1 },
+      ],
+      removed: 3,
+    })
+
+    expect(await labelsOf('RetTfTicket')).toEqual(['fresh'])
+    expect(await labelsOf('RetTfTicketView')).toEqual(['fresh'])
+    expect(await labelsOf('RetTfLaterLog')).toEqual(['fresh'])
+
+    await system.destroy()
+  })
+
+  test('auto-hook on a data-based Transform source (cap): dispatch succeeds and derived rows follow', async () => {
+    // Same SERIALIZABLE requirement through runAfterSuccessfulDispatch. Without the upgrade,
+    // dispatch rejects after its own transaction has already committed.
+    const Note = Entity.create({
+      name: 'RetTfHookNote',
+      properties: [Property.create({ name: 'seq', type: 'number' })],
+      retention: {
+        mode: 'cap',
+        retainLatest: 1,
+        orderBy: ['seq'],
+      },
+    })
+    const NoteView = Entity.create({
+      name: 'RetTfHookNoteView',
+      properties: [Property.create({ name: 'seq', type: 'number' })],
+      computation: Transform.create({
+        record: Note,
+        attributeQuery: ['seq'],
+        callback: (note: { seq: number }) => ({ seq: note.seq }),
+      }),
+    })
+    const Ping = Interaction.create({
+      name: 'RetTfHookPing',
+      action: Action.create({ name: 'retTfHookPing' }),
+    })
+    const { system, controller } = await setupController([Note, NoteView], {
+      eventSources: [Ping],
+      entityRetention: { runAfterSuccessfulDispatch: true },
+    })
+    for (const seq of [1, 2, 3]) {
+      await system.storage.create('RetTfHookNote', { seq })
+    }
+
+    const res = await controller.dispatch(Ping, { user: user() })
+    expect(res.error).toBeUndefined()
+
+    const seqsOf = async (entityName: string) =>
+      ((await system.storage.find(entityName, undefined, undefined, ['seq'])) as unknown as Array<{ seq: number }>)
+        .map(row => row.seq)
+    expect(await seqsOf('RetTfHookNote')).toEqual([3])
+    expect(await seqsOf('RetTfHookNoteView')).toEqual([3])
+
+    await system.destroy()
   })
 
   test('coexists with cleanupAsyncTasks boundary (does not touch internal task tables)', async () => {

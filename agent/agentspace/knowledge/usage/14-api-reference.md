@@ -1409,7 +1409,7 @@ await controller.setup(true) // Create database tables
 ```
 
 #### maintainEntityRetention(options?): Promise\<RetentionReport\>
-Single official entry that applies declared entity `retention` (cap and/or TTL). Runs in storage transaction(s) **outside** the business dispatch attempt. Entities without retention (or `mode: 'forever'`) are never scanned. Deletes go through `storage.delete` and emit normal mutation events.
+Single official entry that applies declared entity `retention` (cap and/or TTL). Runs one retryable storage transaction per entity **outside** the business dispatch attempt, with the same SERIALIZABLE upgrade as `dispatch`. Entities without retention (or `mode: 'forever'`) are never scanned. Deletes go through `storage.delete` and emit normal mutation events, so computations that read the entity (for example a data-based Transform whose source is the entity) are updated in the same transaction.
 
 ```typescript
 // Explicit maintenance (recommended default)
