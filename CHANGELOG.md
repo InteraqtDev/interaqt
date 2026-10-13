@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.12.0](https://github.com/InteraqtDev/interaqt/compare/v4.11.2...v4.12.0) (2026-10-13)
+
+### Features
+
+* **runtime:** isolate and report retention maintenance failures ([#59](https://github.com/InteraqtDev/interaqt/issues/59)) ([a24cbb3](https://github.com/InteraqtDev/interaqt/commit/a24cbb330f428e0a827d6bb6f1a16435a0e7f652)), closes [#57](https://github.com/InteraqtDev/interaqt/issues/57) [#57](https://github.com/InteraqtDev/interaqt/issues/57)
+
+### Bug Fixes
+
+* **migration:** reconcile constraint objects with the declared constraints ([#58](https://github.com/InteraqtDev/interaqt/issues/58)) ([20438a7](https://github.com/InteraqtDev/interaqt/commit/20438a7eb3c97dae59a70b2de325626e0866121a)), closes [one2x-ai/mesh#1674](https://github.com/one2x-ai/mesh/issues/1674)
+* **runtime:** upgrade retention and async-task cleanup transactions to SERIALIZABLE on demand ([#57](https://github.com/InteraqtDev/interaqt/issues/57)) ([3bc6d26](https://github.com/InteraqtDev/interaqt/commit/3bc6d2645377bf5b3def87b123d14091a3ea9394))
+
 ## [4.11.2](https://github.com/InteraqtDev/interaqt/compare/v4.11.1...v4.11.2) (2026-10-10)
 
 ### Bug Fixes
