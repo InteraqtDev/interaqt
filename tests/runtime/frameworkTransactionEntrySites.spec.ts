@@ -159,7 +159,7 @@ describe('framework-owned transaction entry sites', () => {
     });
 
     test('the framework entry points that run computations use the helper (no direct call remains in them)', () => {
-        for (const enclosing of ['Controller.maintainEntityRetention', 'Controller.cleanupAsyncTasks', 'Scheduler.handleAsyncReturn', 'MonoStorage.withAtomicTransaction']) {
+        for (const enclosing of ['Controller.maintainEntityRetention', 'Controller.applyEntityRetention', 'Controller.deleteExpiredByTtl', 'Controller.deleteBeyondCap', 'Controller.cleanupAsyncTasks', 'Scheduler.handleAsyncReturn', 'MonoStorage.withAtomicTransaction']) {
             expect(sites.filter(site => site.enclosing === enclosing).map(site => `${site.file}:${site.line}`), enclosing).toEqual([]);
         }
         const helperCallers = new Set<string>();
@@ -174,9 +174,12 @@ describe('framework-owned transaction entry sites', () => {
             };
             visit(sourceFile);
         }
+        // Retention opens one transaction per TTL batch (deleteExpiredByTtl) and one for the cap
+        // pass (applyEntityRetention); maintainEntityRetention itself only iterates entities.
         expect([...helperCallers].sort()).toEqual([
+            'Controller.applyEntityRetention',
             'Controller.cleanupAsyncTasks',
-            'Controller.maintainEntityRetention',
+            'Controller.deleteExpiredByTtl',
             'MonoStorage.withAtomicTransaction',
             'Scheduler.handleAsyncReturn',
         ]);

@@ -15,7 +15,7 @@ import { RealTimeHandles } from "./computations/RealTime.js";
 import { StateMachineHandles } from "./computations/StateMachine.js";
 import { CustomHandles } from "./computations/Custom.js";
 import { ScopedSequenceHandles } from "./computations/ScopedSequence.js";
-import { ComputationError, IdempotencyError, PostCommitRerunError, SchedulerError, SideEffectError } from "./errors/index.js";
+import { ComputationError, IdempotencyError, MaintenanceError, PostCommitRerunError, SchedulerError, SideEffectError, type MaintenanceFailure } from "./errors/index.js";
 import { assert } from "./util.js";
 import { asyncEffectsContext } from "./asyncEffectsContext.js";
 import { asyncInteractionContext } from "./asyncInteractionContext.js";
@@ -143,7 +143,18 @@ export type DispatchResponse = {
      * this field is whether this response's stage P ran and succeeded.
      */
     postCommitPhase?: PostCommitPhase
+    /**
+     * Outcome of the optional retention auto-hook (`entityRetention.runAfterSuccessfulDispatch`)
+     * that ran after this response's commit. Present only when the hook ran. Retention is
+     * maintenance, not an obligation of the dispatch: a failure is reported here and logged,
+     * never sets `error`, never rejects the call and does not change `postCommitPhase`.
+     */
+    entityRetention?: EntityRetentionHookOutcome
 }
+
+export type EntityRetentionHookOutcome =
+    | { status: 'complete'; report: RetentionReport }
+    | { status: 'failed'; error: unknown }
 
 /**
  * Official predicate: this result object's stage P ran to completion with no failures.
@@ -258,6 +269,8 @@ export type EntityRetentionControllerOptions = {
      * When true, call `maintainEntityRetention()` after a successful dispatch commit
      * (and after postCommit / mutation side effects). Default false — explicit control.
      * Still uses the same single prune path; does not invent a second deletion semantics.
+     * The outcome is reported in `DispatchResponse.entityRetention`; a failure never
+     * rejects `dispatch` or `runInBusinessTransaction`.
      */
     runAfterSuccessfulDispatch?: boolean
 }
@@ -610,6 +623,10 @@ export class Controller {
      * 判定（isLatestAsyncTask 取分区内最大 id）依赖后来的终态行存在。分区里还有未投递
      * 行时整个分区跳过清理，投递语义不受影响。
      *
+     * 每张 task 表各自一个事务：某张表失败不影响其余表，全部处理完后抛 `MaintenanceError`
+     * （`report` 为已提交表的计数，`failures` 为失败的表）；在调用方持有的存储事务内调用时，
+     * 第一个错误原样抛出，由外层事务回滚。
+     *
      * @returns 每张 task 表的清理计数（recordName = 内部 task 表名）。
      */
     async cleanupAsyncTasks(options?: { statuses?: Array<'applied' | 'skipped'> }): Promise<Array<{ taskRecordName: string, removed: number }>> {
@@ -622,32 +639,43 @@ export class Controller {
             )
         }
         const results: Array<{ taskRecordName: string, removed: number }> = []
+        const failures: MaintenanceFailure[] = []
         for (const computation of this.scheduler.computationsHandles.values()) {
             if (!this.scheduler.isAsyncComputation(computation)) continue
             const taskRecordName = this.scheduler.getAsyncTaskRecordKey(computation)
             // Deleting task rows emits normal mutation events; a computation that reads the task
             // link can require SERIALIZABLE, so take the same upgrade-and-retry path as dispatch.
-            const removed = await runInRetryableTransaction(
-                this.system.storage,
-                `cleanupAsyncTasks:${taskRecordName}`,
-                async () => {
-                    // 快照未投递行占用的 freshnessKey 分区（通常极少：pending/success 是瞬态）。
-                    const unappliedRows = await this.system.storage.find(
-                        taskRecordName,
-                        BoolExp.atom({ key: 'status', value: ['in', ['pending', 'success']] }),
-                        undefined,
-                        ['freshnessKey']
-                    ) as Array<{ freshnessKey?: unknown }>
-                    const liveKeys = [...new Set(unappliedRows.map(row => row.freshnessKey).filter(key => key !== undefined && key !== null))]
-                    let terminalMatch = BoolExp.atom({ key: 'status', value: ['in', statuses] })
-                    if (liveKeys.length) {
-                        terminalMatch = terminalMatch.and({ key: 'freshnessKey', value: ['not in', liveKeys] })
+            let removed: number
+            try {
+                removed = await runInRetryableTransaction(
+                    this.system.storage,
+                    `cleanupAsyncTasks:${taskRecordName}`,
+                    async () => {
+                        // 快照未投递行占用的 freshnessKey 分区（通常极少：pending/success 是瞬态）。
+                        const unappliedRows = await this.system.storage.find(
+                            taskRecordName,
+                            BoolExp.atom({ key: 'status', value: ['in', ['pending', 'success']] }),
+                            undefined,
+                            ['freshnessKey']
+                        ) as Array<{ freshnessKey?: unknown }>
+                        const liveKeys = [...new Set(unappliedRows.map(row => row.freshnessKey).filter(key => key !== undefined && key !== null))]
+                        let terminalMatch = BoolExp.atom({ key: 'status', value: ['in', statuses] })
+                        if (liveKeys.length) {
+                            terminalMatch = terminalMatch.and({ key: 'freshnessKey', value: ['not in', liveKeys] })
+                        }
+                        const deleted = await this.system.storage.delete(taskRecordName, terminalMatch) as unknown as unknown[]
+                        return Array.isArray(deleted) ? deleted.length : 0
                     }
-                    const deleted = await this.system.storage.delete(taskRecordName, terminalMatch) as unknown as unknown[]
-                    return Array.isArray(deleted) ? deleted.length : 0
-                }
-            ) as number
+                ) as number
+            } catch (error) {
+                if (this.system.storage.isInTransaction()) throw error
+                failures.push({ target: taskRecordName, error })
+                continue
+            }
             results.push({ taskRecordName, removed })
+        }
+        if (failures.length) {
+            throw new MaintenanceError({ operation: 'cleanupAsyncTasks', report: results, failures })
         }
         return results
     }
@@ -655,12 +683,18 @@ export class Controller {
     /**
      * Single entry point for declarative entity row retention (FR-RET-01).
      *
-     * Scans only entities that declare a non-forever `retention`. Runs one independent
-     * storage transaction per entity, outside any business attempt, with the same
-     * isolation upgrade and retry as dispatch (`runInRetryableTransaction`). Called inside
-     * an active storage transaction, it runs in that transaction without retry, and the
-     * outer transaction owner handles `RequireSerializableRetry`. Does not clean internal
-     * async-task tables — use `cleanupAsyncTasks` for those.
+     * Scans only entities that declare a non-forever `retention`. Runs outside any business
+     * attempt, in independent storage transactions with the same isolation upgrade and retry
+     * as dispatch (`runInRetryableTransaction`): one transaction per TTL batch, so committed
+     * batches survive a later failure and a conflict reruns one batch, and one transaction for
+     * the cap pass, which ranks rows from a single scan. Does not clean internal async-task
+     * tables — use `cleanupAsyncTasks` for those.
+     *
+     * A failing entity does not stop the others. After every entity has run, failures are
+     * thrown as `MaintenanceError` whose `report` counts the committed deletions (including
+     * batches a failed entity committed before failing). Called inside an active storage
+     * transaction, everything runs in that transaction without retry and the first failure
+     * propagates unchanged, so the owner of that transaction can roll it back.
      *
      * Combination order for `mode:'cap'` with optional `ttl`: expire by TTL first, then
      * apply per-partition latest-N by explicit `orderBy` (each key DESC).
@@ -704,69 +738,92 @@ export class Controller {
         }
 
         const entities: RetentionEntityReport[] = []
+        const failures: MaintenanceFailure[] = []
         let removedTotal = 0
         for (const entity of targets) {
             const retention = entity.retention
             if (!retention || retention.mode === 'forever') continue
-            const activeRetention = retention
-            // Retention deletes trigger the computations that read this entity (e.g. the delete patch
-            // of a data-based Transform), which can require SERIALIZABLE: take the same
-            // upgrade-and-retry path as dispatch.
-            const removed = await runInRetryableTransaction(
-                this.system.storage,
-                `maintainEntityRetention:${entity.name}`,
-                async () => this.applyEntityRetention(entity.name, activeRetention, now),
-            ) as number
-            entities.push({ entityName: entity.name, removed })
-            removedTotal += removed
+            // Counts deletions as their transactions commit, so a failed entity still reports
+            // the batches it committed.
+            const progress = { removed: 0 }
+            try {
+                await this.applyEntityRetention(entity.name, retention, now, progress)
+            } catch (error) {
+                if (this.system.storage.isInTransaction()) throw error
+                failures.push({ target: entity.name, error })
+            }
+            entities.push({ entityName: entity.name, removed: progress.removed })
+            removedTotal += progress.removed
         }
-        return { entities, removed: removedTotal }
+        const report: RetentionReport = { entities, removed: removedTotal }
+        if (failures.length) {
+            throw new MaintenanceError({ operation: 'maintainEntityRetention', report, failures })
+        }
+        return report
     }
 
+    // Retention deletes trigger the computations that read the entity (e.g. the delete patch of a
+    // data-based Transform), which can require SERIALIZABLE: every transaction below takes the same
+    // upgrade-and-retry path as dispatch.
     private async applyEntityRetention(
         entityName: string,
         retention: Exclude<EntityRetention, { mode: 'forever' }>,
         now: number,
-    ): Promise<number> {
-        let removed = 0
+        progress: { removed: number },
+    ): Promise<void> {
         if (retention.mode === 'ttl') {
-            removed += await this.deleteExpiredByTtl(entityName, retention.ttl, now)
-            return removed
+            await this.deleteExpiredByTtl(entityName, retention.ttl, now, progress)
+            return
         }
         // mode: 'cap' — optional ttl first, then latest-N
         if (retention.ttl) {
-            removed += await this.deleteExpiredByTtl(entityName, retention.ttl, now)
+            await this.deleteExpiredByTtl(entityName, retention.ttl, now, progress)
         }
-        removed += await this.deleteBeyondCap(entityName, retention)
-        return removed
+        progress.removed += await runInRetryableTransaction(
+            this.system.storage,
+            `maintainEntityRetention:${entityName}`,
+            () => this.deleteBeyondCap(entityName, retention),
+        )
     }
 
     private async deleteExpiredByTtl(
         entityName: string,
         ttl: { timestampProperty: string; maxAgeMs: number },
         now: number,
-    ): Promise<number> {
+        progress: { removed: number },
+    ): Promise<void> {
         const cutoff = now - ttl.maxAgeMs
-        let removed = 0
-        // Batch by id so large tables do not build one giant mutation event list.
+        // One transaction per batch of ids: an expired row qualifies on its own, so each batch is
+        // a complete retention step. Committed batches survive a later failure, and a conflict
+        // reruns one batch instead of the whole backlog. Once a batch committed at SERIALIZABLE,
+        // later batches start there instead of repeating the failing READ COMMITTED attempt.
+        let initialIsolation: TransactionIsolation | undefined
         for (;;) {
-            const expired = await this.system.storage.find(
-                entityName,
-                MatchExp.atom({ key: ttl.timestampProperty, value: ['<', cutoff] }),
-                { limit: ENTITY_RETENTION_DELETE_BATCH, orderBy: { id: 'ASC' } },
-                ['id'],
-            ) as Array<{ id: string }>
-            if (!expired.length) break
-            const ids = expired.map(row => row.id)
-            const deleted = await this.system.storage.delete(
-                entityName,
-                MatchExp.atom({ key: 'id', value: ['in', ids] }),
-            ) as unknown as unknown[]
-            const count = Array.isArray(deleted) ? deleted.length : ids.length
-            removed += count
-            if (expired.length < ENTITY_RETENTION_DELETE_BATCH) break
+            const batch = await runInRetryableTransaction(
+                this.system.storage,
+                `maintainEntityRetention:${entityName}`,
+                async () => {
+                    const expired = await this.system.storage.find(
+                        entityName,
+                        MatchExp.atom({ key: ttl.timestampProperty, value: ['<', cutoff] }),
+                        { limit: ENTITY_RETENTION_DELETE_BATCH, orderBy: { id: 'ASC' } },
+                        ['id'],
+                    ) as Array<{ id: string }>
+                    const isolation = this.system.storage.getTransactionIsolation()
+                    if (!expired.length) return { found: 0, removed: 0, isolation }
+                    const ids = expired.map(row => row.id)
+                    const deleted = await this.system.storage.delete(
+                        entityName,
+                        MatchExp.atom({ key: 'id', value: ['in', ids] }),
+                    ) as unknown as unknown[]
+                    return { found: expired.length, removed: Array.isArray(deleted) ? deleted.length : ids.length, isolation }
+                },
+                { initialIsolation },
+            )
+            progress.removed += batch.removed
+            initialIsolation = batch.isolation
+            if (batch.found < ENTITY_RETENTION_DELETE_BATCH) break
         }
-        return removed
     }
 
     private async deleteBeyondCap(
@@ -1388,8 +1445,11 @@ export class Controller {
             await this.runPostCommitPhase(item.eventSource, item.args, item.result)
         }
         // Same optional hook as non-BT dispatch: after owned COMMIT + deferred postCommit.
+        // One pass for the whole business transaction, reported on every applied result.
         if (anySuccessfulApplied && this.entityRetentionOptions.runAfterSuccessfulDispatch) {
-            await this.maintainEntityRetention()
+            await this.runEntityRetentionHook(
+                deferred.map(item => item.result).filter(result => !result.error && result.outcome !== 'replayed'),
+            )
         }
         return fnResult
     }
@@ -1497,7 +1557,7 @@ export class Controller {
                 // Optional retention maintenance after successful commit + postCommit.
                 // Independent storage transaction(s); never inside the attempt body.
                 if (this.entityRetentionOptions.runAfterSuccessfulDispatch) {
-                    await this.maintainEntityRetention()
+                    await this.runEntityRetentionHook([result])
                 }
             }
         }
@@ -1726,6 +1786,25 @@ export class Controller {
                 })
             })
         })
+    }
+
+    /**
+     * Optional retention auto-hook, after the owning COMMIT and stage P, outside any transaction.
+     * Maintenance is not an obligation of the triggering dispatches: the outcome is attached to
+     * each triggering response as `entityRetention`, a failure is also logged, and nothing is
+     * thrown — the facts are committed, and a rejection would invite the caller to repeat them.
+     */
+    private async runEntityRetentionHook(results: DispatchResponse[]) {
+        let outcome: EntityRetentionHookOutcome
+        try {
+            outcome = { status: 'complete', report: await this.maintainEntityRetention() }
+        } catch (error) {
+            this.system.logger.error({ label: 'entityRetention', message: 'runAfterSuccessfulDispatch failed', error })
+            outcome = { status: 'failed', error }
+        }
+        for (const result of results) {
+            result.entityRetention = outcome
+        }
     }
 
     /**
