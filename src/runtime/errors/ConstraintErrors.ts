@@ -50,12 +50,25 @@ export type ConstraintSetupErrorOptions = {
     driver?: string,
     rawCode?: string | number,
     causedBy?: Error,
+    /** Each installed constraint object that does not match the declared model (catalog check). */
+    mismatches?: ConstraintObjectMismatch[],
+}
+
+export type ConstraintObjectMismatch = {
+    status: 'missing' | 'extra' | 'different' | 'undecidable',
+    kind: string,
+    physicalName: string,
+    tableName: string,
+    constraintName?: string,
+    recordName?: string,
+    reason: string,
 }
 
 export class ConstraintSetupError extends FrameworkError {
     public readonly constraintName?: string;
     public readonly recordName?: string;
     public readonly properties?: string[];
+    public readonly mismatches?: ConstraintObjectMismatch[];
 
     constructor(message: string, options: ConstraintSetupErrorOptions = {}) {
         super(message, {
@@ -78,6 +91,7 @@ export class ConstraintSetupError extends FrameworkError {
         this.constraintName = options.constraintName;
         this.recordName = options.recordName;
         this.properties = options.properties;
+        this.mismatches = options.mismatches;
     }
 }
 

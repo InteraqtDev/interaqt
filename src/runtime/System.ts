@@ -308,6 +308,8 @@ export interface System {
     applyMigrationSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
     verifyMigrationSchema?: (plan: MigrationSchemaPlan) => Promise<void>
     applyMigrationPostSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
+    /** Drops constraint objects the model no longer declares; runs in the migration transaction before recompute. */
+    applyMigrationConstraintCleanup?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
     hasExistingData?: () => Promise<boolean>
     beginMigration?: (modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount?: number) => Promise<MigrationRunState>
     updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>

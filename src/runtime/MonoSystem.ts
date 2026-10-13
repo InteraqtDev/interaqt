@@ -45,8 +45,11 @@ import {
 import { RecordBoundState } from "./computations/Computation.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
-import { canonicalJSONStringify, createFrameworkApplicationIdentityIndexSQL, createFrameworkLogicalIdUniqueIndexSQL, createUniqueIndexSQL, frameworkApplicationIdentityIndexes, frameworkLogicalIdUniqueIndexes, getSchemaDialect, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, shouldSkipConstraintForDialect, timestampParamForDialect } from "@storage";
-import type { AdditiveDDLOperation, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
+import { buildDesiredManagedConstraints, canonicalJSONStringify, createDesiredTransformUniqueIndex, describeManagedConstraintEntry, frameworkApplicationIdentityIndexes, frameworkLogicalIdUniqueIndexes, getSchemaDialect, isStartupBlockingConstraintMismatch, managedConstraintDropSQL, managedConstraintFingerprintSQL, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, readInstalledManagedConstraints, reconcileManagedConstraints, requiresConstraintRemovalApproval, shouldSkipConstraintForDialect, timestampParamForDialect, type DesiredManagedConstraint, type ManagedConstraintReconciliationEntry } from "@storage";
+import type { AdditiveDDLOperation, ConstraintCleanupOperation, MigrationConstraintChange, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
+
+/** Constraint objects that only the system layer can derive (Transform unique indexes need computation state). */
+type ExtraManagedConstraints = (dbSetup: DBSetup) => DesiredManagedConstraint[]
 
 function JSONStringify(value: unknown) {
     // CAUTION JSON.stringify(undefined) 返回 undefined（非字符串），encodeURI 会把它 ToString
@@ -514,7 +517,7 @@ RETURNING "lastValue" AS value`,
     private needsDispatchIdempotencyTable() {
         return typeof this.db.setupDispatchIdempotencyState === 'function'
     }
-    async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false, options?: SystemSchemaOptions) {
+    async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false, options?: SystemSchemaOptions, extraManagedConstraints?: ExtraManagedConstraints) {
         await this.db.open(createTables)
         if (createTables && this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
@@ -543,11 +546,17 @@ RETURNING "lastValue" AS value`,
             )
         }
         if (createTables) await dbSetup.createTables()
-        await this.createConstraints(dbSetup)
-        // Framework logical-id UNIQUE INDEX (identity contract): per non-filtered entity/relation
-        // on physical idField, via createUniqueIndexSQL — not user UniqueConstraint pipeline.
-        await this.setupFrameworkLogicalIdUniqueIndexes(dbSetup)
-        await this.setupFrameworkApplicationIdentityIndexes(dbSetup)
+        const desiredConstraints = this.buildDesiredManagedConstraints(dbSetup, extraManagedConstraints)
+        if (createTables) {
+            await this.createManagedConstraints(desiredConstraints)
+            await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'install')
+        } else {
+            // CAUTION attach 不执行任何约束 DDL（mesh#1674）：此前 setup(false) 重放安装期的 CREATE——
+            //  唯一索引靠 IF NOT EXISTS 恰好幂等，NonNull 的 ADD CONSTRAINT 不幂等，声明了 NonNull
+            //  的应用每次重启都失败；而且这些 DDL 绕过了审阅、验证与迁移锁。声明变化已被 modelHash
+            //  校验拦在 setup(false) 之外，这里只剩「数据库偏离声明」一种情况：只读核对，不一致即 fail-fast。
+            await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'attach')
+        }
         if (this.db.setupRecordSequences) {
             const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
             await this.db.setupRecordSequences(Object.keys(dbSetup.map.records).map(recordName => {
@@ -575,7 +584,7 @@ RETURNING "lastValue" AS value`,
         this.schema = this.createSchemaMetadata(dbSetup)
     }
 
-    async prepareMigrationAdditive(entities: EntityInstance[], relations: RelationInstance[], options?: SystemSchemaOptions): Promise<MigrationSchemaPlan> {
+    async prepareMigrationAdditive(entities: EntityInstance[], relations: RelationInstance[], options?: SystemSchemaOptions, extraManagedConstraints?: ExtraManagedConstraints): Promise<MigrationSchemaPlan> {
         await this.ensureDbOpenForSchemaRead()
         if (this.db.setupInternalComputationState) {
             // The table creation itself is idempotent, but planning must stay
@@ -627,14 +636,21 @@ RETURNING "lastValue" AS value`,
                     : `CREATE TABLE IF NOT EXISTS "_DispatchIdempotency_" ("namespace" TEXT NOT NULL, "idempotencyKey" TEXT NOT NULL, "state" TEXT NOT NULL, "data" ${jsonType} NULL, "context" ${jsonType} NULL, "createdAt" NUMERIC NOT NULL, PRIMARY KEY ("namespace", "idempotencyKey"))`,
             })
         }
-        const { verificationDDL, postRecomputeDDL } = this.createPostRecomputeSchemaPlan(dbSetup)
+        this.assertMigrationConstraintCapabilities(dbSetup)
+        const desiredConstraints = this.buildDesiredManagedConstraints(dbSetup, extraManagedConstraints)
+        const dialect = getSchemaDialect(this.db)
+        const installedConstraints = await readInstalledManagedConstraints(this.db, dialect, Object.keys(dbSetup.tables))
+        const reconciliation = reconcileManagedConstraints(desiredConstraints, installedConstraints, dialect)
+        const { verificationDDL, postRecomputeDDL } = this.createPostRecomputeSchemaPlan(dbSetup, reconciliation)
         return {
             schema: this.createSchemaMetadata(dbSetup),
             preRecomputeDDL,
+            constraintCleanupDDL: this.createConstraintCleanupPlan(reconciliation),
             postRecomputeDDL,
             verificationDDL,
+            constraintChanges: this.createConstraintChanges(reconciliation),
             blockingChanges: [],
-            internal: { dbSetup },
+            internal: { dbSetup, desiredConstraints },
         }
     }
 
@@ -746,8 +762,27 @@ RETURNING "lastValue" AS value`,
         this.schema = this.createSchemaMetadata(dbSetup)
     }
 
+    async applyMigrationConstraintCleanup(plan: MigrationSchemaPlan, migrationId?: string) {
+        await this.applyMigrationOperations('constraint-cleanup', plan.constraintCleanupDDL, migrationId)
+    }
+
     async applyPostRecomputeSchemaPlan(plan: MigrationSchemaPlan, migrationId?: string) {
         await this.applyMigrationOperations('constraints', plan.postRecomputeDDL, migrationId)
+        // 检查不变量：写 manifest 之前，数据库目录中的约束对象必须与声明逐一一致（同一事务内，
+        //  不一致则整个迁移回滚）。manifest 从此只记录数据库确实具有的约束集合。
+        const { dbSetup, desiredConstraints } = plan.internal as { dbSetup: DBSetup, desiredConstraints: DesiredManagedConstraint[] }
+        await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'migration')
+    }
+
+    /** Legacy `System.migrateSchema` path: creates only the Transform unique indexes that are missing. */
+    async createMissingTransformUniqueIndexes(plan: MigrationSchemaPlan) {
+        const { dbSetup, desiredConstraints } = plan.internal as { dbSetup: DBSetup, desiredConstraints: DesiredManagedConstraint[] }
+        const dialect = getSchemaDialect(this.db)
+        const installed = await readInstalledManagedConstraints(this.db, dialect, Object.keys(dbSetup.tables))
+        const missing = reconcileManagedConstraints(desiredConstraints, installed, dialect)
+            .filter(entry => entry.status === 'missing' && entry.kind === 'transform-unique' && entry.desired)
+            .map(entry => entry.desired!)
+        await this.createManagedConstraints(missing)
     }
 
     async verifyMigrationPlan(plan: MigrationSchemaPlan, migrationId?: string) {
@@ -804,7 +839,7 @@ RETURNING "lastValue" AS value`,
         return operations
     }
 
-    private createPostRecomputeSchemaPlan(dbSetup: DBSetup): { verificationDDL: AdditiveDDLOperation[], postRecomputeDDL: AdditiveDDLOperation[] } {
+    private assertMigrationConstraintCapabilities(dbSetup: DBSetup) {
         const dialect = getSchemaDialect(this.db)
         // 框架内部 kv 约束（_System_/_Dictionary_）在能力缺失方言上跳过（与 setup 面的
         //  createConstraintSQL 同一契约，见 shouldSkipConstraintForDialect）；只对用户声明的
@@ -821,6 +856,11 @@ RETURNING "lastValue" AS value`,
                 driver: this.db.constructor?.name,
             })
         }
+    }
+
+    private createPostRecomputeSchemaPlan(dbSetup: DBSetup, reconciliation: ManagedConstraintReconciliationEntry[]): { verificationDDL: AdditiveDDLOperation[], postRecomputeDDL: AdditiveDDLOperation[] } {
+        const dialect = getSchemaDialect(this.db)
+        const constraintSchemaItems = dbSetup.constraintSchemaItems.filter(item => !shouldSkipConstraintForDialect(item, dialect))
         const verificationDDL = [
             ...constraintSchemaItems.map(item => ({
                 kind: 'verify' as const,
@@ -834,33 +874,79 @@ RETURNING "lastValue" AS value`,
             // columns or duplicate keys are a blocked shape and must fail before CREATE INDEX.
             ...this.createApplicationIdentityVerificationDDL(dbSetup),
         ]
-        const postRecomputeDDL = [
-            ...dbSetup.createConstraintSQL().map(statement => ({
-                kind: 'create-constraint' as const,
-                sql: statement.sql,
-                tableName: statement.item.tableName,
-                logicalPath: statement.item.kind === 'unique'
-                    ? `${statement.item.recordName}.${statement.item.properties.join('.')}`
-                    : `${statement.item.recordName}.${statement.item.property}`,
-                description: `migration setup constraint ${statement.item.constraintName}`,
-            })),
-            // Same identity indexes as setup(true): physical idField UNIQUE via createUniqueIndexSQL.
-            ...createFrameworkLogicalIdUniqueIndexSQL(dbSetup.map, dialect).map(item => ({
-                kind: 'create-constraint' as const,
-                sql: item.sql,
-                tableName: item.table,
-                logicalPath: `${item.recordName}.id`,
-                description: `migration setup framework logical id unique index ${item.recordName}`,
-            })),
-            ...createFrameworkApplicationIdentityIndexSQL(dbSetup.map, dialect).map(item => ({
-                kind: 'create-constraint' as const,
-                sql: item.sql,
-                tableName: item.table,
-                logicalPath: `${item.recordName}.identity.${item.properties.join('.')}`,
-                description: `migration setup framework application identity unique index ${item.recordName}`,
-            })),
-        ]
+        // 只为缺失、定义不同、无法核对定义的对象建索引/约束（后两者的旧对象已在重算前删除），
+        //  并在 PostgreSQL 上记录定义指纹；定义一致但尚无指纹的存量对象只补记指纹。
+        const postRecomputeDDL: AdditiveDDLOperation[] = []
+        for (const entry of reconciliation) {
+            const desired = entry.desired
+            if (!desired) continue
+            const rebuild = entry.status === 'missing' || entry.status === 'different' || entry.status === 'undecidable'
+            if (rebuild) {
+                postRecomputeDDL.push({
+                    kind: 'create-constraint',
+                    sql: desired.createSQL,
+                    tableName: desired.definition.tableName,
+                    logicalPath: desired.logicalPath,
+                    description: this.managedConstraintCreateDescription(desired),
+                })
+            }
+            const fingerprintSQL = rebuild || entry.needsFingerprint ? managedConstraintFingerprintSQL(desired, dialect) : undefined
+            if (fingerprintSQL) {
+                postRecomputeDDL.push({
+                    kind: 'annotate-constraint',
+                    sql: fingerprintSQL,
+                    tableName: desired.definition.tableName,
+                    logicalPath: desired.logicalPath,
+                    description: `migration record constraint definition ${desired.physicalName}`,
+                })
+            }
+        }
         return { verificationDDL, postRecomputeDDL }
+    }
+
+    private createConstraintCleanupPlan(reconciliation: ManagedConstraintReconciliationEntry[]): ConstraintCleanupOperation[] {
+        const dialect = getSchemaDialect(this.db)
+        return reconciliation
+            .filter(entry => entry.installed && (entry.status === 'extra' || entry.status === 'different' || entry.status === 'undecidable'))
+            .map(entry => ({
+                kind: 'drop-constraint' as const,
+                sql: managedConstraintDropSQL(entry.installed!, dialect),
+                tableName: entry.installed!.tableName,
+                logicalPath: entry.physicalName,
+                description: `migration drop constraint ${entry.physicalName}`,
+            }))
+    }
+
+    private createConstraintChanges(reconciliation: ManagedConstraintReconciliationEntry[]): MigrationConstraintChange[] {
+        return reconciliation.filter(entry => entry.status !== 'equal').map(entry => {
+            const base = {
+                constraintKind: entry.kind,
+                tableName: entry.tableName,
+                physicalName: entry.physicalName,
+                recordName: entry.desired?.recordName,
+                constraintName: entry.desired?.constraintName,
+                previousDefinition: entry.installed?.definitionText,
+                nextDefinition: entry.desired?.createSQL,
+                requiresApproval: requiresConstraintRemovalApproval(entry),
+            }
+            if (entry.status === 'missing') {
+                return { ...base, changeType: 'added' as const, reason: 'declared constraint object is not installed; it is created after verification' }
+            }
+            if (entry.status === 'extra') {
+                return { ...base, changeType: 'removed' as const, reason: 'installed constraint object is no longer declared; it is dropped before recompute' }
+            }
+            if (entry.status === 'different') {
+                return { ...base, changeType: 'changed' as const, reason: `${entry.reason}; the installed object is dropped before recompute and the declared definition is created after verification` }
+            }
+            return { ...base, changeType: 'changed' as const, reason: `${entry.reason}; the object is rebuilt to the declared definition` }
+        })
+    }
+
+    private managedConstraintCreateDescription(item: DesiredManagedConstraint) {
+        if (item.kind === 'unique' || item.kind === 'non-null') return `migration setup constraint ${item.constraintName}`
+        if (item.kind === 'logical-id') return `migration setup framework logical id unique index ${item.recordName}`
+        if (item.kind === 'identity') return `migration setup framework application identity unique index ${item.recordName}`
+        return `migration setup transform unique index ${item.recordName}`
     }
 
     private createNonNullVerificationSQL(item: ConstraintSchemaItem) {
@@ -1073,78 +1159,12 @@ RETURNING "lastValue" AS value`,
     }
 
     /**
-     * Emit UNIQUE INDEX on each non-filtered entity/relation logical id physical column.
-     * Bypasses createUniqueConstraintStatement so MySQL (unique:false for user TEXT attrs)
-     * still gets fail-loud identity uniqueness. Columns are idField, never literal "id".
-     *
-     * Idempotent on setup re-entry: dialects without CREATE INDEX IF NOT EXISTS (MySQL)
-     * treat "index already exists" as success so setup(false)/attach does not crash.
-     * First setup still creates the index; missing indexes on a cold attach are created.
+     * The desired constraint set (see ManagedConstraints). Declarations the dialect cannot
+     * express fail here with ConstraintSetupError, before any DDL runs.
      */
-    private async setupFrameworkLogicalIdUniqueIndexes(dbSetup: DBSetup) {
-        const dialect = getSchemaDialect(this.db)
-        for (const item of createFrameworkLogicalIdUniqueIndexSQL(dbSetup.map, dialect)) {
-            try {
-                await this.db.scheme(item.sql, `setup framework logical id unique index ${item.recordName}`)
-            } catch (error) {
-                const normalized = normalizeDatabaseError(error, this.db)
-                // setup(true) then setup(false) / new process attach: index already present.
-                if (normalized.isIndexAlreadyExists) {
-                    continue
-                }
-                throw new ConstraintSetupError(
-                    `Failed to setup framework logical id unique index on "${item.recordName}" (${item.table}.${item.idField})`,
-                    {
-                        constraintName: item.indexName,
-                        physicalName: item.indexName,
-                        recordName: item.recordName,
-                        tableName: item.table,
-                        properties: ['id'],
-                        driver: this.db.constructor?.name,
-                        rawCode: normalized.rawCode,
-                        causedBy: error instanceof Error ? error : undefined,
-                    }
-                )
-            }
-        }
-    }
-
-    /**
-     * Entity.identity UNIQUE INDEX via createUniqueIndexSQL — not UniqueConstraint.
-     * Not registered on constraintSchemaItems: identity conflict is ON CONFLICT observe,
-     * and a leftover 23505 from this index is a product bug, not occupancy.
-     */
-    private async setupFrameworkApplicationIdentityIndexes(dbSetup: DBSetup) {
-        const dialect = getSchemaDialect(this.db)
-        for (const item of createFrameworkApplicationIdentityIndexSQL(dbSetup.map, dialect)) {
-            try {
-                await this.db.scheme(item.sql, `setup framework application identity unique index ${item.recordName}`)
-            } catch (error) {
-                const normalized = normalizeDatabaseError(error, this.db)
-                if (normalized.isIndexAlreadyExists) {
-                    continue
-                }
-                throw new ConstraintSetupError(
-                    `Failed to setup application identity unique index on "${item.recordName}" (${item.table}.${item.fields.join(',')})`,
-                    {
-                        constraintName: item.indexName,
-                        physicalName: item.indexName,
-                        recordName: item.recordName,
-                        tableName: item.table,
-                        properties: item.properties,
-                        driver: this.db.constructor?.name,
-                        rawCode: normalized.rawCode,
-                        causedBy: error instanceof Error ? error : undefined,
-                    }
-                )
-            }
-        }
-    }
-
-    private async createConstraints(dbSetup: DBSetup) {
-        let statements
+    private buildDesiredManagedConstraints(dbSetup: DBSetup, extraManagedConstraints?: ExtraManagedConstraints) {
         try {
-            statements = dbSetup.createConstraintSQL()
+            return buildDesiredManagedConstraints(dbSetup, getSchemaDialect(this.db), extraManagedConstraints?.(dbSetup) || [])
         } catch (error) {
             throw new ConstraintSetupError(
                 error instanceof Error ? error.message : String(error),
@@ -1154,20 +1174,37 @@ RETURNING "lastValue" AS value`,
                 }
             )
         }
+    }
 
-        for (const statement of statements) {
-            const item = statement.item
+    /**
+     * Install-time creation. Each object is created from its declaration and, on
+     * PostgreSQL, annotated with its definition fingerprint. Logical-id indexes bypass
+     * createUniqueConstraintStatement so MySQL (unique:false for user TEXT attributes)
+     * still gets fail-loud identity uniqueness; their columns are idField, never "id".
+     */
+    private async createManagedConstraints(items: DesiredManagedConstraint[]) {
+        const dialect = getSchemaDialect(this.db)
+        for (const item of items) {
+            const fingerprintSQL = managedConstraintFingerprintSQL(item, dialect)
             try {
-                await this.db.scheme(statement.sql, `setup constraint ${item.constraintName}`)
+                await this.db.scheme(item.createSQL, `setup ${item.kind} constraint ${item.physicalName}`)
+                if (fingerprintSQL) await this.db.scheme(fingerprintSQL, `record constraint definition ${item.physicalName}`)
             } catch (error) {
+                const subject = item.kind === 'unique' || item.kind === 'non-null'
+                    ? `constraint "${item.constraintName}"`
+                    : item.kind === 'logical-id'
+                    ? 'framework logical id unique index'
+                    : item.kind === 'identity'
+                    ? 'application identity unique index'
+                    : 'transform unique index'
                 throw new ConstraintSetupError(
-                    `Failed to setup constraint "${item.constraintName}" on "${item.recordName}"`,
+                    `Failed to setup ${subject} on "${item.recordName}" (${item.definition.tableName}.${item.definition.fields.join(',')})`,
                     {
-                        constraintName: item.constraintName,
+                        constraintName: item.constraintName ?? item.physicalName,
                         physicalName: item.physicalName,
                         recordName: item.recordName,
-                        tableName: item.tableName,
-                        properties: item.kind === 'unique' ? item.properties : [item.property],
+                        tableName: item.definition.tableName,
+                        properties: item.properties,
                         driver: this.db.constructor?.name,
                         rawCode: normalizeDatabaseError(error, this.db).rawCode,
                         causedBy: error instanceof Error ? error : undefined,
@@ -1176,6 +1213,46 @@ RETURNING "lastValue" AS value`,
             }
         }
     }
+
+    /**
+     * Compares the catalog with the declarations. install / migration require every object
+     * to match (an internal invariant: the DDL just executed must have produced the declared
+     * set). attach refuses only the differences that change what the database enforces
+     * (see isStartupBlockingConstraintMismatch) and tells the operator to migrate.
+     */
+    private async assertManagedConstraintsReconciled(dbSetup: DBSetup, desired: DesiredManagedConstraint[], mode: 'install' | 'attach' | 'migration') {
+        const dialect = getSchemaDialect(this.db)
+        const installed = await readInstalledManagedConstraints(this.db, dialect, Object.keys(dbSetup.tables))
+        const entries = reconcileManagedConstraints(desired, installed, dialect)
+        const mismatches = mode === 'attach'
+            ? entries.filter(isStartupBlockingConstraintMismatch)
+            : entries.filter(entry => entry.status !== 'equal')
+        if (!mismatches.length) return
+        const first = mismatches[0]
+        const details = mismatches.map(describeManagedConstraintEntry).join('; ')
+        const message = mode === 'attach'
+            ? `The database's constraint objects do not match the declared model (${mismatches.length}): ${details}. ` +
+                `setup(false) does not change constraints. Run controller.generateMigrationDiff(), review it, then controller.migrate({ approvedDiff }) to reconcile them.`
+            : `Constraint objects do not match the declared model after ${mode} (${mismatches.length}): ${details}`
+        throw new ConstraintSetupError(message, {
+            constraintName: first.desired?.constraintName ?? first.physicalName,
+            physicalName: first.physicalName,
+            recordName: first.desired?.recordName,
+            tableName: first.tableName,
+            properties: first.desired?.properties,
+            driver: this.db.constructor?.name,
+            mismatches: mismatches.map(entry => ({
+                status: entry.status as 'missing' | 'extra' | 'different' | 'undecidable',
+                kind: entry.kind,
+                physicalName: entry.physicalName,
+                tableName: entry.tableName,
+                constraintName: entry.desired?.constraintName,
+                recordName: entry.desired?.recordName,
+                reason: entry.reason,
+            })),
+        })
+    }
+
 
     private isRecordTarget(target: AtomicTarget): target is AtomicRecordTarget {
         return (target as AtomicRecordTarget).recordName !== undefined
@@ -2376,13 +2453,13 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
 
         // Pass the prepared entities to storage.setup
-        await this.storage.setup(
+        await (this.storage as MonoStorage).setup(
             entities,
             relations,
             install,
-            schemaOptions
+            schemaOptions,
+            dbSetup => this.transformUniqueIndexes(dbSetup, states),
         )
-        await this.setupTransformUniqueIndexes(states)
     }
 
     // setup（install 轨）与 migration 轨（prepareMigrationSchema / migrateSchema）共用的
@@ -2450,15 +2527,19 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
             entities,
             relations,
             options,
+            dbSetup => this.transformUniqueIndexes(dbSetup, states),
         )
         ;(plan.internal as { states?: ComputationState[] }).states = states
         ;(plan.internal as { options?: SystemSchemaOptions }).options = options
-        plan.postRecomputeDDL.push(...this.createTransformUniqueIndexOperations(plan, states))
         return plan
     }
 
     async applyMigrationSchema(plan: MigrationSchemaPlan, migrationId?: string) {
         await (this.storage as MonoStorage).applyMigrationAdditivePlan(plan, migrationId)
+    }
+
+    async applyMigrationConstraintCleanup(plan: MigrationSchemaPlan, migrationId?: string) {
+        await (this.storage as MonoStorage).applyMigrationConstraintCleanup(plan, migrationId)
     }
 
     async applyMigrationPostSchema(plan: MigrationSchemaPlan, migrationId?: string) {
@@ -2470,16 +2551,9 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
     }
 
     async migrateSchema(originalEntities: EntityInstance[], originalRelations: RelationInstance[], states: ComputationState[], options: SystemSchemaOptions = {}) {
-        const { entities, relations } = this.prepareEntitiesForStorage(originalEntities, originalRelations, states)
-        const plan = await (this.storage as MonoStorage).prepareMigrationAdditive(
-            entities,
-            relations,
-            options,
-        )
-        ;(plan.internal as { states?: ComputationState[] }).states = states
-        ;(plan.internal as { options?: SystemSchemaOptions }).options = options
+        const plan = await this.prepareMigrationSchema(originalEntities, originalRelations, states, options)
         await (this.storage as MonoStorage).applyMigrationAdditivePlan(plan)
-        await this.setupTransformUniqueIndexes(states)
+        await (this.storage as MonoStorage).createMissingTransformUniqueIndexes(plan)
     }
 
     // CAUTION 索引名哈希必须抗碰撞（r26 遗留收口，r25 §三 #3）：此前的 32-bit 弱哈希在
@@ -2490,17 +2564,15 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
         return createHash('sha1').update(input).digest('hex').slice(0, 20)
     }
 
-    // 旧 32-bit 弱哈希：仅用于计算 legacy 索引名以便清理（存量部署上旧名索引与新名索引
-    //  语义相同，重复存在无害但冗余；setup 时尽力 DROP，失败静默——索引清理不是关键路径）。
-    private legacyHashIdentifier(input: string) {
-        let hash = 0
-        for (let i = 0; i < input.length; i++) {
-            hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0
-        }
-        return Math.abs(hash).toString(36)
-    }
-
-    private async setupTransformUniqueIndexes(states: ComputationState[]) {
+    /**
+     * Transform unique indexes over (sourceRecordId, transformIndex) bound-state columns,
+     * part of the desired constraint set. Indexes left behind by a removed Transform, or
+     * named with the pre-r26 32-bit hash, are reconciled as extra objects by migration.
+     */
+    private transformUniqueIndexes(dbSetup: DBSetup, states: ComputationState[]): DesiredManagedConstraint[] {
+        const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
+        const dialect = getSchemaDialect((this.storage as MonoStorage).db)
+        const byName = new Map<string, DesiredManagedConstraint>()
         for (const { dataContext, state } of states) {
             const sourceRecordId = state.sourceRecordId
             const transformIndex = state.transformIndex
@@ -2514,63 +2586,21 @@ CREATE TABLE IF NOT EXISTS "__interaqt_migration_operation_log" (
             }
 
             const recordName = dataContext.id.name!
-            const storage = this.storage as MonoStorage
-            const map = storage.queryHandle!.map
-            const recordInfo = map.getRecordInfo(recordName)
-            const [, sourceRecordIdField] = map.getTableAliasAndFieldName([recordName], sourceRecordId.key, true)
-            const [, transformIndexField] = map.getTableAliasAndFieldName([recordName], transformIndex.key, true)
-            const identifierInput = `${recordInfo.table}_${sourceRecordIdField}_${transformIndexField}`
-            const indexName = `idx_transform_${this.hashIdentifier(identifierInput)}`
-            const dialect = getSchemaDialect(storage.db)
-            await storage.db.scheme(
-                createUniqueIndexSQL(indexName, recordInfo.table, [sourceRecordIdField, transformIndexField], dialect),
-                `setup transform unique index ${recordName}`
-            )
-            // 尽力清理旧 32-bit 哈希命名的等价索引（存量部署遗留；重复索引无害但冗余）。
-            const legacyIndexName = `idx_transform_${this.legacyHashIdentifier(identifierInput)}`
-            if (legacyIndexName !== indexName) {
-                try {
-                    const dropSQL = dialect.name === 'mysql'
-                        ? `DROP INDEX ${quoteIdentifier(legacyIndexName, dialect)} ON ${quoteIdentifier(recordInfo.table, dialect)}`
-                        : `DROP INDEX IF EXISTS ${quoteIdentifier(legacyIndexName, dialect)}`
-                    await storage.db.scheme(dropSQL, `drop legacy transform unique index ${recordName}`)
-                } catch {
-                    // MySQL 无 IF EXISTS：索引不存在时报错，静默即可。
-                }
-            }
-        }
-    }
-
-    private createTransformUniqueIndexOperations(plan: MigrationSchemaPlan, states: ComputationState[]): AdditiveDDLOperation[] {
-        const dbSetup = (plan.internal as { dbSetup?: DBSetup }).dbSetup
-        if (!dbSetup) return []
-        const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
-        const dialect = getSchemaDialect((this.storage as MonoStorage).db)
-        return states.flatMap(({ dataContext, state }) => {
-            const sourceRecordId = state.sourceRecordId
-            const transformIndex = state.transformIndex
-            if (
-                !(sourceRecordId instanceof RecordBoundState) ||
-                !(transformIndex instanceof RecordBoundState) ||
-                (sourceRecordId as any).unique === false ||
-                (dataContext.type !== 'entity' && dataContext.type !== 'relation')
-            ) {
-                return []
-            }
-
-            const recordName = dataContext.id.name!
             const recordInfo = tableMap.getRecordInfo(recordName)
             const [, sourceRecordIdField] = tableMap.getTableAliasAndFieldName([recordName], sourceRecordId.key, true)
             const [, transformIndexField] = tableMap.getTableAliasAndFieldName([recordName], transformIndex.key, true)
             const indexName = `idx_transform_${this.hashIdentifier(`${recordInfo.table}_${sourceRecordIdField}_${transformIndexField}`)}`
-            return [{
-                kind: 'create-constraint' as const,
-                sql: createUniqueIndexSQL(indexName, recordInfo.table, [sourceRecordIdField, transformIndexField], dialect),
-                tableName: recordInfo.table,
+            if (byName.has(indexName)) continue
+            byName.set(indexName, createDesiredTransformUniqueIndex({
+                recordName,
                 logicalPath: `${recordName}.${sourceRecordId.key}.${transformIndex.key}`,
-                description: `migration setup transform unique index ${recordName}`,
-            }]
-        })
+                tableName: recordInfo.table,
+                fields: [sourceRecordIdField, transformIndexField],
+                physicalName: indexName,
+                dialect,
+            }))
+        }
+        return [...byName.values()]
     }
     async destroy() {
         await this.storage.destroy()

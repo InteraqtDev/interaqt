@@ -101,7 +101,7 @@ async function approveGeneratedMigrationDiff(controller: Controller, options: {
             reason: "approved by PostgreSQL migration test",
           };
         }
-        if (requirement.kind === "scoped-sequence-seed" || requirement.kind === "scoped-sequence-no-seed") {
+        if (requirement.kind === "scoped-sequence-seed" || requirement.kind === "scoped-sequence-no-seed" || requirement.kind === "constraint-removal") {
           return {
             ...requirement,
             reason: "approved by PostgreSQL migration test",

@@ -27,6 +27,8 @@ export type SchemaDialect = {
 export type ConstraintSchemaStatement = {
     item: ConstraintSchemaItem,
     sql: string,
+    /** Physical field of every property named in a unique constraint's `where` predicate. */
+    predicateFields?: Record<string, string>,
 }
 
 /**
@@ -282,6 +284,7 @@ export function createUniqueConstraintStatement(
             item.where,
             resolveWhereField,
         ),
+        predicateFields: Object.fromEntries(Object.keys(item.where || {}).map(property => [property, resolveWhereField(property)])),
     }
 }
 

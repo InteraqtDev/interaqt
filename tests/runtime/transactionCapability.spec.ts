@@ -34,7 +34,9 @@ class ReadCommittedOnlyDB implements Database {
   close = async () => undefined;
 }
 
-class UnsupportedTransactionDB extends ReadCommittedOnlyDB {
+// setup() verifies the installed constraint objects through the catalog, so a driver that
+// is set up for dispatch needs a real catalog; only the declared capability is replaced.
+class UnsupportedTransactionPGLiteDB extends PGLiteDB {
   transactionCapability: TransactionCapability = {
     transactions: false,
     isolationLevels: [] as const,
@@ -160,7 +162,7 @@ describe("transaction capability", () => {
       entity: EventRecord,
       mapEventData: () => ({ kind: "unsupported" }),
     });
-    const system = new MonoSystem(new UnsupportedTransactionDB());
+    const system = new MonoSystem(new UnsupportedTransactionPGLiteDB());
     const controller = new Controller({
       system,
       entities: [],

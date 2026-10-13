@@ -387,6 +387,8 @@ Declare uniqueness on the entity. Do **not** emit application `CREATE TABLE` or 
 
 Identity properties are total (`NOT NULL`), unique, and immutable. At most one identity per ordinary entity. Do not declare both identity and UniqueConstraint on the **same** property set. Filtered/merged entities cannot declare identity. Relations cannot declare identity (`Relation.create` has no identity parameter). MySQL fail-fasts at setup (identity insert uses `ON CONFLICT`, and `Controller.dispatch` is unavailable on MySQL).
 
+Changing these declarations on an existing database is a migration. Adding, removing, renaming or redefining a UniqueConstraint (properties or `where`), a NonNullConstraint or an identity shows up in the migration diff as a `kind: "constraint"` change. A removal or redefinition also needs a `constraint-removal` decision. `setup(false)` never changes constraint objects; it refuses to start when the database's constraint objects differ from the declarations. See `agent/skill/interaqt-migration.md` § Constraint Reconciliation.
+
 ```javascript
 const HandshakeToken = Entity.create({
   name: 'HandshakeToken',

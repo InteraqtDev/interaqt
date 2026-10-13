@@ -86,7 +86,7 @@ export async function approveGeneratedMigrationDiff(controller: Controller, opti
                     reason: "approved by migration test",
                 };
             }
-            if (requirement.kind === "scoped-sequence-seed" || requirement.kind === "scoped-sequence-no-seed") {
+            if (requirement.kind === "scoped-sequence-seed" || requirement.kind === "scoped-sequence-no-seed" || requirement.kind === "constraint-removal") {
                 return {
                     ...requirement,
                     reason: "approved by migration test",
