@@ -11,6 +11,7 @@ import {
   Property,
   UniqueConstraint,
   // EntityIdentity, EntityRetention  // TypeScript types (identity / retention on Entity.create)
+  // RetentionReport, EntityRetentionHookOutcome, MaintenanceFailure  // TypeScript types (retention maintenance results)
 
   // Property type extension (Entity/Relation columns only)
   definePropertyType,
@@ -86,6 +87,7 @@ import {
   isPostCommitPhaseComplete, // stage P ran and succeeded on this response (not historical)
   SideEffectError,         // postCommit / RecordMutationSideEffect failures (not result.error)
   PostCommitRerunError,    // caller errors on rerun APIs (INVALID_INPUT, UNKNOWN_RECORD_NAME, ...)
+  MaintenanceError,        // maintainEntityRetention / cleanupAsyncTasks finished with failed targets (report + failures)
   ConditionError,          // DEPRECATED historical factory/shape; use InteractionGuardError + .code
   ConstraintViolationError,
   ConstraintSetupError,

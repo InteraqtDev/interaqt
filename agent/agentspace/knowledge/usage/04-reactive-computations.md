@@ -182,7 +182,7 @@ Entity.create({
 })
 ```
 
-Call `await controller.maintainEntityRetention()` at a safe point (cron / admin). Do not hand-write prune loops against storage as the official pattern. `cleanupAsyncTasks` only clears internal async-task terminal rows and is a separate mechanism.
+Call `await controller.maintainEntityRetention()` at a safe point (cron / admin). Do not hand-write prune loops against storage as the official pattern. `cleanupAsyncTasks` only clears internal async-task terminal rows and is a separate mechanism. A failing entity does not stop the others; the call then rejects with `MaintenanceError`, whose `report` says what was committed and whose `failures` names the entities to investigate.
 
 ### Application identity (natural keys)
 

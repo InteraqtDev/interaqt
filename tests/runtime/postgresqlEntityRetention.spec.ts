@@ -9,7 +9,8 @@
  *
  * The second cell covers the other consumer kinds that require SERIALIZABLE on the production
  * driver: a Custom computation with the default concurrency and a data-based Transform whose
- * source is a relation removed together with the retained rows.
+ * source is a relation removed together with the retained rows. The third cell prunes a TTL
+ * backlog larger than one batch, so several per-batch transactions commit at SERIALIZABLE.
  *
  * Requires INTERAQT_POSTGRES_DATABASE. Uses exclusive DB suffixes because setup(true)
  * drops and recreates the database with FORCE.
@@ -178,4 +179,50 @@ describeIfPostgres('entity retention (PostgreSQL)', () => {
       await system.destroy()
     }
   }, 60000)
+
+  test('a TTL backlog larger than one batch on a Transform source is pruned in per-batch transactions', async () => {
+    const backlogDatabase = `${process.env.INTERAQT_POSTGRES_DATABASE}_retention_backlog`
+    const BATCH = 500 // ENTITY_RETENTION_DELETE_BATCH in Controller.ts
+    const Ticket = Entity.create({
+      name: 'PgRetBacklogTicket',
+      properties: [
+        Property.create({ name: 'seq', type: 'number' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: {
+        mode: 'ttl',
+        ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 },
+      },
+    })
+    const TicketView = Entity.create({
+      name: 'PgRetBacklogTicketView',
+      properties: [Property.create({ name: 'seq', type: 'number' })],
+      computation: Transform.create({
+        record: Ticket,
+        attributeQuery: ['seq'],
+        callback: (ticket: { seq: number }) => ({ seq: ticket.seq }),
+      }),
+    })
+    const system = new MonoSystem(new PostgreSQLDB(backlogDatabase, dbOptions))
+    system.conceptClass = KlassByName
+    const controller = new Controller({ system, entities: [Ticket, TicketView], relations: [] })
+    await controller.setup(true)
+
+    try {
+      const now = 1_700_000_000_000
+      for (let seq = 0; seq < BATCH + 20; seq++) {
+        await system.storage.create('PgRetBacklogTicket', { seq, createdAt: now - 5000 })
+      }
+      await system.storage.create('PgRetBacklogTicket', { seq: -1, createdAt: now })
+      const seqsOf = async (name: string) =>
+        ((await system.storage.find(name, undefined, undefined, ['seq'])) as unknown as Array<{ seq: number }>).map(row => row.seq)
+
+      const report = await controller.maintainEntityRetention({ now })
+      expect(report).toEqual({ entities: [{ entityName: 'PgRetBacklogTicket', removed: BATCH + 20 }], removed: BATCH + 20 })
+      expect(await seqsOf('PgRetBacklogTicket')).toEqual([-1])
+      expect(await seqsOf('PgRetBacklogTicketView')).toEqual([-1])
+    } finally {
+      await system.destroy()
+    }
+  }, 120000)
 })

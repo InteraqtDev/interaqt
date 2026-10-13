@@ -456,6 +456,11 @@ Rules enforced by the API:
   SERIALIZABLE upgrade as `dispatch`: deleting task rows emits normal mutation
   events, and a computation whose `attributeQuery` reads the `_<property>_task`
   link may require SERIALIZABLE.
+- A failing task table does not stop the others. After every table has run, the
+  call rejects with `MaintenanceError` (`operation: 'cleanupAsyncTasks'`):
+  `report` lists the tables that were cleaned, `failures` the tables whose
+  transaction rolled back. Inside a caller-owned storage transaction the first
+  failure propagates unchanged.
 
 ### Error Handling
 

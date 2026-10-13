@@ -126,6 +126,8 @@ await system.storage.runInTransaction(
 
 Do not use old manual transaction APIs such as `beginTransaction`, `commitTransaction`, or `rollbackTransaction`.
 
+Inside a caller-owned transaction, storage writes and framework calls such as `maintainEntityRetention` run in that transaction: there is no per-call SAVEPOINT and no retry (nested `runInTransaction` reuses the outer transaction). The computations triggered by a write run in the same transaction, so a write can fail after its own rows were written — for example with `RequireSerializableRetry` when a computation needs SERIALIZABLE and the outer transaction is READ COMMITTED. Let such an error propagate so that the whole transaction rolls back. Catching it and committing anyway persists a partial state (for example a deleted Transform source whose derived rows were not deleted). Open the outer transaction at `SERIALIZABLE` when the work touches computations that require it.
+
 ### Business transactions (storage + dispatch)
 
 When the same request must write rows and then `dispatch` interactions that **see those uncommitted writes**, use `controller.runInBusinessTransaction`. A bare outer `storage.runInTransaction` around `controller.dispatch` is a **hard runtime error** (`BusinessTransactionBoundaryError` / `code: 'DISPATCH_IN_NON_BT_TRANSACTION'`). Nested `dispatch` remains `NestedDispatchError`. Pure storage `runInTransaction` without `dispatch` stays legal (section above).

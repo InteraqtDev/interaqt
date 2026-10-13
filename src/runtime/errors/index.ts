@@ -28,6 +28,13 @@ export {
 export {
     PostCommitRerunError
 } from './PostCommitRerunError.js'
+export {
+    MaintenanceError
+} from './MaintenanceError.js'
+export type {
+    MaintenanceFailure,
+    MaintenanceOperation
+} from './MaintenanceError.js'
 export type {
     PostCommitRerunErrorCode
 } from './PostCommitRerunError.js'

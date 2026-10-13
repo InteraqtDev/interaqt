@@ -1,6 +1,6 @@
 import {
     Controller, Entity, MonoSystem, Property, MatchExp, DataDep, PropertyDataContext,
-    DataBasedComputation, ComputationResult, Dictionary, GlobalDataContext, KlassByName, Transform
+    DataBasedComputation, ComputationResult, Dictionary, GlobalDataContext, KlassByName, Transform, MaintenanceError
 } from "interaqt";
 import { PGLiteDB } from '@drivers';
 import { describe, expect, test } from "vitest";
@@ -305,6 +305,62 @@ describe('async task retention (C1)', () => {
         expect(itemRow.summary).toBe('computed_done')
         const views = await system.storage.find('RetLinkedItemView', undefined, undefined, ['title'])
         expect(views.map(v => v.title)).toEqual(['linked'])
+
+        await system.destroy()
+    })
+
+    test('a failing task table does not stop the others; failures are reported after every table ran', async () => {
+        const makeItem = (name: string) => Entity.create({
+            name,
+            properties: [
+                Property.create({ name: 'title', type: 'string' }),
+                Property.create({
+                    name: 'summary', type: 'string',
+                    computation: AsyncFieldComputed.create({ source: 'title' }) as never
+                })
+            ]
+        })
+        const first = makeItem('RetFailFirstItem')
+        const second = makeItem('RetFailSecondItem')
+        const system = new MonoSystem(new PGLiteDB())
+        system.conceptClass = KlassByName
+        const controller = new Controller({
+            system,
+            entities: [first, second],
+            relations: [],
+            computations: [AsyncFieldComputation]
+        })
+        await controller.setup(true)
+        const computationOf = (hostName: string) => Array.from(controller.scheduler.computationsHandles.values()).find(
+            c => c.dataContext.type === 'property' && (c.dataContext as PropertyDataContext).host.name === hostName
+        )! as DataBasedComputation
+        const tables = ['RetFailFirstItem', 'RetFailSecondItem'].map(hostName => {
+            const computation = computationOf(hostName)
+            return { hostName, computation, taskRecordName: controller.scheduler.getAsyncTaskRecordKey(computation) }
+        })
+        for (const { hostName, computation, taskRecordName } of tables) {
+            await system.storage.create(hostName, { title: hostName })
+            const [task] = await system.storage.find(taskRecordName, undefined, undefined, ['id'])
+            await deliverTask(controller, computation, system, taskRecordName, task.id, 'done')
+        }
+
+        const listenerFailure = new Error('listener failed on a task-row delete')
+        system.storage.listen(async (events) => {
+            if ((events as Array<{ type?: string, recordName?: string }>).some(e => e.type === 'delete' && e.recordName === tables[0].taskRecordName)) {
+                throw listenerFailure
+            }
+        })
+
+        const error = await controller.cleanupAsyncTasks().then(() => undefined, (e: unknown) => e)
+        expect(error).toBeInstanceOf(MaintenanceError)
+        const maintenanceError = error as MaintenanceError<Array<{ taskRecordName: string, removed: number }>>
+        expect(maintenanceError.operation).toBe('cleanupAsyncTasks')
+        expect(maintenanceError.failures).toEqual([{ target: tables[0].taskRecordName, error: listenerFailure }])
+        expect(maintenanceError.causedBy).toBe(listenerFailure)
+        // The second table ran after the first failed; the failed table's transaction rolled back.
+        expect(maintenanceError.report).toEqual([{ taskRecordName: tables[1].taskRecordName, removed: 1 }])
+        expect(await system.storage.find(tables[0].taskRecordName, undefined, undefined, ['id'])).toHaveLength(1)
+        expect(await system.storage.find(tables[1].taskRecordName, undefined, undefined, ['id'])).toHaveLength(0)
 
         await system.destroy()
     })

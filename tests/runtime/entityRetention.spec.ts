@@ -17,9 +17,12 @@
  *     for the auto-hook after dispatch (cap).
  * 11. Downstream-consumer axis: the built-in aggregate, Custom and Transform consumers that read
  *     the deleted rows (directly or through a relation removed with them) converge to the value
- *     derived from the surviving rows. Called inside an active storage transaction, retention runs in that
- *     transaction without retry. Known gap pinned: an auto-hook failure rejects dispatch /
- *     runInBusinessTransaction after their commit.
+ *     derived from the surviving rows. Called inside an active storage transaction, retention runs in
+ *     that transaction without retry and the first failure propagates unchanged.
+ * 12. Failure semantics: a failing entity does not stop later entities (MaintenanceError after the
+ *     pass; its report counts committed deletions); TTL batches commit independently and carry the
+ *     SERIALIZABLE upgrade forward; the auto-hook reports its outcome in
+ *     DispatchResponse.entityRetention and never rejects dispatch / runInBusinessTransaction.
  */
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
@@ -45,7 +48,9 @@ import {
   Transform,
   WeightedSummation,
   clearAllInstances,
+  MaintenanceError,
   createMigrationManifest,
+  isPostCommitPhaseComplete,
   isRequireSerializableRetry,
   isTransactionRetryExhaustedError,
 } from 'interaqt'
@@ -415,6 +420,7 @@ describe('entity retention — maintainEntityRetention contracts', () => {
       await system.storage.create('RetAutoLog', { seq: 2 })
       const res = await controller.dispatch(Ping, { user: user() })
       expect(res.error).toBeUndefined()
+      expect(res.entityRetention).toBeUndefined()
       expect(
         (await system.storage.find('RetAutoLog', undefined, undefined, ['id'])).length,
       ).toBe(2)
@@ -449,6 +455,10 @@ describe('entity retention — maintainEntityRetention contracts', () => {
       await system.storage.create('RetAutoLogOn', { seq: 3 })
       const res = await controller.dispatch(PingOn, { user: user() })
       expect(res.error).toBeUndefined()
+      expect(res.entityRetention).toEqual({
+        status: 'complete',
+        report: { entities: [{ entityName: 'RetAutoLogOn', removed: 2 }], removed: 2 },
+      })
       const remaining = (await system.storage.find(
         'RetAutoLogOn',
         undefined,
@@ -519,6 +529,7 @@ describe('entity retention — maintainEntityRetention contracts', () => {
       await system.storage.create('RetFailHookLog', { seq: 2 })
       const res = await controller.dispatch(Deny, { user: user() })
       expect(res.error).toBeTruthy()
+      expect(res.entityRetention).toBeUndefined()
       expect(
         (await system.storage.find('RetFailHookLog', undefined, undefined, ['id'])).length,
       ).toBe(2)
@@ -1016,21 +1027,16 @@ describe('entity retention — downstream consumers of the deleted rows', () => 
     }
   })
 
-  test('known gap: an auto-hook failure rejects dispatch and runInBusinessTransaction after their commit', async () => {
-    // Pin of a known contract gap, not the intended behaviour. The dispatch contract
-    // (14-api-reference "Stage P completion") says post-commit failures do not set `error`,
-    // do not roll back facts and are reported through `postCommitPhase`. The retention
-    // auto-hook runs after the commit, but its failure propagates out of dispatch and
-    // runInBusinessTransaction, so a caller sees a rejection for a fact that is committed.
-    // Recorded in agentspace/output/entity-retention-serializable-retry-retrospective.md §4.
-    // When the hook failure is reported instead of thrown, replace this pin with a test of
-    // the reported failure.
+  test('auto-hook failure is reported on the response and never rejects dispatch or runInBusinessTransaction', async () => {
+    // The facts are committed before the hook runs, so a rejection would tell the caller that
+    // a committed dispatch failed. Retention is maintenance, not a stage P obligation: the
+    // outcome is reported in `entityRetention` and logged, `postCommitPhase` stays complete.
     const Log = Entity.create({
-      name: 'RetHookGapLog',
+      name: 'RetHookFailLog',
       properties: [Property.create({ name: 'createdAt', type: 'number' })],
       retention: { mode: 'ttl', ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 } },
     })
-    const Ping = Interaction.create({ name: 'RetHookGapPing', action: Action.create({ name: 'retHookGapPing' }) })
+    const Ping = Interaction.create({ name: 'RetHookFailPing', action: Action.create({ name: 'retHookFailPing' }) })
     const { system, controller } = await setupController([Log], {
       eventSources: [Ping],
       entityRetention: { runAfterSuccessfulDispatch: true },
@@ -1038,26 +1044,191 @@ describe('entity retention — downstream consumers of the deleted rows', () => 
     try {
       const hookFailure = new Error('downstream listener failed on a retention delete')
       system.storage.listen(async (events) => {
-        if ((events as Array<{ type?: string; recordName?: string }>).some(e => e.type === 'delete' && e.recordName === 'RetHookGapLog')) {
+        if ((events as Array<{ type?: string; recordName?: string }>).some(e => e.type === 'delete' && e.recordName === 'RetHookFailLog')) {
           throw hookFailure
         }
       })
+      const logged: unknown[] = []
+      const originalError = system.logger.error
+      system.logger.error = (entry) => {
+        if (entry.label === 'entityRetention') logged.push(entry.error)
+        originalError.call(system.logger, entry)
+      }
       const interactionEvents = async () =>
         (await system.storage.find(InteractionEventEntity.name, undefined, undefined, ['id'])).length
+      const expectFailedOutcome = (outcome: unknown) => {
+        expect(outcome).toMatchObject({ status: 'failed' })
+        const error = (outcome as { error: unknown }).error
+        expect(error).toBeInstanceOf(MaintenanceError)
+        expect((error as MaintenanceError).failures).toEqual([{ target: 'RetHookFailLog', error: hookFailure }])
+        expect((error as MaintenanceError).report).toEqual({ entities: [{ entityName: 'RetHookFailLog', removed: 0 }], removed: 0 })
+      }
 
-      await system.storage.create('RetHookGapLog', { createdAt: 0 })
-      await expect(controller.dispatch(Ping, { user: user() })).rejects.toBe(hookFailure)
+      await system.storage.create('RetHookFailLog', { createdAt: 0 })
+      const res = await controller.dispatch(Ping, { user: user() })
+      expect(res.error).toBeUndefined()
+      expect(isPostCommitPhaseComplete(res)).toBe(true)
+      expectFailedOutcome(res.entityRetention)
       expect(await interactionEvents()).toBe(1)
+      expect(logged).toHaveLength(1)
 
-      await expect(controller.runInBusinessTransaction({ name: 'ret-hook-gap' }, async () => {
-        const res = await controller.dispatch(Ping, { user: user() })
-        expect(res.error).toBeUndefined()
-      })).rejects.toBe(hookFailure)
+      let inside: Awaited<ReturnType<typeof controller.dispatch>> | undefined
+      await controller.runInBusinessTransaction({ name: 'ret-hook-fail' }, async () => {
+        inside = await controller.dispatch(Ping, { user: user() })
+        expect(inside.error).toBeUndefined()
+        // Inside the business transaction the hook has not run yet.
+        expect(inside.entityRetention).toBeUndefined()
+      })
+      // After the owned COMMIT the single pass is reported on the applied result.
+      expectFailedOutcome(inside!.entityRetention)
       expect(await interactionEvents()).toBe(2)
+      expect(logged).toHaveLength(2)
       // The failing pass rolled back, so the expired row is still present.
-      expect((await system.storage.find('RetHookGapLog', undefined, undefined, ['id'])).length).toBe(1)
+      expect((await system.storage.find('RetHookFailLog', undefined, undefined, ['id'])).length).toBe(1)
     } finally {
       await system.destroy()
     }
   })
+})
+
+describe('entity retention — failure isolation and transaction granularity', () => {
+  beforeEach(() => {
+    clearAllInstances()
+  })
+
+  const NOW = 1_700_000_000_000
+  const BATCH = 500 // ENTITY_RETENTION_DELETE_BATCH in Controller.ts
+
+  function ttlEntity(name: string) {
+    return Entity.create({
+      name,
+      properties: [
+        Property.create({ name: 'seq', type: 'number' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: { mode: 'ttl', ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 } },
+    })
+  }
+
+  const failOnDelete = (system: MonoSystem, recordName: string, failure: Error, predicate: (record: { id?: unknown }) => boolean = () => true) => {
+    system.storage.listen(async (events) => {
+      const hit = (events as Array<{ type?: string; recordName?: string; record?: { id?: unknown } }>)
+        .some(e => e.type === 'delete' && e.recordName === recordName && predicate(e.record ?? {}))
+      if (hit) throw failure
+    })
+  }
+  const countOf = async (system: MonoSystem, name: string) => (await system.storage.find(name, undefined, undefined, ['id'])).length
+
+  test('a failing entity does not stop later entities; the failure is thrown after the pass', async () => {
+    const First = ttlEntity('RetIsoFirst')
+    const Second = ttlEntity('RetIsoSecond')
+    const { system, controller } = await setupController([First, Second])
+    try {
+      for (const name of ['RetIsoFirst', 'RetIsoSecond']) {
+        await system.storage.create(name, { seq: 1, createdAt: NOW - 5000 })
+        await system.storage.create(name, { seq: 2, createdAt: NOW })
+      }
+      const failure = new Error('listener failed on the first entity')
+      failOnDelete(system, 'RetIsoFirst', failure)
+
+      const error = await controller.maintainEntityRetention({ now: NOW }).then(() => undefined, (e: unknown) => e)
+      expect(error).toBeInstanceOf(MaintenanceError)
+      const maintenanceError = error as MaintenanceError
+      expect(maintenanceError.operation).toBe('maintainEntityRetention')
+      expect(maintenanceError.failures).toEqual([{ target: 'RetIsoFirst', error: failure }])
+      expect(maintenanceError.causedBy).toBe(failure)
+      expect(maintenanceError.report).toEqual({
+        entities: [
+          { entityName: 'RetIsoFirst', removed: 0 },
+          { entityName: 'RetIsoSecond', removed: 1 },
+        ],
+        removed: 1,
+      })
+      expect(await countOf(system, 'RetIsoFirst')).toBe(2)
+      expect(await countOf(system, 'RetIsoSecond')).toBe(1)
+    } finally {
+      await system.destroy()
+    }
+  })
+
+  test('inside a caller-owned transaction the first failure propagates unchanged and later entities do not run', async () => {
+    const First = ttlEntity('RetIsoNestFirst')
+    const Second = ttlEntity('RetIsoNestSecond')
+    const { system, controller } = await setupController([First, Second])
+    try {
+      for (const name of ['RetIsoNestFirst', 'RetIsoNestSecond']) {
+        await system.storage.create(name, { seq: 1, createdAt: NOW - 5000 })
+      }
+      const failure = new Error('listener failed on the first entity')
+      failOnDelete(system, 'RetIsoNestFirst', failure)
+      let deletesOfSecond = 0
+      system.storage.listen(async (events) => {
+        deletesOfSecond += (events as Array<{ type?: string; recordName?: string }>)
+          .filter(e => e.type === 'delete' && e.recordName === 'RetIsoNestSecond').length
+      })
+
+      await expect(system.storage.runInTransaction({ name: 'caller-owned' }, () =>
+        controller.maintainEntityRetention({ now: NOW }),
+      )).rejects.toBe(failure)
+      expect(deletesOfSecond).toBe(0)
+      expect(await countOf(system, 'RetIsoNestFirst')).toBe(1)
+      expect(await countOf(system, 'RetIsoNestSecond')).toBe(1)
+    } finally {
+      await system.destroy()
+    }
+  })
+
+  test('TTL batches commit independently: a failure in a later batch keeps the committed batches', async () => {
+    const Log = ttlEntity('RetBatchLog')
+    const { system, controller } = await setupController([Log])
+    try {
+      const expiredCount = BATCH + 100
+      const ids: unknown[] = []
+      for (let seq = 0; seq < expiredCount; seq++) {
+        ids.push((await system.storage.create('RetBatchLog', { seq, createdAt: NOW - 5000 })).id)
+      }
+      await system.storage.create('RetBatchLog', { seq: -1, createdAt: NOW })
+      // Batches are ordered by id: the row created at position BATCH + 50 is in the second batch.
+      const poisonId = String(ids[BATCH + 50])
+      const failure = new Error('listener failed in the second batch')
+      failOnDelete(system, 'RetBatchLog', failure, record => String(record.id) === poisonId)
+
+      const error = await controller.maintainEntityRetention({ now: NOW }).then(() => undefined, (e: unknown) => e)
+      expect(error).toBeInstanceOf(MaintenanceError)
+      expect((error as MaintenanceError).failures.map(f => f.target)).toEqual(['RetBatchLog'])
+      expect((error as MaintenanceError).report).toEqual({ entities: [{ entityName: 'RetBatchLog', removed: BATCH }], removed: BATCH })
+      // The first batch is committed; the second batch rolled back; the fresh row is untouched.
+      expect(await countOf(system, 'RetBatchLog')).toBe(expiredCount - BATCH + 1)
+    } finally {
+      await system.destroy()
+    }
+  }, 120000)
+
+  test('later TTL batches start at the isolation level the previous batch committed at', async () => {
+    const Source = ttlEntity('RetBatchIsoSource')
+    const View = Entity.create({ name: 'RetBatchIsoView', properties: [Property.create({ name: 'seq', type: 'number' })] })
+    View.computation = Transform.create({ record: Source, attributeQuery: ['seq'], callback: (row: { seq: number }) => ({ seq: row.seq }) })
+    const { system, controller } = await setupController([Source, View])
+    try {
+      for (let seq = 0; seq < BATCH + 1; seq++) {
+        await system.storage.create('RetBatchIsoSource', { seq, createdAt: NOW - 5000 })
+      }
+      const isolations: string[] = []
+      const original = system.storage.runInTransaction.bind(system.storage)
+      system.storage.runInTransaction = (options, fn) => {
+        isolations.push(options.isolation ?? 'READ COMMITTED')
+        return original(options, fn)
+      }
+
+      const report = await controller.maintainEntityRetention({ now: NOW })
+      expect(report).toEqual({ entities: [{ entityName: 'RetBatchIsoSource', removed: BATCH + 1 }], removed: BATCH + 1 })
+      // Batch 1: READ COMMITTED fails on the Transform delete patch, reruns at SERIALIZABLE.
+      // Batch 2 starts at SERIALIZABLE, so the failing READ COMMITTED attempt is not repeated.
+      expect(isolations).toEqual(['READ COMMITTED', 'SERIALIZABLE', 'SERIALIZABLE'])
+      expect(await countOf(system, 'RetBatchIsoSource')).toBe(0)
+      expect(await countOf(system, 'RetBatchIsoView')).toBe(0)
+    } finally {
+      await system.destroy()
+    }
+  }, 120000)
 })
