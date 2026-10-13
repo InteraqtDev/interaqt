@@ -92,6 +92,8 @@ Use `setup(false)` when code and database manifest already match.
 
 If the stored manifest differs from current definitions, `setup(false)` fails before installing the runtime map and tells you to generate and approve a migration diff.
 
+`setup(false)` does not create, change or drop constraints. It reads the database catalog and compares the constraint objects with the declarations (see [Constraint Reconciliation](#constraint-reconciliation)). When they differ, it fails with `ConstraintSetupError` (`error.mismatches` lists each object) and tells you to run a reviewed migration. Two cases do not block startup, and the next migration reconciles them: leftover Transform unique indexes, which cover bound-state columns the model no longer writes or duplicate the current index under a pre-r26 name, and definitions that cannot be read back from the catalog.
+
 ### 3. Generate Review Diff
 
 ```typescript
@@ -382,6 +384,54 @@ The diff is generated before the computation decisions, so it estimates scopes a
 
 ---
 
+## Constraint Reconciliation
+
+The framework derives physical constraint objects from declarations:
+
+| Declaration | Physical object | Name prefix |
+|---|---|---|
+| `UniqueConstraint` (also the framework's `_System_` / `_Dictionary_` key constraints) | unique index, partial when `where` is set | `uniq_` |
+| `NonNullConstraint` | `CHECK (field IS NOT NULL)` constraint | `uniq_` |
+| `Entity.identity` | unique index | `interaqt_ident_` |
+| logical `id` of every entity and relation | unique index | `interaqt_id_` |
+| `Transform` output (`sourceRecordId`, `transformIndex`) | unique index | `idx_transform_` |
+
+On the tables of the model, indexes and CHECK constraints with these prefixes are framework-owned. Do not create your own objects with these prefixes.
+
+Every migration compares the objects in the database catalog with the declarations:
+
+- **Declared but not installed:** created after recompute and verification.
+- **Installed but no longer declared:** dropped.
+- **Same name, different definition:** dropped and created again. Examples are changed properties, a changed `where`, or a NonNullConstraint moved to another property.
+- **Identical:** no DDL.
+
+Drops run inside the migration transaction **before** recompute, so a relaxed or removed constraint no longer applies to rows the recompute writes. Creates run after verification in the same transaction. A verification failure rolls back the drops too.
+
+The diff lists every difference as a `kind: "constraint"` change with `changeType` `added`, `removed` or `changed`, and with the installed and declared definitions. Removing or redefining a declared guarantee (`UniqueConstraint`, `NonNullConstraint`, `Entity.identity`) also needs a `constraint-removal` decision:
+
+```typescript
+{
+  kind: 'constraint-removal',
+  tableName: requirement.tableName,
+  physicalName: requirement.physicalName,
+  constraintKind: requirement.constraintKind,
+  previousDefinition: requirement.previousDefinition,
+  recordName: requirement.recordName,
+  constraintName: requirement.constraintName,
+  reason: 'slug uniqueness now applies to active channels only',
+}
+```
+
+The decision pins the object to drop: its table, physical name and the definition text the catalog reported when the diff was generated. If the object changes after review, the decision no longer matches and migration fails before any DDL. Leftover framework-internal indexes (logical id, Transform) are dropped as listed changes without a decision.
+
+On PostgreSQL the framework records a definition fingerprint as an object comment (`interaqt-constraint:v1:...`) when it creates a constraint object. Objects created before fingerprints existed are compared by catalog structure: columns, uniqueness and predicate. Partial-index predicates are compared by reading the server's deparsed predicate. The next migration records the missing fingerprints. If an installed predicate cannot be read back (for example it was edited by hand), the object does not block startup. The next migration lists it as `changed` and rebuilds it to the declared definition. SQLite compares the stored `CREATE INDEX` statement.
+
+Databases migrated by interaqt 4.11.2 or earlier may still hold removed constraints, or an older definition under a constraint's name. `setup(false)` reports them. Run `generateMigrationDiff()` and `migrate({ approvedDiff })` even when the model hash is unchanged; the diff then contains only the constraint changes.
+
+`createMigrationBaseline()` checks tables and columns, not constraint objects. After a baseline, `setup(false)` reports any constraint differences, and a reviewed migration reconciles them.
+
+---
+
 ## Safety Gates
 
 Approved diff cannot bypass core safety gates:
@@ -396,6 +446,8 @@ Approved diff cannot bypass core safety gates:
 - Event-based computations without full compute require an approved event rebuild decision and runtime handler.
 - Destructive computed output requires exact approved ids.
 - Unique/non-null constraints are verified after backfill and before post-recompute indexes/constraints are created.
+- Removing or redefining a UniqueConstraint, NonNullConstraint or Entity.identity requires an exact `constraint-removal` decision.
+- Before the manifest is written, the constraint objects in the catalog must match the declarations exactly; otherwise the migration rolls back.
 
 ---
 
@@ -447,6 +499,14 @@ The diff was generated for a different database manifest or current model. Gener
 ### `Missing migration decision`
 
 Every current required decision must have exactly one matching decision in the approved diff. Execution rebuilds the expected diff and does not trust a user-edited `requiredDecisions` list as the source of truth.
+
+### `Migration removes or redefines ... constraint ... without an approved decision`
+
+The migration drops a UniqueConstraint, NonNullConstraint or Entity.identity object that the database still holds. Review the `constraint-removal` requirement in the generated diff and add it to `decisions`. If the error is `constraint removal decision does not match a required review item`, the installed object changed after the diff was generated: regenerate the diff and review it again.
+
+### `The database's constraint objects do not match the declared model`
+
+`setup(false)` found constraint objects that differ from the declarations: missing objects, objects that are no longer declared, or same-name objects with another definition. Startup does not change constraints. Run `generateMigrationDiff()`, review the `kind: "constraint"` changes, and run `migrate({ approvedDiff })`. This works when the model hash is unchanged, which is the case for databases migrated by interaqt 4.11.2 or earlier.
 
 ### `Missing migration event rebuild handler`
 

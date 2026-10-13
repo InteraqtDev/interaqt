@@ -415,54 +415,37 @@ describe("entity identity — storage invariants (M-01)", () => {
     }
   });
 
-  test("MySQL-like re-entry: setupFrameworkLogicalIdUniqueIndexes swallows index-already-exists only", async () => {
-    // PGLite/SQLite emit CREATE INDEX IF NOT EXISTS, so full setup(false) never hits the
-    // catch branch that MySQL needs (supportsCreateIndexIfNotExists === false). Drive that
-    // private path directly with a scheme stub so removing isIndexAlreadyExists fails this test.
-    const Note = makeNoteEntity("CatchPathNote");
-    const real = new SQLiteDB(":memory:");
-    const system = new MonoSystem(real);
-    system.conceptClass = KlassByName;
-    await new Controller({ system, entities: [Note], relations: [] }).setup(true);
+  test("attach re-entry runs no constraint DDL, so dialects without CREATE INDEX IF NOT EXISTS never re-create indexes", async () => {
+    // Before mesh#1674, setup(false) re-ran the install DDL and relied on swallowing
+    // "index already exists" on MySQL. Attach is now a read-only catalog check: no DDL for a
+    // framework-managed constraint object reaches the driver, on any dialect.
+    for (const db of [new PGLiteDB(), new SQLiteDB(":memory:")]) {
+      const Note = makeNoteEntity(`AttachNoDDLNote${db.constructor.name}`);
+      const system1 = new MonoSystem(db);
+      system1.conceptClass = KlassByName;
+      await new Controller({ system: system1, entities: [Note], relations: [] }).setup(true);
 
-    const map = (system.storage as any).map;
-    const mysqlDialect = {
-      name: "mysql" as const,
-      maxIdentifierLength: 64,
-      supportsCreateIndexIfNotExists: false,
-      enforceMaxIdentifierLength: true,
-      encodeLiteral: (v: unknown) => JSON.stringify(v),
-      constraints: { unique: false, filteredUnique: false, nonNull: false },
-    };
-    const items = createFrameworkLogicalIdUniqueIndexSQL(map, mysqlDialect as any);
-    expect(items.some(i => i.recordName === Note.name)).toBe(true);
-    expect(items.every(i => !/IF NOT EXISTS/i.test(i.sql))).toBe(true);
-
-    let schemeCalls = 0;
-    const stubDb = {
-      constructor: { name: "MysqlDB" },
-      schemaDialect: mysqlDialect,
-      async scheme(sql: string) {
-        schemeCalls++;
-        if (/CREATE UNIQUE INDEX/i.test(sql) && /interaqt_id_/i.test(sql)) {
-          const err = Object.assign(new Error("Duplicate key name 'interaqt_id_x'"), {
-            errno: 1061,
-            code: "ER_DUP_KEYNAME",
-          });
-          throw err;
-        }
-      },
-    };
-    // Swap the live storage's db only for the framework-id setup call.
-    const storage = system.storage as any;
-    const originalDb = storage.db;
-    storage.db = stubDb;
-    try {
-      await expect(storage.setupFrameworkLogicalIdUniqueIndexes({ map })).resolves.toBeUndefined();
-    } finally {
-      storage.db = originalDb;
+      const statements: string[] = [];
+      const originalScheme = db.scheme.bind(db);
+      (db as any).scheme = async (sql: string, name?: string) => {
+        statements.push(sql);
+        return originalScheme(sql, name);
+      };
+      try {
+        const system2 = new MonoSystem(db);
+        system2.conceptClass = KlassByName;
+        await expect(new Controller({ system: system2, entities: [Note], relations: [] }).setup(false)).resolves.toBeUndefined();
+      } finally {
+        (db as any).scheme = originalScheme;
+      }
+      // Framework-managed objects only (reserved name prefixes); the driver's own id-allocation
+      // table keeps its idempotent setup on open.
+      const managedDDL = statements.filter(sql =>
+        /^\s*(CREATE|ALTER|DROP|COMMENT)\b/i.test(sql) && /(uniq_|interaqt_id_|interaqt_ident_|idx_transform_)/.test(sql)
+      );
+      expect(managedDDL).toEqual([]);
+      await system1.destroy();
     }
-    expect(schemeCalls).toBe(items.length);
 
     // Row-level unique violation must NOT be treated as index-already-exists (fail closed).
     const uniqErr = Object.assign(new Error("Duplicate entry '1' for key 'interaqt_id_x'"), {
@@ -471,21 +454,6 @@ describe("entity identity — storage invariants (M-01)", () => {
     });
     expect(normalizeDatabaseError(uniqErr).isIndexAlreadyExists).toBe(false);
     expect(normalizeDatabaseError(uniqErr).isUniqueViolation).toBe(true);
-
-    storage.db = {
-      constructor: { name: "MysqlDB" },
-      schemaDialect: mysqlDialect,
-      async scheme() {
-        throw uniqErr;
-      },
-    };
-    try {
-      await expect(storage.setupFrameworkLogicalIdUniqueIndexes({ map })).rejects.toBeTruthy();
-    } finally {
-      storage.db = originalDb;
-    }
-
-    await system.destroy();
   });
 
   test.skipIf(!MYSQL_ENABLED)(

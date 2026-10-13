@@ -24,8 +24,9 @@
  * 再现：FUZZ_MIG_SEED_START / FUZZ_MIG_SEED_COUNT / FUZZ_MIG_OPS；FUZZ_VERBOSE=1。
  */
 import { describe, expect, test } from "vitest";
-import { Controller, Count, Dictionary, Entity, KlassByName, MonoSystem, Property, Relation } from 'interaqt';
+import { Controller, Count, Dictionary, Entity, KlassByName, MonoSystem, NonNullConstraint, Property, Relation, UniqueConstraint } from 'interaqt';
 import type { Database } from '@runtime';
+import { getSchemaDialect, readInstalledManagedConstraints } from '@storage';
 import { PGLiteDB } from '@drivers';
 import { mulberry32, chance, int, pick, isExpectedRejection, type Rng } from "../storage/helpers/fuzzSchema.js";
 import { decideNextOp, executeOpIntent, type FuzzOpIntent, type IdPools } from "../storage/helpers/fuzzOps.js";
@@ -186,11 +187,57 @@ function genMigrationPair(rng: Rng, tag: string): {
     return { v1: v1Build.decls, v2: v2Build.decls, v1View: v1Build.v1View!, mutations: v2Build.mutations }
 }
 
+// ---------- 约束变更轴（mesh#1674）----------
+// 独立 rng 子流：不消耗主决策流，既有种子的 schema / 数据操作 / 变异决策保持不变。
+// 约束只挂在数据操作从不写入的两列上：ckey（恒为 NULL，唯一约束永不冲突）与
+// cflag（默认 'x'，NonNull 验证恒通过）——约束轴只考察迁移对约束对象的对账，不制造数据冲突。
+type UniqueState = 'none' | 'full' | 'pair' | 'partial' | 'renamed'
+type ConstraintState = { unique: UniqueState, nonNull: boolean }
+type ConstraintCase = { entityName: string, v1: ConstraintState, v2: ConstraintState }
+
+const UNIQUE_STATES: UniqueState[] = ['none', 'full', 'pair', 'partial', 'renamed']
+
+function decorateConstraintCase(seed: number, tag: string, v1: VersionedDecls, v2: VersionedDecls): ConstraintCase {
+    const constraintRng = mulberry32((seed * 2654435761) ^ 0x5bd1e995)
+    const draw = (): ConstraintState => ({ unique: pick(constraintRng, UNIQUE_STATES), nonNull: chance(constraintRng, 0.4) })
+    const baseNames = ['A', 'B', 'C'].map(n => `Mg${tag}${n}`)
+    const entityName = pick(constraintRng, baseNames)
+    const constraintCase: ConstraintCase = { entityName, v1: draw(), v2: draw() }
+    const apply = (decls: VersionedDecls, state: ConstraintState) => {
+        for (const entity of decls.entities as InstanceType<typeof Entity>[]) {
+            if (!baseNames.includes(entity.name)) continue
+            entity.properties.push(
+                new Property({ name: 'ckey', type: 'string' }, { uuid: `${tag}-${entity.name}-ckey` }),
+                new Property({ name: 'cflag', type: 'string', defaultValue: () => 'x' }, { uuid: `${tag}-${entity.name}-cflag` }),
+            )
+            if (entity.name !== entityName) continue
+            const constraints = []
+            if (state.unique === 'full') constraints.push(new UniqueConstraint({ name: `${tag}_ck`, properties: ['ckey'] }, { uuid: `${tag}-ck-full` }))
+            if (state.unique === 'pair') constraints.push(new UniqueConstraint({ name: `${tag}_ck`, properties: ['ckey', 'label'] }, { uuid: `${tag}-ck-pair` }))
+            if (state.unique === 'partial') constraints.push(new UniqueConstraint({ name: `${tag}_ck`, properties: ['ckey'], where: { cflag: { op: 'equals', value: 'x' } } }, { uuid: `${tag}-ck-partial` }))
+            if (state.unique === 'renamed') constraints.push(new UniqueConstraint({ name: `${tag}_ck2`, properties: ['ckey'] }, { uuid: `${tag}-ck-renamed` }))
+            if (state.nonNull) constraints.push(new NonNullConstraint({ name: `${tag}_cf`, property: 'cflag' }, { uuid: `${tag}-cf` }))
+            entity.constraints = constraints
+        }
+    }
+    apply(v1, constraintCase.v1)
+    apply(v2, constraintCase.v2)
+    return constraintCase
+}
+
+async function managedConstraintSignature(db: Database, tableNames: string[]) {
+    const installed = await readInstalledManagedConstraints(db, getSchemaDialect(db), tableNames)
+    return installed
+        .map(item => `${item.physicalName}|${item.tableName}|${item.objectType}|${item.fields.join(',')}|${item.unique}|${item.hasPredicate}|${item.fingerprint ?? '-'}`)
+        .sort()
+}
+
 // ---------- runner ----------
 async function runMigrationFuzzCase(seed: number, opsCount: number) {
     const rng = mulberry32(seed)
     const tag = `S${seed}`
     const { v1, v2, v1View, mutations } = genMigrationPair(rng, tag)
+    const constraintCase = decorateConstraintCase(seed, tag, v1, v2)
     const injectFault = seed % 2 === 0 // 偶数种子注入 kill-resume
 
     const rawDb = new PGLiteDB()
@@ -199,6 +246,7 @@ async function runMigrationFuzzCase(seed: number, opsCount: number) {
     const failWith = (message: string): never => {
         throw new Error(`[mig-fuzz seed=${seed}${injectFault ? ' kill-resume' : ''}] ${message}\n` +
             `mutations: ${JSON.stringify(mutations)}\n` +
+            `constraints: ${JSON.stringify(constraintCase)}\n` +
             `relations: ${JSON.stringify(v1View.relationChoices.map(c => ({ name: c.relation.name, relType: c.relType, source: c.source, target: c.target })))}`)
     }
 
@@ -261,6 +309,7 @@ async function runMigrationFuzzCase(seed: number, opsCount: number) {
             await controllerV2.migrate({ approvedDiff })
         } catch (error) {
             firstRunFailed = true
+            if (process.env.FUZZ_MIG_DEBUG) console.log(`[mig-fuzz seed=${seed}] first migrate error: ${error instanceof Error ? error.stack : String(error)}`)
         }
         if (process.env.FUZZ_MIG_DEBUG) console.log(`[mig-fuzz seed=${seed}] first migrate ${firstRunFailed ? 'CRASHED (injected)' : 'completed before fault point'}`)
         if (firstRunFailed) {
@@ -354,6 +403,37 @@ async function runMigrationFuzzCase(seed: number, opsCount: number) {
             }
         }
     }
+
+    // ---- 预言机 5：约束对象的安装等价（mesh#1674）----
+    // 迁移后数据库目录中的框架约束对象（名、表、列、唯一性、谓词有无、定义指纹）必须与
+    // 对 v2 全新 setup(true) 的结果逐一相同。期望来自独立的安装路径，而不是迁移自己的计划。
+    const tableNames = controllerV2.system.storage.schema.tables.map(table => table.tableName)
+    const migratedSignature = await managedConstraintSignature(rawDb as unknown as Database, tableNames)
+    const freshSystem = new MonoSystem(new PGLiteDB())
+    freshSystem.conceptClass = KlassByName
+    await new Controller({ system: freshSystem, entities: v2.entities as any, relations: v2.relations as any, dict: v2.dictionaries as any }).setup(true)
+    const freshSignature = await managedConstraintSignature((freshSystem as unknown as { db: Database }).db, tableNames)
+    await freshSystem.destroy()
+    if (JSON.stringify(migratedSignature) !== JSON.stringify(freshSignature)) {
+        failWith(`constraint install-equivalence: migrated catalog differs from a fresh install of v2\n` +
+            `migrated: ${JSON.stringify(migratedSignature)}\nfresh:    ${JSON.stringify(freshSignature)}`)
+    }
+
+    // ---- 预言机 6：约束行为（由 v2 声明独立推出，绝对断言）----
+    const accepts = async (data: Row) => {
+        try { await storageV2.create(constraintCase.entityName, data); return true } catch { return false }
+    }
+    const expectAccepts = async (data: Row, expected: boolean, label: string) => {
+        const actual = await accepts(data)
+        if (actual !== expected) failWith(`constraint behaviour (${label}): create ${JSON.stringify(data)} was ${actual ? 'accepted' : 'rejected'}, v2 declares it ${expected ? 'allowed' : 'forbidden'}`)
+    }
+    const unique = constraintCase.v2.unique
+    await expectAccepts({ label: 'probe-a', ckey: 'k1' }, true, 'first key')
+    await expectAccepts({ label: 'probe-a', ckey: 'k1' }, unique === 'none', 'duplicate key and label')
+    await expectAccepts({ label: 'probe-b', ckey: 'k1' }, unique === 'none' || unique === 'pair', 'duplicate key, other label')
+    await expectAccepts({ label: 'probe-c', ckey: 'k2', cflag: 'y' }, true, 'outside the partial predicate')
+    await expectAccepts({ label: 'probe-c', ckey: 'k2', cflag: 'y' }, unique !== 'full' && unique !== 'renamed' && unique !== 'pair', 'duplicate outside the partial predicate')
+    await expectAccepts({ label: 'probe-d', ckey: 'k3', cflag: null }, !constraintCase.v2.nonNull, 'null cflag')
 
     await (controllerV2.system as MonoSystem).destroy()
     return { seed, executed }

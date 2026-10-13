@@ -3,7 +3,7 @@ import type { Computation, ComputationResultPatch, DataBasedComputation, DataCon
 import { ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip } from "./computations/Computation.js";
 import type { AtomicSequenceScope, RecordMutationEvent, ScopedSequenceDeclarationManifest, StorageSchemaMetadata, System } from "./System.js";
 import { DICTIONARY_RECORD } from "./System.js";
-import { EntityQueryHandle, EntityToTableMap, getSchemaDialect, LINK_SYMBOL, MatchExp, quoteIdentifier } from "@storage";
+import { EntityQueryHandle, EntityToTableMap, getSchemaDialect, LINK_SYMBOL, MatchExp, quoteIdentifier, type ManagedConstraintKind } from "@storage";
 import { BoolExp } from "@core";
 import { createHash } from "node:crypto";
 import { ComputationSourceMapManager, type DataBasedEntityEventsSourceMap, type EntityEventSourceMap, type EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
@@ -146,6 +146,20 @@ export type MigrationChange =
         changeType: "added" | "removed" | "changed" | "unchanged";
         dataContext: string;
         reason: string;
+    }
+    | {
+        // 数据库目录中由框架管理的约束对象（UniqueConstraint / NonNullConstraint /
+        // Entity.identity / 逻辑 id / Transform 唯一索引）与声明的差异。id 是物理名。
+        kind: "constraint";
+        id: string;
+        changeType: "added" | "removed" | "changed";
+        dataContext: string;
+        constraintKind: ManagedConstraintKind;
+        tableName: string;
+        physicalName: string;
+        previousDefinition?: string;
+        nextDefinition?: string;
+        reason: string;
     };
 
 export type MigrationDecisionRequirement =
@@ -230,7 +244,24 @@ export type MigrationDecisionRequirement =
         scopeSignature?: string;
         expectedHostCount: 0;
         reason: string;
-    };
+    }
+    | ConstraintRemovalReview;
+
+/**
+ * 删除或改定义一条已声明的保证（UniqueConstraint / NonNullConstraint / Entity.identity）
+ * 需要显式批准。批准固定被删除的物理对象：表、物理名与数据库目录给出的定义文本；
+ * 审阅后数据库中的对象发生变化，批准即失效。
+ */
+export type ConstraintRemovalReview = {
+    kind: "constraint-removal";
+    tableName: string;
+    physicalName: string;
+    constraintKind: ManagedConstraintKind;
+    previousDefinition: string;
+    recordName?: string;
+    constraintName?: string;
+    reason: string;
+};
 
 export type MigrationDecision =
     | {
@@ -318,7 +349,8 @@ export type MigrationDecision =
         scopeSignature?: string;
         expectedHostCount: 0;
         reason: string;
-    };
+    }
+    | ConstraintRemovalReview;
 
 export type MigrationSafetyReview = {
     blockingChanges: StorageBlockingChange[];
@@ -502,7 +534,7 @@ export type MigrationManifest = {
 };
 
 export type AdditiveDDLOperation = {
-    kind: "create-table" | "add-column" | "create-constraint" | "verify";
+    kind: "create-table" | "add-column" | "create-constraint" | "annotate-constraint" | "verify";
     sql?: string;
     tableName?: string;
     columnName?: string;
@@ -522,7 +554,33 @@ export type DestructiveCleanupOperation = {
     };
 };
 
-export type MigrationDDLOperation = AdditiveDDLOperation | DestructiveCleanupOperation;
+/**
+ * 删除已安装的框架约束对象（声明删除、改定义的旧对象、无法核对定义而重建的对象）。
+ * 在迁移重算事务开始时、重算之前执行：放宽后的约束必须在重算写入之前生效。
+ */
+export type ConstraintCleanupOperation = {
+    kind: "drop-constraint";
+    sql: string;
+    tableName: string;
+    logicalPath: string;
+    description: string;
+};
+
+export type MigrationDDLOperation = AdditiveDDLOperation | DestructiveCleanupOperation | ConstraintCleanupOperation;
+
+/** 约束对账给审阅面的一条变化（由 schema plan 产出，buildMigrationDiff 列入 diff）。 */
+export type MigrationConstraintChange = {
+    changeType: "added" | "removed" | "changed";
+    constraintKind: ManagedConstraintKind;
+    tableName: string;
+    physicalName: string;
+    recordName?: string;
+    constraintName?: string;
+    previousDefinition?: string;
+    nextDefinition?: string;
+    requiresApproval: boolean;
+    reason: string;
+};
 
 export type StorageBlockingChange = {
     kind: "physical-path-move" | "unsupported-destructive-schema-change" | "unrebuildable-computation" | "destructive-computed-output" | "async-computation";
@@ -535,8 +593,11 @@ export type StorageBlockingChange = {
 export type MigrationSchemaPlan = {
     schema: StorageSchemaMetadata;
     preRecomputeDDL: AdditiveDDLOperation[];
+    /** Runs inside the migration transaction before recompute. */
+    constraintCleanupDDL: ConstraintCleanupOperation[];
     postRecomputeDDL: MigrationDDLOperation[];
     verificationDDL: AdditiveDDLOperation[];
+    constraintChanges: MigrationConstraintChange[];
     blockingChanges: StorageBlockingChange[];
     internal?: unknown;
 };
@@ -1259,6 +1320,7 @@ function requirementKey(requirement: MigrationDecisionRequirement) {
     if (requirement.kind === "scoped-sequence-no-seed") return `${requirement.kind}:${requirement.id}`;
     const recordName = requirement.kind === "destructive-scope" ? requirement.recordName || "" : "";
     if (requirement.kind === "empty-fact-record-removal") return `${requirement.kind}:${requirement.recordName}`;
+    if (requirement.kind === "constraint-removal") return constraintRemovalKey(requirement);
     return `${requirement.kind}:${requirement.dataContext}:${recordName}`;
 }
 
@@ -1269,7 +1331,12 @@ function decisionKey(decision: MigrationDecision) {
     if (decision.kind === "rename-candidate-reviewed") return `${decision.kind}:${decision.from}:${decision.to}`;
     const recordName = decision.kind === "destructive-scope" ? decision.recordName || "" : "";
     if (decision.kind === "empty-fact-record-removal") return `${decision.kind}:${decision.recordName}`;
+    if (decision.kind === "constraint-removal") return constraintRemovalKey(decision);
     return `${decision.kind}:${decision.dataContext}:${recordName}`;
+}
+
+function constraintRemovalKey(review: ConstraintRemovalReview) {
+    return `${review.kind}:${review.tableName}:${review.physicalName}:${review.previousDefinition}`;
 }
 
 function changeKey(change: MigrationChange) {
@@ -1280,6 +1347,7 @@ function changeKey(change: MigrationChange) {
     if (change.kind === "record") return `record:${change.id}`;
     if (change.kind === "property") return `property:${change.id}`;
     if (change.kind === "relation") return `relation:${change.id}`;
+    if (change.kind === "constraint") return `constraint:${change.id}`;
     return `storage:${change.dataContext}`;
 }
 
@@ -2016,6 +2084,39 @@ export function buildMigrationDiff(
             reason: change.reason,
         });
     }
+    for (const planned of schemaPlan.constraintChanges || []) {
+        // 已删除的约束不在新声明里：从上一个 manifest 取回它的记录名与约束名，便于审阅。
+        const previousItem = previousManifest.storage.constraints.find(item => item.physicalName === planned.physicalName);
+        const change = {
+            ...planned,
+            recordName: planned.recordName ?? previousItem?.recordName,
+            constraintName: planned.constraintName ?? (previousItem && previousItem.constraintName !== previousItem.physicalName ? previousItem.constraintName : undefined),
+        };
+        changes.push({
+            kind: "constraint",
+            id: change.physicalName,
+            changeType: change.changeType,
+            dataContext: `constraint:${change.recordName ?? change.tableName}.${change.constraintName ?? change.physicalName}`,
+            constraintKind: change.constraintKind,
+            tableName: change.tableName,
+            physicalName: change.physicalName,
+            previousDefinition: change.previousDefinition,
+            nextDefinition: change.nextDefinition,
+            reason: change.reason,
+        });
+        if (change.requiresApproval) {
+            requiredDecisions.push({
+                kind: "constraint-removal",
+                tableName: change.tableName,
+                physicalName: change.physicalName,
+                constraintKind: change.constraintKind,
+                previousDefinition: change.previousDefinition!,
+                recordName: change.recordName,
+                constraintName: change.constraintName,
+                reason: change.reason,
+            });
+        }
+    }
     for (const scope of safety.destructiveScopes) {
         requiredDecisions.push({
             kind: "destructive-scope",
@@ -2294,12 +2395,25 @@ export function validateApprovedDiff(
                 throw new MigrationError(`Invalid empty fact record removal decision for ${decision.recordName}`);
             }
         }
+        if (decision.kind === "constraint-removal") {
+            // 只对照本次重新生成的审阅面：数据库中的对象在审阅后变化时，旧批准不得放行删除。
+            if (!expectedReview.requiredDecisions.some(requirement => requirementKey(requirement) === key)) {
+                throw new MigrationError(`Migration constraint removal decision does not match a required review item: ${decision.physicalName} on ${decision.tableName}. The installed definition may have changed since review; regenerate the diff and review it again.`);
+            }
+        }
         if (decision.kind === "rename-candidate-reviewed") {
             throw new MigrationError(`Migration rename candidate decision does not match any Phase 1.5 executable review item: ${decision.from} -> ${decision.to}`);
         }
     }
     for (const requirement of expectedReview.requiredDecisions) {
         if (!decisionKeys.has(requirementKey(requirement))) {
+            if (requirement.kind === "constraint-removal") {
+                throw new MigrationError(
+                    `Migration removes or redefines ${requirement.constraintKind} constraint ${requirement.physicalName} on "${requirement.tableName}" (installed: ${requirement.previousDefinition}) without an approved decision. ` +
+                    `Review the "constraint-removal" item in the generated diff and add it to decisions.`,
+                    { requirement },
+                );
+            }
             throw new MigrationError(`Missing migration decision for required review item: ${requirementKey(requirement)}`);
         }
     }

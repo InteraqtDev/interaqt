@@ -16,6 +16,7 @@ import {
 } from 'interaqt'
 import { PGLiteDB, SQLiteDB, PostgreSQLDB, MysqlDB } from '@drivers'
 import { createMigrationManifest } from '../../src/runtime/migration.js'
+import { approveGeneratedMigrationDiff } from './helpers/migrationApproval.js'
 
 const PG = process.env.INTERAQT_POSTGRES_DATABASE
 const MY = process.env.INTERAQT_MYSQL_DATABASE
@@ -203,7 +204,9 @@ describe('L-5 — StateMachine.clone(deep) isolates the graph', () => {
 // ============ L-6 Transform 索引名 ============
 
 describe('L-6 — transform unique index uses sha1 name and drops legacy', () => {
-  test('new-name index created; legacy weak-hash index dropped on setup', async () => {
+  // mesh#1674 起 setup(false) 不执行约束 DDL：legacy 名索引在启动时只被识别为「多余的 Transform
+  //  索引」（不阻止启动：它与 sha1 名索引定义相同），由下一次迁移作为列出的变更删除（无需审批）。
+  test('new-name index created; legacy weak-hash index is dropped by the next migration, not by setup(false)', async () => {
     function legacyHash(input: string) {
       let hash = 0
       for (let i = 0; i < input.length; i++) hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0
@@ -241,6 +244,17 @@ describe('L-6 — transform unique index uses sha1 name and drops legacy', () =>
 
     const controller2 = new Controller({ system, entities: [Source, Derived], relations: [], eventSources: [] })
     await controller2.setup(false)
+    const namesAfterAttach = (await (system as any).db.query(
+      `SELECT indexname FROM pg_indexes WHERE tablename = 'L6Derived'`, [], 'list indexes after attach')).map((r: any) => r.indexname)
+    expect(namesAfterAttach).toContain(legacyName)
+
+    const controller3 = new Controller({ system, entities: [Source, Derived], relations: [], eventSources: [] })
+    const diff = await controller3.generateMigrationDiff()
+    expect(diff.changes.filter(change => change.kind === 'constraint')).toEqual([
+      expect.objectContaining({ kind: 'constraint', changeType: 'removed', constraintKind: 'transform-unique', physicalName: legacyName }),
+    ])
+    expect(diff.requiredDecisions.filter(requirement => requirement.kind === 'constraint-removal')).toEqual([])
+    await controller3.migrate({ approvedDiff: await approveGeneratedMigrationDiff(controller3) })
     const indexes2 = await (system as any).db.query(
       `SELECT indexname FROM pg_indexes WHERE tablename = 'L6Derived'`, [], 'list indexes 2')
     const names2 = indexes2.map((r: any) => r.indexname)

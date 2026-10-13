@@ -923,6 +923,7 @@ export class Controller {
             applyMigrationSchema: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
             verifyMigrationSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
             applyMigrationPostSchema?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
+            applyMigrationConstraintCleanup?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
             beginMigration?: (modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount?: number) => Promise<MigrationRunState>
             updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>
             finishMigration?: (migrationId: string, status: 'succeeded' | 'failed', error?: unknown) => Promise<void>
@@ -993,8 +994,10 @@ export class Controller {
             schemaPlan: {
                 schema: executionSchemaPlan.schema,
                 preRecomputeDDL: executionSchemaPlan.preRecomputeDDL,
+                constraintCleanupDDL: executionSchemaPlan.constraintCleanupDDL,
                 postRecomputeDDL: executionSchemaPlan.postRecomputeDDL,
                 verificationDDL: executionSchemaPlan.verificationDDL,
+                constraintChanges: executionSchemaPlan.constraintChanges,
                 blockingChanges: allBlockingChanges,
             },
             blockingChanges,
@@ -1047,6 +1050,10 @@ export class Controller {
             if (!reached(phase, 'manifest-written')) {
                 await this.system.storage.runInTransaction({ name: 'migration recompute', isolation: 'SERIALIZABLE' }, async () => {
                     if (!reached(phase, 'computation-applied')) {
+                        // 删除不再声明或定义已变的约束对象必须先于重算：重算可能写入只有新声明
+                        //  才允许的行（放宽约束的同一迁移里新增 Transform 输出）。DDL 在本事务内，
+                        //  任何后续失败都会一并回滚。
+                        await migrationSystem.applyMigrationConstraintCleanup?.(executionSchemaPlan, migrationRun?.id)
                         await backfillNewFactPropertyDefaults(this, factPropertyBackfills)
                         const filteredEvents = await recomputeFilteredMemberships(this, previousManifest, nextManifest)
                         await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest)
