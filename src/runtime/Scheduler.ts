@@ -12,7 +12,8 @@ import {
 } from "./errors/index.js";
 import { Computation, ComputationClass, ComputationExecutionResult, ComputationResult, ComputationResultAsync, ComputationResultFullRecompute, ComputationResultPatch, ComputationResultResolved, ComputationResultSkip, DataBasedComputation, DataDep, DataDepEventContext, EventBasedComputation, GlobalBoundState, IncrementalPlan, LastValuePolicy, RecordBoundState, RecordsDataDep } from "./computations/Computation.js";
 import { DICTIONARY_RECORD, type InternalSchemaRequirement, RecordMutationCallback, RecordMutationEvent, SYSTEM_RECORD } from "./System.js";
-import { RequireSerializableRetry, runWithTransactionRetry } from "./transaction.js";
+import { RequireSerializableRetry } from "./transaction.js";
+import { runInRetryableTransaction } from "./frameworkTransaction.js";
 import {
     EntityEventSourceMap,
     EntityUpdateEventsSourceMap,
@@ -1289,91 +1290,90 @@ export class Scheduler {
     }
 
     async handleAsyncReturn(computation: DataBasedComputation, taskRecordIdRef: {id: string}) {
-        return runWithTransactionRetry(`asyncReturn:${this.getAsyncTaskRecordKey(computation)}`, async (isolation) => {
-            return this.controller.system.storage.runInTransaction({ name: `asyncReturn:${this.getAsyncTaskRecordKey(computation)}`, isolation }, async () => {
-                const taskRecordName = this.getAsyncTaskRecordKey(computation)
-                const attributeQuery: AttributeQueryData = computation.dataContext.type === 'property' ? ['*', ['record', {attributeQuery: ['id']}]] : ['*']
-                // 先无锁读出 freshnessKey，再对同一 freshnessKey 的全部 task 行取行锁（按 id 有序，避免死锁）。
-                // CAUTION 必须先锁定整个 freshness 维度再做"是否最新"的判定和 apply：
-                //  否则 check 与 apply 之间另一个连接可以创建并应用更新的 task，随后本事务把陈旧结果覆盖回去（TOCTOU）。
-                //  锁住全组行后，并发 handler 会在这里阻塞到本事务提交，届时它的 isLatest 判定基于已提交的最新状态。
-                const preRead = await this.controller.system.storage.findOne(
-                    taskRecordName,
-                    MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}),
-                    undefined,
-                    ['id', 'freshnessKey']
-                )
-                if (!preRead) return { skipped: true, reason: 'missing-task' }
-                await this.controller.system.storage.atomic.lockRows(
-                    taskRecordName,
-                    MatchExp.atom({key: 'freshnessKey', value: ['=', preRead.freshnessKey]}),
-                    ['id']
-                )
-                // 拿到锁之后重读本 task：等待锁期间它可能已被并发 handler 标记为 applied/skipped。
-                const taskRecord = await this.controller.system.storage.findOne(
-                    taskRecordName,
-                    MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}),
-                    undefined,
-                    attributeQuery
-                )
-                if (!taskRecord) return { skipped: true, reason: 'missing-task' }
-                if (taskRecord.status === 'applied' || taskRecord.status === 'skipped') {
-                    return { skipped: true, reason: 'already-handled' }
-                }
+        const transactionName = `asyncReturn:${this.getAsyncTaskRecordKey(computation)}`
+        return runInRetryableTransaction(this.controller.system.storage, transactionName, async () => {
+            const taskRecordName = this.getAsyncTaskRecordKey(computation)
+            const attributeQuery: AttributeQueryData = computation.dataContext.type === 'property' ? ['*', ['record', {attributeQuery: ['id']}]] : ['*']
+            // 先无锁读出 freshnessKey，再对同一 freshnessKey 的全部 task 行取行锁（按 id 有序，避免死锁）。
+            // CAUTION 必须先锁定整个 freshness 维度再做"是否最新"的判定和 apply：
+            //  否则 check 与 apply 之间另一个连接可以创建并应用更新的 task，随后本事务把陈旧结果覆盖回去（TOCTOU）。
+            //  锁住全组行后，并发 handler 会在这里阻塞到本事务提交，届时它的 isLatest 判定基于已提交的最新状态。
+            const preRead = await this.controller.system.storage.findOne(
+                taskRecordName,
+                MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}),
+                undefined,
+                ['id', 'freshnessKey']
+            )
+            if (!preRead) return { skipped: true, reason: 'missing-task' }
+            await this.controller.system.storage.atomic.lockRows(
+                taskRecordName,
+                MatchExp.atom({key: 'freshnessKey', value: ['=', preRead.freshnessKey]}),
+                ['id']
+            )
+            // 拿到锁之后重读本 task：等待锁期间它可能已被并发 handler 标记为 applied/skipped。
+            const taskRecord = await this.controller.system.storage.findOne(
+                taskRecordName,
+                MatchExp.atom({key: 'id', value: ['=', taskRecordIdRef.id]}),
+                undefined,
+                attributeQuery
+            )
+            if (!taskRecord) return { skipped: true, reason: 'missing-task' }
+            if (taskRecord.status === 'applied' || taskRecord.status === 'skipped') {
+                return { skipped: true, reason: 'already-handled' }
+            }
 
-                // r34-B: record link 缺席的 task 是毒丸——不拦截则 apply 在 record.id 上抛
-                //  裸 TypeError，task 停在 success，daemon 每次重投递都再抛（永不收敛）。
-                //  record link 缺席有两个合法来路（对投递而言等价——都永远无法 apply）：
-                //  1. 宿主已被删除（级联解除 link）；
-                //  2. 同宿主的更新 task 抢走了 link——task↔record 关系声明为 1:1，宿主侧排他，
-                //     新 task 建立 link 时旧 task 的 link 被置换删除（写路径 replace 语义）。
-                //     这也是 invalidateUnappliedAsyncTasks 按 record.id 只删得到「持链最新 task」
-                //     的原因：被置换的旧 task 由本守卫在投递时中和（skipped），两个机制合起来
-                //     保证「非 task 轨产出之后无陈旧 apply」。
-                //  按 skipped 停放：重投递经 already-handled 短路；晚到的 worker 盲写把状态
-                //  复活成 success 也无害——本守卫先于 apply，再次投递仍落回 orphaned-record
-                //  （与 stale-task 同用「标记而非删除」语义）。
-                if (computation.dataContext.type === 'property' && ((taskRecord.record as {id?: unknown} | undefined)?.id === undefined || (taskRecord.record as {id?: unknown} | null)?.id === null)) {
-                    await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
-                    return { skipped: true, reason: 'orphaned-record' }
-                }
+            // r34-B: record link 缺席的 task 是毒丸——不拦截则 apply 在 record.id 上抛
+            //  裸 TypeError，task 停在 success，daemon 每次重投递都再抛（永不收敛）。
+            //  record link 缺席有两个合法来路（对投递而言等价——都永远无法 apply）：
+            //  1. 宿主已被删除（级联解除 link）；
+            //  2. 同宿主的更新 task 抢走了 link——task↔record 关系声明为 1:1，宿主侧排他，
+            //     新 task 建立 link 时旧 task 的 link 被置换删除（写路径 replace 语义）。
+            //     这也是 invalidateUnappliedAsyncTasks 按 record.id 只删得到「持链最新 task」
+            //     的原因：被置换的旧 task 由本守卫在投递时中和（skipped），两个机制合起来
+            //     保证「非 task 轨产出之后无陈旧 apply」。
+            //  按 skipped 停放：重投递经 already-handled 短路；晚到的 worker 盲写把状态
+            //  复活成 success 也无害——本守卫先于 apply，再次投递仍落回 orphaned-record
+            //  （与 stale-task 同用「标记而非删除」语义）。
+            if (computation.dataContext.type === 'property' && ((taskRecord.record as {id?: unknown} | undefined)?.id === undefined || (taskRecord.record as {id?: unknown} | null)?.id === null)) {
+                await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
+                return { skipped: true, reason: 'orphaned-record' }
+            }
 
-                if (!(await this.isLatestAsyncTask(computation, taskRecord))) {
-                    await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
-                    return { skipped: true, reason: 'stale-task' }
-                }
+            if (!(await this.isLatestAsyncTask(computation, taskRecord))) {
+                await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'skipped')
+                return { skipped: true, reason: 'stale-task' }
+            }
 
-                if (taskRecord.status === 'success') {
-                    this.requireSerializableForCustomCallback(computation, 'async return')
-                    const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args) as ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined
-                    if (computation.incrementalPatchCompute && this.requiresSerializablePatchApply(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
-                        throw new RequireSerializableRetry(`entity/relation async patch from custom computation ${this.getComputationName(computation)}`)
-                    }
+            if (taskRecord.status === 'success') {
+                this.requireSerializableForCustomCallback(computation, 'async return')
+                const resultOrPatch = await computation.asyncReturn!(taskRecord.result, taskRecord.args) as ComputationResult|ComputationResultPatch|ComputationResultPatch[]|undefined
+                if (computation.incrementalPatchCompute && this.requiresSerializablePatchApply(computation) && this.controller.system.storage.getTransactionIsolation() !== 'SERIALIZABLE') {
+                    throw new RequireSerializableRetry(`entity/relation async patch from custom computation ${this.getComputationName(computation)}`)
+                }
                     
-                    if (computation.dataContext.type === 'global') {
-                        if (computation.incrementalPatchCompute) {
-                            await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
-                        } else {
-                            await this.controller.applyResult(computation.dataContext, resultOrPatch)
-                        }
-                    } else if (computation.dataContext.type === 'property') {
-                        if (computation.incrementalPatchCompute) {
-                            await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
-                        } else {
-                            await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
-                        }
-                    } else if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') {
-                        if (computation.incrementalPatchCompute) {
-                            await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
-                        } else {
-                            await this.controller.applyResult(computation.dataContext, resultOrPatch)
-                        }
+                if (computation.dataContext.type === 'global') {
+                    if (computation.incrementalPatchCompute) {
+                        await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
+                    } else {
+                        await this.controller.applyResult(computation.dataContext, resultOrPatch)
                     }
-                    await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'applied')
-                    return { skipped: false }
+                } else if (computation.dataContext.type === 'property') {
+                    if (computation.incrementalPatchCompute) {
+                        await this.controller.applyResultPatch(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
+                    } else {
+                        await this.controller.applyResult(computation.dataContext, resultOrPatch, taskRecord.record as Record<string, unknown>)
+                    }
+                } else if (computation.dataContext.type === 'entity' || computation.dataContext.type === 'relation') {
+                    if (computation.incrementalPatchCompute) {
+                        await this.controller.applyResultPatch(computation.dataContext, resultOrPatch)
+                    } else {
+                        await this.controller.applyResult(computation.dataContext, resultOrPatch)
+                    }
                 }
-                return { skipped: true, reason: 'task-not-success' }
-            })
+                await this.markAsyncTaskStatus(taskRecordName, String(taskRecord.id), 'applied')
+                return { skipped: false }
+            }
+            return { skipped: true, reason: 'task-not-success' }
         })
     }
 

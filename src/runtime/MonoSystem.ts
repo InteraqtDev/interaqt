@@ -28,7 +28,8 @@ import {
 import { IdempotencyError } from "./errors/IdempotencyError.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { RequireSerializableRetry, RetryableWriteConflict, runWithTransactionRetry, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
+import { RequireSerializableRetry, RetryableWriteConflict, TransactionCapability, TransactionCapabilityError, TransactionIsolation, TransactionOptions } from "./transaction.js";
+import { runInRetryableTransaction } from "./frameworkTransaction.js";
 import { getCurrentEffects, addToCurrentEffects } from "./asyncEffectsContext.js";
 import { Property, EntityInstance, RelationInstance, Entity, Relation, RefContainer, type ConstraintPredicateOperator } from "@core";
 import {
@@ -343,10 +344,7 @@ class MonoStorage implements Storage{
         }
     }
     private async withAtomicTransaction<T>(operation: string, fn: () => Promise<T>): Promise<T> {
-        if (this.isInTransaction()) {
-            return fn()
-        }
-        return runWithTransactionRetry(operation, (isolation) => this.runInTransaction({ name: operation, isolation }, fn))
+        return runInRetryableTransaction(this, operation, fn)
     }
     private normalizeSequenceScope(scope: AtomicSequenceScope) {
         return scope.map(item => ({ name: item.name, type: item.type, value: item.value }))

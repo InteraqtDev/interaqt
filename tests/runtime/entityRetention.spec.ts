@@ -15,22 +15,39 @@
  *     SERIALIZABLE, so each per-entity transaction must take the same RequireSerializableRetry
  *     upgrade as dispatch. Covered for the direct call (ttl, later entities still pruned) and
  *     for the auto-hook after dispatch (cap).
+ * 11. Downstream-consumer axis: the built-in aggregate, Custom and Transform consumers that read
+ *     the deleted rows (directly or through a relation removed with them) converge to the value
+ *     derived from the surviving rows. Called inside an active storage transaction, retention runs in that
+ *     transaction without retry. Known gap pinned: an auto-hook failure rejects dispatch /
+ *     runInBusinessTransaction after their commit.
  */
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
   Action,
+  Any,
+  Average,
   Condition,
   Controller,
+  Count,
+  Custom,
+  Dictionary,
   Entity,
+  Every,
   HardDeletionProperty,
   Interaction,
+  InteractionEventEntity,
   KlassByName,
   MatchExp,
   MonoSystem,
   Property,
+  Relation,
+  Summation,
   Transform,
+  WeightedSummation,
   clearAllInstances,
   createMigrationManifest,
+  isRequireSerializableRetry,
+  isTransactionRetryExhaustedError,
 } from 'interaqt'
 import { PGLiteDB } from '@drivers'
 
@@ -742,5 +759,305 @@ describe('entity retention — maintainEntityRetention contracts', () => {
 
     await system.destroy()
     await system2.destroy()
+  })
+})
+
+describe('entity retention — downstream consumers of the deleted rows', () => {
+  beforeEach(() => {
+    clearAllInstances()
+  })
+
+  const NOW = 1_700_000_000_000
+  // Two expired rows and one fresh row. Every expected value below is derived by hand from
+  // the surviving row (amount 3), independently of the computation under test.
+  const ROWS = [
+    { amount: 10, createdAt: NOW - 5000 },
+    { amount: 4, createdAt: NOW - 2000 },
+    { amount: 3, createdAt: NOW - 500 },
+  ]
+
+  type ConsumerCell = {
+    label: string
+    /** True when the consumer requires SERIALIZABLE on delete (red on v4.11.2). */
+    requiresSerializable: boolean
+    withOwner?: boolean
+    build: (Source: any, Owner: any, Link: any) => { entities?: any[]; dict?: any[] }
+    read: (system: MonoSystem, ownerId: string | undefined) => Promise<unknown>
+    before: unknown
+    after: unknown
+  }
+
+  const readDict = (system: MonoSystem) => system.storage.dict.get('retConsValue')
+  const readAmounts = async (system: MonoSystem, name: string) =>
+    ((await system.storage.find(name, undefined, undefined, ['amount'])) as unknown as Array<{ amount: number }>)
+      .map(row => row.amount)
+      .sort((a, b) => a - b)
+  const dictOf = (type: string, computation: any) => [Dictionary.create({ name: 'retConsValue', type, collection: false, computation })]
+
+  const cells: ConsumerCell[] = [
+    {
+      label: 'Count (global)', requiresSerializable: false,
+      build: Source => ({ dict: dictOf('number', Count.create({ record: Source })) }),
+      read: readDict, before: 3, after: 1,
+    },
+    {
+      label: 'Summation (global)', requiresSerializable: false,
+      build: Source => ({ dict: dictOf('number', Summation.create({ record: Source, attributeQuery: ['amount'] })) }),
+      read: readDict, before: 17, after: 3,
+    },
+    {
+      label: 'WeightedSummation (global)', requiresSerializable: false,
+      build: Source => ({
+        dict: dictOf('number', WeightedSummation.create({
+          record: Source, attributeQuery: ['amount'], callback: (row: { amount: number }) => ({ weight: 1, value: row.amount }),
+        })),
+      }),
+      read: readDict, before: 17, after: 3,
+    },
+    {
+      label: 'Average (global)', requiresSerializable: false,
+      build: Source => ({ dict: dictOf('number', Average.create({ record: Source, attributeQuery: ['amount'] })) }),
+      read: async system => Number(await readDict(system)), before: 17 / 3, after: 3,
+    },
+    {
+      label: 'Every (global)', requiresSerializable: false,
+      build: Source => ({
+        dict: dictOf('boolean', Every.create({ record: Source, attributeQuery: ['amount'], callback: (row: { amount: number }) => row.amount < 5 })),
+      }),
+      read: readDict, before: false, after: true,
+    },
+    {
+      label: 'Any (global)', requiresSerializable: false,
+      build: Source => ({
+        dict: dictOf('boolean', Any.create({ record: Source, attributeQuery: ['amount'], callback: (row: { amount: number }) => row.amount > 5 })),
+      }),
+      read: readDict, before: true, after: false,
+    },
+    {
+      label: 'Custom, default concurrency (global)', requiresSerializable: true,
+      build: Source => ({
+        dict: dictOf('number', Custom.create({
+          name: 'RetConsCustomSum',
+          dataDeps: { rows: { type: 'records', source: Source, attributeQuery: ['amount'] } },
+          compute: async (deps: { rows?: Array<{ amount: number }> }) => (deps.rows ?? []).reduce((sum, row) => sum + row.amount, 0),
+          getInitialValue: () => 0,
+        })),
+      }),
+      read: readDict, before: 17, after: 3,
+    },
+    {
+      label: 'Custom, atomic-safe (global)', requiresSerializable: false,
+      build: Source => ({
+        dict: dictOf('number', Custom.create({
+          name: 'RetConsCustomSumSafe',
+          concurrency: 'atomic-safe',
+          dataDeps: { rows: { type: 'records', source: Source, attributeQuery: ['amount'] } },
+          compute: async (deps: { rows?: Array<{ amount: number }> }) => (deps.rows ?? []).reduce((sum, row) => sum + row.amount, 0),
+          getInitialValue: () => 0,
+        })),
+      }),
+      read: readDict, before: 17, after: 3,
+    },
+    {
+      label: 'data-based Transform (entity)', requiresSerializable: true,
+      build: Source => {
+        const View = Entity.create({ name: 'RetConsView', properties: [Property.create({ name: 'amount', type: 'number' })] })
+        View.computation = Transform.create({ record: Source, attributeQuery: ['amount'], callback: (row: { amount: number }) => ({ amount: row.amount }) })
+        return { entities: [View] }
+      },
+      read: system => readAmounts(system, 'RetConsView'), before: [3, 4, 10], after: [3],
+    },
+    {
+      // Event-based outputs are facts about past create events, not projections of live rows.
+      label: 'event-based Transform on create (entity)', requiresSerializable: false,
+      build: Source => {
+        const View = Entity.create({ name: 'RetConsView', properties: [Property.create({ name: 'amount', type: 'number' })] })
+        View.computation = Transform.create({
+          eventDeps: { SourceCreated: { recordName: Source.name, type: 'create' } },
+          callback: (event: { record: { amount: number } }) => ({ amount: event.record.amount }),
+        })
+        return { entities: [View] }
+      },
+      read: system => readAmounts(system, 'RetConsView'), before: [3, 4, 10], after: [3, 4, 10],
+    },
+    {
+      label: 'data-based Transform on a relation removed with the rows', requiresSerializable: true, withOwner: true,
+      build: (_Source, _Owner, Link) => {
+        const LinkView = Entity.create({ name: 'RetConsLinkView', properties: [Property.create({ name: 'tag', type: 'string' })] })
+        LinkView.computation = Transform.create({ record: Link, attributeQuery: ['id'], callback: () => ({ tag: 'link' }) })
+        return { entities: [LinkView] }
+      },
+      read: async system => (await system.storage.find('RetConsLinkView', undefined, undefined, ['id'])).length,
+      before: 3, after: 1,
+    },
+    {
+      label: 'property Count over a relation removed with the rows', requiresSerializable: false, withOwner: true,
+      build: () => ({}),
+      read: async (system, ownerId) => ((await system.storage.findOne(
+        'RetConsOwner', MatchExp.atom({ key: 'id', value: ['=', ownerId] }), undefined, ['itemCount'],
+      )) as unknown as { itemCount: number }).itemCount,
+      before: 3, after: 1,
+    },
+  ]
+
+  test.each(cells)('$label converges to the surviving rows', async (cell) => {
+    const Source = Entity.create({
+      name: 'RetConsSource',
+      properties: [
+        Property.create({ name: 'amount', type: 'number' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: { mode: 'ttl', ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 } },
+    })
+    let Owner: any
+    let Link: any
+    if (cell.withOwner) {
+      Owner = Entity.create({
+        name: 'RetConsOwner',
+        properties: [
+          Property.create({ name: 'name', type: 'string' }),
+          Property.create({ name: 'itemCount', type: 'number', computation: Count.create({ property: 'items' }) }),
+        ],
+      })
+      Link = Relation.create({ name: 'RetConsLink', source: Source, sourceProperty: 'owner', target: Owner, targetProperty: 'items', type: 'n:1' })
+    }
+    const built = cell.build(Source, Owner, Link)
+    const system = new MonoSystem(new PGLiteDB())
+    system.conceptClass = KlassByName
+    const controller = new Controller({
+      system,
+      entities: [Source, ...(Owner ? [Owner] : []), ...(built.entities ?? [])],
+      relations: Link ? [Link] : [],
+      dict: built.dict ?? [],
+    })
+    await controller.setup(true)
+    try {
+      const owner = Owner ? await system.storage.create('RetConsOwner', { name: 'owner' }) : undefined
+      for (const row of ROWS) {
+        await system.storage.create('RetConsSource', owner ? { ...row, owner: { id: owner.id } } : row)
+      }
+      expect(await cell.read(system, owner?.id)).toEqual(cell.before)
+
+      const report = await controller.maintainEntityRetention({ now: NOW })
+      expect(report).toEqual({ entities: [{ entityName: 'RetConsSource', removed: 2 }], removed: 2 })
+      expect(await readAmounts(system, 'RetConsSource')).toEqual([3])
+      expect(await cell.read(system, owner?.id)).toEqual(cell.after)
+    } finally {
+      await system.destroy()
+    }
+  })
+
+  test('the axis contains consumers that require SERIALIZABLE and consumers that do not', () => {
+    // Guards the matrix itself: without both kinds the cells cannot distinguish an entry point
+    // that upgrades from one that does not.
+    expect(cells.filter(cell => cell.requiresSerializable).map(cell => cell.label)).toEqual([
+      'Custom, default concurrency (global)',
+      'data-based Transform (entity)',
+      'data-based Transform on a relation removed with the rows',
+    ])
+    expect(cells.some(cell => !cell.requiresSerializable)).toBe(true)
+  })
+
+  async function setupTransformSource() {
+    const Source = Entity.create({
+      name: 'RetNestSource',
+      properties: [
+        Property.create({ name: 'amount', type: 'number' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: { mode: 'ttl', ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 } },
+    })
+    const View = Entity.create({ name: 'RetNestView', properties: [Property.create({ name: 'amount', type: 'number' })] })
+    View.computation = Transform.create({ record: Source, attributeQuery: ['amount'], callback: (row: { amount: number }) => ({ amount: row.amount }) })
+    const { system, controller } = await setupController([Source, View])
+    for (const row of ROWS) {
+      await system.storage.create('RetNestSource', row)
+    }
+    return { system, controller }
+  }
+
+  test('inside an active READ COMMITTED transaction: runs in it once and leaves the upgrade to the outer owner', async () => {
+    const { system, controller } = await setupTransformSource()
+    try {
+      let inner: unknown
+      await expect(system.storage.runInTransaction({ name: 'outer-read-committed' }, async () => {
+        try {
+          await controller.maintainEntityRetention({ now: NOW })
+        } catch (error) {
+          inner = error
+          throw error
+        }
+      })).rejects.toBeDefined()
+      // One attempt in the outer transaction: the signal propagates unchanged, without
+      // futile nested retries that cannot raise the outer isolation level.
+      expect(isRequireSerializableRetry(inner)).toBe(true)
+      expect(isTransactionRetryExhaustedError(inner)).toBe(false)
+      expect((inner as { transactionAttempts?: number }).transactionAttempts).toBeUndefined()
+      // The outer transaction rolled back, so source and derived rows are unchanged.
+      expect(await readAmounts(system, 'RetNestSource')).toEqual([3, 4, 10])
+      expect(await readAmounts(system, 'RetNestView')).toEqual([3, 4, 10])
+    } finally {
+      await system.destroy()
+    }
+  })
+
+  test('inside an active SERIALIZABLE transaction: prunes within the outer transaction', async () => {
+    const { system, controller } = await setupTransformSource()
+    try {
+      const report = await system.storage.runInTransaction(
+        { name: 'outer-serializable', isolation: 'SERIALIZABLE' },
+        () => controller.maintainEntityRetention({ now: NOW }),
+      )
+      expect(report).toEqual({ entities: [{ entityName: 'RetNestSource', removed: 2 }], removed: 2 })
+      expect(await readAmounts(system, 'RetNestSource')).toEqual([3])
+      expect(await readAmounts(system, 'RetNestView')).toEqual([3])
+    } finally {
+      await system.destroy()
+    }
+  })
+
+  test('known gap: an auto-hook failure rejects dispatch and runInBusinessTransaction after their commit', async () => {
+    // Pin of a known contract gap, not the intended behaviour. The dispatch contract
+    // (14-api-reference "Stage P completion") says post-commit failures do not set `error`,
+    // do not roll back facts and are reported through `postCommitPhase`. The retention
+    // auto-hook runs after the commit, but its failure propagates out of dispatch and
+    // runInBusinessTransaction, so a caller sees a rejection for a fact that is committed.
+    // Recorded in agentspace/output/entity-retention-serializable-retry-retrospective.md §4.
+    // When the hook failure is reported instead of thrown, replace this pin with a test of
+    // the reported failure.
+    const Log = Entity.create({
+      name: 'RetHookGapLog',
+      properties: [Property.create({ name: 'createdAt', type: 'number' })],
+      retention: { mode: 'ttl', ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 } },
+    })
+    const Ping = Interaction.create({ name: 'RetHookGapPing', action: Action.create({ name: 'retHookGapPing' }) })
+    const { system, controller } = await setupController([Log], {
+      eventSources: [Ping],
+      entityRetention: { runAfterSuccessfulDispatch: true },
+    })
+    try {
+      const hookFailure = new Error('downstream listener failed on a retention delete')
+      system.storage.listen(async (events) => {
+        if ((events as Array<{ type?: string; recordName?: string }>).some(e => e.type === 'delete' && e.recordName === 'RetHookGapLog')) {
+          throw hookFailure
+        }
+      })
+      const interactionEvents = async () =>
+        (await system.storage.find(InteractionEventEntity.name, undefined, undefined, ['id'])).length
+
+      await system.storage.create('RetHookGapLog', { createdAt: 0 })
+      await expect(controller.dispatch(Ping, { user: user() })).rejects.toBe(hookFailure)
+      expect(await interactionEvents()).toBe(1)
+
+      await expect(controller.runInBusinessTransaction({ name: 'ret-hook-gap' }, async () => {
+        const res = await controller.dispatch(Ping, { user: user() })
+        expect(res.error).toBeUndefined()
+      })).rejects.toBe(hookFailure)
+      expect(await interactionEvents()).toBe(2)
+      // The failing pass rolled back, so the expired row is still present.
+      expect((await system.storage.find('RetHookGapLog', undefined, undefined, ['id'])).length).toBe(1)
+    } finally {
+      await system.destroy()
+    }
   })
 })

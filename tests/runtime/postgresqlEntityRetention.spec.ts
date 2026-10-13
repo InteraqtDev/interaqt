@@ -7,16 +7,23 @@
  * so maintainEntityRetention must upgrade each per-entity transaction on the pool client,
  * as dispatch does.
  *
- * Requires INTERAQT_POSTGRES_DATABASE. Uses an exclusive DB suffix because setup(true)
+ * The second cell covers the other consumer kinds that require SERIALIZABLE on the production
+ * driver: a Custom computation with the default concurrency and a data-based Transform whose
+ * source is a relation removed together with the retained rows.
+ *
+ * Requires INTERAQT_POSTGRES_DATABASE. Uses exclusive DB suffixes because setup(true)
  * drops and recreates the database with FORCE.
  */
 import { describe, expect, test } from 'vitest'
 import {
   Controller,
+  Custom,
+  Dictionary,
   Entity,
   KlassByName,
   MonoSystem,
   Property,
+  Relation,
   Transform,
 } from 'interaqt'
 import { PostgreSQLDB } from '@drivers'
@@ -101,6 +108,72 @@ describeIfPostgres('entity retention (PostgreSQL)', () => {
       expect(await labelsOf('PgRetTfTicket')).toEqual(['fresh'])
       expect(await labelsOf('PgRetTfTicketView')).toEqual(['fresh'])
       expect(await labelsOf('PgRetTfLaterLog')).toEqual(['fresh'])
+    } finally {
+      await system.destroy()
+    }
+  }, 60000)
+
+  test('Custom (default concurrency) and a relation-sourced Transform converge after retention', async () => {
+    const consumersDatabase = `${process.env.INTERAQT_POSTGRES_DATABASE}_retention_consumers`
+    const Item = Entity.create({
+      name: 'PgRetConsItem',
+      properties: [
+        Property.create({ name: 'amount', type: 'number' }),
+        Property.create({ name: 'createdAt', type: 'number' }),
+      ],
+      retention: {
+        mode: 'ttl',
+        ttl: { timestampProperty: 'createdAt', maxAgeMs: 1000 },
+      },
+    })
+    const Owner = Entity.create({
+      name: 'PgRetConsOwner',
+      properties: [Property.create({ name: 'name', type: 'string' })],
+    })
+    const Link = Relation.create({
+      name: 'PgRetConsLink', source: Item, sourceProperty: 'owner', target: Owner, targetProperty: 'items', type: 'n:1',
+    })
+    const LinkView = Entity.create({
+      name: 'PgRetConsLinkView',
+      properties: [Property.create({ name: 'tag', type: 'string' })],
+      computation: Transform.create({ record: Link, attributeQuery: ['id'], callback: () => ({ tag: 'link' }) }),
+    })
+    const total = Dictionary.create({
+      name: 'pgRetConsTotal',
+      type: 'number',
+      collection: false,
+      computation: Custom.create({
+        name: 'PgRetConsTotal',
+        dataDeps: { rows: { type: 'records', source: Item, attributeQuery: ['amount'] } },
+        compute: async (deps: { rows?: Array<{ amount: number }> }) => (deps.rows ?? []).reduce((sum, row) => sum + row.amount, 0),
+        getInitialValue: () => 0,
+      }),
+    })
+
+    const system = new MonoSystem(new PostgreSQLDB(consumersDatabase, dbOptions))
+    system.conceptClass = KlassByName
+    const controller = new Controller({
+      system,
+      entities: [Item, Owner, LinkView],
+      relations: [Link],
+      dict: [total],
+    })
+    await controller.setup(true)
+
+    try {
+      const now = 1_700_000_000_000
+      const owner = await system.storage.create('PgRetConsOwner', { name: 'owner' })
+      await system.storage.create('PgRetConsItem', { amount: 10, createdAt: now - 5000, owner: { id: owner.id } })
+      await system.storage.create('PgRetConsItem', { amount: 4, createdAt: now - 2000, owner: { id: owner.id } })
+      await system.storage.create('PgRetConsItem', { amount: 3, createdAt: now - 500, owner: { id: owner.id } })
+      const linkViews = async () => (await system.storage.find('PgRetConsLinkView', undefined, undefined, ['id'])).length
+      expect(await linkViews()).toBe(3)
+      expect(await system.storage.dict.get('pgRetConsTotal')).toBe(17)
+
+      const report = await controller.maintainEntityRetention({ now })
+      expect(report).toEqual({ entities: [{ entityName: 'PgRetConsItem', removed: 2 }], removed: 2 })
+      expect(await linkViews()).toBe(1)
+      expect(await system.storage.dict.get('pgRetConsTotal')).toBe(3)
     } finally {
       await system.destroy()
     }
