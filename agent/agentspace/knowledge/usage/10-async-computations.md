@@ -452,6 +452,10 @@ Rules enforced by the API:
   in its partition, so removing a newer terminal row could resurrect a stale
   result. Such partitions are skipped and reclaimed on a later cleanup, after
   the pending task is delivered.
+- Each task table is cleaned in its own retryable transaction, with the same
+  SERIALIZABLE upgrade as `dispatch`: deleting task rows emits normal mutation
+  events, and a computation whose `attributeQuery` reads the `_<property>_task`
+  link may require SERIALIZABLE.
 
 ### Error Handling
 
