@@ -97,10 +97,12 @@ export type SystemSchemaOptions = {
     install?: boolean
     internalRequirements?: InternalSchemaRequirement[]
     /**
-     * Set by Controller.setup when attaching in accepted mode (`acceptModelHashes`): the stored
-     * manifest's modelHash. Only changes the wording of attach-time constraint mismatch errors.
+     * Set by Controller.setup when the stored manifest was admitted without an exact match
+     * (declared compatible by its migration, or listed in `acceptModelHashes`): its modelHash and
+     * how it was admitted. Only changes the wording of attach-time constraint mismatch errors.
      */
     acceptedModelHash?: string
+    acceptedManifestMode?: 'declared-compatible' | 'accepted'
 }
 
 /**

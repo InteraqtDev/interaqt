@@ -1406,33 +1406,44 @@ new Controller({
 Initialize the system against a database.
 ```typescript
 await controller.setup(true)   // install: create tables and write the migration manifest
-await controller.setup(false)  // attach: the stored manifest's modelHash must equal the declared one
-await controller.setup({ install: false, acceptModelHashes: [previousReleaseHash] })  // attach, N-1 acceptance
+await controller.setup(false)  // attach: same model, or a model the database's migration declared compatible
+await controller.setup({ install: false, acceptModelHashes: [releaseNModelHash] })  // attach with an explicit override
 ```
 
 - **Install** (`setup(true)` / `{ install: true }`) creates the tables and writes the migration manifest of the current declarations.
-- **Attach** (`setup(false)` / `setup()` / `{ install: false }`) compares the stored manifest's `modelHash` with the hash of the current declarations. A difference throws `Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). ...`. A database with data but no manifest throws `MigrationBaselineError` (call `createMigrationBaseline()` first). Attach never runs DDL.
+- **Attach** (`setup(false)` / `setup()` / `{ install: false }`) compares the stored manifest's `modelHash` with the hash of the current declarations. Equal hashes attach exactly as before. A database with data but no manifest throws `MigrationBaselineError` (call `createMigrationBaseline()` first). Attach never runs DDL.
 - **Migrate**: `{ migrate: { approvedDiff } }` is the same as `controller.migrate({ approvedDiff })`.
 
-**N-1 model acceptance (object form only).** `acceptModelHashes` lets the code of the previous release start on a database that a newer release has already migrated — a rollback, or an old pod restarting during a canary — when the application declares that model compatible:
+**N-1 attach: starting the previous release on a migrated database** (rollback, an old pod restarting during a canary). A different stored `modelHash` is admitted in two ways, decided in one place:
+
+1. **Declared by the migration (default, no option).** `migrate` classifies each migration from its approved diff and writes `compatibleFrom: [previous modelHash]` into the manifest when code built for the previous model can keep reading the database (`compatibleFrom: []` when it cannot). The classification and its reasons are kept in `manifest.compatibility`; `generateMigrationDiff()` returns a provisional `diff.compatibility` and `migrate()` returns the final `plan.compatibility`. Only the immediately previous model is declared. A migration that leaves the model unchanged keeps the existing declaration. setup admits a declared model with `manifestMode: 'declared-compatible'`. A migration is classified **not** compatible when:
+   - a record or attribute of the previous model is removed, moved, or retyped;
+   - a constraint object is added, removed, or changed on a table the previous model uses (unique, non-null, identity; Transform output indexes added to such a table are exempt);
+   - an existing computation changes, is removed, or takes over a fact property, unless the change is approved as `'unchanged'`;
+   - a StateMachine's persisted states are remapped;
+   - a new fact property on an existing record relies on an application-side default value (the database has no DEFAULT, so rows the previous code inserts would hold NULL).
+   New tables, new columns without a default, and new computations on new data stay compatible.
+2. **Explicit override (object form only).** `acceptModelHashes` admits stored manifests whose `modelHash` is listed (`manifestMode: 'accepted'`) — for databases whose manifest has no declaration (written by install, `createMigrationBaseline`, or interaqt 4.12.x and earlier) or a deliberate operator override.
 
 | Option | Meaning |
 |---|---|
-| `acceptModelHashes?: string[]` | Stored-manifest hashes this code may attach to besides its own `modelHash`. At most 2 (the current release and the previous one); more is an error. Omitted or `[]`: strict equality with the same error text as `setup(false)`. Cannot be combined with `install: true` or `migrate`. |
-| `requireSchemaSuperset?: boolean` | Default `true`. Used only when the stored hash differs and is accepted. Before attaching, setup throws `SchemaSupersetError` when (1) the database's manifest model lacks, moves, or retypes a record or attribute the current model maps to (the migration planner's blocking-change rules), or (2) the live catalog (`information_schema` / `PRAGMA table_info`) lacks a table or column, types a column incompatibly, or holds a constraint object that differs from the declared ones. `error.details.violations` lists each one (`model-difference` / `missing-table` / `missing-column` / `incompatible-column-type` / `constraint-mismatch`, with physical names and `Record.property`). `false` skips the check and trusts the declaration. |
+| `acceptModelHashes?: string[]` | At most 2 (the current release and the previous one); more is an error. Cannot be combined with `install: true` or `migrate`. |
+| `requireSchemaSuperset?: boolean` | Default `true`. Used whenever the stored hash differs and is admitted (declared or accepted). Before attaching, setup throws `SchemaSupersetError` when (1) the database's manifest model lacks, moves, or retypes a record or attribute the current model maps to (the migration planner's blocking-change rules), or (2) the live catalog (`information_schema` / `PRAGMA table_info`) lacks a table or column, types a column incompatibly, or holds a constraint object that differs from the declared ones. `error.details.violations` lists each one (`model-difference` / `missing-table` / `missing-column` / `incompatible-column-type` / `constraint-mismatch`, with physical names and `Record.property`); `error.details.manifestMode` says how the model was admitted. `false` skips the check. |
 
-- A stored hash outside the accept set throws the usual `Model manifest mismatch...` error, extended with the database hash, the declared hash, and the accept set.
-- Every successful attach logs (`system.logger.info`, label `setup`) `manifestMode: 'exact' | 'accepted'`, `declaredModelHash` (the current code's hash) and `acceptedModelHash` (the stored manifest's hash). The default `SystemConsoleLogger` level is `ERROR`; pass a logger at `INFO` to `new MonoSystem(db, logger)` to see it.
+- **Not admitted:** setup throws `Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: _MigrationManifest_/current`. When the manifest has no declaration and `acceptModelHashes` is empty, that is the whole message (identical to 4.12.0). Otherwise it continues with the database hash, the declared hash, the manifest's `compatibleFrom`, the accept set, and — when the migration was classified incompatible — its reasons.
+- Every successful attach logs (`system.logger.info`, label `setup`) `manifestMode: 'exact' | 'declared-compatible' | 'accepted'`, `declaredModelHash` (the current code's hash) and `acceptedModelHash` (the stored manifest's hash). The default `SystemConsoleLogger` level is `ERROR`; pass a logger at `INFO` to `new MonoSystem(db, logger)` to see it.
 - Column types are compared in the catalog's form: PostgreSQL base type (`udt_name`, declared types resolved by the database with `to_regtype`; type modifiers such as lengths or vector dimensions are not compared), SQLite declared type text, MySQL `data_type`.
-- **Constraint objects.** An extra constraint the newer model installed on a table the current code uses (for example a `UniqueConstraint` or `NonNullConstraint`) can reject the older code's writes, so it is incompatible: `SchemaSupersetError` reports it as `constraint-mismatch` with `status: 'extra'` and the constraint's physical name. With `requireSchemaSuperset: false`, the attach-time reconciliation still rejects it with `ConstraintSetupError`. Add constraints in the contract release, after the previous release is retired.
-- **Read compatibility only; a passing superset check does not make writes safe.** Not checked:
-  - A fact property the newer model added has no database-level DEFAULT, so rows the older code inserts hold NULL there. When the newer release attaches again the hashes are equal and nothing backfills them.
-  - A computed property the newer model added is not maintained while the older code runs, so it goes stale for the rows the older code changes.
-  - A computation the newer migration rebuilt keeps being maintained incrementally by the older code with its old semantics.
+- **Constraint objects.** An extra constraint the newer model installed on a table the current code uses (for example a `UniqueConstraint` or `NonNullConstraint`) can reject the older code's writes, so it is incompatible: the migration does not declare compatibility, and an explicit override still fails the superset check (`constraint-mismatch`, `status: 'extra'`, with the constraint's physical name). With `requireSchemaSuperset: false`, the attach-time reconciliation still rejects it with `ConstraintSetupError`. Add constraints in the contract release, after the previous release is retired.
+- **Read compatibility only; a passing check does not make writes safe.** Not checked:
+  - A fact property the newer model added without a default is still compatible, and rows the older code inserts hold NULL there. When the newer release attaches again the hashes are equal and nothing backfills them.
+  - A computed property the newer model added is not maintained while the older code runs, so it goes stale for the rows the older code changes; nothing recomputes it when the newer release attaches again.
+  - An explicit `acceptModelHashes` override can admit a model whose migration was classified incompatible (for example one that rebuilt a computation); the older code then keeps maintaining that computation with its old semantics.
   Keep write compatibility with expand/contract releases: add columns and tables in one release; start requiring the new data, change computations, and add constraints only after the previous release is retired.
 
 ```typescript
-// Release N-1 restarting after release N migrated the database (hash from the deployment ledger):
+// Release N-1 restarting after release N's expand-only migration: nothing to configure.
+await controller.setup(false)   // manifestMode: 'declared-compatible'
+// Explicit override for a database whose manifest carries no declaration:
 await controller.setup({ install: false, acceptModelHashes: [releaseNModelHash] })
 ```
 

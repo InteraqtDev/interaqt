@@ -41,6 +41,7 @@ import {
   recordingLogger,
   richController,
   setupLogs,
+  stripDeclaredCompatibility,
 } from "./helpers/setupAcceptanceFixtures.js";
 import { migrateWithApproval } from "./helpers/migrationApproval.js";
 
@@ -913,6 +914,8 @@ describeIfPostgres("PostgreSQL setup acceptModelHashes", () => {
     await v1.system.storage.create("AcceptProduct", { name: "before", price: 1 });
     const { controller: v2, hash: hashB } = await migrateAcceptModel(db, { sku: true });
     await v2.system.storage.create("AcceptProduct", { name: "after", price: 2, sku: "S-2" });
+    // Exercise the explicit path: drop the declaration the migration recorded (4.12.x shape).
+    await stripDeclaredCompatibility(v2);
 
     const { logger, infos } = recordingLogger();
     const rollback = controllerFor(db, {}, logger);
@@ -930,6 +933,7 @@ describeIfPostgres("PostgreSQL setup acceptModelHashes", () => {
     const db = openDatabase("accept_rich");
     const { controller: v1, publish } = richController(db, false);
     await v1.setup(true);
+    const hashA = (await readMigrationManifest(v1))!.modelHash;
     const author = await v1.system.storage.create("RichUser", {
       name: "ann", age: 30, active: true, joinedAt: Date.now(), profile: { city: "x" }, meta: { a: [1] }, tags: ["t1"], avatar: { url: "u" },
     });
@@ -938,7 +942,12 @@ describeIfPostgres("PostgreSQL setup acceptModelHashes", () => {
     const { controller: v2 } = richController(db, true);
     await migrateWithApproval(v2);
     const hashB = (await readMigrationManifest(v2))!.modelHash;
+    expect((await readMigrationManifest(v2))!.compatibleFrom).toEqual([hashA]);
 
+    // Declared by the migration: the previous release starts with setup(false).
+    await richController(db, false).controller.setup(false);
+
+    await stripDeclaredCompatibility(v2);
     const { controller: rollback } = richController(db, false);
     await rollback.setup({ install: false, acceptModelHashes: [hashB] });
     const users = await rollback.system.storage.find("RichUser", undefined, undefined, ["name", "postCount", ["posts", { attributeQuery: ["title", "status"] }]]);
@@ -979,6 +988,44 @@ describeIfPostgres("PostgreSQL setup acceptModelHashes", () => {
     expect(error.details?.violations).toHaveLength(2);
     const attachError = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: [hashB], requireSchemaSuperset: false }));
     expect(attachError.message).toContain("admitted through acceptModelHashes");
+    await db.close();
+  });
+});
+
+// Compatibility declared by the migration (one2x-ai/mesh#2826) on real PostgreSQL.
+describeIfPostgres("PostgreSQL migration-declared compatibility", () => {
+  const openDatabase = (suffix: string) => new PostgreSQLDB(`${process.env.INTERAQT_POSTGRES_DATABASE!}_${suffix}`, dbOptions);
+
+  test("expand-only migration declares compatibleFrom; N-1 starts with setup(false) and reads", async () => {
+    const db = openDatabase("declared_expand");
+    const { controller: v1, hash: hashA } = await installAcceptModel(db);
+    await v1.system.storage.create("AcceptProduct", { name: "before", price: 1 });
+    const { controller: v2, hash: hashB } = await migrateAcceptModel(db, { sku: true });
+    expect((await readMigrationManifest(v2))!.compatibleFrom).toEqual([hashA]);
+    const { logger, infos } = recordingLogger();
+    const rollback = controllerFor(db, {}, logger);
+    await rollback.setup(false);
+    expect((await rollback.system.storage.find("AcceptProduct", undefined, undefined, ["*"])).map(row => row.name)).toEqual(["before"]);
+    expect(setupLogs(infos)).toEqual([expect.objectContaining({ manifestMode: "declared-compatible", declaredModelHash: hashA, acceptedModelHash: hashB })]);
+    await db.close();
+  });
+
+  test("a migration adding constraints declares nothing; N-1 is refused with the reason; a legacy manifest keeps the 4.12.0 text", async () => {
+    const db = openDatabase("declared_constraint");
+    await installAcceptModel(db);
+    const { controller: v2 } = await migrateAcceptModel(db, { sku: true, skuUnique: true, skuRequired: true });
+    const manifest = (await readMigrationManifest(v2))!;
+    expect(manifest.compatibleFrom).toEqual([]);
+    expect(manifest.compatibility?.reasons).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^constraint added on existing table "AcceptProduct": unique/),
+      expect.stringMatching(/^constraint added on existing table "AcceptProduct": non-null/),
+    ]));
+    const error = await captureError(controllerFor(db).setup(false));
+    expect(error.message).toContain("was classified incompatible: constraint added on existing table");
+
+    await stripDeclaredCompatibility(v2);
+    const legacy = await captureError(controllerFor(db).setup(false));
+    expect(legacy.message).toBe(DEFAULT_MISMATCH_MESSAGE);
     await db.close();
   });
 });

@@ -1,15 +1,33 @@
 import type { ManagedConstraintKind } from "@storage";
-import { getStorageBlockingChanges, MIGRATION_MANIFEST_CONCEPT, MIGRATION_MANIFEST_CURRENT_KEY, MigrationError, type MigrationManifest, type SetupOptions, type StorageBlockingChange } from "./migration.js";
+import {
+    getStorageBlockingChanges,
+    MIGRATION_MANIFEST_CONCEPT,
+    MIGRATION_MANIFEST_CURRENT_KEY,
+    MigrationError,
+    type FactPropertyBackfill,
+    type MigrationCompatibility,
+    type MigrationConstraintChange,
+    type MigrationDecision,
+    type MigrationDecisionRequirement,
+    type MigrationManifest,
+    type SetupOptions,
+    type StorageBlockingChange,
+} from "./migration.js";
 
 /**
- * N-1 model acceptance for `controller.setup({ acceptModelHashes, requireSchemaSuperset })`.
+ * N-1 attach (one2x-ai/mesh#2826): letting the code of release N-1 start on a database already
+ * migrated to release N (rollback, canary restart).
  *
- * Normal attach (`setup(false)`) requires the stored migration manifest's modelHash to equal
- * the modelHash of the current declarations. An accept set lets the code of release N-1
- * start on a database already migrated to release N (rollback, canary restart) when the
- * application has declared that model compatible. The guarantee is read compatibility only;
- * write-semantics compatibility is the application's expand/contract discipline and is not
- * checked here. See `SetupOptions.acceptModelHashes`.
+ * Normal attach requires the stored manifest's modelHash to equal the hash of the current
+ * declarations. Two sources can admit a different stored model, both through
+ * `resolveManifestMode`:
+ * - the migration's own declaration: migrate classifies itself (`classifyMigrationCompatibility`)
+ *   and records `compatibleFrom: [previous modelHash]` in the manifest when compatible
+ *   (`manifestMode: 'declared-compatible'`, the default path, no option needed);
+ * - the explicit override `setup({ acceptModelHashes })` (`manifestMode: 'accepted'`).
+ * Either way the schema superset check then verifies the database. The guarantee is read
+ * compatibility only; write-semantics compatibility is the application's expand/contract
+ * discipline and is not checked here.
  */
 
 /** Hard limit on `acceptModelHashes`: the current release and the previous one. */
@@ -17,9 +35,10 @@ export const MAX_ACCEPTED_MODEL_HASHES = 2;
 
 /**
  * How setup admitted the stored manifest: `exact` — the stored modelHash equals the declared
- * one; `accepted` — it differs and is listed in `acceptModelHashes`.
+ * one; `declared-compatible` — it differs and the manifest's `compatibleFrom` lists the declared
+ * modelHash; `accepted` — it differs and is listed in `acceptModelHashes`.
  */
-export type SetupManifestMode = "exact" | "accepted";
+export type SetupManifestMode = "exact" | "declared-compatible" | "accepted";
 
 export type SetupAcceptance = {
     acceptModelHashes: string[];
@@ -142,13 +161,112 @@ export function resolveSetupAcceptance(options: boolean | SetupOptions | undefin
 /**
  * The single acceptance decision for attach. Returns how the stored manifest is admitted, or
  * throws the mismatch error. Every rule about which stored model the current code may start on
- * lives here, so a future source of accepted hashes (for example compatibility declared by the
- * migration in the manifest) plugs in at this one point.
+ * lives here: the database's own declaration first, then the explicit override.
  */
-export function resolveManifestMode(databaseModelHash: string, declaredModelHash: string, acceptModelHashes: string[]): SetupManifestMode {
-    if (databaseModelHash === declaredModelHash) return "exact";
-    if (acceptModelHashes.includes(databaseModelHash)) return "accepted";
-    throw new Error(createModelManifestMismatchMessage(databaseModelHash, declaredModelHash, acceptModelHashes));
+export function resolveManifestMode(databaseManifest: MigrationManifest, declaredModelHash: string, acceptModelHashes: string[]): SetupManifestMode {
+    if (databaseManifest.modelHash === declaredModelHash) return "exact";
+    if (databaseManifest.compatibleFrom?.includes(declaredModelHash)) return "declared-compatible";
+    if (acceptModelHashes.includes(databaseManifest.modelHash)) return "accepted";
+    throw new Error(createModelManifestMismatchMessage(databaseManifest, declaredModelHash, acceptModelHashes));
+}
+
+export type MigrationCompatibilityInput = {
+    previousManifest: MigrationManifest;
+    nextManifest: MigrationManifest;
+    /** The schema plan's constraint changes (catalog reconciliation against the next model). */
+    constraintChanges: MigrationConstraintChange[];
+    requiredDecisions: MigrationDecisionRequirement[];
+    /** Approved decisions. Omitted for a freshly generated diff: the classification is then provisional. */
+    decisions?: MigrationDecision[];
+    /** New fact properties whose application-side default the migration backfills. */
+    factPropertyBackfills: FactPropertyBackfill[];
+};
+
+/**
+ * Classify a migration from `previousManifest` to `nextManifest`: can code built for the previous
+ * model keep reading the database after it? Not compatible when
+ * - the previous model's records or attributes are removed, moved, or retyped (the same logical
+ *   check setup runs, `findModelSupersetViolations`);
+ * - a constraint object changes on a table the previous model uses (an added one can reject the
+ *   previous code's writes; a removed or changed one fails its attach-time reconciliation).
+ *   Indexes of Transform outputs added to such a table are exempt, as at attach;
+ * - an existing computation changes, is removed, or takes over a fact property (the previous
+ *   code keeps maintaining that data with the old semantics), unless the change is approved
+ *   as 'unchanged';
+ * - a StateMachine's persisted states are remapped (the previous code writes the old names);
+ * - a new fact property on an existing record relies on an application-side default (the
+ *   database has no DEFAULT, so rows the previous code inserts hold NULL).
+ * New tables, new columns without defaults, and new computations on new data stay compatible.
+ */
+export function classifyMigrationCompatibility(input: MigrationCompatibilityInput): MigrationCompatibility {
+    const { previousManifest, nextManifest } = input;
+    const reasons: string[] = findModelSupersetViolations(previousManifest, nextManifest).map(describeSchemaSupersetViolation);
+
+    const previousTables = new Set((previousManifest.storage.tables || []).map(table => table.tableName));
+    for (const change of input.constraintChanges) {
+        if (!previousTables.has(change.tableName)) continue;
+        if (change.reconciliation === "undecidable") continue;
+        if (change.changeType === "added" && change.constraintKind === "transform-unique") continue;
+        const subject = change.constraintName ? `"${change.constraintName}" (${change.physicalName})` : change.physicalName;
+        reasons.push(`constraint ${change.changeType} on existing table "${change.tableName}": ${change.constraintKind} ${subject}`);
+    }
+
+    const provisional = input.decisions === undefined;
+    const nextComputations = new Map(nextManifest.computations.map(computation => [computation.id, computation]));
+    for (const previous of previousManifest.computations) {
+        const next = nextComputations.get(previous.id);
+        if (!next) {
+            reasons.push(`existing computation removed: ${previous.dataContext}`);
+            continue;
+        }
+        if (next.signature === previous.signature) continue;
+        if (provisional) {
+            reasons.push(`existing computation changed: ${next.dataContext} (not yet decided; approve it as 'unchanged' if the change is not semantic)`);
+            continue;
+        }
+        const decision = input.decisions!.find(item => item.kind === "computation" && item.id === previous.id) as Extract<MigrationDecision, { kind: "computation" }> | undefined;
+        if (decision?.decision === "unchanged") continue;
+        reasons.push(`existing computation changed: ${next.dataContext} (decision: ${decision?.decision ?? "none"})`);
+    }
+    const takeovers = provisional
+        ? input.requiredDecisions.filter(item => item.kind === "computation-takeover")
+        : input.decisions!.filter(item => item.kind === "computation-takeover");
+    for (const dataContext of [...new Set(takeovers.map(item => item.dataContext))].sort()) {
+        reasons.push(`existing fact property taken over by a computation: ${dataContext}`);
+    }
+
+    const remaps = [...input.requiredDecisions, ...(input.decisions || [])].filter(item => item.kind === "state-graph-mapping");
+    for (const dataContext of [...new Set(remaps.map(item => item.dataContext))].sort()) {
+        reasons.push(`StateMachine state remap: ${dataContext} (persisted state names change; the previous code would keep writing the old names)`);
+    }
+
+    const previousRecords = new Set(previousManifest.records.map(record => record.name));
+    for (const backfill of input.factPropertyBackfills) {
+        if (!previousRecords.has(backfill.recordName)) continue;
+        reasons.push(`new fact property ${backfill.recordName}.${backfill.propertyName} relies on an application-side default value; the database has no DEFAULT, so rows the previous code inserts would hold NULL`);
+    }
+    return { fromModelHash: previousManifest.modelHash, compatible: reasons.length === 0, reasons };
+}
+
+/**
+ * The manifest a migration writes, carrying its declaration. Only the immediately previous
+ * model is declared (`compatibleFrom` never chains). A migration that leaves the model unchanged
+ * (reconciling constraint objects, for example) keeps the declaration of the migration that
+ * produced the model.
+ */
+export function declareMigrationCompatibility(nextManifest: MigrationManifest, previousManifest: MigrationManifest, compatibility: MigrationCompatibility): MigrationManifest {
+    if (previousManifest.modelHash === nextManifest.modelHash) {
+        return {
+            ...nextManifest,
+            ...(previousManifest.compatibleFrom !== undefined ? { compatibleFrom: previousManifest.compatibleFrom } : {}),
+            ...(previousManifest.compatibility !== undefined ? { compatibility: previousManifest.compatibility } : {}),
+        };
+    }
+    return {
+        ...nextManifest,
+        compatibleFrom: compatibility.compatible ? [previousManifest.modelHash] : [],
+        compatibility,
+    };
 }
 
 /**
@@ -200,14 +318,24 @@ function attributePhysicalPath(attribute: { tableName?: string; fieldName?: stri
 }
 
 /**
- * The attach-time mismatch message. With an empty accept set this is the exact pre-existing
- * text (callers and runbooks match on it); with an accept set it additionally lists the
- * database's hash, the declared hash, and the accept set.
+ * The attach-time mismatch message. When the manifest carries no declaration and the accept set
+ * is empty this is the exact pre-existing text (callers and runbooks match on it). Otherwise it
+ * also lists the database's hash, the declared hash, the manifest's `compatibleFrom`, the accept
+ * set, and the reasons the migration that wrote the manifest was classified incompatible.
  */
-export function createModelManifestMismatchMessage(databaseModelHash: string, declaredModelHash: string, acceptModelHashes: string[]) {
+export function createModelManifestMismatchMessage(databaseManifest: MigrationManifest, declaredModelHash: string, acceptModelHashes: string[]) {
     const message = `Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`;
-    if (!acceptModelHashes.length) return message;
-    return `${message}. Database modelHash ${databaseModelHash} is neither the declared modelHash ${declaredModelHash} nor in acceptModelHashes [${acceptModelHashes.join(", ")}].`;
+    const declaration = databaseManifest.compatibleFrom;
+    if (!acceptModelHashes.length && declaration === undefined) return message;
+    const details = [`database modelHash ${databaseManifest.modelHash}`, `declared modelHash ${declaredModelHash}`];
+    if (declaration !== undefined) details.push(`the database manifest declares compatibleFrom [${declaration.join(", ")}]`);
+    if (acceptModelHashes.length) details.push(`acceptModelHashes [${acceptModelHashes.join(", ")}]`);
+    let text = `${message}. Not admitted: ${details.join("; ")}.`;
+    const assessment = databaseManifest.compatibility;
+    if (assessment && !assessment.compatible) {
+        text += ` The migration from ${assessment.fromModelHash} to ${databaseManifest.modelHash} was classified incompatible: ${assessment.reasons.join("; ")}.`;
+    }
+    return text;
 }
 
 function describeColumn(tableName: string, columnName: string, logicalPath?: string) {
@@ -238,11 +366,12 @@ export function describeSchemaSupersetViolation(violation: SchemaSupersetViolati
     }
 }
 
-export function createSchemaSupersetMessage(violations: SchemaSupersetViolation[], declaredModelHash: string, acceptedModelHash: string) {
-    return `Database schema is not a superset of the declared model, so the accepted modelHash ${acceptedModelHash} is not read-compatible with the declared modelHash ${declaredModelHash} ` +
+export function createSchemaSupersetMessage(violations: SchemaSupersetViolation[], declaredModelHash: string, acceptedModelHash: string, manifestMode: Exclude<SetupManifestMode, "exact">) {
+    return `Database schema is not a superset of the declared model, so the database model ${acceptedModelHash} (manifestMode: ${manifestMode}) is not read-compatible with the declared model ${declaredModelHash} ` +
         `(${violations.length} problem${violations.length === 1 ? "" : "s"}): ${violations.map(describeSchemaSupersetViolation).join("; ")}. ` +
-        `Either the acceptModelHashes declaration is wrong for this database, or the database was changed outside interaqt migration. ` +
-        DIRECTION_ADVICE;
+        (manifestMode === "declared-compatible"
+            ? `The database manifest declares this model compatible, but the database disagrees: it was changed outside interaqt migration. Deploy the release that matches the database model, or repair the database.`
+            : `Either the acceptModelHashes declaration is wrong for this database, or the database was changed outside interaqt migration. ` + DIRECTION_ADVICE);
 }
 
 // Both directions reach accepted mode: older code on a newer database (rollback), or newer code
@@ -252,13 +381,16 @@ const DIRECTION_ADVICE =
     `if it is newer, deploy the release that matches it — migrating older code against a newer database would remove what the newer model added.`;
 
 /**
- * Attach-time constraint reconciliation message when the stored manifest was admitted through
- * acceptModelHashes (reached with requireSchemaSuperset: false, which skips the earlier check).
- * The default advice — migrate to reconcile — would downgrade the newer model's constraints.
+ * Attach-time constraint reconciliation message when the stored manifest was admitted without an
+ * exact match (reached with requireSchemaSuperset: false, which skips the earlier check). The
+ * default advice — migrate to reconcile — would downgrade the newer model's constraints.
  */
-export function createAcceptedConstraintMismatchMessage(details: string, count: number, acceptedModelHash: string) {
+export function createAcceptedConstraintMismatchMessage(details: string, count: number, acceptedModelHash: string, manifestMode: Exclude<SetupManifestMode, "exact">) {
+    const admission = manifestMode === "accepted"
+        ? "was admitted through acceptModelHashes"
+        : "was admitted because the migration that wrote it declared this code's model compatible";
     return `The database's constraint objects do not match the declared model (${count}): ${details}. ` +
-        `The database manifest (modelHash ${acceptedModelHash}) was admitted through acceptModelHashes; an extra constraint object installed by a newer model can reject this code's writes, so it counts as incompatible. ` +
+        `The database manifest (modelHash ${acceptedModelHash}) ${admission}; an extra constraint object installed by a newer model can reject this code's writes, so it counts as incompatible. ` +
         DIRECTION_ADVICE;
 }
 

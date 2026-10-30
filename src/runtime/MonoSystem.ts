@@ -558,7 +558,7 @@ RETURNING "lastValue" AS value`,
             //  校验拦在 setup(false) 之外，这里只剩「数据库偏离声明」一种情况：只读核对，不一致即 fail-fast。
             //  例外是接受模式（setup acceptModelHashes）：库中模型本来就与声明不同，新模型多装的约束
             //  在这里同样判为不兼容（通常已被超集校验先报出），报错改用接受模式的说法（acceptedModelHash）。
-            await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'attach', options?.acceptedModelHash)
+            await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'attach', options?.acceptedModelHash ? { modelHash: options.acceptedModelHash, manifestMode: options.acceptedManifestMode ?? 'accepted' } : undefined)
         }
         if (this.db.setupRecordSequences) {
             const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
@@ -931,6 +931,7 @@ RETURNING "lastValue" AS value`,
                 previousDefinition: entry.installed?.definitionText,
                 nextDefinition: entry.desired?.createSQL,
                 requiresApproval: requiresConstraintRemovalApproval(entry),
+                reconciliation: entry.status as 'missing' | 'extra' | 'different' | 'undecidable',
             }
             if (entry.status === 'missing') {
                 return { ...base, changeType: 'added' as const, reason: 'declared constraint object is not installed; it is created after verification' }
@@ -1362,7 +1363,7 @@ RETURNING "lastValue" AS value`,
      * set). attach refuses only the differences that change what the database enforces
      * (see isStartupBlockingConstraintMismatch) and tells the operator to migrate.
      */
-    private async assertManagedConstraintsReconciled(dbSetup: DBSetup, desired: DesiredManagedConstraint[], mode: 'install' | 'attach' | 'migration', acceptedModelHash?: string) {
+    private async assertManagedConstraintsReconciled(dbSetup: DBSetup, desired: DesiredManagedConstraint[], mode: 'install' | 'attach' | 'migration', admitted?: { modelHash: string, manifestMode: 'declared-compatible' | 'accepted' }) {
         const dialect = getSchemaDialect(this.db)
         const installed = await readInstalledManagedConstraints(this.db, dialect, Object.keys(dbSetup.tables))
         const entries = reconcileManagedConstraints(desired, installed, dialect)
@@ -1372,8 +1373,8 @@ RETURNING "lastValue" AS value`,
         if (!mismatches.length) return
         const first = mismatches[0]
         const details = mismatches.map(describeManagedConstraintEntry).join('; ')
-        const message = mode === 'attach' && acceptedModelHash
-            ? createAcceptedConstraintMismatchMessage(details, mismatches.length, acceptedModelHash)
+        const message = mode === 'attach' && admitted
+            ? createAcceptedConstraintMismatchMessage(details, mismatches.length, admitted.modelHash, admitted.manifestMode)
             : mode === 'attach'
             ? `The database's constraint objects do not match the declared model (${mismatches.length}): ${details}. ` +
                 `setup(false) does not change constraints. Run controller.generateMigrationDiff(), review it, then controller.migrate({ approvedDiff }) to reconcile them.`
