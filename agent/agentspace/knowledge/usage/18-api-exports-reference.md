@@ -88,6 +88,8 @@ import {
   SideEffectError,         // postCommit / RecordMutationSideEffect failures (not result.error)
   PostCommitRerunError,    // caller errors on rerun APIs (INVALID_INPUT, UNKNOWN_RECORD_NAME, ...)
   MaintenanceError,        // maintainEntityRetention / cleanupAsyncTasks finished with failed targets (report + failures)
+  SchemaSupersetError,     // setup({ acceptModelHashes }): live schema lacks a table/column/type the code maps to (details.violations)
+  MAX_ACCEPTED_MODEL_HASHES, // hard limit on setup acceptModelHashes (2)
   ConditionError,          // DEPRECATED historical factory/shape; use InteractionGuardError + .code
   ConstraintViolationError,
   ConstraintSetupError,

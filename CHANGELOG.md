@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+Minor release: a new, opt-in setup capability. Default behavior is unchanged.
+
+### Features
+
+* **runtime:** `controller.setup({ install: false, acceptModelHashes, requireSchemaSuperset })`
+  lets the code of the previous release attach to a database that a newer release has already
+  migrated (rollback, an old pod restarting during a canary) when the application declares that
+  model compatible ([one2x-ai/mesh#2826](https://github.com/one2x-ai/mesh/issues/2826)).
+  Object form only; at most 2 hashes. Omitted or empty keeps the strict `modelHash` comparison
+  and the exact 4.12.0 error text, and the boolean form is unchanged. A stored hash outside the
+  accept set throws the usual `Model manifest mismatch` error extended with the database hash,
+  the declared hash, and the accept set. When the hash is accepted, setup first reads the live
+  catalog (`requireSchemaSuperset`, default `true`) and throws `SchemaSupersetError` naming every
+  table, column, or column type the current model maps to that is missing or incompatible.
+  Every successful attach logs `manifestMode: exact | accepted`, `declaredModelHash`, and
+  `acceptedModelHash` through `system.logger.info` (label `setup`). The guarantee is read
+  compatibility only: write-semantics compatibility is not checked, and a constraint object the
+  newer model added on a table the current code uses still blocks attach. Design record:
+  `docs/setup-accept-model-hashes/`.
+
 ## [4.12.0](https://github.com/InteraqtDev/interaqt/compare/v4.11.2...v4.12.0) (2026-10-13)
 
 ### Features

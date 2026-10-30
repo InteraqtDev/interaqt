@@ -1402,10 +1402,34 @@ new Controller({
 
 **Main Methods**
 
-#### setup(install?: boolean)
-Initialize system.
+#### setup(options?: boolean | SetupOptions)
+Initialize the system against a database.
 ```typescript
-await controller.setup(true) // Create database tables
+await controller.setup(true)   // install: create tables and write the migration manifest
+await controller.setup(false)  // attach: the stored manifest's modelHash must equal the declared one
+await controller.setup({ install: false, acceptModelHashes: [previousReleaseHash] })  // attach, N-1 acceptance
+```
+
+- **Install** (`setup(true)` / `{ install: true }`) creates the tables and writes the migration manifest of the current declarations.
+- **Attach** (`setup(false)` / `setup()` / `{ install: false }`) compares the stored manifest's `modelHash` with the hash of the current declarations. A difference throws `Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). ...`. A database with data but no manifest throws `MigrationBaselineError` (call `createMigrationBaseline()` first). Attach never runs DDL.
+- **Migrate**: `{ migrate: { approvedDiff } }` is the same as `controller.migrate({ approvedDiff })`.
+
+**N-1 model acceptance (object form only).** `acceptModelHashes` lets the code of the previous release start on a database that a newer release has already migrated — a rollback, or an old pod restarting during a canary — when the application declares that model compatible:
+
+| Option | Meaning |
+|---|---|
+| `acceptModelHashes?: string[]` | Stored-manifest hashes this code may attach to besides its own `modelHash`. At most 2 (the current release and the previous one); more is an error. Omitted or `[]`: strict equality with the same error text as `setup(false)`. Cannot be combined with `install: true` or `migrate`. |
+| `requireSchemaSuperset?: boolean` | Default `true`. Used only when the stored hash differs and is accepted: before attaching, setup reads the live database catalog (`information_schema` / `PRAGMA table_info`) and throws `SchemaSupersetError` when a table, column, or column type the current model maps to is missing or incompatible. `error.details.violations` lists each one (`missing-table` / `missing-column` / `incompatible-column-type`, with physical names and `Record.property`). `false` skips the check and trusts the declaration. |
+
+- A stored hash outside the accept set throws the usual `Model manifest mismatch...` error, extended with the database hash, the declared hash, and the accept set.
+- Every successful attach logs (`system.logger.info`, label `setup`) `manifestMode: 'exact' | 'accepted'`, `declaredModelHash` (the current code's hash) and `acceptedModelHash` (the stored manifest's hash). The default `SystemConsoleLogger` level is `ERROR`; pass a logger at `INFO` to `new MonoSystem(db, logger)` to see it.
+- Column types are compared in the catalog's form: PostgreSQL base type (`udt_name`, declared types resolved by the database with `to_regtype`; type modifiers such as lengths or vector dimensions are not compared), SQLite declared type text, MySQL `data_type`.
+- **Read compatibility only.** An accepted hash says the current code can read the newer schema. Write-semantics compatibility (for example values the newer model expects in columns the older code does not write) is not checked; keep it with expand/contract releases: add columns and tables in one release, add constraints or start requiring the new data only after the previous release is retired.
+- Constraint objects are still reconciled at attach as before: a constraint the newer model added on a table the current code uses (for example a `UniqueConstraint`) is an extra constraint and blocks startup with `ConstraintSetupError`.
+
+```typescript
+// Release N-1 restarting after release N migrated the database (hash from the deployment ledger):
+await controller.setup({ install: false, acceptModelHashes: [releaseNModelHash] })
 ```
 
 #### maintainEntityRetention(options?): Promise\<RetentionReport\>
