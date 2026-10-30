@@ -96,6 +96,11 @@ export type InternalSchemaRequirement =
 export type SystemSchemaOptions = {
     install?: boolean
     internalRequirements?: InternalSchemaRequirement[]
+    /**
+     * Set by Controller.setup when attaching in accepted mode (`acceptModelHashes`): the stored
+     * manifest's modelHash. Only changes the wording of attach-time constraint mismatch errors.
+     */
+    acceptedModelHash?: string
 }
 
 /**

@@ -47,7 +47,7 @@ import { ConstraintSetupError, ConstraintViolationError, findConstraintViolation
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
 import { buildDesiredManagedConstraints, canonicalJSONStringify, createDesiredTransformUniqueIndex, describeManagedConstraintEntry, frameworkApplicationIdentityIndexes, frameworkLogicalIdUniqueIndexes, getSchemaDialect, isStartupBlockingConstraintMismatch, managedConstraintDropSQL, managedConstraintFingerprintSQL, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, readInstalledManagedConstraints, reconcileManagedConstraints, requiresConstraintRemovalApproval, shouldSkipConstraintForDialect, timestampParamForDialect, type DesiredManagedConstraint, type ManagedConstraintReconciliationEntry } from "@storage";
 import type { AdditiveDDLOperation, ConstraintCleanupOperation, MigrationConstraintChange, MigrationDDLOperation, MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
-import { canonicalMySQLColumnType, canonicalSQLiteColumnType, postgresTypeLookupName, type SchemaSupersetViolation } from "./setupAcceptance.js";
+import { canonicalMySQLColumnType, canonicalSQLiteColumnType, createAcceptedConstraintMismatchMessage, postgresTypeLookupName, type SchemaSupersetViolation } from "./setupAcceptance.js";
 
 /** Constraint objects that only the system layer can derive (Transform unique indexes need computation state). */
 type ExtraManagedConstraints = (dbSetup: DBSetup) => DesiredManagedConstraint[]
@@ -556,7 +556,9 @@ RETURNING "lastValue" AS value`,
             //  唯一索引靠 IF NOT EXISTS 恰好幂等，NonNull 的 ADD CONSTRAINT 不幂等，声明了 NonNull
             //  的应用每次重启都失败；而且这些 DDL 绕过了审阅、验证与迁移锁。声明变化已被 modelHash
             //  校验拦在 setup(false) 之外，这里只剩「数据库偏离声明」一种情况：只读核对，不一致即 fail-fast。
-            await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'attach')
+            //  例外是接受模式（setup acceptModelHashes）：库中模型本来就与声明不同，新模型多装的约束
+            //  在这里同样判为不兼容（通常已被超集校验先报出），报错改用接受模式的说法（acceptedModelHash）。
+            await this.assertManagedConstraintsReconciled(dbSetup, desiredConstraints, 'attach', options?.acceptedModelHash)
         }
         if (this.db.setupRecordSequences) {
             const tableMap = new EntityToTableMap(dbSetup.map, dbSetup.aliasManager)
@@ -651,7 +653,7 @@ RETURNING "lastValue" AS value`,
             verificationDDL,
             constraintChanges: this.createConstraintChanges(reconciliation),
             blockingChanges: [],
-            internal: { dbSetup, desiredConstraints },
+            internal: { dbSetup, desiredConstraints, reconciliation },
         }
     }
 
@@ -1147,10 +1149,12 @@ RETURNING "lastValue" AS value`,
      * Read-only N-1 attach check (setup acceptModelHashes). Existence comes from the additive
      * migration plan, which already compared the compiled model with the live catalog: its
      * create-table / add-column entries are exactly what the current model needs and the
-     * database lacks. Types of the columns that do exist are read from the catalog here.
+     * database lacks. Constraint objects come from the plan's catalog reconciliation, filtered
+     * by the same predicate the attach-time check applies. Types of the columns that do exist
+     * are read from the catalog here.
      */
     async findSchemaSupersetViolations(plan: MigrationSchemaPlan): Promise<SchemaSupersetViolation[]> {
-        const { dbSetup } = plan.internal as { dbSetup: DBSetup }
+        const { dbSetup, reconciliation } = plan.internal as { dbSetup: DBSetup, reconciliation: ManagedConstraintReconciliationEntry[] }
         await this.ensureDbOpenForSchemaRead()
         const recordsByTable = new Map<string, string[]>()
         const logicalPathByColumn = new Map<string, string>()
@@ -1185,6 +1189,19 @@ RETURNING "lastValue" AS value`,
                     declaredType: dbSetup.tables[operation.tableName]?.columns[operation.columnName]?.fieldType,
                 })
             }
+        }
+
+        for (const entry of reconciliation.filter(isStartupBlockingConstraintMismatch)) {
+            violations.push({
+                kind: 'constraint-mismatch',
+                status: entry.status as 'missing' | 'extra' | 'different',
+                constraintKind: entry.kind,
+                tableName: entry.tableName,
+                physicalName: entry.physicalName,
+                constraintName: entry.desired?.constraintName,
+                recordName: entry.desired?.recordName,
+                reason: entry.reason,
+            })
         }
 
         const declaredTypeCache = new Map<string, string>()
@@ -1345,7 +1362,7 @@ RETURNING "lastValue" AS value`,
      * set). attach refuses only the differences that change what the database enforces
      * (see isStartupBlockingConstraintMismatch) and tells the operator to migrate.
      */
-    private async assertManagedConstraintsReconciled(dbSetup: DBSetup, desired: DesiredManagedConstraint[], mode: 'install' | 'attach' | 'migration') {
+    private async assertManagedConstraintsReconciled(dbSetup: DBSetup, desired: DesiredManagedConstraint[], mode: 'install' | 'attach' | 'migration', acceptedModelHash?: string) {
         const dialect = getSchemaDialect(this.db)
         const installed = await readInstalledManagedConstraints(this.db, dialect, Object.keys(dbSetup.tables))
         const entries = reconcileManagedConstraints(desired, installed, dialect)
@@ -1355,7 +1372,9 @@ RETURNING "lastValue" AS value`,
         if (!mismatches.length) return
         const first = mismatches[0]
         const details = mismatches.map(describeManagedConstraintEntry).join('; ')
-        const message = mode === 'attach'
+        const message = mode === 'attach' && acceptedModelHash
+            ? createAcceptedConstraintMismatchMessage(details, mismatches.length, acceptedModelHash)
+            : mode === 'attach'
             ? `The database's constraint objects do not match the declared model (${mismatches.length}): ${details}. ` +
                 `setup(false) does not change constraints. Run controller.generateMigrationDiff(), review it, then controller.migrate({ approvedDiff }) to reconcile them.`
             : `Constraint objects do not match the declared model after ${mode} (${mismatches.length}): ${details}`

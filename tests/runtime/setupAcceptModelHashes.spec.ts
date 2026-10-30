@@ -35,7 +35,7 @@ const drivers: Array<{ name: string; create: () => AnyDB }> = [
     { name: "SQLite", create: () => new SQLiteDB() },
 ];
 
-describe.each(drivers)("setup acceptModelHashes ($name)", ({ create }) => {
+describe.each(drivers)("setup acceptModelHashes ($name)", ({ name, create }) => {
     test("expand-only (added column): N-1 code starts with the accepted hash and reads existing rows", async () => {
         const db = create();
         const { controller: v1, hash: hashA } = await install(db);
@@ -124,7 +124,31 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ create }) => {
         const error = await captureError(controllerFor(db, { sku: true }).setup({ install: false, acceptModelHashes: [hashA] }));
         expect(error.name).toBe("SchemaSupersetError");
         expect(error.message).toContain("AcceptProduct.sku");
-        expect(error.details?.violations).toEqual([expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" })]);
+        // Both layers report it: the live catalog lacks the column, and the database's manifest
+        // model lacks the attribute.
+        expect(error.details?.violations).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" }),
+            expect.objectContaining({ kind: "model-difference", logicalPath: "AcceptProduct.sku" }),
+        ]));
+        expect(error.details?.violations).toHaveLength(2);
+        await db.close();
+    });
+
+    test("the manifest layer catches an attribute the database model lacks even when a same-named column exists", async () => {
+        const db = create();
+        const { hash: hashA } = await install(db);
+        // Learn the physical name and type the code with sku compiles to, then add that column
+        // out of band: the catalog now has it, but the database model (hashA) does not.
+        const probeDb = create();
+        const { controller: probe } = await install(probeDb, { sku: true });
+        const record = probe.system.storage.schema.records.find(item => item.recordName === "AcceptProduct")!;
+        const sku = record.attributeDetails!.find(attribute => attribute.name === "sku")!;
+        await probeDb.close();
+        await db.scheme(`ALTER TABLE "${record.tableName}" ADD COLUMN "${sku.fieldName}" ${sku.fieldType}`);
+
+        const error = await captureError(controllerFor(db, { sku: true }).setup({ install: false, acceptModelHashes: [hashA] }));
+        expect(error.name).toBe("SchemaSupersetError");
+        expect(error.details?.violations).toEqual([expect.objectContaining({ kind: "model-difference", logicalPath: "AcceptProduct.sku" })]);
         await db.close();
     });
 
@@ -143,7 +167,10 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ create }) => {
         const error = await captureError(controllerFor(db, { category: true }).setup({ install: false, acceptModelHashes: [hashA] }));
         expect(error.name).toBe("SchemaSupersetError");
         expect(error.message).toContain("AcceptCategory");
-        expect(error.details?.violations).toEqual([expect.objectContaining({ kind: "missing-table", recordNames: ["AcceptCategory"] })]);
+        expect(error.details?.violations).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "missing-table", recordNames: ["AcceptCategory"] }),
+            expect.objectContaining({ kind: "model-difference", logicalPath: "AcceptCategory" }),
+        ]));
         await db.close();
     });
 
@@ -153,7 +180,11 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ create }) => {
         const error = await captureError(controllerFor(db, { priceType: "string" }).setup({ install: false, acceptModelHashes: [hashA] }));
         expect(error.name).toBe("SchemaSupersetError");
         expect(error.message).toContain("AcceptProduct.price");
-        expect(error.details?.violations).toEqual([expect.objectContaining({ kind: "incompatible-column-type", logicalPath: "AcceptProduct.price" })]);
+        expect(error.details?.violations).toEqual(expect.arrayContaining([
+            expect.objectContaining({ kind: "incompatible-column-type", logicalPath: "AcceptProduct.price" }),
+            expect.objectContaining({ kind: "model-difference", logicalPath: "AcceptProduct.price", change: "unsupported-destructive-schema-change" }),
+        ]));
+        expect(error.details?.violations).toHaveLength(2);
         await db.close();
     });
 
@@ -191,13 +222,33 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ create }) => {
         await db.close();
     });
 
-    test("constraint objects added by the newer model on a table the current code uses still block startup (documented limitation)", async () => {
+    test("a unique constraint the newer model added on a table the current code uses is incompatible and named", async () => {
         const db = create();
         await install(db);
         const { hash: hashB } = await migrateTo(db, { sku: true, skuUnique: true });
+
         const error = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: [hashB] }));
-        expect(error).toBeInstanceOf(ConstraintSetupError);
-        expect(error.message).toMatch(/extra unique/);
+        expect(error.name).toBe("SchemaSupersetError");
+        expect(error.details?.violations).toEqual([expect.objectContaining({ kind: "constraint-mismatch", status: "extra", constraintKind: "unique", tableName: "AcceptProduct" })]);
+        expect(error.message).toMatch(/extra unique constraint \S+ on "AcceptProduct": installed in the database but not declared by the current code/);
+
+        // Skipping the superset check does not skip attach-time reconciliation; its accepted-mode
+        // message names the constraint and does not advise migrating the older code.
+        const attachError = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: [hashB], requireSchemaSuperset: false }));
+        expect(attachError).toBeInstanceOf(ConstraintSetupError);
+        expect(attachError.message).toMatch(/extra unique/);
+        expect(attachError.message).toContain("admitted through acceptModelHashes");
+        expect(attachError.message).not.toContain("Run controller.generateMigrationDiff()");
+        await db.close();
+    });
+
+    test.skipIf(name === "SQLite")("a NonNull constraint the newer model added on a new column is incompatible and named", async () => {
+        const db = create();
+        await install(db);
+        const { hash: hashB } = await migrateTo(db, { sku: true, skuRequired: true });
+        const error = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: [hashB] }));
+        expect(error.name).toBe("SchemaSupersetError");
+        expect(error.details?.violations).toEqual([expect.objectContaining({ kind: "constraint-mismatch", status: "extra", constraintKind: "non-null", tableName: "AcceptProduct" })]);
         await db.close();
     });
 });

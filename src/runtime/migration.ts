@@ -418,22 +418,33 @@ export type SetupOptions = {
      * usual "Model manifest mismatch" error, extended with the actual hash and the accept set.
      *
      * Read compatibility only: an accepted hash means the current code may read a database
-     * whose schema is a superset of what it maps to (see `requireSchemaSuperset`). Write
-     * semantics are NOT checked or guaranteed — for example, columns or constraint
-     * expectations added by the newer model that the older code does not satisfy on insert.
+     * whose schema is a superset of what it maps to (see `requireSchemaSuperset`). Passing the
+     * superset check does not make writes safe. Not checked and not guaranteed:
+     * - A fact property the newer model added has no database-level DEFAULT, so rows this code
+     *   inserts hold NULL there; when the newer release attaches again the hashes are equal and
+     *   nothing backfills them.
+     * - A computed property the newer model added is not maintained by this code while it runs.
+     * - A computation the newer migration rebuilt keeps being maintained incrementally by this
+     *   code with its old semantics.
      * Applications keep write compatibility through expand/contract releases.
      *
-     * Attach-time constraint reconciliation is unchanged: a constraint object the newer model
-     * added on a table the current code uses (for example a UniqueConstraint) is reported as
-     * an extra constraint and still blocks startup.
+     * Constraint objects: an extra constraint the newer model installed on a table this code
+     * uses (for example a UniqueConstraint or NonNullConstraint) can reject this code's writes,
+     * so it counts as incompatible — reported by the superset check, and by the attach-time
+     * constraint reconciliation when the superset check is skipped.
      */
     acceptModelHashes?: string[];
     /**
      * Default true. Consulted only when the stored modelHash differs from the declared one
-     * and is admitted through `acceptModelHashes`. Before attaching, setup reads the live
-     * database catalog and refuses to start (`SchemaSupersetError`, listing each table and
-     * column) when a table, column, or column type the current model maps to is missing or
-     * incompatible. `false` skips this check and trusts the declaration.
+     * and is admitted through `acceptModelHashes`. Before attaching, setup refuses to start
+     * (`SchemaSupersetError`, `details.violations` listing each problem) when
+     * - the database's manifest model lacks, moves, or retypes a record or attribute the
+     *   current model maps to (the migration planner's blocking-change rules, declared model
+     *   as "old", database model as "new"), or
+     * - the live database catalog lacks a table or column the current model maps to, types a
+     *   column incompatibly, or holds a constraint object that differs from the declared ones.
+     * `false` skips this check and trusts the declaration; attach-time constraint
+     * reconciliation still runs.
      */
     requireSchemaSuperset?: boolean;
 };

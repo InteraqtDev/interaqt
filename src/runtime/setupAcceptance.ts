@@ -1,4 +1,5 @@
-import { MIGRATION_MANIFEST_CONCEPT, MIGRATION_MANIFEST_CURRENT_KEY, MigrationError, type SetupOptions } from "./migration.js";
+import type { ManagedConstraintKind } from "@storage";
+import { getStorageBlockingChanges, MIGRATION_MANIFEST_CONCEPT, MIGRATION_MANIFEST_CURRENT_KEY, MigrationError, type MigrationManifest, type SetupOptions, type StorageBlockingChange } from "./migration.js";
 
 /**
  * N-1 model acceptance for `controller.setup({ acceptModelHashes, requireSchemaSuperset })`.
@@ -55,6 +56,38 @@ export type SchemaSupersetViolation =
         expectedType: string;
         /** The column's type as read from the database catalog. */
         actualType: string;
+    }
+    | {
+        /**
+         * Logical difference between the declared model and the database's manifest model:
+         * a record or attribute the current code maps to is absent from the database model,
+         * stored at another physical location, or typed differently. Derived with the
+         * migration planner's own blocking-change rules (getStorageBlockingChanges, declared
+         * model as "old", database model as "new"), plus computed-attribute moves, which a
+         * migration may perform but which leave the current code reading a stale column.
+         */
+        kind: "model-difference";
+        logicalPath: string;
+        change: StorageBlockingChange["kind"] | "computed-physical-path-move";
+        declaredPhysicalPath?: string;
+        databasePhysicalPath?: string;
+        reason: string;
+    }
+    | {
+        /**
+         * A managed constraint object that differs between the declared model and the live
+         * catalog, using the same predicate as the attach-time reconciliation. `extra` is an
+         * object the accepted (newer) model installed and the current code does not declare;
+         * it can reject this code's writes, so it counts as incompatible.
+         */
+        kind: "constraint-mismatch";
+        status: "missing" | "extra" | "different";
+        constraintKind: ManagedConstraintKind;
+        tableName: string;
+        physicalName: string;
+        constraintName?: string;
+        recordName?: string;
+        reason: string;
     };
 
 /** setup refused to attach in accepted mode: the live schema lacks what the current model needs. */
@@ -107,6 +140,66 @@ export function resolveSetupAcceptance(options: boolean | SetupOptions | undefin
 }
 
 /**
+ * The single acceptance decision for attach. Returns how the stored manifest is admitted, or
+ * throws the mismatch error. Every rule about which stored model the current code may start on
+ * lives here, so a future source of accepted hashes (for example compatibility declared by the
+ * migration in the manifest) plugs in at this one point.
+ */
+export function resolveManifestMode(databaseModelHash: string, declaredModelHash: string, acceptModelHashes: string[]): SetupManifestMode {
+    if (databaseModelHash === declaredModelHash) return "exact";
+    if (acceptModelHashes.includes(databaseModelHash)) return "accepted";
+    throw new Error(createModelManifestMismatchMessage(databaseModelHash, declaredModelHash, acceptModelHashes));
+}
+
+/**
+ * Logical superset check between the declared manifest and the database's manifest. Reuses the
+ * migration planner's blocking-change rules: a change that would block migrating the declared
+ * model to the database model is exactly something the current code needs and the database
+ * model removed, moved, or retyped. Computed-attribute moves are exempt there (a migration
+ * recomputes them into the new column) but not here: the current code would keep reading the
+ * old column, which the newer release no longer maintains.
+ */
+export function findModelSupersetViolations(declaredManifest: MigrationManifest, databaseManifest: MigrationManifest): SchemaSupersetViolation[] {
+    const violations: SchemaSupersetViolation[] = getStorageBlockingChanges(declaredManifest, databaseManifest).map(change => ({
+        kind: "model-difference" as const,
+        logicalPath: change.logicalPath,
+        change: change.kind,
+        declaredPhysicalPath: change.oldPhysicalPath,
+        databasePhysicalPath: change.newPhysicalPath,
+        reason: change.reason,
+    }));
+    const databaseRecords = new Map(databaseManifest.storage.records.map(record => [record.recordName, record]));
+    for (const record of declaredManifest.storage.records) {
+        const databaseRecord = databaseRecords.get(record.recordName);
+        if (!databaseRecord) continue;
+        const declaredLogical = declaredManifest.records.find(item => item.name === record.recordName);
+        const databaseAttributes = new Map((databaseRecord.attributeDetails || []).map(attribute => [attribute.name, attribute]));
+        for (const attribute of record.attributeDetails || []) {
+            const databaseAttribute = databaseAttributes.get(attribute.name);
+            if (!databaseAttribute) continue;
+            const computed = declaredLogical?.properties.find(property => property.name === attribute.name)?.computed === true;
+            if (!computed) continue;
+            const declaredPath = attributePhysicalPath(attribute);
+            const databasePath = attributePhysicalPath(databaseAttribute);
+            if (declaredPath === databasePath) continue;
+            violations.push({
+                kind: "model-difference",
+                logicalPath: `${record.recordName}.${attribute.name}`,
+                change: "computed-physical-path-move",
+                declaredPhysicalPath: declaredPath,
+                databasePhysicalPath: databasePath,
+                reason: "computed attribute is stored at a different physical location in the database model; the current code would read the old location, which the newer release no longer maintains",
+            });
+        }
+    }
+    return violations;
+}
+
+function attributePhysicalPath(attribute: { tableName?: string; fieldName?: string; sourceField?: string; targetField?: string }) {
+    return `${attribute.tableName ?? "?"}.${attribute.fieldName ?? attribute.sourceField ?? attribute.targetField ?? "?"}`;
+}
+
+/**
  * The attach-time mismatch message. With an empty accept set this is the exact pre-existing
  * text (callers and runbooks match on it); with an accept set it additionally lists the
  * database's hash, the declared hash, and the accept set.
@@ -129,6 +222,19 @@ export function describeSchemaSupersetViolation(violation: SchemaSupersetViolati
             return `missing column ${describeColumn(violation.tableName, violation.columnName, violation.logicalPath)}${violation.declaredType ? `, declared ${violation.declaredType}` : ""}`;
         case "incompatible-column-type":
             return `column ${describeColumn(violation.tableName, violation.columnName, violation.logicalPath)} has catalog type ${violation.actualType}; the current model declares ${violation.declaredType} (catalog form ${violation.expectedType})`;
+        case "model-difference": {
+            const paths = violation.declaredPhysicalPath || violation.databasePhysicalPath
+                ? ` (declared ${violation.declaredPhysicalPath ?? "?"}, database model ${violation.databasePhysicalPath ?? "absent"})`
+                : "";
+            return `model difference at ${violation.logicalPath}${paths}: ${violation.reason}`;
+        }
+        case "constraint-mismatch": {
+            const subject = `${violation.constraintKind} constraint ${violation.constraintName ? `"${violation.constraintName}" (${violation.physicalName})` : violation.physicalName} on "${violation.tableName}"`;
+            if (violation.status === "extra") {
+                return `extra ${subject}: installed in the database but not declared by the current code, so it can reject this code's writes`;
+            }
+            return `${violation.status} ${subject}: ${violation.reason}`;
+        }
     }
 }
 
@@ -136,7 +242,24 @@ export function createSchemaSupersetMessage(violations: SchemaSupersetViolation[
     return `Database schema is not a superset of the declared model, so the accepted modelHash ${acceptedModelHash} is not read-compatible with the declared modelHash ${declaredModelHash} ` +
         `(${violations.length} problem${violations.length === 1 ? "" : "s"}): ${violations.map(describeSchemaSupersetViolation).join("; ")}. ` +
         `Either the acceptModelHashes declaration is wrong for this database, or the database was changed outside interaqt migration. ` +
-        `Remove the hash from acceptModelHashes, or migrate the database to the declared model.`;
+        DIRECTION_ADVICE;
+}
+
+// Both directions reach accepted mode: older code on a newer database (rollback), or newer code
+// wrongly accepting an older database. Migration is the fix only in the second case.
+const DIRECTION_ADVICE =
+    `Remove the hash from acceptModelHashes. If the database model is older than the declared model, migrate it to the declared model; ` +
+    `if it is newer, deploy the release that matches it — migrating older code against a newer database would remove what the newer model added.`;
+
+/**
+ * Attach-time constraint reconciliation message when the stored manifest was admitted through
+ * acceptModelHashes (reached with requireSchemaSuperset: false, which skips the earlier check).
+ * The default advice — migrate to reconcile — would downgrade the newer model's constraints.
+ */
+export function createAcceptedConstraintMismatchMessage(details: string, count: number, acceptedModelHash: string) {
+    return `The database's constraint objects do not match the declared model (${count}): ${details}. ` +
+        `The database manifest (modelHash ${acceptedModelHash}) was admitted through acceptModelHashes; an extra constraint object installed by a newer model can reject this code's writes, so it counts as incompatible. ` +
+        DIRECTION_ADVICE;
 }
 
 // ---------------------------------------------------------------------------------------

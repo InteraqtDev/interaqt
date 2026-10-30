@@ -59,6 +59,7 @@ import {
     hashMigrationDiff,
     MigrationBaselineError,
     MigrationDiffFile,
+    MigrationManifest,
     MigrationOptions,
     MigrationPhase,
     MigrationRunState,
@@ -74,8 +75,9 @@ import {
     writeMigrationManifest,
 } from "./migration.js";
 import {
-    createModelManifestMismatchMessage,
     createSchemaSupersetMessage,
+    findModelSupersetViolations,
+    resolveManifestMode,
     resolveSetupAcceptance,
     SchemaSupersetError,
     SetupManifestMode,
@@ -571,26 +573,23 @@ export class Controller {
             if (previousManifest) {
                 assertManifestGeneratorCurrent(previousManifest)
             }
-            let manifestMode: SetupManifestMode | undefined
-            if (previousManifest) {
-                if (previousManifest.modelHash === nextManifest.modelHash) {
-                    manifestMode = 'exact'
-                } else if (acceptance.acceptModelHashes.includes(previousManifest.modelHash)) {
-                    manifestMode = 'accepted'
-                } else {
-                    throw new Error(createModelManifestMismatchMessage(previousManifest.modelHash, nextManifest.modelHash, acceptance.acceptModelHashes))
-                }
-            }
-            // An accepted hash is a declaration; the physical check verifies it against the live
-            // catalog before anything attaches. Exact mode needs no check: the stored model is the
-            // declared model.
+            const manifestMode: SetupManifestMode | undefined = previousManifest
+                ? resolveManifestMode(previousManifest.modelHash, nextManifest.modelHash, acceptance.acceptModelHashes)
+                : undefined
+            // An accepted hash is a declaration; the superset check verifies it against the
+            // database's manifest model and the live catalog before anything attaches. Exact mode
+            // needs no check: the stored model is the declared model.
             if (manifestMode === 'accepted' && acceptance.requireSchemaSuperset) {
-                await this.assertSchemaSuperset(schemaPlan, nextManifest.modelHash, previousManifest!.modelHash)
+                await this.assertSchemaSuperset(schemaPlan, nextManifest, previousManifest!)
             }
             if (!previousManifest && await this.system.hasExistingData?.()) {
                 throw new MigrationBaselineError('Existing database has no migration manifest. Call controller.createMigrationBaseline() before normal setup or migration.')
             }
-            await this.system.setup(this.entities, this.relations, states, { install, internalRequirements })
+            await this.system.setup(this.entities, this.relations, states, {
+                install,
+                internalRequirements,
+                ...(manifestMode === 'accepted' ? { acceptedModelHash: previousManifest!.modelHash } : {}),
+            })
             await this.scheduler.setup(install)
             if (manifestMode) {
                 this.system.logger.info({
@@ -627,7 +626,7 @@ export class Controller {
         }
     }
 
-    private async assertSchemaSuperset(schemaPlan: MigrationSchemaPlan, declaredModelHash: string, acceptedModelHash: string) {
+    private async assertSchemaSuperset(schemaPlan: MigrationSchemaPlan, declaredManifest: MigrationManifest, databaseManifest: MigrationManifest) {
         const supersetSystem = this.system as System & {
             findSchemaSupersetViolations?: System['findSchemaSupersetViolations']
         }
@@ -635,7 +634,14 @@ export class Controller {
         if (typeof findSchemaSupersetViolations !== 'function') {
             throw new Error('Current system does not support schema superset verification; setup({ acceptModelHashes }) requires it unless requireSchemaSuperset is false')
         }
-        const violations = await findSchemaSupersetViolations.call(supersetSystem, schemaPlan)
+        const declaredModelHash = declaredManifest.modelHash
+        const acceptedModelHash = databaseManifest.modelHash
+        // Logical differences from the two manifests, then what the live catalog actually holds:
+        // the manifest says what the newer model intended, the catalog says what exists.
+        const violations = [
+            ...findModelSupersetViolations(declaredManifest, databaseManifest),
+            ...await findSchemaSupersetViolations.call(supersetSystem, schemaPlan),
+        ]
         if (violations.length) {
             throw new SchemaSupersetError(createSchemaSupersetMessage(violations, declaredModelHash, acceptedModelHash), {
                 violations,

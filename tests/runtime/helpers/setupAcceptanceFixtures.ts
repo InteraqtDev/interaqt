@@ -14,6 +14,7 @@ import {
     KlassByName,
     MatchExp,
     MonoSystem,
+    NonNullConstraint,
     Payload,
     PayloadItem,
     Property,
@@ -35,6 +36,7 @@ export const DEFAULT_MISMATCH_MESSAGE = "Model manifest mismatch. Call controlle
 export type ModelShape = {
     sku?: boolean;
     skuUnique?: boolean;
+    skuRequired?: boolean;
     category?: boolean;
     priceType?: "number" | "string";
 };
@@ -47,8 +49,11 @@ export function buildEntities(shape: ModelShape = {}) {
             new Property({ name: "price", type: shape.priceType ?? "number" }, { uuid: "accept-product-price" }),
             ...(shape.sku ? [new Property({ name: "sku", type: "string" }, { uuid: "accept-product-sku" })] : []),
         ],
-        ...(shape.skuUnique ? {
-            constraints: [new UniqueConstraint({ name: "accept_sku_unique", properties: ["sku"] }, { uuid: "accept-product-sku-unique" })],
+        ...(shape.skuUnique || shape.skuRequired ? {
+            constraints: [
+                ...(shape.skuUnique ? [new UniqueConstraint({ name: "accept_sku_unique", properties: ["sku"] }, { uuid: "accept-product-sku-unique" })] : []),
+                ...(shape.skuRequired ? [new NonNullConstraint({ name: "accept_sku_required", property: "sku" }, { uuid: "accept-product-sku-required" })] : []),
+            ],
         } : {}),
     }, { uuid: "accept-product" });
     const entities = [Product];

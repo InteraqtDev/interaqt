@@ -13,14 +13,19 @@ Minor release: a new, opt-in setup capability. Default behavior is unchanged.
   Object form only; at most 2 hashes. Omitted or empty keeps the strict `modelHash` comparison
   and the exact 4.12.0 error text, and the boolean form is unchanged. A stored hash outside the
   accept set throws the usual `Model manifest mismatch` error extended with the database hash,
-  the declared hash, and the accept set. When the hash is accepted, setup first reads the live
-  catalog (`requireSchemaSuperset`, default `true`) and throws `SchemaSupersetError` naming every
-  table, column, or column type the current model maps to that is missing or incompatible.
-  Every successful attach logs `manifestMode: exact | accepted`, `declaredModelHash`, and
-  `acceptedModelHash` through `system.logger.info` (label `setup`). The guarantee is read
-  compatibility only: write-semantics compatibility is not checked, and a constraint object the
-  newer model added on a table the current code uses still blocks attach. Design record:
-  `docs/setup-accept-model-hashes/`.
+  the declared hash, and the accept set. When the hash is accepted, setup first runs a superset
+  check (`requireSchemaSuperset`, default `true`) and throws `SchemaSupersetError` listing every
+  problem: a record or attribute the database's manifest model lacks, moves, or retypes (the
+  migration planner's blocking-change rules), a table or column missing from the live catalog,
+  an incompatible column type, or a constraint object that differs from the declared ones — an
+  extra `UniqueConstraint` or `NonNullConstraint` added by the newer model counts as
+  incompatible. Every successful attach logs `manifestMode: exact | accepted`,
+  `declaredModelHash`, and `acceptedModelHash` through `system.logger.info` (label `setup`).
+  The guarantee is read compatibility only; passing the check does not make writes safe: rows
+  the older code inserts hold NULL in fact columns the newer model added (no database DEFAULT,
+  and no backfill when the newer release attaches again), computed properties the newer model
+  added are not maintained, and computations the newer migration rebuilt keep being maintained
+  with the old semantics. Design record: `docs/setup-accept-model-hashes/`.
 
 ## [4.12.0](https://github.com/InteraqtDev/interaqt/compare/v4.11.2...v4.12.0) (2026-10-13)
 
