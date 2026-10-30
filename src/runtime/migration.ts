@@ -406,6 +406,36 @@ export type MigrationOptions = {
 export type SetupOptions = {
     install?: boolean;
     migrate?: boolean | MigrationOptions;
+    /**
+     * N-1 model acceptance, object form only and only for attach (install not true, no
+     * migrate). Stored-manifest modelHash values this code may start on besides its own
+     * declared modelHash — typically the hash of the release that is one step ahead, so the
+     * previous release can restart on a migrated database (rollback, canary restart).
+     *
+     * At most 2 entries (the current release and the previous one); more is an error.
+     * Omitted or empty: strict equality, exactly as `setup(false)`, with the same error text.
+     * When the stored hash differs from the declared one and is not listed, setup throws the
+     * usual "Model manifest mismatch" error, extended with the actual hash and the accept set.
+     *
+     * Read compatibility only: an accepted hash means the current code may read a database
+     * whose schema is a superset of what it maps to (see `requireSchemaSuperset`). Write
+     * semantics are NOT checked or guaranteed — for example, columns or constraint
+     * expectations added by the newer model that the older code does not satisfy on insert.
+     * Applications keep write compatibility through expand/contract releases.
+     *
+     * Attach-time constraint reconciliation is unchanged: a constraint object the newer model
+     * added on a table the current code uses (for example a UniqueConstraint) is reported as
+     * an extra constraint and still blocks startup.
+     */
+    acceptModelHashes?: string[];
+    /**
+     * Default true. Consulted only when the stored modelHash differs from the declared one
+     * and is admitted through `acceptModelHashes`. Before attaching, setup reads the live
+     * database catalog and refuses to start (`SchemaSupersetError`, listing each table and
+     * column) when a table, column, or column type the current model maps to is missing or
+     * incompatible. `false` skips this check and trusts the declaration.
+     */
+    requireSchemaSuperset?: boolean;
 };
 
 export type ComputationManifest = {

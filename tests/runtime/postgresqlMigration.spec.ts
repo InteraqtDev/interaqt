@@ -32,6 +32,17 @@ import {
   readMigrationManifest,
 } from "interaqt";
 import { PostgreSQLDB } from "@drivers";
+import {
+  DEFAULT_MISMATCH_MESSAGE,
+  captureError,
+  controllerFor,
+  install as installAcceptModel,
+  migrateTo as migrateAcceptModel,
+  recordingLogger,
+  richController,
+  setupLogs,
+} from "./helpers/setupAcceptanceFixtures.js";
+import { migrateWithApproval } from "./helpers/migrationApproval.js";
 
 const describeIfPostgres = process.env.INTERAQT_POSTGRES_DATABASE ? describe : describe.skip;
 const dbOptions = {
@@ -886,5 +897,67 @@ describeIfPostgres("PostgreSQL state graph mapping migration", () => {
     const rolledBackGhost = await readStateMapTicket(systemV2, ghostTicket.id);
     expect(rolledBackGhost[STATUS_COLUMN]).toBe("ghost");
     await systemV2.destroy();
+  });
+});
+
+// N-1 model acceptance (one2x-ai/mesh#2826) on real PostgreSQL: the catalog type reader uses
+// information_schema.columns.udt_name and resolves declared types with to_regtype, and the
+// schema plan reads the live catalog over a pooled connection — PGLite does not cover the
+// PostgreSQL driver's 'INT GENERATED ALWAYS AS IDENTITY' row id or its 'INT' logical id.
+describeIfPostgres("PostgreSQL setup acceptModelHashes", () => {
+  const openDatabase = (suffix: string) => new PostgreSQLDB(`${process.env.INTERAQT_POSTGRES_DATABASE!}_${suffix}`, dbOptions);
+
+  test("expand-only (added column): N-1 code starts with the accepted hash and reads existing rows", async () => {
+    const db = openDatabase("accept_expand");
+    const { controller: v1, hash: hashA } = await installAcceptModel(db);
+    await v1.system.storage.create("AcceptProduct", { name: "before", price: 1 });
+    const { controller: v2, hash: hashB } = await migrateAcceptModel(db, { sku: true });
+    await v2.system.storage.create("AcceptProduct", { name: "after", price: 2, sku: "S-2" });
+
+    const { logger, infos } = recordingLogger();
+    const rollback = controllerFor(db, {}, logger);
+    await rollback.setup({ install: false, acceptModelHashes: [hashB] });
+    const rows = await rollback.system.storage.find("AcceptProduct", undefined, undefined, ["*"]);
+    expect(rows.map(row => [row.name, row.price]).sort()).toEqual([["after", 2], ["before", 1]]);
+    expect(setupLogs(infos)).toEqual([expect.objectContaining({ manifestMode: "accepted", declaredModelHash: hashA, acceptedModelHash: hashB })]);
+
+    const error = await captureError(controllerFor(db).setup(false));
+    expect(error.message).toBe(DEFAULT_MISMATCH_MESSAGE);
+    await db.close();
+  });
+
+  test("no false positive: every column shape of a richer model passes the catalog check after an expand-only migration", async () => {
+    const db = openDatabase("accept_rich");
+    const { controller: v1, publish } = richController(db, false);
+    await v1.setup(true);
+    const author = await v1.system.storage.create("RichUser", {
+      name: "ann", age: 30, active: true, joinedAt: Date.now(), profile: { city: "x" }, meta: { a: [1] }, tags: ["t1"], avatar: { url: "u" },
+    });
+    const post = await v1.system.storage.create("RichPost", { title: "p1", author: { id: author.id } });
+    await v1.dispatch(publish, { user: { id: "rich-user" }, payload: { postId: String(post.id) } });
+    const { controller: v2 } = richController(db, true);
+    await migrateWithApproval(v2);
+    const hashB = (await readMigrationManifest(v2))!.modelHash;
+
+    const { controller: rollback } = richController(db, false);
+    await rollback.setup({ install: false, acceptModelHashes: [hashB] });
+    const users = await rollback.system.storage.find("RichUser", undefined, undefined, ["name", "postCount", ["posts", { attributeQuery: ["title", "status"] }]]);
+    expect(users.map(user => [user.name, Number(user.postCount), user.posts.map((item: any) => item.status)])).toEqual([["ann", 1, ["published"]]]);
+    await db.close();
+  });
+
+  test("a missing column or an incompatible column type refuses startup and names the column", async () => {
+    const db = openDatabase("accept_negative");
+    const { hash: hashA } = await installAcceptModel(db);
+    const missing = await captureError(controllerFor(db, { sku: true }).setup({ install: false, acceptModelHashes: [hashA] }));
+    expect(missing.name).toBe("SchemaSupersetError");
+    expect(missing.details?.violations).toEqual([expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" })]);
+    const missingTable = await captureError(controllerFor(db, { category: true }).setup({ install: false, acceptModelHashes: [hashA] }));
+    expect(missingTable.details?.violations).toEqual([expect.objectContaining({ kind: "missing-table", recordNames: ["AcceptCategory"] })]);
+    const retyped = await captureError(controllerFor(db, { priceType: "string" }).setup({ install: false, acceptModelHashes: [hashA] }));
+    expect(retyped.details?.violations).toEqual([expect.objectContaining({
+      kind: "incompatible-column-type", logicalPath: "AcceptProduct.price", expectedType: "text", actualType: "float8",
+    })]);
+    await db.close();
   });
 });

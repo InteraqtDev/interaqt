@@ -8,6 +8,7 @@ export * from './asyncInteractionContext.js'
 export * from './asyncEffectsContext.js'
 export * from './transaction.js'
 export * from './migration.js'
+export * from './setupAcceptance.js'
 export * from './computations/index.js'
 export * from './computations/MathResolver.js'
 // error related

@@ -6,6 +6,7 @@ import { DataContext } from "./computations/Computation.js";
 import type { AttributeQueryData, ConstraintSchemaItem, MatchExpressionData, SchemaDialect } from "@storage";
 import { TransactionCapability, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import type { MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
+import type { SchemaSupersetViolation } from "./setupAcceptance.js";
 export type SystemCallback = (...arg: unknown[]) => unknown
 export type RecordMutationCallback = (mutationEvents:RecordMutationEvent[]) => Promise<{ events?: RecordMutationEvent[] } |undefined|void>
 export const SYSTEM_RECORD = '_System_'
@@ -311,6 +312,12 @@ export interface System {
     /** Drops constraint objects the model no longer declares; runs in the migration transaction before recompute. */
     applyMigrationConstraintCleanup?: (plan: MigrationSchemaPlan, migrationId?: string) => Promise<void>
     hasExistingData?: () => Promise<boolean>
+    /**
+     * Read-only check used by setup in accepted mode (`acceptModelHashes`): the tables,
+     * columns, and column types of the compiled model in `plan` that the live database
+     * catalog lacks or types incompatibly. Empty when the database is a superset.
+     */
+    findSchemaSupersetViolations?: (plan: MigrationSchemaPlan) => Promise<SchemaSupersetViolation[]>
     beginMigration?: (modelHash: string, approvedDiffHash?: string, approvedDiffSummary?: unknown, decisionCount?: number) => Promise<MigrationRunState>
     updateMigrationPhase?: (migrationId: string, phase: Exclude<MigrationPhase, 'pending' | 'succeeded' | 'failed'>) => Promise<void>
     finishMigration?: (migrationId: string, status: 'succeeded' | 'failed', error?: unknown) => Promise<void>

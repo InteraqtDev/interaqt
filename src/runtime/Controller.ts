@@ -57,8 +57,6 @@ import {
     getStorageBlockingChanges,
     GenerateMigrationDiffOptions,
     hashMigrationDiff,
-    MIGRATION_MANIFEST_CURRENT_KEY,
-    MIGRATION_MANIFEST_CONCEPT,
     MigrationBaselineError,
     MigrationDiffFile,
     MigrationOptions,
@@ -75,6 +73,13 @@ import {
     validateApprovedDiff,
     writeMigrationManifest,
 } from "./migration.js";
+import {
+    createModelManifestMismatchMessage,
+    createSchemaSupersetMessage,
+    resolveSetupAcceptance,
+    SchemaSupersetError,
+    SetupManifestMode,
+} from "./setupAcceptance.js";
 
 export const USER_ENTITY = 'User'
 
@@ -540,6 +545,7 @@ export class Controller {
     
     async setup(options?: boolean | SetupOptions) {
         const install = typeof options === 'boolean' ? options : options?.install === true
+        const acceptance = resolveSetupAcceptance(options)
         const migrateOptions = typeof options === 'object' ? options.migrate : undefined
         if (migrateOptions) {
             if (migrateOptions === true) {
@@ -565,14 +571,38 @@ export class Controller {
             if (previousManifest) {
                 assertManifestGeneratorCurrent(previousManifest)
             }
-            if (previousManifest && previousManifest.modelHash !== nextManifest.modelHash) {
-                throw new Error(`Model manifest mismatch. Call controller.generateMigrationDiff(), review it, then call controller.migrate({ approvedDiff }). Manifest key: ${MIGRATION_MANIFEST_CONCEPT}/${MIGRATION_MANIFEST_CURRENT_KEY}`)
+            let manifestMode: SetupManifestMode | undefined
+            if (previousManifest) {
+                if (previousManifest.modelHash === nextManifest.modelHash) {
+                    manifestMode = 'exact'
+                } else if (acceptance.acceptModelHashes.includes(previousManifest.modelHash)) {
+                    manifestMode = 'accepted'
+                } else {
+                    throw new Error(createModelManifestMismatchMessage(previousManifest.modelHash, nextManifest.modelHash, acceptance.acceptModelHashes))
+                }
+            }
+            // An accepted hash is a declaration; the physical check verifies it against the live
+            // catalog before anything attaches. Exact mode needs no check: the stored model is the
+            // declared model.
+            if (manifestMode === 'accepted' && acceptance.requireSchemaSuperset) {
+                await this.assertSchemaSuperset(schemaPlan, nextManifest.modelHash, previousManifest!.modelHash)
             }
             if (!previousManifest && await this.system.hasExistingData?.()) {
                 throw new MigrationBaselineError('Existing database has no migration manifest. Call controller.createMigrationBaseline() before normal setup or migration.')
             }
             await this.system.setup(this.entities, this.relations, states, { install, internalRequirements })
             await this.scheduler.setup(install)
+            if (manifestMode) {
+                this.system.logger.info({
+                    label: 'setup',
+                    message: manifestMode === 'exact'
+                        ? 'attached to a database whose manifest modelHash equals the declared modelHash'
+                        : 'attached to a database whose manifest modelHash is in acceptModelHashes (read compatibility only)',
+                    manifestMode,
+                    declaredModelHash: nextManifest.modelHash,
+                    acceptedModelHash: previousManifest!.modelHash,
+                })
+            }
             return
         }
         await this.system.setup(this.entities, this.relations, states, { install, internalRequirements })
@@ -594,6 +624,24 @@ export class Controller {
         }
         if (install) {
             await writeMigrationManifest(this, nextManifest)
+        }
+    }
+
+    private async assertSchemaSuperset(schemaPlan: MigrationSchemaPlan, declaredModelHash: string, acceptedModelHash: string) {
+        const supersetSystem = this.system as System & {
+            findSchemaSupersetViolations?: System['findSchemaSupersetViolations']
+        }
+        const findSchemaSupersetViolations = supersetSystem.findSchemaSupersetViolations
+        if (typeof findSchemaSupersetViolations !== 'function') {
+            throw new Error('Current system does not support schema superset verification; setup({ acceptModelHashes }) requires it unless requireSchemaSuperset is false')
+        }
+        const violations = await findSchemaSupersetViolations.call(supersetSystem, schemaPlan)
+        if (violations.length) {
+            throw new SchemaSupersetError(createSchemaSupersetMessage(violations, declaredModelHash, acceptedModelHash), {
+                violations,
+                declaredModelHash,
+                acceptedModelHash,
+            })
         }
     }
 
