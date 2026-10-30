@@ -2,30 +2,42 @@
 
 ## [Unreleased]
 
-Minor release: a new, opt-in setup capability. Default behavior is unchanged.
+Minor release: new N-1 attach capabilities. Attaching with an unchanged model, and attaching to
+databases whose manifest carries no compatibility declaration, behave exactly as in 4.12.0.
 
 ### Features
 
-* **runtime:** `controller.setup({ install: false, acceptModelHashes, requireSchemaSuperset })`
-  lets the code of the previous release attach to a database that a newer release has already
-  migrated (rollback, an old pod restarting during a canary) when the application declares that
-  model compatible ([one2x-ai/mesh#2826](https://github.com/one2x-ai/mesh/issues/2826)).
-  Object form only; at most 2 hashes. Omitted or empty keeps the strict `modelHash` comparison
-  and the exact 4.12.0 error text, and the boolean form is unchanged. A stored hash outside the
-  accept set throws the usual `Model manifest mismatch` error extended with the database hash,
-  the declared hash, and the accept set. When the hash is accepted, setup first runs a superset
-  check (`requireSchemaSuperset`, default `true`) and throws `SchemaSupersetError` listing every
-  problem: a record or attribute the database's manifest model lacks, moves, or retypes (the
-  migration planner's blocking-change rules), a table or column missing from the live catalog,
-  an incompatible column type, or a constraint object that differs from the declared ones — an
-  extra `UniqueConstraint` or `NonNullConstraint` added by the newer model counts as
-  incompatible. Every successful attach logs `manifestMode: exact | accepted`,
-  `declaredModelHash`, and `acceptedModelHash` through `system.logger.info` (label `setup`).
-  The guarantee is read compatibility only; passing the check does not make writes safe: rows
-  the older code inserts hold NULL in fact columns the newer model added (no database DEFAULT,
-  and no backfill when the newer release attaches again), computed properties the newer model
-  added are not maintained, and computations the newer migration rebuilt keep being maintained
-  with the old semantics. Design record: `docs/setup-accept-model-hashes/`.
+* **migration:** a migration now declares its own read compatibility. `migrate()` classifies the
+  migration from the approved diff and writes `compatibleFrom: [previous modelHash]` into the
+  manifest when code built for the previous model can keep reading the database (`[]`
+  otherwise); the classification and its reasons are kept in `manifest.compatibility`,
+  reported provisionally by `generateMigrationDiff()` (`diff.compatibility`) and finally by
+  `migrate()` (`plan.compatibility`). Not compatible: a record or attribute removed, moved, or
+  retyped; a constraint object added, removed, or changed on a table the previous model uses; an
+  existing computation changed, removed, or taking over a fact property (unless approved as
+  `'unchanged'`); a StateMachine state remap; a new fact property on an existing record that
+  relies on an application-side default. Only the immediately previous model is declared
+  ([one2x-ai/mesh#2826](https://github.com/one2x-ai/mesh/issues/2826)).
+* **runtime:** `controller.setup(false)` admits a model the database's migration declared
+  compatible, with no option (`manifestMode: 'declared-compatible'`), so the previous release
+  can restart on a migrated database (rollback, an old pod restarting during a canary). The
+  explicit override `setup({ install: false, acceptModelHashes })` (object form only, at most 2
+  hashes; `manifestMode: 'accepted'`) admits listed hashes, for manifests without a declaration.
+  Both paths decide in one function and then run a superset check (`requireSchemaSuperset`,
+  default `true`) that throws `SchemaSupersetError` listing every problem: a record or attribute
+  the database's manifest model lacks, moves, or retypes (the migration planner's
+  blocking-change rules), a table or column missing from the live catalog, an incompatible column
+  type, or a constraint object that differs from the declared ones — an extra `UniqueConstraint`
+  or `NonNullConstraint` added by the newer model counts as incompatible. When a model is not
+  admitted, the `Model manifest mismatch` error is unchanged for manifests without a declaration
+  and an empty accept set; otherwise it adds the database hash, the declared hash, the
+  manifest's `compatibleFrom`, the accept set, and the incompatibility reasons. Every successful
+  attach logs `manifestMode: exact | declared-compatible | accepted`, `declaredModelHash`, and
+  `acceptedModelHash` through `system.logger.info` (label `setup`). The guarantee is read
+  compatibility only: rows the older code inserts hold NULL in fact columns the newer model added
+  (no database DEFAULT, no backfill when the newer release attaches again), and computed
+  properties the newer model added are not maintained by the older code. Design record:
+  `docs/setup-accept-model-hashes/`.
 
 ## [4.12.0](https://github.com/InteraqtDev/interaqt/compare/v4.11.2...v4.12.0) (2026-10-13)
 

@@ -1,10 +1,11 @@
 ```text
 status: 已完成
 tracking-issue: one2x-ai/mesh#2826
-decision-record: sskyy 2026-10-30（issue 评论）
+decision-record: sskyy 2026-10-30 15:07（接受集）、2026-10-30 15:47（改为由迁移声明兼容）
+delivery: PR #60（接受集 + 超集校验），第二个 PR（迁移声明兼容，§6）
 ```
 
-# setup 的 N-1 模型接受集 — 设计记录
+# setup 的 N-1 attach：迁移声明兼容与接受集 — 设计记录
 
 ## 1. 问题
 
@@ -16,9 +17,14 @@ canary 期间旧 ReplicaSet 的 Pod 重启、Rollout 自动 abort。即使迁移
 
 缺的不是放宽校验，而是一种显式声明「这一次兼容」的手段，并且框架要能验证这个声明。
 
+声明由谁来做：崩的是旧版本（N-1）的 Pod，而 N-1 的镜像构建时不可能知道 N 的 hash，运行时注入
+接受集又恰好要走触发 Pod 重建的配置通道。迁移是唯一同时知道新旧两个 hash 的时刻，所以主路径是
+由迁移在库的 manifest 里声明兼容（§6，做法对应 Flyway 的「库比代码新可以容忍」）；接受集
+`acceptModelHashes` 保留为显式覆盖手段。两条路径都经同一个判定函数，并且都要过超集校验（§3）。
+
 ## 2. 合同
 
-只在对象形态上提供（`src/runtime/migration.ts` 的 `SetupOptions`）：
+显式覆盖只在对象形态上提供（`src/runtime/migration.ts` 的 `SetupOptions`）：
 
 ```ts
 await controller.setup({
@@ -30,10 +36,11 @@ await controller.setup({
 
 | 情形 | 行为 |
 |---|---|
-| 布尔形态、`setup()`、`{}`、`{ install: false }`、`acceptModelHashes: []` | 与 4.12.0 一致：严格相等，报错文本逐字不变 |
-| 库中 hash 等于声明 hash | `manifestMode: 'exact'`，不做结构校验 |
-| 库中 hash 不等但在接受集里 | `manifestMode: 'accepted'`；`requireSchemaSuperset !== false` 时先做超集校验（§3） |
-| 库中 hash 不等且不在接受集里 | 原 `Model manifest mismatch` 文本之后追加库中 hash、声明 hash 和接受集 |
+| 库中 hash 等于声明 hash | `manifestMode: 'exact'`，与 4.12.0 一致，不做结构校验 |
+| 库中 hash 不等，库 manifest 的 `compatibleFrom` 含声明 hash | `manifestMode: 'declared-compatible'`（默认路径，不需要参数）；先做超集校验（§3） |
+| 库中 hash 不等但在接受集里 | `manifestMode: 'accepted'`；先做超集校验（§3） |
+| 以上都不满足，manifest 没有声明且接受集为空（布尔形态、`setup()`、`{}`、`{ install: false }`、`acceptModelHashes: []`） | 与 4.12.0 一致：报错文本逐字不变 |
+| 以上都不满足，其他情况 | 原 `Model manifest mismatch` 文本之后追加库中 hash、声明 hash、manifest 的 `compatibleFrom`、接受集，以及迁移被判为不兼容的原因 |
 | 接受集超过 2 个、不是数组、含空串或重复项 | 读库之前直接报错 |
 | 非空接受集与 `install: true` 或 `migrate` 同时出现 | 直接报错（这两种模式下没有「库中已有模型」可接受） |
 
@@ -41,16 +48,20 @@ await controller.setup({
 `declaredModelHash`（当前代码的 hash）和 `acceptedModelHash`（库中 manifest 的 hash）。
 沿用仓库现有的日志接口；默认 `SystemConsoleLogger` 级别是 `ERROR`，因此默认无输出。
 
-接受判定只有一个入口：`resolveManifestMode`（`src/runtime/setupAcceptance.ts`）。以后如果改为由
-迁移在 manifest 里声明兼容来源，只需改这一处。
+接受判定只有一个入口：`resolveManifestMode`（`src/runtime/setupAcceptance.ts`），顺序是精确相等、
+库的声明、显式接受集。`requireSchemaSuperset: false` 对声明路径和接受集路径都生效（只能在对象形态
+里显式关闭）。
 
 **边界：只承诺读兼容，通过超集校验不等于写入安全。** 以下情况不检查也不保证，由应用的
 expand/contract 两次发布纪律保证：
 
 - 新模型新增的 fact 属性没有数据库层 DEFAULT，旧代码插入的行在该列为 NULL。重新前滚时 hash
-  相等，不会走迁移，也就不会回填。
-- 新模型新增的 computed 属性在兼容窗口内不会被旧代码维护，旧代码改过的行上这个值会过期。
-- 被新版本迁移重建过的 computation，会被旧代码按旧语义继续增量维护。
+  相等，不会走迁移，也就不会回填。（依赖应用侧默认值的新属性会让迁移判为不兼容，见 §6；不带
+  默认值的新属性仍判为兼容，NULL 由新代码自行处理。）
+- 新模型新增的 computed 属性在兼容窗口内不会被旧代码维护，旧代码改过的行上这个值会过期；重新
+  前滚时也不会重算。
+- 被新版本迁移重建过的 computation，会被旧代码按旧语义继续增量维护。迁移声明路径把这种迁移判为
+  不兼容（§6）；只有显式接受集能越过这一判定，后果由使用者承担。
 
 这几点写在 `SetupOptions` 的类型注释、`agent/agentspace/knowledge/usage/14-api-reference.md` 和
 CHANGELOG 里。
@@ -118,3 +129,43 @@ new。凡是「从当前模型迁到库中模型会被阻塞」的变化，恰�
 - 变异：去掉接受集判断、去掉超集校验、上限不设限、去掉类型比较、默认路径也追加扩展报错文本、
   去掉启动日志、忽略 `requireSchemaSuperset: false`、去掉逻辑层、去掉约束层，每个变异都至少让一个
   对应用例变红。补丁与结果见 PR 描述。
+
+## 6. 迁移声明兼容（第二个 PR）
+
+**分类**（`classifyMigrationCompatibility`，`src/runtime/setupAcceptance.ts`）：`migrate` 用批准后的
+决策给本次迁移分类，结果写进它写入的 manifest：
+
+- `compatibleFrom`：兼容时为 `[上一个 modelHash]`，不兼容时为 `[]`。只声明紧邻的上一个模型，不做传递
+  （A→B→C 两步都兼容时，C 的 manifest 只有 `[B]`）。
+- `compatibility`：`{ fromModelHash, compatible, reasons }`，无论是否兼容都记录，供排障。
+- 模型没变的迁移（例如只对齐约束对象）保留上一次迁移的声明，不会把声明抹掉。
+- 两个字段都不进 `modelHash`。install、`createMigrationBaseline` 和 4.12.x 写的 manifest 没有这两个
+  字段，setup 对它们保持严格相等，报错文本与 4.12.0 一致。
+
+判为不兼容的情况（每条都会写进 `reasons`）：
+
+| 规则 | 依据 |
+|---|---|
+| 上一个模型的记录或属性被删除、挪动或改类型 | 与 setup 逻辑层同一个判定（`findModelSupersetViolations`） |
+| 上一个模型用到的表上约束对象有增、删、改（unique、non-null、identity） | 新增的会拒绝旧代码的写入；删除或修改的会让旧代码的 attach 核对失败。新增在这类表上的 Transform 输出索引除外，与 attach 判定一致；目录核对里「不可判定、按原定义重建」的条目不算 |
+| 已有 computation 被修改、删除或接管 fact 属性 | 旧代码会继续按旧语义维护这些数据；修改被批准为 `'unchanged'` 时不算 |
+| StateMachine 状态重映射（state-graph-mapping） | 持久化的状态名变了，旧代码会继续写旧名字 |
+| 已有记录上新增的 fact 属性依赖应用侧默认值 | 数据库没有 DEFAULT，旧代码插入的行在该列为 NULL |
+
+新表、不带默认值的新列、新数据上的新 computation 仍然兼容（写语义边界见 §2）。
+
+`generateMigrationDiff()` 在 `diff.compatibility` 里给出临时分类：决策尚未做出，已有 computation 的
+修改一律按语义修改计，并提示「若不是语义修改，可批准为 `'unchanged'`」。`migrate()` 用批准后的
+决策重新计算，结果写进 manifest，也在 `plan.compatibility` 里返回（dry run 同样返回）。批准文件里的
+`compatibility` 只是参考，`migrate` 不采信。
+
+**setup**：`resolveManifestMode` 先看精确相等，再看库 manifest 的 `compatibleFrom` 是否包含当前代码的
+hash，最后看显式接受集。声明路径同样要过超集校验：库被迁移之外的 DDL 改过时，即使 manifest 声明了
+兼容也拒绝启动，报错写明 `manifestMode: declared-compatible`，并说明是库与声明不符。
+
+**证据**：`tests/runtime/migrationDeclaredCompatibility.spec.ts`（PGLite、SQLite 各 12 个），
+`tests/runtime/postgresqlMigration.spec.ts` 的 `PostgreSQL migration-declared compatibility`（真实
+PostgreSQL，2 个）。实现前在 PR #60 的代码上跑，22 个失败；没有声明的旧 manifest 那两例在实现前后都是绿的。
+10 个变异都至少让一个用例变红：分类器把新增约束判为兼容、setup 忽略 `compatibleFrom`、分类器忽略
+computation 修改、忽略状态重映射、忽略应用侧默认值、模型不变的迁移抹掉声明、声明做传递、旧 manifest
+的报错追加内容、忽略 `'unchanged'` 决策、声明路径跳过超集校验。补丁与结果见第二个 PR 的描述。
