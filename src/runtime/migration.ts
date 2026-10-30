@@ -370,6 +370,12 @@ export type MigrationDiffFile = {
     requiredDecisions: MigrationDecisionRequirement[];
     decisions: MigrationDecision[];
     safety: MigrationSafetyReview;
+    /**
+     * Provisional read-compatibility classification at generation time (before decisions: a
+     * changed existing computation counts as semantic). Informational only — migrate recomputes
+     * it from the approved decisions and records the result in the manifest.
+     */
+    compatibility?: MigrationCompatibility;
 };
 
 export type GenerateMigrationDiffOptions = {
@@ -407,15 +413,20 @@ export type SetupOptions = {
     install?: boolean;
     migrate?: boolean | MigrationOptions;
     /**
-     * N-1 model acceptance, object form only and only for attach (install not true, no
-     * migrate). Stored-manifest modelHash values this code may start on besides its own
-     * declared modelHash — typically the hash of the release that is one step ahead, so the
-     * previous release can restart on a migrated database (rollback, canary restart).
+     * Explicit N-1 override, object form only and only for attach (install not true, no
+     * migrate). The primary path needs no option: a migration classified compatible records
+     * `compatibleFrom: [previous modelHash]` in the manifest, and setup admits that code by
+     * default (`manifestMode: 'declared-compatible'`). This option additionally admits stored
+     * manifests whose modelHash is listed here (`manifestMode: 'accepted'`) — for databases
+     * whose manifest carries no declaration (written by interaqt 4.12.x or earlier) or as a
+     * deliberate operator override.
      *
      * At most 2 entries (the current release and the previous one); more is an error.
-     * Omitted or empty: strict equality, exactly as `setup(false)`, with the same error text.
-     * When the stored hash differs from the declared one and is not listed, setup throws the
-     * usual "Model manifest mismatch" error, extended with the actual hash and the accept set.
+     * When the stored hash differs from the declared one, is not declared compatible by the
+     * manifest, and is not listed here, setup throws the usual "Model manifest mismatch" error.
+     * The text is exactly the 4.12.0 text when the manifest has no declaration and this list is
+     * empty; otherwise it also lists the actual hash, the manifest's `compatibleFrom`, this
+     * list, and the reasons the migration was classified incompatible.
      *
      * Read compatibility only: an accepted hash means the current code may read a database
      * whose schema is a superset of what it maps to (see `requireSchemaSuperset`). Passing the
@@ -436,7 +447,8 @@ export type SetupOptions = {
     acceptModelHashes?: string[];
     /**
      * Default true. Consulted only when the stored modelHash differs from the declared one
-     * and is admitted through `acceptModelHashes`. Before attaching, setup refuses to start
+     * and is admitted (declared compatible by the manifest, or listed in `acceptModelHashes`).
+     * Before attaching, setup refuses to start
      * (`SchemaSupersetError`, `details.violations` listing each problem) when
      * - the database's manifest model lacks, moves, or retypes a record or attribute the
      *   current model maps to (the migration planner's blocking-change rules, declared model
@@ -511,10 +523,33 @@ export type BoundStateManifest = {
     valueType?: string;
 };
 
+/**
+ * A migration's read-compatibility classification (one2x-ai/mesh#2826): whether code built for
+ * `fromModelHash` can keep reading the database after the migration. Computed from the approved
+ * diff when migrate runs; generateMigrationDiff reports a provisional one before decisions exist.
+ */
+export type MigrationCompatibility = {
+    fromModelHash: string;
+    compatible: boolean;
+    /** Why the migration is not compatible; empty when compatible. */
+    reasons: string[];
+};
+
 export type MigrationManifest = {
     version: 2;
     frameworkVersion: string;
     modelHash: string;
+    /**
+     * Model hashes whose code may attach to this database without migrating it, declared by the
+     * migration that wrote this manifest: `[previous modelHash]` when that migration was
+     * classified compatible, `[]` when it was not. Absent on manifests written by install,
+     * createMigrationBaseline, or interaqt 4.12.x and earlier — setup then requires strict
+     * equality. Not part of modelHash. setup() honors it by default, subject to the schema
+     * superset check (see SetupOptions).
+     */
+    compatibleFrom?: string[];
+    /** The classification of the migration that wrote this manifest, kept for diagnostics. */
+    compatibility?: MigrationCompatibility;
     records: Array<{
         id: string;
         identity: MigrationIdentity;
@@ -621,6 +656,8 @@ export type MigrationConstraintChange = {
     nextDefinition?: string;
     requiresApproval: boolean;
     reason: string;
+    /** The catalog reconciliation status behind the change; 'undecidable' means a rebuild of an unchanged declaration. */
+    reconciliation?: "missing" | "extra" | "different" | "undecidable";
 };
 
 export type StorageBlockingChange = {
@@ -671,6 +708,8 @@ export type MigrationPlan = {
     blockingChanges: string[];
     deletionScope: Array<{ dataContext: string; recordName?: string; ids?: string[]; count?: number; reason: string }>;
     approvedDiffHash?: string;
+    /** The classification recorded in the manifest this migration writes. */
+    compatibility?: MigrationCompatibility;
 };
 
 export type FactPropertyBackfill = {

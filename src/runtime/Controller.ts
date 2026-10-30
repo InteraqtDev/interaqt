@@ -75,7 +75,9 @@ import {
     writeMigrationManifest,
 } from "./migration.js";
 import {
+    classifyMigrationCompatibility,
     createSchemaSupersetMessage,
+    declareMigrationCompatibility,
     findModelSupersetViolations,
     resolveManifestMode,
     resolveSetupAcceptance,
@@ -574,13 +576,14 @@ export class Controller {
                 assertManifestGeneratorCurrent(previousManifest)
             }
             const manifestMode: SetupManifestMode | undefined = previousManifest
-                ? resolveManifestMode(previousManifest.modelHash, nextManifest.modelHash, acceptance.acceptModelHashes)
+                ? resolveManifestMode(previousManifest, nextManifest.modelHash, acceptance.acceptModelHashes)
                 : undefined
-            // An accepted hash is a declaration; the superset check verifies it against the
-            // database's manifest model and the live catalog before anything attaches. Exact mode
-            // needs no check: the stored model is the declared model.
-            if (manifestMode === 'accepted' && acceptance.requireSchemaSuperset) {
-                await this.assertSchemaSuperset(schemaPlan, nextManifest, previousManifest!)
+            // A declared-compatible or accepted model is a claim; the superset check verifies it
+            // against the database's manifest model and the live catalog before anything attaches.
+            // Exact mode needs no check: the stored model is the declared model.
+            const admittedMode = manifestMode && manifestMode !== 'exact' ? manifestMode : undefined
+            if (admittedMode && acceptance.requireSchemaSuperset) {
+                await this.assertSchemaSuperset(schemaPlan, nextManifest, previousManifest!, admittedMode)
             }
             if (!previousManifest && await this.system.hasExistingData?.()) {
                 throw new MigrationBaselineError('Existing database has no migration manifest. Call controller.createMigrationBaseline() before normal setup or migration.')
@@ -588,7 +591,7 @@ export class Controller {
             await this.system.setup(this.entities, this.relations, states, {
                 install,
                 internalRequirements,
-                ...(manifestMode === 'accepted' ? { acceptedModelHash: previousManifest!.modelHash } : {}),
+                ...(admittedMode ? { acceptedModelHash: previousManifest!.modelHash, acceptedManifestMode: admittedMode } : {}),
             })
             await this.scheduler.setup(install)
             if (manifestMode) {
@@ -596,6 +599,8 @@ export class Controller {
                     label: 'setup',
                     message: manifestMode === 'exact'
                         ? 'attached to a database whose manifest modelHash equals the declared modelHash'
+                        : manifestMode === 'declared-compatible'
+                        ? 'attached to a database whose manifest declares the declared modelHash compatible (read compatibility only)'
                         : 'attached to a database whose manifest modelHash is in acceptModelHashes (read compatibility only)',
                     manifestMode,
                     declaredModelHash: nextManifest.modelHash,
@@ -626,7 +631,7 @@ export class Controller {
         }
     }
 
-    private async assertSchemaSuperset(schemaPlan: MigrationSchemaPlan, declaredManifest: MigrationManifest, databaseManifest: MigrationManifest) {
+    private async assertSchemaSuperset(schemaPlan: MigrationSchemaPlan, declaredManifest: MigrationManifest, databaseManifest: MigrationManifest, manifestMode: Exclude<SetupManifestMode, 'exact'>) {
         const supersetSystem = this.system as System & {
             findSchemaSupersetViolations?: System['findSchemaSupersetViolations']
         }
@@ -643,8 +648,9 @@ export class Controller {
             ...await findSchemaSupersetViolations.call(supersetSystem, schemaPlan),
         ]
         if (violations.length) {
-            throw new SchemaSupersetError(createSchemaSupersetMessage(violations, declaredModelHash, acceptedModelHash), {
+            throw new SchemaSupersetError(createSchemaSupersetMessage(violations, declaredModelHash, acceptedModelHash, manifestMode), {
                 violations,
+                manifestMode,
                 declaredModelHash,
                 acceptedModelHash,
             })
@@ -1024,7 +1030,17 @@ export class Controller {
         const { schemaPlan, previousManifest, nextManifest } = await this.prepareMigrationContext({
             includeFunctionText: options.includeFunctionText === true,
         })
-        return this.buildCurrentMigrationDiff(schemaPlan, previousManifest, nextManifest, options)
+        const diff = await this.buildCurrentMigrationDiff(schemaPlan, previousManifest, nextManifest, options)
+        return {
+            ...diff,
+            compatibility: classifyMigrationCompatibility({
+                previousManifest,
+                nextManifest,
+                constraintChanges: schemaPlan.constraintChanges,
+                requiredDecisions: diff.requiredDecisions,
+                factPropertyBackfills: getNewFactPropertyBackfills(this, previousManifest, nextManifest),
+            }),
+        }
     }
 
     async migrate(options: MigrationOptions = {}): Promise<MigrationPlan> {
@@ -1094,6 +1110,16 @@ export class Controller {
         await assertComputationTakeoverAllowed(this, migrationOptions, previousManifest, readHandle)
         await assertScopedSequenceNoSeedDecisions(this, migrationOptions.approvedDiff, previousManifest, readHandle)
         const factPropertyBackfills = getNewFactPropertyBackfills(this, previousManifest, nextManifest)
+        // The migration is the only moment that knows both models: classify it from the approved
+        // decisions and record the result in the manifest it writes (compatibleFrom).
+        const compatibility = classifyMigrationCompatibility({
+            previousManifest,
+            nextManifest,
+            constraintChanges: schemaPlan.constraintChanges,
+            requiredDecisions: expectedDiff.requiredDecisions,
+            decisions: approvedDiff.decisions,
+            factPropertyBackfills,
+        })
         const plan: MigrationPlan = {
             mode: 'compute',
             dryRun: migrationOptions.dryRun === true,
@@ -1114,6 +1140,7 @@ export class Controller {
             blockingChanges,
             deletionScope,
             approvedDiffHash,
+            compatibility,
         }
 
         if (plan.dryRun) return plan
@@ -1181,7 +1208,7 @@ export class Controller {
                     const manifestOperationKey = `manifest:current:${nextManifest.modelHash}:${approvedDiffHash}`
                     const manifestAlreadyWritten = await migrationSystem.isMigrationOperationComplete?.(migrationRun?.id, manifestOperationKey)
                     if (!manifestAlreadyWritten) {
-                        await writeMigrationManifest(this, nextManifest)
+                        await writeMigrationManifest(this, declareMigrationCompatibility(nextManifest, previousManifest, compatibility))
                         await migrationSystem.markMigrationOperationComplete?.(migrationRun?.id, manifestOperationKey)
                     }
                     if (migrationRun) await migrationSystem.updateMigrationPhase?.(migrationRun.id, 'manifest-written')

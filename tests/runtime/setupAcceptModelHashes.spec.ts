@@ -12,6 +12,7 @@ import {
     recordingLogger,
     richController,
     setupLogs,
+    stripDeclaredCompatibility,
     type AnyDB,
 } from "./helpers/setupAcceptanceFixtures.js";
 
@@ -23,6 +24,11 @@ import {
  * strict modelHash comparison refuses to start. With the previous release's hash declared as
  * accepted, setup must start (read compatibility only) after verifying against the live
  * catalog that every table, column, and column type the current code maps to exists.
+ *
+ * A current migration declares its own compatibility in the manifest (see
+ * migrationDeclaredCompatibility.spec.ts), which setup honors before consulting the accept set.
+ * Cells that exercise the explicit accept path or the strict path on a migrated database
+ * therefore strip that declaration first, which is what a manifest written by 4.12.x looks like.
  *
  * The negative superset cases use the opposite direction (code of release N declaring the
  * hash of N-1 while the database is still at N-1): that is the natural way a wrong accept
@@ -41,6 +47,7 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ name, create }) => 
         const { controller: v1, hash: hashA } = await install(db);
         await v1.system.storage.create("AcceptProduct", { name: "before", price: 1 });
         const { controller: v2, hash: hashB } = await migrateTo(db, { sku: true });
+        await stripDeclaredCompatibility(v2);
         expect(hashB).not.toBe(hashA);
         await v2.system.storage.create("AcceptProduct", { name: "after", price: 2, sku: "S-2" });
 
@@ -63,6 +70,7 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ name, create }) => 
         const { controller: v1, hash: hashA } = await install(db);
         await v1.system.storage.create("AcceptProduct", { name: "kept", price: 3 });
         const { controller: v2, hash: hashB } = await migrateTo(db, { category: true });
+        await stripDeclaredCompatibility(v2);
         await v2.system.storage.create("AcceptCategory", { title: "new-table-row" });
 
         const rollback = controllerFor(db);
@@ -87,6 +95,7 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ name, create }) => 
 
         const { controller: v2 } = richController(db, true);
         await migrateWithApproval(v2);
+        await stripDeclaredCompatibility(v2);
         const hashB = (await readMigrationManifest(v2))!.modelHash;
         expect(hashB).not.toBe(hashA);
 
@@ -106,7 +115,8 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ name, create }) => 
     test("a database hash outside the accept set is rejected; the message lists the actual hash and the accept set", async () => {
         const db = create();
         const { hash: hashA } = await install(db);
-        const { hash: hashB } = await migrateTo(db, { sku: true });
+        const { controller: v2, hash: hashB } = await migrateTo(db, { sku: true });
+        await stripDeclaredCompatibility(v2);
 
         const error = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: ["hash-of-some-other-release"] }));
         expect(error.message).toMatch(/^Model manifest mismatch\./);
@@ -191,7 +201,8 @@ describe.each(drivers)("setup acceptModelHashes ($name)", ({ name, create }) => 
     test("default path regression: without an accept set the strict comparison and the 4.12.0 error text are unchanged", async () => {
         const db = create();
         await install(db);
-        await migrateTo(db, { sku: true });
+        const { controller: v2 } = await migrateTo(db, { sku: true });
+        await stripDeclaredCompatibility(v2);
 
         const attempts: Array<() => Promise<unknown>> = [
             () => controllerFor(db).setup(false),

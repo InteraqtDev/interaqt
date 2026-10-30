@@ -1,12 +1,14 @@
 /**
- * Shared fixtures for the setup({ acceptModelHashes }) suites (one2x-ai/mesh#2826):
- * tests/runtime/setupAcceptModelHashes.spec.ts (PGLite / SQLite / env-gated MySQL) and the
- * real-PostgreSQL block in tests/runtime/postgresqlMigration.spec.ts.
+ * Shared fixtures for the N-1 attach suites (one2x-ai/mesh#2826):
+ * tests/runtime/setupAcceptModelHashes.spec.ts (explicit acceptModelHashes; PGLite / SQLite /
+ * env-gated MySQL), tests/runtime/migrationDeclaredCompatibility.spec.ts (compatibility declared
+ * by the migration), and the real-PostgreSQL blocks in tests/runtime/postgresqlMigration.spec.ts.
  */
 import {
     Action,
     Controller,
     Count,
+    Custom,
     Dictionary,
     Entity,
     Interaction,
@@ -24,6 +26,7 @@ import {
     StateTransfer,
     UniqueConstraint,
     readMigrationManifest,
+    writeMigrationManifest,
     type SystemLogger,
     type SystemLogType,
 } from "interaqt";
@@ -35,10 +38,23 @@ export const DEFAULT_MISMATCH_MESSAGE = "Model manifest mismatch. Call controlle
 
 export type ModelShape = {
     sku?: boolean;
+    /** sku carries an application-side default value (the database has no DEFAULT). */
+    skuDefault?: boolean;
     skuUnique?: boolean;
     skuRequired?: boolean;
     category?: boolean;
+    /** The new AcceptCategory.title carries an application-side default value. */
+    categoryTitleDefault?: boolean;
     priceType?: "number" | "string";
+    /** A computed doublePrice property; the two versions differ only in the compute function text. */
+    doublePrice?: "times-two" | "times-three";
+};
+
+// Two literal functions: the migration signature hashes the function text, so a closure over a
+// factor variable would not register as a change.
+const DOUBLE_PRICE_COMPUTE = {
+    "times-two": async (_deps: unknown, record: { price: number }) => record.price * 2,
+    "times-three": async (_deps: unknown, record: { price: number }) => record.price * 3,
 };
 
 export function buildEntities(shape: ModelShape = {}) {
@@ -47,7 +63,20 @@ export function buildEntities(shape: ModelShape = {}) {
         properties: [
             new Property({ name: "name", type: "string" }, { uuid: "accept-product-name" }),
             new Property({ name: "price", type: shape.priceType ?? "number" }, { uuid: "accept-product-price" }),
-            ...(shape.sku ? [new Property({ name: "sku", type: "string" }, { uuid: "accept-product-sku" })] : []),
+            ...(shape.sku || shape.skuDefault ? [new Property({
+                name: "sku",
+                type: "string",
+                ...(shape.skuDefault ? { defaultValue: () => "unassigned" } : {}),
+            }, { uuid: "accept-product-sku" })] : []),
+            ...(shape.doublePrice ? [new Property({
+                name: "doublePrice",
+                type: "number",
+                computation: new Custom({
+                    name: "AcceptDoublePrice",
+                    dataDeps: { current: { type: "property", attributeQuery: ["price"] } },
+                    compute: DOUBLE_PRICE_COMPUTE[shape.doublePrice] as any,
+                }, { uuid: "accept-product-double-price-computation" }),
+            }, { uuid: "accept-product-double-price" })] : []),
         ],
         ...(shape.skuUnique || shape.skuRequired ? {
             constraints: [
@@ -60,7 +89,11 @@ export function buildEntities(shape: ModelShape = {}) {
     if (shape.category) {
         entities.push(new Entity({
             name: "AcceptCategory",
-            properties: [new Property({ name: "title", type: "string" }, { uuid: "accept-category-title" })],
+            properties: [new Property({
+                name: "title",
+                type: "string",
+                ...(shape.categoryTitleDefault ? { defaultValue: () => "untitled" } : {}),
+            }, { uuid: "accept-category-title" })],
         }, { uuid: "accept-category" }));
     }
     return entities;
@@ -95,6 +128,46 @@ export async function migrateTo(db: AnyDB, shape: ModelShape) {
     const controller = controllerFor(db, shape);
     await migrateWithApproval(controller);
     return { controller, hash: (await readMigrationManifest(controller))!.modelHash };
+}
+
+/**
+ * Rewrite the stored manifest without the migration's compatibility declaration — the shape a
+ * manifest written by interaqt 4.12.x or earlier has. Used where a suite needs the strict or the
+ * explicit-acceptModelHashes path on a database that a current migration would have declared.
+ */
+export async function stripDeclaredCompatibility(controller: Controller) {
+    const manifest = (await readMigrationManifest(controller))!;
+    const { compatibleFrom: _compatibleFrom, compatibility: _compatibility, ...legacy } = manifest as typeof manifest & { compatibleFrom?: unknown; compatibility?: unknown };
+    await writeMigrationManifest(controller, legacy as typeof manifest);
+}
+
+/**
+ * A property-level StateMachine over record updates (no interactions), for state-remap cells.
+ * Renaming the middle state requires a state-graph-mapping decision at migration.
+ */
+export function buildTicketEntities(stateNames: [string, string, string]) {
+    const node = (name: string) => new StateNode({ name }, { uuid: `compat-ticket-node-${name}` });
+    const machine = new StateMachine({
+        states: stateNames.map(node),
+        transfers: [
+            new StateTransfer({ trigger: { recordName: "CompatTicket", type: "update" }, current: node(stateNames[0]), next: node(stateNames[1]), computeTarget: (event: any) => ({ id: event.record.id }) }, { uuid: "compat-ticket-transfer-1" }),
+            new StateTransfer({ trigger: { recordName: "CompatTicket", type: "update" }, current: node(stateNames[1]), next: node(stateNames[2]), computeTarget: (event: any) => ({ id: event.record.id }) }, { uuid: "compat-ticket-transfer-2" }),
+        ],
+        initialState: node(stateNames[0]),
+    }, { uuid: "compat-ticket-machine" });
+    return [new Entity({
+        name: "CompatTicket",
+        properties: [
+            new Property({ name: "title", type: "string" }, { uuid: "compat-ticket-title" }),
+            new Property({ name: "status", type: "string", computation: machine }, { uuid: "compat-ticket-status" }),
+        ],
+    }, { uuid: "compat-ticket" })];
+}
+
+export function ticketController(db: AnyDB, stateNames: [string, string, string], logger?: SystemLogger) {
+    const system = new MonoSystem(db, logger);
+    system.conceptClass = KlassByName;
+    return new Controller({ system, entities: buildTicketEntities(stateNames), relations: [] });
 }
 
 /**
