@@ -406,6 +406,47 @@ export type MigrationOptions = {
 export type SetupOptions = {
     install?: boolean;
     migrate?: boolean | MigrationOptions;
+    /**
+     * N-1 model acceptance, object form only and only for attach (install not true, no
+     * migrate). Stored-manifest modelHash values this code may start on besides its own
+     * declared modelHash — typically the hash of the release that is one step ahead, so the
+     * previous release can restart on a migrated database (rollback, canary restart).
+     *
+     * At most 2 entries (the current release and the previous one); more is an error.
+     * Omitted or empty: strict equality, exactly as `setup(false)`, with the same error text.
+     * When the stored hash differs from the declared one and is not listed, setup throws the
+     * usual "Model manifest mismatch" error, extended with the actual hash and the accept set.
+     *
+     * Read compatibility only: an accepted hash means the current code may read a database
+     * whose schema is a superset of what it maps to (see `requireSchemaSuperset`). Passing the
+     * superset check does not make writes safe. Not checked and not guaranteed:
+     * - A fact property the newer model added has no database-level DEFAULT, so rows this code
+     *   inserts hold NULL there; when the newer release attaches again the hashes are equal and
+     *   nothing backfills them.
+     * - A computed property the newer model added is not maintained by this code while it runs.
+     * - A computation the newer migration rebuilt keeps being maintained incrementally by this
+     *   code with its old semantics.
+     * Applications keep write compatibility through expand/contract releases.
+     *
+     * Constraint objects: an extra constraint the newer model installed on a table this code
+     * uses (for example a UniqueConstraint or NonNullConstraint) can reject this code's writes,
+     * so it counts as incompatible — reported by the superset check, and by the attach-time
+     * constraint reconciliation when the superset check is skipped.
+     */
+    acceptModelHashes?: string[];
+    /**
+     * Default true. Consulted only when the stored modelHash differs from the declared one
+     * and is admitted through `acceptModelHashes`. Before attaching, setup refuses to start
+     * (`SchemaSupersetError`, `details.violations` listing each problem) when
+     * - the database's manifest model lacks, moves, or retypes a record or attribute the
+     *   current model maps to (the migration planner's blocking-change rules, declared model
+     *   as "old", database model as "new"), or
+     * - the live database catalog lacks a table or column the current model maps to, types a
+     *   column incompatibly, or holds a constraint object that differs from the declared ones.
+     * `false` skips this check and trusts the declaration; attach-time constraint
+     * reconciliation still runs.
+     */
+    requireSchemaSuperset?: boolean;
 };
 
 export type ComputationManifest = {
