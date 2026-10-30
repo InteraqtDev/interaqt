@@ -89,7 +89,7 @@ new。凡是「从当前模型迁到库中模型会被阻塞」的变化，恰�
   `missing-column`、`incompatible-column-type`、`constraint-mismatch`，带物理名和 `Record.property`
   逻辑路径。
 
-为什么类型校验大概率是安全网：框架自己的迁移不会删除列，也不会就地改类型
+类型校验主要起兜底作用，原因是：框架自己的迁移不会删除列，也不会就地改类型
 （`getStorageBlockingChanges` 对类型变更报 `unsupported-destructive-schema-change`）。经框架迁移
 到达的库，旧代码需要的列一定还在且类型不变。校验真正拦住的是两类情况：接受集声明错了（例如新代码
 把旧模型的 hash 当成兼容），或数据库被框架迁移之外的 DDL 改过。
@@ -111,10 +111,10 @@ new。凡是「从当前模型迁到库中模型会被阻塞」的变化，恰�
 
 - 测试：`tests/runtime/setupAcceptModelHashes.spec.ts`（PGLite 13 个、SQLite 12 个、选项校验 2 个、
   MySQL 环境门控 2 个），`tests/runtime/postgresqlMigration.spec.ts` 的
-  `PostgreSQL setup acceptModelHashes`（真实 PostgreSQL，环境门控，3 个）。夹具在
+  `PostgreSQL setup acceptModelHashes`（真实 PostgreSQL，环境门控，4 个）。夹具在
   `tests/runtime/helpers/setupAcceptanceFixtures.ts`。CI 的 `postgres-concurrency.yml` 同时跑这两个
   文件的真实 PostgreSQL 与 MySQL 部分。
-- 先红后绿：实现前 20 个用例失败；默认路径回归两例在实现前后都是绿的（这正是要证明的性质）。
+- 先红后绿：在 4.12.0（`102d569`）上跑最终的 spec，25 个用例失败；默认路径回归两例在实现前后都是绿的（这正是要证明的性质）。
 - 变异：去掉接受集判断、去掉超集校验、上限不设限、去掉类型比较、默认路径也追加扩展报错文本、
   去掉启动日志、忽略 `requireSchemaSuperset: false`、去掉逻辑层、去掉约束层，每个变异都至少让一个
   对应用例变红。补丁与结果见 PR 描述。

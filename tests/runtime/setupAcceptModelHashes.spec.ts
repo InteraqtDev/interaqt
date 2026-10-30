@@ -320,9 +320,9 @@ describe.skipIf(!MYSQL_ENABLED)("setup acceptModelHashes (MySQL)", () => {
         const subset = await freshDatabase("accept_subset");
         const { hash: hashA } = await install(subset);
         const missing = await captureError(controllerFor(subset, { sku: true }).setup({ install: false, acceptModelHashes: [hashA] }));
-        expect(missing.details?.violations).toEqual([expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" })]);
+        expect(missing.details?.violations).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" })]));
         const retyped = await captureError(controllerFor(subset, { priceType: "string" }).setup({ install: false, acceptModelHashes: [hashA] }));
-        expect(retyped.details?.violations).toEqual([expect.objectContaining({ kind: "incompatible-column-type", logicalPath: "AcceptProduct.price" })]);
+        expect(retyped.details?.violations).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "incompatible-column-type", logicalPath: "AcceptProduct.price" })]));
         await subset.close();
     });
 

@@ -951,13 +951,34 @@ describeIfPostgres("PostgreSQL setup acceptModelHashes", () => {
     const { hash: hashA } = await installAcceptModel(db);
     const missing = await captureError(controllerFor(db, { sku: true }).setup({ install: false, acceptModelHashes: [hashA] }));
     expect(missing.name).toBe("SchemaSupersetError");
-    expect(missing.details?.violations).toEqual([expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" })]);
+    expect(missing.details?.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "missing-column", logicalPath: "AcceptProduct.sku" }),
+      expect.objectContaining({ kind: "model-difference", logicalPath: "AcceptProduct.sku" }),
+    ]));
     const missingTable = await captureError(controllerFor(db, { category: true }).setup({ install: false, acceptModelHashes: [hashA] }));
-    expect(missingTable.details?.violations).toEqual([expect.objectContaining({ kind: "missing-table", recordNames: ["AcceptCategory"] })]);
+    expect(missingTable.details?.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "missing-table", recordNames: ["AcceptCategory"] }),
+    ]));
     const retyped = await captureError(controllerFor(db, { priceType: "string" }).setup({ install: false, acceptModelHashes: [hashA] }));
-    expect(retyped.details?.violations).toEqual([expect.objectContaining({
+    expect(retyped.details?.violations).toEqual(expect.arrayContaining([expect.objectContaining({
       kind: "incompatible-column-type", logicalPath: "AcceptProduct.price", expectedType: "text", actualType: "float8",
-    })]);
+    })]));
+    await db.close();
+  });
+
+  test("unique and NonNull constraints the newer model added are incompatible and named", async () => {
+    const db = openDatabase("accept_constraints");
+    await installAcceptModel(db);
+    const { hash: hashB } = await migrateAcceptModel(db, { sku: true, skuUnique: true, skuRequired: true });
+    const error = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: [hashB] }));
+    expect(error.name).toBe("SchemaSupersetError");
+    expect(error.details?.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "constraint-mismatch", status: "extra", constraintKind: "unique", tableName: "AcceptProduct" }),
+      expect.objectContaining({ kind: "constraint-mismatch", status: "extra", constraintKind: "non-null", tableName: "AcceptProduct" }),
+    ]));
+    expect(error.details?.violations).toHaveLength(2);
+    const attachError = await captureError(controllerFor(db).setup({ install: false, acceptModelHashes: [hashB], requireSchemaSuperset: false }));
+    expect(attachError.message).toContain("admitted through acceptModelHashes");
     await db.close();
   });
 });
