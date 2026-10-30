@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.13.0](https://github.com/InteraqtDev/interaqt/compare/v4.12.0...v4.13.0) (2026-10-30)
+
+### Features
+
+* **migration:** declare read compatibility in the manifest and honor it in setup ([c320fea](https://github.com/InteraqtDev/interaqt/commit/c320fea369c1f08e95e50be728072b6be547fda1)), closes [one2x-ai/mesh#2826](https://github.com/one2x-ai/mesh/issues/2826)
+* **runtime:** accept the previous release's model hash in setup with a live schema superset check ([eafa894](https://github.com/InteraqtDev/interaqt/commit/eafa894440d797743f015fa7dc3a37b1a9ec6b39)), closes [one2x-ai/mesh#2826](https://github.com/one2x-ai/mesh/issues/2826)
+* **runtime:** extend the setup superset check to manifest differences and constraint objects ([e140ed9](https://github.com/InteraqtDev/interaqt/commit/e140ed90a88fe8e8cd2ceed404ff84c473c62b5e)), closes [one2x-ai/mesh#2826](https://github.com/one2x-ai/mesh/issues/2826)
+
 ## [Unreleased]
 
 Minor release: new N-1 attach capabilities. Attaching with an unchanged model, and attaching to
