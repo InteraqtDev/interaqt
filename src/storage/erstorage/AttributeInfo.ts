@@ -30,6 +30,10 @@ export class AttributeInfo {
         return (this.data as ValueAttribute).fieldType
     }
 
+    get isExcludedFromOldRecord() {
+        return this.isValue && (this.data as ValueAttribute).excludeFromOldRecord === true
+    }
+
     get computed() {
         if (!this.isComputed) throw new Error('not a computed attribute')
         return (this.data as ValueAttribute).computed

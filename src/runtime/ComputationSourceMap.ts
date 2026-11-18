@@ -6,6 +6,7 @@ import { DICTIONARY_RECORD, RecordMutationEvent } from "./System.js";
 import { Scheduler } from "./Scheduler.js";
 import { ComputationProtocolError } from "./errors/index.js";
 import { mergedMutationEventView } from "./computations/TransitionFinder.js";
+import { OldRecordExclusions, resolveOldRecordExclusions } from "./oldRecordExclusion.js";
 
 // SourceMap 类型定义
 export type EntityCreateEventsSourceMap = {
@@ -93,6 +94,8 @@ export class ComputationSourceMapManager {
     private filteredToPhysicalName: Map<string, string> = new Map()
     // storage 可发射事件的全部记录名（事件的 recordName 恒 ∈ 此集合）
     private knownRecordNames: Set<string> = new Set()
+    // Property.excludeFromOldRecord declarations by physical record name (see oldRecordExclusion.ts).
+    private oldRecordExclusions: OldRecordExclusions = new Map()
 
     constructor(public controller: Controller, public scheduler: Scheduler) {
         
@@ -212,12 +215,66 @@ export class ComputationSourceMapManager {
         }
     }
 
+    getOldRecordExclusions(): OldRecordExclusions {
+        return this.oldRecordExclusions
+    }
+
+    /**
+     * Property.excludeFromOldRecord invariant (listener surface): an update listener must not
+     * depend on the old value of an excluded column. Update listeners are keyed under physical
+     * record names after normalization, which is also the name the exclusion is declared under.
+     *  - data-based, listener on the dataDep source itself (no targetPath): the Scheduler evaluates
+     *    the records dataDep `match` on oldRecord to classify membership (entered / left / stayed),
+     *    treating an absent plain column as NULL — an excluded column would be misread as NULL.
+     *    Other dataDep reads are safe: dataDep values are re-queried, and an excluded column only
+     *    makes the "did a dependency change" comparison report a written column as changed.
+     *  - event-based: trigger / eventDep `record` patterns are matched against
+     *    {...oldRecord, ...record} and `oldRecord` patterns against oldRecord.
+     */
+    private assertOldRecordExclusionRespected(source: EntityEventSourceMap): void {
+        if (source.type !== 'update') return
+        const excluded = this.oldRecordExclusions.get(source.recordName)
+        if (!excluded?.size) return
+        const viewNote = (source as { filteredRecordName?: string }).filteredRecordName
+            ? ` (through the view "${(source as { filteredRecordName?: string }).filteredRecordName}")`
+            : ''
+        const fail = (property: string, how: string, remedy = `stop depending on "${property}" in this listener`) => {
+            throw new ComputationProtocolError(
+                `Property "${source.recordName}.${property}" declares excludeFromOldRecord, but ${this.describeComputation(source.computation)} ${how}${viewNote}. ` +
+                `Update events of "${source.recordName}" do not carry the old value of an excluded column, so this listener would compare against or match on a missing value. ` +
+                `Remove excludeFromOldRecord, or ${remedy}.`,
+                {
+                    handleName: source.computation.constructor.name,
+                    dataContext: source.computation.dataContext,
+                    computationPhase: 'old-record-exclusion-validation'
+                }
+            )
+        }
+        if ('dataDep' in source) {
+            const dataSource = source as EntityUpdateEventsSourceMap
+            if (dataSource.targetPath?.length || dataSource.dataDep.type !== 'records') return
+            const topLevelMatchKeys = this.matchAttributeQuery(dataSource.dataDep.match)
+                .filter((item): item is string => typeof item === 'string')
+            const hit = topLevelMatchKeys.find(key => excluded.has(key))
+            if (hit) fail(hit, `filters on it in the match of a records dataDep`, `move the condition to a column that is not excluded`)
+            return
+        }
+        const eventSource = source as EventBasedEntityEventsSourceMap
+        for (const side of ['record', 'oldRecord'] as const) {
+            const pattern = eventSource[side]
+            if (!pattern || typeof pattern !== 'object') continue
+            const hit = Object.keys(pattern).find(key => excluded.has(key))
+            if (hit) fail(hit, `matches it in the \`${side}\` pattern of an update trigger or eventDep`)
+        }
+    }
+
     /**
      * 初始化或重新初始化 SourceMap 数据
      * @param sourceMaps EntityEventSourceMap 数组
      */
     initialize(computations: Set<Computation>): void {
         this.buildEventNamespace()
+        this.oldRecordExclusions = resolveOldRecordExclusions(this.controller.entities, this.controller.relations)
         const sortedERMutationEventSources: EntityEventSourceMap[][] = [[], [], []]
 
         
@@ -309,7 +366,28 @@ export class ComputationSourceMapManager {
         }
 
         this.sourceMaps = sortedERMutationEventSources.flat().map(source => this.normalizeFilteredUpdateSourceMap(source))
-        this.sourceMaps.forEach(source => this.assertListenerReachable(source))
+        this.sourceMaps.forEach(source => {
+            this.assertListenerReachable(source)
+            this.assertOldRecordExclusionRespected(source)
+        })
+        // StateMachine trigger patterns are matched by TransitionFinder, not by the listener: the
+        //  handle registers {recordName, type} only, so check the transfer triggers themselves.
+        for (const computation of computations) {
+            const transfers = (computation.args as { transfers?: Array<{ trigger?: { recordName?: string, type?: string, record?: unknown, oldRecord?: unknown } }> }).transfers
+            for (const transfer of transfers || []) {
+                const trigger = transfer.trigger
+                if (!trigger || trigger.type !== 'update' || !trigger.recordName) continue
+                const physicalName = this.filteredToPhysicalName.get(trigger.recordName)
+                this.assertOldRecordExclusionRespected({
+                    type: 'update',
+                    recordName: physicalName ?? trigger.recordName,
+                    ...(physicalName ? { filteredRecordName: trigger.recordName } : {}),
+                    record: trigger.record,
+                    oldRecord: trigger.oldRecord,
+                    computation,
+                } as EventBasedEntityEventsSourceMap)
+            }
+        }
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
     }
     /**
@@ -320,6 +398,7 @@ export class ComputationSourceMapManager {
     addSourceMap(sourceMap: EntityEventSourceMap): void {
         const normalized = this.normalizeFilteredUpdateSourceMap(sourceMap)
         this.assertListenerReachable(normalized)
+        this.assertOldRecordExclusionRespected(normalized)
         this.sourceMaps.push(normalized)
         this.addToTree(normalized)
     }

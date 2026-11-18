@@ -21,6 +21,12 @@ export interface PropertyInstance extends IInstance {
   defaultValue?: Function;
   computed?: Function;
   computation?: ComputationInstance;
+  /**
+   * Leave this column out of the pre-update read of `storage.update` and therefore out of the
+   * `oldRecord` of update events (side effects, `storage.listen`, computation event views).
+   * Setup rejects declarations whose consumers need the old value; see the usage guide.
+   */
+  excludeFromOldRecord?: boolean;
 }
 
 export interface PropertyCreateArgs {
@@ -31,6 +37,7 @@ export interface PropertyCreateArgs {
   defaultValue?: Function;
   computed?: Function;
   computation?: ComputationInstance;
+  excludeFromOldRecord?: boolean;
 }
 
 export class Property implements PropertyInstance {
@@ -44,6 +51,7 @@ export class Property implements PropertyInstance {
   public defaultValue?: Function;
   public computed?: Function;
   public computation?: ComputationInstance;
+  public excludeFromOldRecord?: boolean;
   
   constructor(args: PropertyCreateArgs, options?: { uuid?: string }) {
     this._options = options;
@@ -55,6 +63,7 @@ export class Property implements PropertyInstance {
     this.defaultValue = args.defaultValue;
     this.computed = args.computed;
     this.computation = args.computation;
+    if (args.excludeFromOldRecord !== undefined) this.excludeFromOldRecord = args.excludeFromOldRecord;
   }
   
   // 静态属性和方法
@@ -104,6 +113,10 @@ export class Property implements PropertyInstance {
     computation: {
       type: [] as const,
       collection: false as const,
+      required: false as const
+    },
+    excludeFromOldRecord: {
+      type: 'boolean' as const,
       required: false as const
     }
   };
@@ -160,6 +173,13 @@ export class Property implements PropertyInstance {
         `computed must be a function of the record's own row, e.g. computed: (record) => ...`
       );
     }
+    // excludeFromOldRecord accepts booleans only: a truthy string or number would hide the intent.
+    if (args.excludeFromOldRecord !== undefined && typeof args.excludeFromOldRecord !== 'boolean') {
+      throw new Error(
+        `Property "${args.name}" declares a non-boolean excludeFromOldRecord (${JSON.stringify(args.excludeFromOldRecord)}). ` +
+        `Use excludeFromOldRecord: true, or omit it.`
+      );
+    }
     // defaultValue/computed 在 storage 写路径上同步求值（返回值直接落库）：async 函数返回的
     //  Promise 会被序列化成 "{}" 持久化（字符串列静默、数值列裸驱动报错）——r35，声明期拒绝。
     assertSynchronousFunctionArg(`Property "${args.name}"`, 'defaultValue', args.defaultValue);
@@ -204,6 +224,7 @@ export class Property implements PropertyInstance {
     if (instance.defaultValue !== undefined) args.defaultValue = instance.defaultValue;
     if (instance.computed !== undefined) args.computed = instance.computed;
     if (instance.computation !== undefined) args.computation = instance.computation;
+    if (instance.excludeFromOldRecord !== undefined) args.excludeFromOldRecord = instance.excludeFromOldRecord;
     
     return new Property(args);
   }

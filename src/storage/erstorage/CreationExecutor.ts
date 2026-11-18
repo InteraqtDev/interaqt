@@ -330,6 +330,17 @@ export class CreationExecutor {
             delete updateRecord.source
             delete updateRecord.target
         }
+        // Property.excludeFromOldRecord: the host's pre-update read already skips the column; nested
+        //  same-row snapshots (combined / link data) still carry it, so drop it here to give every
+        //  update event the same oldRecord surface. Records without the declaration keep the
+        //  snapshot object unchanged.
+        const excludedAttributes = this.map.getRecordInfo(recordInfo.resolvedBaseRecordName ?? recordName).valueAttributes
+            .filter(attr => attr.isExcludedFromOldRecord)
+        let eventOldRecord = oldRecord
+        if (excludedAttributes.length) {
+            eventOldRecord = { ...oldRecord }
+            excludedAttributes.forEach(attr => { delete eventOldRecord[attr.attributeName] })
+        }
         return {
             type: 'update',
             recordName,
@@ -337,7 +348,7 @@ export class CreationExecutor {
             //  StateTransfer.trigger.keys 等字段级匹配依赖它。
             keys: updatedKeys,
             record: { ...updateRecord, id: oldRecord.id },
-            oldRecord
+            oldRecord: eventOldRecord
         }
     }
 

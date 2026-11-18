@@ -406,6 +406,48 @@ const HandshakeToken = Entity.create({
 
 Admission `Condition` checks remain valid for permissions, but they are **not** a substitute for identity under concurrent registration: locking a key that has no row obtains no lock. The official occupancy recipe (Transform register + StateMachine consume + `Entity.retention`) is in [15-entity-crud-patterns.md](./15-entity-crud-patterns.md).
 
+### Excluding a column from oldRecord
+
+Every `storage.update` (including the writes that computations and interactions perform) first reads the matched record. That snapshot becomes the `oldRecord` of the update event, which `storage.listen` callbacks, `RecordMutationSideEffect` content, and computations receive. By default the snapshot holds every value column of the record. For wide fact columns (long text, JSON documents, embedding vectors) that no consumer compares against, this read moves data that is never used, once per updated record.
+
+Declare `excludeFromOldRecord: true` on such a property:
+
+```javascript
+const Document = Entity.create({
+  name: 'Document',
+  properties: [
+    Property.create({ name: 'title', type: 'string' }),
+    Property.create({ name: 'status', type: 'string' }),
+    Property.create({ name: 'fullText', type: 'string', excludeFromOldRecord: true }),
+  ],
+});
+```
+
+What changes for an excluded column:
+
+- The pre-update read does not select it, and the `oldRecord` of the record's update events does not contain it. This includes update events of the record produced inside another record's update (in-place `&` link data, combined records): their snapshot is still read completely, because row relocation copies it, and the column is removed from the event.
+- When an update writes the column, the event `record` carries the new value and `keys` lists it, as for any column. The merged event view that computations receive (`{...oldRecord, ...record}`) therefore contains the column only when the update wrote it.
+- Writes, `find` / `findOne`, delete events (their `record` is the full deleted row), and create events are unchanged. The declaration does not enter `modelHash`, so adding or removing it needs no migration.
+
+Setup rejects the declaration, naming the record and property, when a framework consumer needs the old value:
+
+| Rule | Reason |
+|------|--------|
+| The property is `computed`, has a `computation`, or has a `defaultValue` | `computed` is recomputed from the old row on every write; a computation output is read back as the previous value; a `defaultValue` is applied on update to columns absent from the old row, which would overwrite the stored value |
+| The property is part of `Entity.identity` | The immutability guard reads the stored value from the old row |
+| The record declares any `computed` property | `computed` functions run against the merged old row on every update and do not declare which fields they read |
+| The record is a filtered view (re-declaring a base property) or an input of a merged entity/relation | The flag would not reach the physical column |
+| A records dataDep whose source is the record filters on the column in its `match` | The scheduler classifies membership (entered / left / stayed) by evaluating `match` on `oldRecord`, where an absent column reads as NULL; an incremental computation would skip updates of its members |
+| A StateMachine trigger or eventDep on an update of the record names the column in its `record` or `oldRecord` pattern | Patterns are matched against `oldRecord` and `{...oldRecord, ...record}` |
+| A `ScopedSequence` uses the column as a scope value field | The scope immutability guard compares it with the old record |
+
+Allowed, because they do not need the old value:
+
+- computations that read the column through a dataDep `attributeQuery` (including `'*'` and relation paths): dataDep values are re-queried from storage. An update that writes the column counts as a change of it even when the value is equal;
+- filtered entities whose `matchExpression` references the column: membership is decided by queries before and after the write.
+
+Code that the framework cannot inspect sees `oldRecord` without the column: side-effect content, `storage.listen`, `computeTarget`, `computeValue`, Transform and Custom callbacks, and the `record` argument of a property computation on the same record when an update of that record triggered it (that argument is the pre-update snapshot). Declaring the flag is the statement that such code does not need the old value.
+
 ## Complete Example
 
 Here's a complete example of a user entity definition:

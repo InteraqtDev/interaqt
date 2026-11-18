@@ -461,6 +461,16 @@ export class Scheduler {
                     valueFields.push(topField)
                 }
             }
+            // The guard compares each scope value field against oldRecord; an excluded column
+            //  would always look changed (or never, for the numbered check), so reject it at setup.
+            const excludedScopeField = valueFields.find(field => this.sourceMapManager.getOldRecordExclusions().get(hostName)?.has(field))
+            if (excludedScopeField) {
+                throw new ComputationProtocolError(
+                    `Property "${hostName}.${excludedScopeField}" declares excludeFromOldRecord, but it is a scope field of the ScopedSequence "${args.name}" on "${hostName}.${dataContext.id.name}". ` +
+                    `The scope immutability guard compares scope fields with the old record on every update; remove excludeFromOldRecord.`,
+                    { handleName: 'ScopedSequence', dataContext, computationPhase: 'old-record-exclusion-validation' }
+                )
+            }
             this.scopedSequenceScopeGuards.push({
                 hostName,
                 propertyName: dataContext.id.name,

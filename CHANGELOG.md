@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+Minor release: a new, opt-in property declaration. Properties without it behave exactly as in 4.13.0.
+
+### Features
+
+* **storage:** `Property.create({ ..., excludeFromOldRecord: true })` leaves a value column out of the
+  pre-update read of `storage.update` ("find record for updating"), so the `oldRecord` of the record's
+  update events (`storage.listen`, `RecordMutationSideEffect`, computation event views) does not
+  contain it. It is meant for wide fact columns (long text, JSON, embedding vectors) whose old value no
+  consumer needs; without it every update, including the write of each StateMachine transition, reads
+  the whole row ([one2x-ai/mesh#3283](https://github.com/one2x-ai/mesh/issues/3283)). Update events
+  produced for the record inside another record's update (in-place `&` link data, combined records)
+  drop the column as well. Writes, `find`, create and delete events are unchanged, and the declaration
+  is not part of `modelHash`. Setup throws `ComputationProtocolError`, naming the record and property,
+  when a framework consumer needs the old value: the property is `computed`, has a `computation` or a
+  `defaultValue`, or is part of `Entity.identity`; the record declares a `computed` property; the
+  record is a filtered view or an input of a merged record; a records dataDep on the record filters on
+  it in its `match`; a StateMachine trigger or eventDep names it in a `record` or `oldRecord` pattern
+  of an update; a `ScopedSequence` uses it as a scope value field. Reading the column through a dataDep
+  `attributeQuery` and filtering a filtered entity on it stay allowed. Usage:
+  `agent/agentspace/knowledge/usage/02-define-entities-properties.md` § Excluding a column from oldRecord.
+
 ## [4.13.0](https://github.com/InteraqtDev/interaqt/compare/v4.12.0...v4.13.0) (2026-10-30)
 
 ### Features

@@ -266,6 +266,7 @@ export class DBSetup {
                     collection: prop.collection,
                     args: prop.args,
                     defaultValue: prop.defaultValue as (() => any) | undefined,
+                    ...(prop.excludeFromOldRecord === true ? { excludeFromOldRecord: true } : {}),
                     fieldType: resolveFieldType({
                         type: prop.type,
                         collection: prop.collection,
@@ -360,6 +361,7 @@ export class DBSetup {
                     collection: prop.collection,
                     args: prop.args,
                     defaultValue: prop.defaultValue as (() => any) | undefined,
+                    ...(prop.excludeFromOldRecord === true ? { excludeFromOldRecord: true } : {}),
                     fieldType: resolveFieldType({
                         type: prop.type,
                         collection: prop.collection,

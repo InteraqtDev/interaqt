@@ -52,8 +52,19 @@ export class UpdateExecutor {
         const recordInfo = this.map.getRecordInfo(this.map.getRecordInfo(entityName).resolvedBaseRecordName!)
         const involvedRecordAttributes = new Set(Object.keys(newEntityData.getData() || {}))
         recordInfo.managedRecordAttributes.forEach(info => involvedRecordAttributes.add(info.attributeName))
+        // Value attributes declared with Property.excludeFromOldRecord are not read: the snapshot
+        //  feeds the update event's oldRecord, and the declaration says no consumer needs the old
+        //  value (setup rejects the declarations that do; see oldRecordExclusion.ts). The filter
+        //  applies to this record's own value columns only. Nested same-row snapshots (combined and
+        //  reliance records) stay complete because row relocation copies them; their update events
+        //  drop the column instead (CreationExecutor.buildSameRowUpdateEvent).
+        const excludedValueAttributes = new Set(
+            recordInfo.valueAttributes.filter(info => info.isExcludedFromOldRecord).map(info => info.attributeName)
+        )
         const trimmedAttributeQuery = fullAttributeQuery.filter(item =>
-            typeof item === 'string' || involvedRecordAttributes.has(item[0])
+            typeof item === 'string'
+                ? !excludedValueAttributes.has(item)
+                : involvedRecordAttributes.has(item[0])
         )
 
         const updateRecordQuery = RecordQuery.create(entityName, this.map, {
