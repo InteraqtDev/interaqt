@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.14.0](https://github.com/InteraqtDev/interaqt/compare/v4.13.0...v4.14.0) (2026-11-19)
+
+### Features
+
+* **storage:** add Property.excludeFromOldRecord to skip a column in the pre-update read ([71104e5](https://github.com/InteraqtDev/interaqt/commit/71104e5de966ebca39175970dbb3653914878a07)), closes [one2x-ai/mesh#3283](https://github.com/one2x-ai/mesh/issues/3283)
+
+### Bug Fixes
+
+* preserve update semantics for excluded old record columns ([8975ffe](https://github.com/InteraqtDev/interaqt/commit/8975ffea5f037544bdc4e42faa3f10ae687de6d2))
+
+### Performance Improvements
+
+* **runtime:** read only consumed columns in StateMachine and Transform lock re-reads ([3f5e8bf](https://github.com/InteraqtDev/interaqt/commit/3f5e8bf8c2b6b66b953eb128b1f40abb86d7e925)), closes [one2x-ai/mesh#3283](https://github.com/one2x-ai/mesh/issues/3283)
+
 ## [Unreleased]
 
 Minor release: a new, opt-in property declaration. Properties without it behave exactly as in 4.13.0.
