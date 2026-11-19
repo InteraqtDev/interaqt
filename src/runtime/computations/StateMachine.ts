@@ -262,7 +262,16 @@ Or if you want to use state name as value, you should not set ${this.dataContext
     
     async incrementalCompute(lastValue: string, mutationEvent: RecordMutationEvent, dirtyRecord: any) {
         // Now we can handle any mutationEvent, not just interaction events
-        const lockedRecord = await this.state.currentState.lock(dirtyRecord, ['*'])
+        // The locked snapshot never leaves this method, so read only what it consumes: the bound
+        //  state column (decides the transition), the output property (previous value for
+        //  computeValue), and id (addresses the write). The row lock (SELECT id ... FOR UPDATE on the
+        //  host row) does not depend on the attribute query, and value attributes carry no related
+        //  rows for lockRecord to lock, so the lock set is the same as with '*'.
+        const lockedRecord = await this.state.currentState.lock(dirtyRecord, [
+            'id',
+            this.state.currentState.key,
+            this.dataContext.id.name,
+        ])
         if (!lockedRecord) return ComputationResult.skip()
         const currentStateName = (lockedRecord[this.state.currentState.key] ?? this.initialState.name) as string
         const nextState = this.transitionFinder?.findNextState(currentStateName, mutationEvent)

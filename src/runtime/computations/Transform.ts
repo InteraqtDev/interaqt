@@ -188,7 +188,14 @@ export class RecordsTransformHandle implements DataBasedComputation {
                 }
             }
             const match = MatchExp.atom({key: this.state.sourceRecordId.key, value: ['=', sourceRecordId]})
-            const mappedRecords = await this.controller.system.storage.atomic.lockRows(dataContext.id.name!, match, ['*'])
+            // Only id (patch target) and the transform index (slot matching) of the mapped rows are
+            //  consumed below; the patch data comes from the callback. Reading the other value columns
+            //  of every mapped row would not change the lock set or the patch.
+            const mappedRecords = await this.controller.system.storage.atomic.lockRows(
+                dataContext.id.name!,
+                match,
+                ['id', this.state.transformIndex.key]
+            )
             
 
             const mappedRecordsByIndex = mappedRecords.reduce((acc: Record<number, any>, record: any) => {
