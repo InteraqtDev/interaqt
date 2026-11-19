@@ -4,6 +4,7 @@ import { RecordBoundState } from "./computations/Computation.js";
 import { EntityInstance, RelationInstance } from "@core";
 import { DataContext } from "./computations/Computation.js";
 import type { AttributeQueryData, ConstraintSchemaItem, MatchExpressionData, SchemaDialect } from "@storage";
+import type { OldRecordExclusions } from "../storage/erstorage/oldRecordExclusion.js";
 import { TransactionCapability, TransactionIsolation, TransactionOptions } from "./transaction.js";
 import type { MigrationManifest, MigrationPhase, MigrationRunState, MigrationSchemaPlan } from "./migration.js";
 import type { SchemaSupersetViolation } from "./setupAcceptance.js";
@@ -192,6 +193,7 @@ export type StorageSchemaMetadata = {
 export type Storage = {
     map: unknown
     schema: StorageSchemaMetadata
+    getOldRecordExclusions?: () => OldRecordExclusions | undefined
     runInTransaction: <T>(options: TransactionOptions, fn: () => Promise<T>) => Promise<T>
     getTransactionIsolation: () => TransactionIsolation | undefined
     getTransactionCapability: () => TransactionCapability

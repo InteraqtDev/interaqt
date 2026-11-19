@@ -1,3 +1,4 @@
+import { StateMachine } from "@core";
 import { AttributeQueryData, RecordQueryData } from "../storage/index.js";
 import { DataDep, Computation, RecordsDataDep, EventBasedComputation, EventDep } from "./computations/Computation.js";
 import { PropertyDataContext } from "./computations/Computation.js";
@@ -215,6 +216,10 @@ export class ComputationSourceMapManager {
         }
     }
 
+    physicalRecordName(recordName: string): string {
+        return this.filteredToPhysicalName.get(recordName) ?? recordName
+    }
+
     getOldRecordExclusions(): OldRecordExclusions {
         return this.oldRecordExclusions
     }
@@ -274,7 +279,8 @@ export class ComputationSourceMapManager {
      */
     initialize(computations: Set<Computation>): void {
         this.buildEventNamespace()
-        this.oldRecordExclusions = resolveOldRecordExclusions(this.controller.entities, this.controller.relations)
+        this.oldRecordExclusions = this.controller.system.storage.getOldRecordExclusions?.()
+            ?? resolveOldRecordExclusions(this.controller.entities, this.controller.relations)
         const sortedERMutationEventSources: EntityEventSourceMap[][] = [[], [], []]
 
         
@@ -373,19 +379,12 @@ export class ComputationSourceMapManager {
         // StateMachine trigger patterns are matched by TransitionFinder, not by the listener: the
         //  handle registers {recordName, type} only, so check the transfer triggers themselves.
         for (const computation of computations) {
-            const transfers = (computation.args as { transfers?: Array<{ trigger?: { recordName?: string, type?: string, record?: unknown, oldRecord?: unknown } }> }).transfers
-            for (const transfer of transfers || []) {
-                const trigger = transfer.trigger
-                if (!trigger || trigger.type !== 'update' || !trigger.recordName) continue
-                const physicalName = this.filteredToPhysicalName.get(trigger.recordName)
-                this.assertOldRecordExclusionRespected({
-                    type: 'update',
-                    recordName: physicalName ?? trigger.recordName,
-                    ...(physicalName ? { filteredRecordName: trigger.recordName } : {}),
-                    record: trigger.record,
-                    oldRecord: trigger.oldRecord,
-                    computation,
-                } as EventBasedEntityEventsSourceMap)
+            const args = computation.args
+            if (!(args instanceof StateMachine)) continue
+            for (const { trigger } of args.transfers) {
+                if (trigger.type !== 'update') continue
+                const source = this.normalizeFilteredUpdateSourceMap({ ...trigger, computation })
+                this.assertOldRecordExclusionRespected(source)
             }
         }
         this.sourceMapTree = this.buildDataSourceMapTree(this.sourceMaps)
@@ -435,16 +434,24 @@ export class ComputationSourceMapManager {
         if (source.type !== 'update' || !('dataDep' in source)) {
             return true
         }
-        // 如果是更新，检查是否是依赖的属性有变化。
-        if (source.attributes!.includes('*')) {
-            return Object.keys(mutationEvent.record || {}).some(attr =>
-                attr !== 'id' && mutationEvent.record![attr] !== mutationEvent.oldRecord?.[attr]
-            )
+        const attributes = source.attributes
+        const wildcard = attributes.includes('*')
+        const excluded = this.oldRecordExclusions.get(source.recordName)
+        // Excluded values are absent from the snapshot. Use the actual write set even when
+        // an explicitly written value is undefined.
+        if (excluded && mutationEvent.keys?.some(attr =>
+            excluded.has(attr) && (wildcard || attributes.includes(attr))
+        )) {
+            return true
         }
-        const propAttrs = source.attributes!.filter(attr => attr !== 'id')
-        return !propAttrs.every(attr => 
-            !mutationEvent.record!.hasOwnProperty(attr) || 
-            (mutationEvent.record![attr] === mutationEvent.oldRecord![attr])
+        const record = mutationEvent.record
+        if (!record) return false
+        const candidates = wildcard ? Object.keys(record) : attributes
+        return candidates.some(attr =>
+            attr !== 'id' &&
+            !excluded?.has(attr) &&
+            Object.hasOwn(record, attr) &&
+            record[attr] !== mutationEvent.oldRecord?.[attr]
         )
     }
 

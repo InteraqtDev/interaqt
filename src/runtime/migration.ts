@@ -1,3 +1,4 @@
+import { projectOldRecord } from "../storage/erstorage/oldRecordExclusion.js";
 import type { Controller } from "./Controller.js";
 import type { Computation, ComputationResultPatch, DataBasedComputation, DataContext, EventBasedComputation, GlobalBoundState, RecordBoundState } from "./computations/Computation.js";
 import { ComputationResultAsync, ComputationResultFullRecompute, ComputationResultResolved, ComputationResultSkip } from "./computations/Computation.js";
@@ -3683,16 +3684,21 @@ async function resolveMigrationAsyncResult(controller: Controller, computation: 
     });
 }
 
+type ForcedPropertyUpdate = {
+    recordName: string;
+    excludedFields: ReadonlySet<string> | undefined;
+};
+
 async function writeComputationResult(
     controller: Controller,
     computation: Computation,
     result: unknown,
     record?: Record<string, unknown>,
     options: MigrationOptions = {},
-    writeOptions: { forceMutationEvent?: boolean; skipAsNull?: boolean } = {},
+    forcedPropertyUpdate?: ForcedPropertyUpdate,
 ): Promise<RecordMutationEvent[]> {
     if (result instanceof ComputationResultSkip) {
-        if (!writeOptions.skipAsNull || computation.dataContext.type !== "property") return [];
+        if (!forcedPropertyUpdate || computation.dataContext.type !== "property") return [];
         const propertyContext = computation.dataContext;
         const nonNull = controller.system.storage.schema.constraints.some(constraint =>
             constraint.kind === "non-null" &&
@@ -3711,12 +3717,22 @@ async function writeComputationResult(
         throw new AsyncMigrationComputationError(`Migration requires direct final output, not asyncReturn resolution, for ${dataContextPath(computation.dataContext)}`);
     }
     const previous = await controller.retrieveLastValue(computation.dataContext, record);
-    if (!writeOptions.forceMutationEvent && isEqualValue(previous, result)) return [];
     if (isEqualValue(previous, result)) {
-        // forceMutationEvent 且值未变（takeover 接管既有事实值）：没有 storage 写入可捕获，
-        //  合成事件让依赖计算仍然 rebuild。
-        const forced = createMutationEventForOutput(computation.dataContext, result, previous, record);
-        return forced ? [forced] : [];
+        const context = computation.dataContext;
+        if (!forcedPropertyUpdate || context.type !== "property" || !record) return [];
+        // A takeover can rederive the existing value. There is no write event, so
+        // synthesize one for the rebuild using the storage update event's namespace and projection.
+        const property = context.id.name;
+        if (property === HARD_DELETION_PROPERTY_NAME && result) {
+            return [{ recordName: context.host.name!, type: "delete", record: record as any }];
+        }
+        return [{
+            recordName: forcedPropertyUpdate.recordName,
+            type: "update",
+            record: { ...record, [property]: result } as any,
+            oldRecord: projectOldRecord({ ...record, [property]: previous }, forcedPropertyUpdate.excludedFields) as any,
+            keys: [property],
+        }];
     }
     // CAUTION property 写入以 storage 事件为真相源（r32，与 writeComputationPatch 同一契约）：
     //  applyResult 的宿主 update / 硬删除 delete 会连带派生事件（filtered entity 成员资格
@@ -3730,7 +3746,7 @@ async function writeComputationResult(
         return storageEvents;
     }
     await controller.applyResult(computation.dataContext, result, record);
-    const event = createMutationEventForOutput(computation.dataContext, result, previous, record);
+    const event = createDictionaryMutationEvent(computation.dataContext, result, previous);
     return event ? [event] : [];
 }
 
@@ -3773,42 +3789,22 @@ async function writeComputationPatch(controller: Controller, computation: Comput
             // global：dict 写路径无事件捕获面（也没有派生事件），保持合成。
             const previous = await controller.retrieveLastValue(computation.dataContext, record);
             await controller.applyResultPatch(computation.dataContext, typedPatch, record);
-            const event = createMutationEventForOutput(computation.dataContext, (typedPatch as any).data, previous, record);
+            const event = createDictionaryMutationEvent(computation.dataContext, (typedPatch as any).data, previous);
             if (event) events.push(event);
         }
     }
     return events;
 }
 
-function createMutationEventForOutput(dataContext: DataContext, result: unknown, previous: unknown, record?: Record<string, unknown>): RecordMutationEvent | undefined {
-    if (dataContext.type === "global") {
-        return {
-            recordName: DICTIONARY_RECORD,
-            type: previous === undefined ? "create" : "update",
-            record: { key: dataContext.id.name, value: result, id: dataContext.id.name } as any,
-            oldRecord: previous === undefined ? undefined : { key: dataContext.id.name, value: previous, id: dataContext.id.name } as any,
-            keys: ["value"],
-        };
-    }
-    if (dataContext.type === "property" && record) {
-        // A truthy hard-deletion output physically deletes the host record, so
-        // downstream computations must see a delete event, not a property update.
-        if (dataContext.id.name === HARD_DELETION_PROPERTY_NAME && result) {
-            return {
-                recordName: dataContext.host.name!,
-                type: "delete",
-                record: record as any,
-            };
-        }
-        return {
-            recordName: dataContext.host.name!,
-            type: "update",
-            record: { ...record, [dataContext.id.name]: result } as any,
-            oldRecord: { ...record, [dataContext.id.name]: previous } as any,
-            keys: [dataContext.id.name],
-        };
-    }
-    return undefined;
+function createDictionaryMutationEvent(dataContext: DataContext, result: unknown, previous: unknown): RecordMutationEvent | undefined {
+    if (dataContext.type !== "global") return undefined;
+    return {
+        recordName: DICTIONARY_RECORD,
+        type: previous === undefined ? "create" : "update",
+        record: { key: dataContext.id.name, value: result, id: dataContext.id.name } as any,
+        oldRecord: previous === undefined ? undefined : { key: dataContext.id.name, value: previous, id: dataContext.id.name } as any,
+        keys: ["value"],
+    };
 }
 
 function stripPropertyFromInput<T>(value: T, propertyName: string, seen = new WeakSet<object>()): T {
@@ -4189,9 +4185,14 @@ class MigrationScheduler {
 
     private async runFullRecompute(computation: Computation) {
         const takeover = takeoverDecision(this.options.approvedDiff, dataContextPath(computation.dataContext));
-        const takeoverWriteOptions = takeover?.targetType === "property"
-            ? { forceMutationEvent: true, skipAsNull: true }
-            : {};
+        let forcedPropertyUpdate: ForcedPropertyUpdate | undefined;
+        if (takeover?.targetType === "property" && computation.dataContext.type === "property") {
+            const recordName = this.sourceMapManager.physicalRecordName(computation.dataContext.host.name!);
+            forcedPropertyUpdate = {
+                recordName,
+                excludedFields: this.sourceMapManager.getOldRecordExclusions().get(recordName),
+            };
+        }
         const eventRebuildHandler = getEventRebuildHandler(this.options, dataContextPath(computation.dataContext));
         if (eventRebuildHandler && typeof (computation as DataBasedComputation).compute !== "function") {
             if (computation.dataContext.type === "property") {
@@ -4203,7 +4204,7 @@ class MigrationScheduler {
                         ? stripPropertyFromInput(record, computation.dataContext.id.name)
                         : record;
                     const result = await eventRebuildHandler({ controller: this.controller, dataContext: computation.dataContext, record: handlerRecord });
-                    events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions));
+                    events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, forcedPropertyUpdate));
                 }
                 return events;
             }
@@ -4233,7 +4234,7 @@ class MigrationScheduler {
                 computeDeps,
                 computeRecord,
             );
-            events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, takeoverWriteOptions));
+            events.push(...await writeComputationResult(this.controller, computation, result, record, this.options, forcedPropertyUpdate));
         }
         return events;
     }
@@ -4377,7 +4378,7 @@ class MigrationScheduler {
                 //  「成员资格事件 + 字段 update」双计，或把 stay-out 记录的更新错误路由进聚合。
                 const routedEvent = await this.controller.scheduler.resolveFilteredUpdateEvent(source, mutationEvent, mutationEvents);
                 if (!routedEvent) continue;
-                const dirtyRecordsAndEvents = await this.controller.scheduler.computeDataBasedDirtyRecordsAndEvents(source as DataBasedEntityEventsSourceMap, routedEvent);
+                const dirtyRecordsAndEvents = await this.controller.scheduler.computeDataBasedDirtyRecordsAndEvents(source as DataBasedEntityEventsSourceMap, routedEvent, this.sourceMapManager);
                 for (const [record, event] of dirtyRecordsAndEvents) {
                     events.push(...await this.runOneDirtyComputation(computation as DataBasedComputation, event, record));
                 }

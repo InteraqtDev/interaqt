@@ -10,6 +10,7 @@ import { processMergedItems } from "./MergedItemProcessor.js";
 import { AliasManager } from "./util/AliasManager.js";
 import { ConstraintSchemaStatement, createNonNullConstraintStatement, createUniqueConstraintStatement, frameworkApplicationIdentityIndexName, getSchemaDialect, shouldSkipConstraintForDialect } from "./SchemaDialect.js";
 import { resolveFieldType } from "../propertyTypeStorage.js";
+import { validateOldRecordExclusions } from "./oldRecordExclusion.js";
 
 // Define the types we need
 
@@ -361,7 +362,6 @@ export class DBSetup {
                     collection: prop.collection,
                     args: prop.args,
                     defaultValue: prop.defaultValue as (() => any) | undefined,
-                    ...(prop.excludeFromOldRecord === true ? { excludeFromOldRecord: true } : {}),
                     fieldType: resolveFieldType({
                         type: prop.type,
                         collection: prop.collection,
@@ -1013,6 +1013,8 @@ export class DBSetup {
 
         // -0.5. 校验保留属性名（id/_rowId/source/target）与重复属性名
         this.validatePropertyNames();
+
+        validateOldRecordExclusions(this.entities, this.relations);
 
         // 0. 预处理：将 merged entity 和 merged relation 转化为 filtered entity/relation
         this.processMergedItems();

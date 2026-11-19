@@ -8,6 +8,7 @@ import { SQLBuilder } from "./SQLBuilder.js";
 import { sameRecordId } from "../utils.js";
 import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
+import { getExcludedValueAttributes } from "./oldRecordExclusion.js";
 
 /**
  * UpdateExecutor - 更新操作执行器
@@ -40,7 +41,7 @@ export class UpdateExecutor {
     async updateRecord(entityName: string, matchExpressionData: MatchExpressionData, newEntityData: NewRecordData, events?: RecordMutationEvent[]): Promise<Record[]> {
         // 现在支持在 update 字段的同时，使用 null 来删除关系
         // CAUTION 前置查询按需裁剪：
-        //  - 值属性全部保留：update 事件的 oldRecord、computed 属性重算、增量计算都依赖旧值。
+        //  - 保留未声明 excludeFromOldRecord 的值属性，供 update 事件及计算使用。
         //  - 关系记录（reliance/合表/合并 link）只保留本次 update 实际涉及的 attribute：
         //    unlink 判断和 flash-out 只会用到 newEntityData 里出现的关系，其余的递归 JOIN 纯属浪费。
         //  - link record 自身的 source/target（managedRecordAttributes）始终保留，它们是同行字段，代价极小。
@@ -58,9 +59,7 @@ export class UpdateExecutor {
         //  applies to this record's own value columns only. Nested same-row snapshots (combined and
         //  reliance records) stay complete because row relocation copies them; their update events
         //  drop the column instead (CreationExecutor.buildSameRowUpdateEvent).
-        const excludedValueAttributes = new Set(
-            recordInfo.valueAttributes.filter(info => info.isExcludedFromOldRecord).map(info => info.attributeName)
-        )
+        const excludedValueAttributes = getExcludedValueAttributes(recordInfo.data)
         const trimmedAttributeQuery = fullAttributeQuery.filter(item =>
             typeof item === 'string'
                 ? !excludedValueAttributes.has(item)

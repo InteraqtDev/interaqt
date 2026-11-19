@@ -9,6 +9,7 @@ import { SQLBuilder } from "./SQLBuilder.js";
 import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 import type { QueryExecutor } from "./QueryExecutor.js";
+import { getExcludedValueAttributes, projectOldRecord } from "./oldRecordExclusion.js";
 
 /**
  * CreationExecutor - 创建操作执行器
@@ -334,13 +335,8 @@ export class CreationExecutor {
         //  same-row snapshots (combined / link data) still carry it, so drop it here to give every
         //  update event the same oldRecord surface. Records without the declaration keep the
         //  snapshot object unchanged.
-        const excludedAttributes = this.map.getRecordInfo(recordInfo.resolvedBaseRecordName ?? recordName).valueAttributes
-            .filter(attr => attr.isExcludedFromOldRecord)
-        let eventOldRecord = oldRecord
-        if (excludedAttributes.length) {
-            eventOldRecord = { ...oldRecord }
-            excludedAttributes.forEach(attr => { delete eventOldRecord[attr.attributeName] })
-        }
+        const excludedAttributes = getExcludedValueAttributes(recordInfo.data)
+        const hasExcludedValues = [...excludedAttributes].some(key => Object.hasOwn(oldRecord, key))
         return {
             type: 'update',
             recordName,
@@ -348,7 +344,7 @@ export class CreationExecutor {
             //  StateTransfer.trigger.keys 等字段级匹配依赖它。
             keys: updatedKeys,
             record: { ...updateRecord, id: oldRecord.id },
-            oldRecord: eventOldRecord
+            oldRecord: hasExcludedValues ? projectOldRecord(oldRecord, excludedAttributes) : oldRecord
         }
     }
 

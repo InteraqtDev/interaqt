@@ -20,7 +20,10 @@ Minor release: a new, opt-in property declaration. Properties without it behave 
   record is a filtered view or an input of a merged record; a records dataDep on the record filters on
   it in its `match`; a StateMachine trigger or eventDep names it in a `record` or `oldRecord` pattern
   of an update; a `ScopedSequence` uses it as a scope value field. Reading the column through a dataDep
-  `attributeQuery` and filtering a filtered entity on it stay allowed. Usage:
+  `attributeQuery` and filtering a filtered entity on it stay allowed. A write to an excluded
+  column invalidates its dependencies even when the new value is `undefined`. Standalone
+  `DBSetup` validates the storage rules as well. Global dependency updates and migration rebuilds
+  apply the same exclusions to synthetic update snapshots. See
   `agent/agentspace/knowledge/usage/02-define-entities-properties.md` § Excluding a column from oldRecord.
 
 ## [4.13.0](https://github.com/InteraqtDev/interaqt/compare/v4.12.0...v4.13.0) (2026-10-30)

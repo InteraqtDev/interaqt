@@ -426,7 +426,8 @@ const Document = Entity.create({
 What changes for an excluded column:
 
 - The pre-update read does not select it, and the `oldRecord` of the record's update events does not contain it. This includes update events of the record produced inside another record's update (in-place `&` link data, combined records): their snapshot is still read completely, because row relocation copies it, and the column is removed from the event.
-- When an update writes the column, the event `record` carries the new value and `keys` lists it, as for any column. The merged event view that computations receive (`{...oldRecord, ...record}`) therefore contains the column only when the update wrote it.
+- When an update writes the column, the event `record` carries the new value and `keys` lists it, as for any column. For a storage update, the merged event view that computations receive (`{...oldRecord, ...record}`) contains the excluded column only when the update wrote it.
+- A change to a global dictionary can trigger a property computation without changing its host row. In this case the scheduler supplies the full current host as `record` and applies the same exclusions to its synthetic `oldRecord`. Migration uses this projection when it emits a property update during a rebuild.
 - Writes, `find` / `findOne`, delete events (their `record` is the full deleted row), and create events are unchanged. The declaration does not enter `modelHash`, so adding or removing it needs no migration.
 
 Setup rejects the declaration, naming the record and property, when a framework consumer needs the old value:
@@ -439,12 +440,14 @@ Setup rejects the declaration, naming the record and property, when a framework 
 | The record is a filtered view (re-declaring a base property) or an input of a merged entity/relation | The flag would not reach the physical column |
 | A records dataDep whose source is the record filters on the column in its `match` | The scheduler classifies membership (entered / left / stayed) by evaluating `match` on `oldRecord`, where an absent column reads as NULL; an incremental computation would skip updates of its members |
 | A StateMachine trigger or eventDep on an update of the record names the column in its `record` or `oldRecord` pattern | Patterns are matched against `oldRecord` and `{...oldRecord, ...record}` |
-| A `ScopedSequence` uses the column as a scope value field | The scope immutability guard compares it with the old record |
+| A `ScopedSequence` uses the column as a scope value field | The scope immutability guard compares it with the old record, including when the sequence is declared on a filtered view of that record |
 
 Allowed, because they do not need the old value:
 
-- computations that read the column through a dataDep `attributeQuery` (including `'*'` and relation paths): dataDep values are re-queried from storage. An update that writes the column counts as a change of it even when the value is equal;
+- computations that read the column through a dataDep `attributeQuery` (including `'*'` and relation paths): dataDep values are re-queried from storage. The written keys trigger these dependencies even on a same-value write or a write of `undefined`;
 - filtered entities whose `matchExpression` references the column: membership is decided by queries before and after the write.
+
+The standalone storage API validates the storage rules when `DBSetup` compiles the schema. Controller setup also checks computation dependencies and sequence scopes.
 
 Code that the framework cannot inspect sees `oldRecord` without the column: side-effect content, `storage.listen`, `computeTarget`, `computeValue`, Transform and Custom callbacks, and the `record` argument of a property computation on the same record when an update of that record triggered it (that argument is the pre-update snapshot). Declaring the flag is the statement that such code does not need the old value.
 

@@ -43,6 +43,8 @@ import {
 } from '@storage';
 // SQLiteDB is now imported from @drivers when needed
 import { RecordBoundState } from "./computations/Computation.js";
+import { ComputationProtocolError } from "./errors/ComputationErrors.js";
+import { getOldRecordExclusions, OldRecordExclusionError } from "../storage/erstorage/oldRecordExclusion.js";
 import { ConstraintSetupError, ConstraintViolationError, findConstraintViolationError } from "./errors/ConstraintErrors.js";
 import { normalizeDatabaseError } from "./errors/DatabaseErrors.js";
 import { buildDesiredManagedConstraints, canonicalJSONStringify, createDesiredTransformUniqueIndex, describeManagedConstraintEntry, frameworkApplicationIdentityIndexes, frameworkLogicalIdUniqueIndexes, getSchemaDialect, isStartupBlockingConstraintMismatch, managedConstraintDropSQL, managedConstraintFingerprintSQL, normalizeTimestampInputToMs, normalizeTimestampReadValue, quoteIdentifier, readInstalledManagedConstraints, reconcileManagedConstraints, requiresConstraintRemovalApproval, shouldSkipConstraintForDialect, timestampParamForDialect, type DesiredManagedConstraint, type ManagedConstraintReconciliationEntry } from "@storage";
@@ -518,7 +520,32 @@ RETURNING "lastValue" AS value`,
     private needsDispatchIdempotencyTable() {
         return typeof this.db.setupDispatchIdempotencyState === 'function'
     }
+    getOldRecordExclusions() {
+        return this.map && getOldRecordExclusions(this.map)
+    }
+
+    private compileSchema(entities: EntityInstance[], relations: RelationInstance[]): DBSetup {
+        try {
+            return new DBSetup(entities, relations, this.db)
+        } catch (error) {
+            if (error instanceof OldRecordExclusionError) {
+                throw new ComputationProtocolError(error.message, {
+                    computationPhase: 'old-record-exclusion-validation',
+                    causedBy: error,
+                })
+            }
+            throw new ConstraintSetupError(
+                error instanceof Error ? error.message : String(error),
+                {
+                    driver: this.db.constructor?.name,
+                    causedBy: error instanceof Error ? error : undefined,
+                }
+            )
+        }
+    }
+
     async setup(entities: EntityInstance[], relations: RelationInstance[], createTables = false, options?: SystemSchemaOptions, extraManagedConstraints?: ExtraManagedConstraints) {
+        const dbSetup = this.compileSchema(entities, relations)
         await this.db.open(createTables)
         if (createTables && this.db.setupInternalComputationState) {
             await this.db.setupInternalComputationState()
@@ -529,22 +556,6 @@ RETURNING "lastValue" AS value`,
         // I1: always ensure the dispatch idempotency ledger when the driver can create it.
         if (createTables && this.needsDispatchIdempotencyTable()) {
             await this.db.setupDispatchIdempotencyState!()
-        }
-        let dbSetup: DBSetup
-        try {
-            dbSetup = new DBSetup(
-                entities, 
-                relations, 
-                this.db
-            )
-        } catch (error) {
-            throw new ConstraintSetupError(
-                error instanceof Error ? error.message : String(error),
-                {
-                    driver: this.db.constructor?.name,
-                    causedBy: error instanceof Error ? error : undefined,
-                }
-            )
         }
         if (createTables) await dbSetup.createTables()
         const desiredConstraints = this.buildDesiredManagedConstraints(dbSetup, extraManagedConstraints)
@@ -588,28 +599,12 @@ RETURNING "lastValue" AS value`,
     }
 
     async prepareMigrationAdditive(entities: EntityInstance[], relations: RelationInstance[], options?: SystemSchemaOptions, extraManagedConstraints?: ExtraManagedConstraints): Promise<MigrationSchemaPlan> {
+        const dbSetup = this.compileSchema(entities, relations)
         await this.ensureDbOpenForSchemaRead()
         if (this.db.setupInternalComputationState) {
             // The table creation itself is idempotent, but planning must stay
             // read-only. The actual setup runs in applyMigrationAdditivePlan.
         }
-        let dbSetup: DBSetup
-        try {
-            dbSetup = new DBSetup(
-                entities,
-                relations,
-                this.db
-            )
-        } catch (error) {
-            throw new ConstraintSetupError(
-                error instanceof Error ? error.message : String(error),
-                {
-                    driver: this.db.constructor?.name,
-                    causedBy: error instanceof Error ? error : undefined,
-                }
-            )
-        }
-
         const preRecomputeDDL = await this.createAdditiveSchemaPlan(dbSetup)
         const existingTables = await this.getExistingTables()
         // S2: capability-driven table DDL when missing — independent of Property declarations.

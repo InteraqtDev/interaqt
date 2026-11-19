@@ -141,6 +141,40 @@ describe('excludeFromOldRecord: pre-update read and update event oldRecord', () 
         }
     })
 
+    test('an existing database attaches with the exclusion enabled or removed', async () => {
+        const db = new PGLiteDB()
+        const name = 'ExOrAttach'
+        const attach = async (exclude: boolean, install: boolean) => {
+            const system = new MonoSystem(db)
+            system.conceptClass = KlassByName
+            const controller = new Controller({ system, entities: [documentEntity(name, exclude)], relations: [] })
+            await controller.setup(install)
+            return controller
+        }
+        try {
+            const initial = await attach(false, true)
+            const doc = await initial.system.storage.create(name, { title: 'initial', body: LARGE })
+            initial.teardown()
+            const match = MatchExp.atom({ key: 'id', value: ['=', doc.id] })
+            for (const exclude of [true, false]) {
+                const controller = await attach(exclude, false)
+                const snapshots: unknown[] = []
+                const storage = controller.system.storage
+                storage.listen(async events => {
+                    for (const event of events) if (event.recordName === name && event.type === 'update') snapshots.push(event.oldRecord)
+                })
+                await storage.update(name, match, { title: exclude ? 'short snapshot' : 'full snapshot' })
+                expect(snapshots).toHaveLength(1)
+                if (exclude) expect(snapshots[0]).not.toHaveProperty('body')
+                else expect(snapshots[0]).toHaveProperty('body', LARGE)
+                expect(await storage.findOne(name, match, undefined, ['body'])).toHaveProperty('body', LARGE)
+                controller.teardown()
+            }
+        } finally {
+            await db.close()
+        }
+    })
+
     test('dispatch: a StateMachine write does not read the declared column, and side effects see oldRecord without it', async () => {
         const draft = StateNode.create({ name: 'draft' })
         const published = StateNode.create({ name: 'published' })
