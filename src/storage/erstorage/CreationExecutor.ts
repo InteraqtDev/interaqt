@@ -9,6 +9,7 @@ import { SQLBuilder } from "./SQLBuilder.js";
 import { FilteredEntityManager, MembershipCheck } from "./FilteredEntityManager.js";
 import type { Record, RecordOperationAgent } from "./RecordQueryAgent.js";
 import type { QueryExecutor } from "./QueryExecutor.js";
+import { getExcludedValueAttributes, projectOldRecord } from "./oldRecordExclusion.js";
 
 /**
  * CreationExecutor - 创建操作执行器
@@ -330,6 +331,12 @@ export class CreationExecutor {
             delete updateRecord.source
             delete updateRecord.target
         }
+        // Property.excludeFromOldRecord: the host's pre-update read already skips the column; nested
+        //  same-row snapshots (combined / link data) still carry it, so drop it here to give every
+        //  update event the same oldRecord surface. Records without the declaration keep the
+        //  snapshot object unchanged.
+        const excludedAttributes = getExcludedValueAttributes(recordInfo.data)
+        const hasExcludedValues = [...excludedAttributes].some(key => Object.hasOwn(oldRecord, key))
         return {
             type: 'update',
             recordName,
@@ -337,7 +344,7 @@ export class CreationExecutor {
             //  StateTransfer.trigger.keys 等字段级匹配依赖它。
             keys: updatedKeys,
             record: { ...updateRecord, id: oldRecord.id },
-            oldRecord
+            oldRecord: hasExcludedValues ? projectOldRecord(oldRecord, excludedAttributes) : oldRecord
         }
     }
 

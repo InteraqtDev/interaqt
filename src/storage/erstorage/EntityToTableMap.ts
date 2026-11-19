@@ -21,7 +21,9 @@ export type ValueAttribute = {
     // 数据库字段类型
     fieldType?: string,
     computed?: (record: any) => any,
-    defaultValue?: (record: any, recordName: string) => any
+    defaultValue?: (record: any, recordName: string) => any,
+    /** Copied from Property.excludeFromOldRecord at Setup: the pre-update read of storage.update skips this column. */
+    excludeFromOldRecord?: boolean
 }
 
 

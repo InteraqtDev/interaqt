@@ -19,7 +19,7 @@
  */
 import { describe, expect, test } from "vitest";
 import {
-    Action, Activity, ActivityGroup, ActivityManager, Controller, Count, Dictionary, Entity,
+    Action, Activity, ActivityGroup, ActivityManager, Controller, Count, Custom, Dictionary, Entity,
     Interaction, KlassByName, MonoSystem, Property, StateMachine,
     StateNode, StateTransfer, Transfer, Transform, UniqueConstraint, Relation,
 } from 'interaqt';
@@ -488,6 +488,50 @@ const TABOO_CELLS: TabooCell[] = [
             }
         },
     },
+    {
+        // Property.excludeFromOldRecord: the Scheduler evaluates a records dataDep match on oldRecord
+        //  (absent column = NULL), so membership classification would misread the excluded column.
+        name: 'excludeFromOldRecord on a column a records dataDep matches on',
+        expectedError: /declares excludeFromOldRecord, but Custom computation of global "tb\w+exCount" filters on it in the match of a records dataDep/,
+        run: async (surrounding, rng, tag) => {
+            const host = mkEntity(`Tb${tag}ExH`, [Property.create({ name: 'wide', type: 'string', excludeFromOldRecord: true })])
+            const count = Dictionary.create({
+                name: `tb${tag}exCount`,
+                type: 'number',
+                computation: Custom.create({
+                    name: `Tb${tag}ExCustom`,
+                    dataDeps: { hosts: { type: 'records', source: host, match: MatchExp.atom({ key: 'wide', value: ['=', 'on'] }), attributeQuery: ['id'] } },
+                    compute: async (deps: any) => deps.hosts.length,
+                    getInitialValue: () => 0,
+                }),
+            })
+            return {
+                phase: 'setup',
+                action: async () => {
+                    const { system, controller } = await constructController(surrounding, { entities: [host], dict: [count] })
+                    try { await controller.setup(true) } finally { await system.destroy().catch(() => {}) }
+                },
+            }
+        },
+    },
+    {
+        // Property.excludeFromOldRecord: computed siblings are evaluated against the merged old row.
+        name: 'excludeFromOldRecord on a record with a computed property',
+        expectedError: /declares excludeFromOldRecord, but "Tb\w+ExC" also declares the computed property "shout"/,
+        run: async (surrounding, rng, tag) => {
+            const host = mkEntity(`Tb${tag}ExC`, [
+                Property.create({ name: 'wide', type: 'string', excludeFromOldRecord: true }),
+                Property.create({ name: 'shout', type: 'string', computed: (record: any) => `${record.label}!` }),
+            ])
+            return {
+                phase: 'setup',
+                action: async () => {
+                    const { system, controller } = await constructController(surrounding, { entities: [host] })
+                    try { await controller.setup(true) } finally { await system.destroy().catch(() => {}) }
+                },
+            }
+        },
+    },
 ]
 
 // ---------- 合法双胞胎（守卫不得过度收紧） ----------
@@ -595,6 +639,30 @@ const LEGAL_TWIN_CELLS: LegalTwinCell[] = [
             const second = await system.storage.create(`Lg${tag}IdTok`, { k: 'one', payload: 'discarded' })
             expect(second.id).toBe(first.id)
             expect(second.payload).toBe('kept')
+            await system.destroy()
+        },
+    },
+    {
+        name: 'excludeFromOldRecord on a plain column: setup, update, and the column is kept out of oldRecord',
+        run: async (surrounding, rng, tag) => {
+            const host = mkEntity(`Lg${tag}ExH`, [Property.create({ name: 'wide', type: 'string', excludeFromOldRecord: true })])
+            const derived = Entity.create({
+                name: `Lg${tag}ExD`,
+                properties: [Property.create({ name: 'copy', type: 'string' })],
+                computation: Transform.create({ record: host, attributeQuery: ['*'], callback: (record: any) => ({ copy: record.label }) }),
+            })
+            const { system, controller } = await constructController(surrounding, { entities: [host, derived] })
+            await controller.setup(true)
+            const created = await system.storage.create(`Lg${tag}ExH`, { label: 'a', score: 1, wide: 'w' })
+            const updates: any[] = []
+            system.storage.listen(async events => { updates.push(...events.filter(e => e.type === 'update' && e.recordName === `Lg${tag}ExH`)) })
+            await system.storage.update(`Lg${tag}ExH`, MatchExp.atom({ key: 'id', value: ['=', created.id] }), { label: 'b' })
+            expect(updates).toHaveLength(1)
+            expect(updates[0].oldRecord).not.toHaveProperty('wide')
+            const stored = await system.storage.findOne(`Lg${tag}ExH`, MatchExp.atom({ key: 'id', value: ['=', created.id] }), undefined, ['label', 'wide'])
+            expect(stored).toMatchObject({ label: 'b', wide: 'w' })
+            const copies = await system.storage.find(`Lg${tag}ExD`, undefined, undefined, ['copy'])
+            expect(copies.map((row: any) => row.copy)).toEqual(['b'])
             await system.destroy()
         },
     },

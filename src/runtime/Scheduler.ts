@@ -1,3 +1,4 @@
+import { projectOldRecord } from "../storage/erstorage/oldRecordExclusion.js";
 import { AttributeQueryData, MatchExp, type MatchExpressionData } from "@storage";
 import { Entity, Property, Relation, EntityInstance, RelationInstance, PropertyInstance, IInstance, DictionaryInstance } from "@core";
 import { DataBasedEntityEventsSourceMap, EventBasedEntityEventsSourceMap, type EtityMutationEvent } from "./ComputationSourceMap.js";
@@ -417,6 +418,7 @@ export class Scheduler {
     // ScopedSequence 的 scope 输入不可变守卫（见 buildScopedSequenceScopeGuards）。
     private scopedSequenceScopeGuards: Array<{
         hostName: string,
+        physicalHostName: string,
         propertyName: string,
         sequenceName: string,
         valueFields: string[],
@@ -439,19 +441,24 @@ export class Scheduler {
             if (computation.dataContext.type !== 'property') continue
             const dataContext = computation.dataContext as PropertyDataContext
             const hostName = dataContext.host.name!
+            const physicalHostName = this.sourceMapManager.physicalRecordName(hostName)
+            const hostSchema = this.controller.system.storage.schema.records.find(record => record.recordName === physicalHostName)
             const valueFields: string[] = []
             const refRelations = new Map<string, { relationName: string, hostIsSource: boolean }>()
             for (const item of (args.scope || [])) {
                 const topField = item.path.split('.')[0]
                 if (item.type === 'ref') {
-                    const relation = this.controller.relations.find(r =>
-                        (r.source?.name === hostName && r.sourceProperty === topField) ||
-                        (r.target?.name === hostName && r.targetProperty === topField)
-                    )
+                    const linkName = hostSchema?.attributeDetails?.find(attribute => attribute.name === topField)?.linkName
+                    const relation = linkName
+                        ? this.controller.relations.find(relation => relation.name === linkName)
+                        : this.controller.relations.find(relation =>
+                            (relation.source.name === physicalHostName && relation.sourceProperty === topField) ||
+                            (relation.target.name === physicalHostName && relation.targetProperty === topField)
+                        )
                     if (relation) {
                         refRelations.set(topField, {
-                            relationName: relation.name!,
-                            hostIsSource: relation.source?.name === hostName && relation.sourceProperty === topField
+                            relationName: this.sourceMapManager.physicalRecordName(relation.name!),
+                            hostIsSource: this.sourceMapManager.physicalRecordName(relation.source.name!) === physicalHostName && relation.sourceProperty === topField
                         })
                     } else {
                         // ref scope 也可能以行内 id 值字段实现（如 type:'id' 的普通属性），按值字段守卫。
@@ -461,8 +468,20 @@ export class Scheduler {
                     valueFields.push(topField)
                 }
             }
+            // The guard compares each scope value field against oldRecord; an excluded column
+            //  would always look changed (or never, for the numbered check), so reject it at setup.
+            const excluded = this.sourceMapManager.getOldRecordExclusions().get(physicalHostName)
+            const excludedScopeField = valueFields.find(field => excluded?.has(field))
+            if (excludedScopeField) {
+                throw new ComputationProtocolError(
+                    `Property "${physicalHostName}.${excludedScopeField}" declares excludeFromOldRecord, but it is a scope field of the ScopedSequence "${args.name}" on "${hostName}.${dataContext.id.name}". ` +
+                    `The scope immutability guard compares scope fields with the old record on every update; remove excludeFromOldRecord.`,
+                    { handleName: 'ScopedSequence', dataContext, computationPhase: 'old-record-exclusion-validation' }
+                )
+            }
             this.scopedSequenceScopeGuards.push({
                 hostName,
+                physicalHostName,
                 propertyName: dataContext.id.name,
                 sequenceName: args.name!,
                 valueFields,
@@ -470,15 +489,30 @@ export class Scheduler {
             })
         }
     }
-    private async assertScopedSequenceScopeUnchanged(mutationEvent: RecordMutationEvent) {
+    private async matchesScopedSequenceHost(
+        hostName: string,
+        physicalHostName: string,
+        hostId: unknown,
+        events: readonly RecordMutationEvent[],
+    ): Promise<boolean> {
+        if (hostName === physicalHostName) return true
+        // The same write can change the scope and remove the row from its view.
+        if (events.some(event => event.type === 'delete' && event.recordName === hostName && event.record?.id === hostId)) return true
+        return Boolean(await this.controller.system.storage.findOne(
+            hostName, MatchExp.atom({ key: 'id', value: ['=', hostId] }), undefined, ['id']
+        ))
+    }
+
+    private async assertScopedSequenceScopeUnchanged(mutationEvent: RecordMutationEvent, events: readonly RecordMutationEvent[]) {
         for (const guard of this.scopedSequenceScopeGuards) {
             // 1. 值字段：宿主 update 事件中 scope 字段实际变化，且记录已编号 → 拒绝。
-            if (mutationEvent.type === 'update' && mutationEvent.recordName === guard.hostName) {
+            if (mutationEvent.type === 'update' && mutationEvent.recordName === guard.physicalHostName) {
                 const changed = guard.valueFields.filter(field =>
                     mutationEvent.record?.hasOwnProperty(field) &&
                     mutationEvent.record[field] !== mutationEvent.oldRecord?.[field]
                 )
-                if (changed.length && mutationEvent.oldRecord?.[guard.propertyName] != null) {
+                if (changed.length && mutationEvent.oldRecord?.[guard.propertyName] != null &&
+                    await this.matchesScopedSequenceHost(guard.hostName, guard.physicalHostName, mutationEvent.record?.id, events)) {
                     throw new ComputationProtocolError(
                         `ScopedSequence "${guard.sequenceName}": scope field${changed.length > 1 ? 's' : ''} ${changed.map(f => `"${f}"`).join(', ')} of ${guard.hostName}.${guard.propertyName} cannot change after a sequence number is assigned. ` +
                         `Sequence numbers are allocated once at creation per scope; moving a numbered record to another scope silently duplicates numbers there (and permanently violates a unique constraint over scope+number, if declared). ` +
@@ -495,12 +529,13 @@ export class Scheduler {
                     const hostId = (mutationEvent.record as { source?: { id?: unknown }, target?: { id?: unknown } } | undefined)?.[refInfo.hostIsSource ? 'source' : 'target']?.id
                     if (hostId === undefined) continue
                     const host = await this.controller.system.storage.findOne(
-                        guard.hostName,
+                        guard.physicalHostName,
                         MatchExp.atom({ key: 'id', value: ['=', hostId] }),
                         undefined,
                         ['id', guard.propertyName]
                     )
-                    if (host && host[guard.propertyName] != null) {
+                    if (host && host[guard.propertyName] != null &&
+                        await this.matchesScopedSequenceHost(guard.hostName, guard.physicalHostName, hostId, events)) {
                         throw new ComputationProtocolError(
                             `ScopedSequence "${guard.sequenceName}": scope relation "${field}" of ${guard.hostName}.${guard.propertyName} cannot be removed or replaced after a sequence number is assigned. ` +
                             `Sequence numbers are allocated once at creation per scope; re-scoping a numbered record silently duplicates numbers in the target scope (and permanently violates a unique constraint over scope+number, if declared). ` +
@@ -541,7 +576,7 @@ export class Scheduler {
             const trail = parent?.trail ?? []
             await this.propagationContext.run({ depth, trail }, async () => {
                 for(let mutationEvent of mutationEvents){
-                    await this.assertScopedSequenceScopeUnchanged(mutationEvent)
+                    await this.assertScopedSequenceScopeUnchanged(mutationEvent, mutationEvents)
                     const sources = this.sourceMapManager.findSourceMapsForMutation(mutationEvent)
                     if (sources.length > 0) {
                         // CAUTION 同一计算声明多个 property dataDeps 时，每个 dep 都注册了自己的监听——
@@ -709,7 +744,11 @@ export class Scheduler {
     }
     /** global dep 扇出的宿主分批拉取大小（keyset 分页，防止单条无界查询物化整表）。 */
     static GLOBAL_DEP_FANOUT_BATCH_SIZE = 1000
-    async computeDataBasedDirtyRecordsAndEvents(source: DataBasedEntityEventsSourceMap, mutationEvent: RecordMutationEvent) {
+    async computeDataBasedDirtyRecordsAndEvents(
+        source: DataBasedEntityEventsSourceMap,
+        mutationEvent: RecordMutationEvent,
+        sourceMapManager = this.sourceMapManager
+    ) {
         let dirtyRecordsAndEvents: [any, EtityMutationEvent][] = []
 
         // 特殊处理 Global 类型的数据依赖
@@ -725,6 +764,7 @@ export class Scheduler {
                 //  可读宿主任意字段（globalDataDependency.spec 固化 `context.price` 用法），
                 //  retrieveLastValue 快路径也读 record[输出属性]。列裁剪是违约，不做。
                 const hostName = propertyContext.host.name!
+                const excluded = sourceMapManager.getOldRecordExclusions().get(sourceMapManager.physicalRecordName(hostName))
                 const fanoutAttributeQuery = ['*']
                 const batchSize = Scheduler.GLOBAL_DEP_FANOUT_BATCH_SIZE
                 let cursor: unknown = undefined
@@ -741,9 +781,9 @@ export class Scheduler {
                             type: 'update',
                             recordName: hostName,
                             record: record,
-                            // 变化发生在 global dict 上，宿主记录自身没有变：old/new 快照内容相同是语义事实，
-                            // 但必须是独立副本，避免消费方原地修改 record 时污染 oldRecord。
-                            oldRecord: {...record},
+                            // The host row did not change. Keep its full current value while applying
+                            // the update-event projection to the independent old snapshot.
+                            oldRecord: projectOldRecord(record, excluded),
                             relatedMutationEvent: mutationEvent
                         }])
                     }

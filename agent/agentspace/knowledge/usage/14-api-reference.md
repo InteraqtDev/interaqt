@@ -71,6 +71,7 @@ Property.create(config: PropertyConfig): KlassInstance<typeof Property>
 - `config.defaultValue` (function, optional): Default value function
 - `config.computed` (function, optional): Computed property function
 - `config.computation` (Computation, optional): Property computed data
+- `config.excludeFromOldRecord` (boolean, optional): Leave this column out of the pre-update read of `storage.update`, so the `oldRecord` of the record's update events (`storage.listen`, `RecordMutationSideEffect`, computation event views) does not contain it. Writes and reads through `find` are unchanged. For wide fact columns (long text, JSON, embedding vectors) whose old value no consumer needs. Setup rejects it when a framework consumer needs the old value: see usage `02-define-entities-properties.md` § Excluding a column from oldRecord.
 
 **Extended types:** call `definePropertyType` before create. Physical DDL/codec/Match apply only to Entity/Relation property columns. See usage `02-define-entities-properties.md`.
 
