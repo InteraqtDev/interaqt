@@ -12,9 +12,9 @@
  * mapped rows. The row lock is `SELECT id ... FOR UPDATE` and does not depend on the attribute query;
  * `'*'` expands to value attributes only, so the related-row pass of `lockRecord` had nothing to lock.
  *
- * These cells pin (a) the re-read column set and (b) unchanged transition / patch results, including
- * the previous value seen by `computeValue` and relation hosts in their own table and merged into an
- * entity table. Concurrency of the row lock is covered on real PostgreSQL by
+ * These tests verify the complete re-read projection, the absence of related-row locks for relation
+ * hosts, and the transition and patch results. Relation hosts cover both dedicated tables and rows
+ * stored in an entity table. Concurrency of the row lock is covered on real PostgreSQL by
  * `postgresqlConcurrency.spec.ts` ("serializes concurrent state machine transitions across worker
  * processes", "keeps transform mapped records aligned ...").
  *
@@ -40,18 +40,19 @@ function recordQueries(db: PGLiteDB): { recorded: RecordedQuery[], restore: () =
     return { recorded, restore: () => { (db as any).query = original } }
 }
 
-function fieldOf(system: MonoSystem, recordName: string, attributeName: string): string {
+function mappedColumns(system: MonoSystem, recordName: string, attributes: string[]): string[] {
     const map = (system.storage as any).queryHandle.map
-    return map.getInfo(recordName, attributeName).field as string
+    return attributes.map(attribute => map.getInfo(recordName, attribute).field as string).sort()
 }
 
-/** Physical columns (among `candidates`) that appear in the SELECT list of `sql`. */
-function selectedColumns(sql: string, candidates: Record<string, string>): string[] {
-    const selectList = sql.slice(0, sql.search(/\bFROM\b/))
-    return Object.entries(candidates)
-        .filter(([, field]) => selectList.includes(`"${field}"`))
-        .map(([attributeName]) => attributeName)
-        .sort()
+/** Extract every projected column from these storage read queries, ignoring output aliases. */
+function selectedColumns(sql: string): string[] {
+    const selectList = /^\s*SELECT\s+([\s\S]+?)\s+FROM\b/i.exec(sql)?.[1]
+    expect(selectList, sql).toBeDefined()
+    return selectList!.split(',').map(item => {
+        const column = /^"[^"]+"\."([^"]+)"\s+AS\s+"[^"]+"$/i.exec(item.trim())
+        return column?.[1] ?? item.trim()
+    }).sort()
 }
 
 /** The value re-read that `atomic.lockRecord(recordName, ...)` issues right after its FOR UPDATE. */
@@ -59,7 +60,9 @@ function lockRecordReReads(recorded: RecordedQuery[], recordName: string): Recor
     const result: RecordedQuery[] = []
     recorded.forEach((query, index) => {
         if (query.name === `atomic lockRecord ${recordName}` && /FOR UPDATE/.test(query.sql)) {
-            result.push(recorded[index + 1])
+            const reRead = recorded[index + 1]
+            expect(reRead?.name).toBe(`finding ${recordName} from handle`)
+            result.push(reRead)
         }
     })
     return result
@@ -138,17 +141,6 @@ describe('property StateMachine transition reads only the columns it consumes fr
             // computeValue of the initial state runs at creation: the counter starts at 1.
             const created = await system.storage.findOne(Doc.name, MatchExp.atom({ key: 'id', value: ['=', doc.id] }), undefined, ['publishCount'])
             expect(created.publishCount).toBe(1)
-            const columns = {
-                id: fieldOf(system, Doc.name, 'id'),
-                title: fieldOf(system, Doc.name, 'title'),
-                largeBody: fieldOf(system, Doc.name, 'largeBody'),
-                metadata: fieldOf(system, Doc.name, 'metadata'),
-                status: fieldOf(system, Doc.name, 'status'),
-                publishCount: fieldOf(system, Doc.name, 'publishCount'),
-                statusState: fieldOf(system, Doc.name, '_LockReadDoc_status_bound_currentState'),
-                publishCountState: fieldOf(system, Doc.name, '_LockReadDoc_publishCount_bound_currentState'),
-            }
-
             const { recorded, restore } = recordQueries(db)
             const first = await controller.dispatch(Publish, { user: { id: 'u1' }, payload: { docId: doc.id } })
             restore()
@@ -157,11 +149,12 @@ describe('property StateMachine transition reads only the columns it consumes fr
             const reReads = lockRecordReReads(recorded, Doc.name)
             // One locked re-read per transitioned property (status, publishCount).
             expect(reReads).toHaveLength(2)
-            const readSets = reReads.map(query => selectedColumns(query.sql, columns)).sort((a, b) => a.join().localeCompare(b.join()))
-            expect(readSets).toEqual([
-                ['id', 'publishCount', 'publishCountState'],
-                ['id', 'status', 'statusState'],
-            ])
+            const readSets = reReads.map(query => selectedColumns(query.sql)).sort((a, b) => a.join().localeCompare(b.join()))
+            const expectedReadSets = [
+                mappedColumns(system, Doc.name, ['id', 'publishCount', '_LockReadDoc_publishCount_bound_currentState']),
+                mappedColumns(system, Doc.name, ['id', 'status', '_LockReadDoc_status_bound_currentState']),
+            ].sort((a, b) => a.join().localeCompare(b.join()))
+            expect(readSets).toEqual(expectedReadSets)
 
             // Transition results: draft -> published; computeValue received the previous value.
             let stored = await system.storage.findOne(Doc.name, MatchExp.atom({ key: 'id', value: ['=', doc.id] }), undefined, ['*'])
@@ -231,13 +224,6 @@ describe('property StateMachine transition reads only the columns it consumes fr
             const member = await system.storage.create(Member.name, { name: 'm', groups: [{ id: group.id, '&': { note: 'n'.repeat(2048) } }] })
             const [link] = await system.storage.find(membershipName, MatchExp.atom({ key: 'source.id', value: ['=', member.id] }), undefined, ['id', 'note', 'phase'])
             expect(link.phase).toBe('active')
-            const columns = {
-                id: fieldOf(system, membershipName, 'id'),
-                note: fieldOf(system, membershipName, 'note'),
-                phase: fieldOf(system, membershipName, 'phase'),
-                phaseState: fieldOf(system, membershipName, `_${membershipName}_phase_bound_currentState`),
-            }
-
             const { recorded, restore } = recordQueries(db)
             const response = await controller.dispatch(End, { user: { id: 'u1' }, payload: { membershipId: link.id } })
             restore()
@@ -245,7 +231,11 @@ describe('property StateMachine transition reads only the columns it consumes fr
 
             const reReads = lockRecordReReads(recorded, membershipName)
             expect(reReads).toHaveLength(1)
-            expect(selectedColumns(reReads[0].sql, columns)).toEqual(['id', 'phase', 'phaseState'])
+            expect.soft(selectedColumns(reReads[0].sql)).toEqual(
+                mappedColumns(system, membershipName, ['id', 'phase', `_${membershipName}_phase_bound_currentState`])
+            )
+            const relatedLocks = recorded.filter(query => query.name.startsWith(`atomic lockRecord ${membershipName} related `))
+            expect(relatedLocks).toEqual([])
 
             const [after] = await system.storage.find(membershipName, MatchExp.atom({ key: 'id', value: ['=', link.id] }), undefined, ['id', 'note', 'phase'])
             expect(after.phase).toBe('ended')
@@ -291,14 +281,6 @@ describe('data-based Transform update path reads only id and the transform index
             let derived = await system.storage.find(Derived.name, undefined, undefined, ['derivedLabel'])
             expect(derived.map(row => row.derivedLabel).sort()).toEqual(['a#0', 'a#1'])
 
-            const columns = {
-                id: fieldOf(system, Derived.name, 'id'),
-                derivedLabel: fieldOf(system, Derived.name, 'derivedLabel'),
-                derivedPayload: fieldOf(system, Derived.name, 'derivedPayload'),
-                transformIndex: fieldOf(system, Derived.name, `_${Derived.name}_bound_transformIndex`),
-                sourceRecordId: fieldOf(system, Derived.name, `_${Derived.name}_bound_sourceRecordId`),
-            }
-
             const { recorded, restore } = recordQueries(db)
             await system.storage.update(Source.name, MatchExp.atom({ key: 'id', value: ['=', source.id] }), { label: 'b', value: 3 })
             restore()
@@ -310,13 +292,13 @@ describe('data-based Transform update path reads only id and the transform index
             const lockRowsReads = recorded.slice(lockIndex)
                 .filter(query => query.name === `finding ${Derived.name} from handle`)
             expect(lockRowsReads.length).toBeGreaterThan(0)
-            const readSets = lockRowsReads.map(query => selectedColumns(query.sql, columns))
+            const readSets = lockRowsReads.map(query => selectedColumns(query.sql))
+            const idColumns = mappedColumns(system, Derived.name, ['id'])
+            const resultColumns = mappedColumns(system, Derived.name, ['id', `_${Derived.name}_bound_transformIndex`])
             for (const readSet of readSets) {
-                expect(readSet).not.toContain('derivedLabel')
-                expect(readSet).not.toContain('derivedPayload')
+                expect([idColumns, resultColumns]).toContainEqual(readSet)
             }
-            // The read returned to the handle (the match on sourceRecordId is in WHERE, not selected).
-            expect(readSets).toContainEqual(['id', 'transformIndex'])
+            expect(readSets).toContainEqual(resultColumns)
 
             derived = await system.storage.find(Derived.name, undefined, undefined, ['derivedLabel', 'derivedPayload'])
             expect(derived).toHaveLength(1)
